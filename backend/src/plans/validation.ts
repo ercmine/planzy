@@ -1,0 +1,131 @@
+import { ValidationError } from "./errors.js";
+import type { Category, PriceLevel, SearchPlansInput, TimeWindow } from "./types.js";
+
+const MIN_RADIUS_METERS = 100;
+const MAX_RADIUS_METERS = 50_000;
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
+const MAX_TIME_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+export interface SearchPlansInputNormalized {
+  location: { lat: number; lng: number };
+  radiusMeters: number;
+  timeWindow?: TimeWindow;
+  categories?: Category[];
+  priceLevelMax?: PriceLevel;
+  openNow?: boolean;
+  limit: number;
+  cursor: string | null;
+  locale?: string;
+}
+
+export function validateSearchPlansInput(input: SearchPlansInput): SearchPlansInputNormalized {
+  const details: string[] = [];
+
+  if (!input || typeof input !== "object") {
+    throw new ValidationError(["input must be an object"]);
+  }
+
+  const latCandidate = input.location?.lat;
+  const lngCandidate = input.location?.lng;
+  const hasValidLat =
+    typeof latCandidate === "number" && Number.isFinite(latCandidate) && latCandidate >= -90 && latCandidate <= 90;
+  const hasValidLng =
+    typeof lngCandidate === "number" && Number.isFinite(lngCandidate) && lngCandidate >= -180 && lngCandidate <= 180;
+
+  if (!hasValidLat) {
+    details.push("location.lat must be a number between -90 and 90");
+  }
+  if (!hasValidLng) {
+    details.push("location.lng must be a number between -180 and 180");
+  }
+
+  let radiusMeters = input.radiusMeters;
+  if (typeof radiusMeters !== "number" || Number.isNaN(radiusMeters) || !Number.isFinite(radiusMeters)) {
+    details.push("radiusMeters must be a finite number");
+    radiusMeters = MIN_RADIUS_METERS;
+  } else {
+    radiusMeters = Math.max(MIN_RADIUS_METERS, Math.min(MAX_RADIUS_METERS, Math.round(radiusMeters)));
+  }
+
+  let limit = input.limit ?? DEFAULT_LIMIT;
+  if (typeof limit !== "number" || Number.isNaN(limit) || !Number.isFinite(limit)) {
+    details.push("limit must be a finite number");
+    limit = DEFAULT_LIMIT;
+  }
+  limit = Math.max(1, Math.min(MAX_LIMIT, Math.round(limit)));
+
+  const cursor = input.cursor ?? null;
+  if (cursor !== null && typeof cursor !== "string") {
+    details.push("cursor must be a string or null");
+  }
+
+  if (input.timeWindow !== undefined) {
+    const startMs = Date.parse(input.timeWindow.start);
+    const endMs = Date.parse(input.timeWindow.end);
+    if (Number.isNaN(startMs)) {
+      details.push("timeWindow.start must be a valid ISO 8601 string");
+    }
+    if (Number.isNaN(endMs)) {
+      details.push("timeWindow.end must be a valid ISO 8601 string");
+    }
+    if (!Number.isNaN(startMs) && !Number.isNaN(endMs)) {
+      if (startMs >= endMs) {
+        details.push("timeWindow.start must be earlier than timeWindow.end");
+      }
+      if (endMs - startMs > MAX_TIME_WINDOW_MS) {
+        details.push("timeWindow must not exceed 14 days");
+      }
+    }
+  }
+
+  if (input.categories !== undefined) {
+    if (!Array.isArray(input.categories)) {
+      details.push("categories must be an array");
+    } else {
+      const seen = new Set<string>();
+      for (const rawCategory of input.categories) {
+        if (typeof rawCategory !== "string" || rawCategory.trim().length === 0) {
+          details.push("categories must contain non-empty strings");
+          break;
+        }
+        if (seen.has(rawCategory)) {
+          details.push("categories must not contain duplicates");
+          break;
+        }
+        seen.add(rawCategory);
+      }
+    }
+  }
+
+  if (input.priceLevelMax !== undefined) {
+    const price = input.priceLevelMax;
+    if (typeof price !== "number" || !Number.isInteger(price) || price < 0 || price > 4) {
+      details.push("priceLevelMax must be an integer between 0 and 4");
+    }
+  }
+
+  if (input.openNow !== undefined && typeof input.openNow !== "boolean") {
+    details.push("openNow must be a boolean");
+  }
+
+  if (input.locale !== undefined && (typeof input.locale !== "string" || input.locale.trim() === "")) {
+    details.push("locale must be a non-empty string");
+  }
+
+  if (details.length > 0) {
+    throw new ValidationError(details);
+  }
+
+  return {
+    location: { lat: latCandidate, lng: lngCandidate },
+    radiusMeters,
+    timeWindow: input.timeWindow,
+    categories: input.categories,
+    priceLevelMax: input.priceLevelMax,
+    openNow: input.openNow,
+    limit,
+    cursor,
+    locale: input.locale
+  };
+}
