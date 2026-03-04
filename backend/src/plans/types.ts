@@ -1,16 +1,6 @@
-export type Category =
-  | "food"
-  | "drinks"
-  | "coffee"
-  | "outdoors"
-  | "movies"
-  | "music"
-  | "shopping"
-  | "wellness"
-  | "sports"
-  | "other";
+import type { Category, Plan, PriceLevel } from "./plan.js";
 
-export type PriceLevel = 0 | 1 | 2 | 3 | 4;
+export type { Category, PriceLevel } from "./plan.js";
 
 export interface TimeWindow {
   start: string;
@@ -34,45 +24,10 @@ export interface SearchPlansInput {
   locale?: string;
 }
 
-export interface PlanDeepLinks {
-  maps?: string;
-  website?: string;
-  call?: string;
-  booking?: string;
-  ticket?: string;
-}
-
-export interface NormalizedPlan {
-  id: string;
-  source: string;
-  sourceId: string;
-  title: string;
-  category: Category;
-  description?: string;
-  location: {
-    lat: number;
-    lng: number;
-    address?: string;
-  };
-  distanceMeters?: number;
-  priceLevel?: PriceLevel;
-  rating?: number;
-  reviewCount?: number;
-  photos?: Array<{
-    url: string;
-    width?: number;
-    height?: number;
-  }>;
-  hours?: {
-    openNow?: boolean;
-    weekdayText?: string[];
-  };
-  deepLinks?: PlanDeepLinks;
-  metadata?: Record<string, unknown>;
-}
+export type NormalizedPlan = Plan;
 
 export interface SearchPlansResult {
-  plans: NormalizedPlan[];
+  plans: Plan[];
   nextCursor?: string | null;
   source: string;
   debug?: {
