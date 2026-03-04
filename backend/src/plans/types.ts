@@ -35,3 +35,5 @@ export interface SearchPlansResult {
     returned: number;
   };
 }
+
+export type { NormalizeOptions } from "./normalization/normalize.js";
