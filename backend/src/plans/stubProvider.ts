@@ -1,7 +1,8 @@
 import { ValidationError } from "./errors.js";
 import type { PlanProvider, ProviderContext } from "./provider.js";
-import { makePlanId } from "./provider.js";
-import type { Category, NormalizedPlan, SearchPlansInput, SearchPlansResult } from "./types.js";
+import { planId, type Category, type Plan } from "./plan.js";
+import { validatePlanArray } from "./planValidation.js";
+import type { SearchPlansInput, SearchPlansResult } from "./types.js";
 import { validateSearchPlansInput } from "./validation.js";
 
 interface StubRecord {
@@ -104,8 +105,8 @@ export class StubProvider implements PlanProvider {
     const nextOffset = offset + paged.length;
     const nextCursor = nextOffset < filtered.length ? encodeCursor(nextOffset) : null;
 
-    const plans: NormalizedPlan[] = paged.map(({ record, distanceMeters }) => ({
-      id: makePlanId(this.name, record.sourceId),
+    const plans: Plan[] = paged.map(({ record, distanceMeters }) => ({
+      id: planId(this.name, record.sourceId),
       source: this.name,
       sourceId: record.sourceId,
       title: record.title,
@@ -117,13 +118,15 @@ export class StubProvider implements PlanProvider {
       hours: record.hours
     }));
 
+    const validatedPlans = validatePlanArray(plans);
+
     return {
-      plans,
+      plans: validatedPlans,
       nextCursor,
       source: this.name,
       debug: {
         tookMs: Date.now() - started,
-        returned: plans.length
+        returned: validatedPlans.length
       }
     };
   }
