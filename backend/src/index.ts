@@ -12,3 +12,7 @@ export * from "./plans/normalization/urls.js";
 export * from "./plans/normalization/normalize.js";
 export * from "./plans/normalization/providers/placesLike.js";
 export * from "./plans/normalization/providers/eventsLike.js";
+export * from "./plans/router/routerTypes.js";
+export * from "./plans/router/dedupe.js";
+export * from "./plans/router/ranking.js";
+export * from "./plans/router/providerRouter.js";

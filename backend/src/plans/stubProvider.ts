@@ -1,4 +1,4 @@
-import { ValidationError } from "./errors.js";
+import { ProviderError, ValidationError } from "./errors.js";
 import type { PlanProvider, ProviderContext } from "./provider.js";
 import { planId, type Category, type Plan } from "./plan.js";
 import { validatePlanArray } from "./planValidation.js";
@@ -64,42 +64,61 @@ export class StubProvider implements PlanProvider {
   public async searchPlans(input: SearchPlansInput, ctx?: ProviderContext): Promise<SearchPlansResult> {
     const started = Date.now();
     if (ctx?.signal?.aborted) {
-      throw new Error("AbortError");
+      throw new ProviderError({
+        provider: this.name,
+        code: "ABORTED",
+        message: "Provider request was aborted",
+        retryable: true,
+        cause: ctx.signal.reason
+      });
     }
 
     const normalized = validateSearchPlansInput(input);
     const offset = decodeCursor(normalized.cursor);
 
-    const filtered = STUB_DATA.map((record) => {
+    const filtered: Array<{ record: StubRecord; distanceMeters: number }> = [];
+
+    for (const record of STUB_DATA) {
+      if (ctx?.signal?.aborted) {
+        throw new ProviderError({
+          provider: this.name,
+          code: "ABORTED",
+          message: "Provider request was aborted",
+          retryable: true,
+          cause: ctx.signal.reason
+        });
+      }
+
       const distanceMeters = haversineMeters(
         normalized.location.lat,
         normalized.location.lng,
         record.location.lat,
         record.location.lng
       );
-      return { record, distanceMeters };
-    })
-      .filter((entry) => entry.distanceMeters <= normalized.radiusMeters)
-      .filter((entry) => {
-        if (!normalized.categories || normalized.categories.length === 0) {
-          return true;
+
+      if (distanceMeters > normalized.radiusMeters) {
+        continue;
+      }
+
+      if (normalized.categories && normalized.categories.length > 0 && !normalized.categories.includes(record.category)) {
+        continue;
+      }
+
+      if (normalized.priceLevelMax !== undefined) {
+        const price = record.priceLevel ?? 0;
+        if (price > normalized.priceLevelMax) {
+          continue;
         }
-        return normalized.categories.includes(entry.record.category);
-      })
-      .filter((entry) => {
-        if (normalized.priceLevelMax === undefined) {
-          return true;
-        }
-        const price = entry.record.priceLevel ?? 0;
-        return price <= normalized.priceLevelMax;
-      })
-      .filter((entry) => {
-        if (normalized.openNow === undefined) {
-          return true;
-        }
-        return entry.record.hours?.openNow === normalized.openNow;
-      })
-      .sort((a, b) => a.distanceMeters - b.distanceMeters);
+      }
+
+      if (normalized.openNow !== undefined && record.hours?.openNow !== normalized.openNow) {
+        continue;
+      }
+
+      filtered.push({ record, distanceMeters });
+    }
+
+    filtered.sort((a, b) => a.distanceMeters - b.distanceMeters);
 
     const paged = filtered.slice(offset, offset + normalized.limit);
     const nextOffset = offset + paged.length;
