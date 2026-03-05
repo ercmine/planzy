@@ -16,3 +16,4 @@ export * from "./plans/router/routerTypes.js";
 export * from "./plans/router/dedupe.js";
 export * from "./plans/router/ranking.js";
 export * from "./plans/router/providerRouter.js";
+export * from "./config/index.js";

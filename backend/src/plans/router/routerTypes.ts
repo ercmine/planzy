@@ -1,5 +1,6 @@
 import type { Plan } from "../plan.js";
 import type { PlanProvider } from "../provider.js";
+import type { AppConfig } from "../../config/schema.js";
 
 export interface ProviderRouterOptions {
   providers: PlanProvider[];
@@ -8,6 +9,7 @@ export interface ProviderRouterOptions {
   maxFanout?: number;
   allowPartial?: boolean;
   includeDebug?: boolean;
+  config?: AppConfig;
 }
 
 export interface ProviderCallDebug {

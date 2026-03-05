@@ -39,3 +39,5 @@ export interface SearchPlansResult {
 export type { NormalizeOptions } from "./normalization/normalize.js";
 
 export type { RouterSearchResult } from "./router/routerTypes.js";
+
+export type { AppConfig, PlansRouterConfig, ProviderConfig, ProviderName } from "../config/schema.js";
