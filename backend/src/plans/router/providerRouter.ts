@@ -10,6 +10,7 @@ import { rankPlansAdvanced } from "./ranking.js";
 import { applyColdStartBooster } from "./coldStartBooster.js";
 import type { NeverEmptyOptions } from "./fallbackTypes.js";
 import type { ProviderCallDebug, ProviderRouterOptions, RouterSearchResult } from "./routerTypes.js";
+import { DeckBatcher } from "./pagination/deckBatcher.js";
 
 const DEFAULT_TIMEOUT_MS = 2_500;
 const MAX_PROVIDER_QUEUE = 100;
@@ -51,26 +52,6 @@ class ProviderSemaphore {
     this.active = Math.max(0, this.active - 1);
     const next = this.queue.shift();
     next?.();
-  }
-}
-
-function encodeCursor(offset: number): string {
-  return Buffer.from(JSON.stringify({ offset }), "utf8").toString("base64");
-}
-
-function decodeCursor(cursor: string | null | undefined): number {
-  if (!cursor) {
-    return 0;
-  }
-
-  try {
-    const parsed = JSON.parse(Buffer.from(cursor, "base64").toString("utf8")) as { offset?: unknown };
-    if (typeof parsed.offset !== "number" || !Number.isInteger(parsed.offset) || parsed.offset < 0) {
-      return 0;
-    }
-    return parsed.offset;
-  } catch {
-    return 0;
   }
 }
 
@@ -141,6 +122,7 @@ export class ProviderRouter {
   private readonly config?: AppConfig;
   private readonly semaphores = new Map<ProviderName, ProviderSemaphore>();
   private readonly neverEmpty: NeverEmptyOptions;
+  private readonly deckBatcher: DeckBatcher;
 
   constructor(opts: ProviderRouterOptions) {
     this.providers = opts.providers;
@@ -160,6 +142,7 @@ export class ProviderRouter {
     this.allowPartial = opts.allowPartial ?? this.config?.plans.router.allowPartial ?? true;
     this.includeDebug = opts.includeDebug ?? false;
     this.neverEmpty = opts.neverEmpty ?? {};
+    this.deckBatcher = new DeckBatcher();
 
     for (const provider of this.providers) {
       const maxConcurrent = this.config?.plans.providers[provider.name]?.budget?.maxConcurrent ?? Number.POSITIVE_INFINITY;
@@ -283,14 +266,15 @@ export class ProviderRouter {
       { includeDebug: this.includeDebug }
     );
 
-    const offset = decodeCursor(normalizedInput.cursor);
-    const plans = boosted.plans.slice(offset, offset + normalizedInput.limit);
-    const nextOffset = offset + plans.length;
-    const nextCursor = nextOffset < boosted.plans.length ? encodeCursor(nextOffset) : null;
+    const batchResult = this.deckBatcher.batch(boosted.plans, {
+      cursor: normalizedInput.cursor,
+      requestedBatchSize: normalizedInput.limit,
+      sessionId: ctx?.sessionId
+    });
 
     const response: RouterSearchResult = {
-      plans,
-      nextCursor,
+      plans: batchResult.items,
+      nextCursor: batchResult.nextCursor,
       sources: fanoutProviders.map((provider) => provider.name)
       // TODO: wire quotas and costs against provider budgets.
     };

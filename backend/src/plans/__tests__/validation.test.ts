@@ -41,7 +41,18 @@ describe("validateSearchPlansInput", () => {
       limit: 999
     });
 
-    expect(result.limit).toBe(200);
+    expect(result.limit).toBe(100);
+  });
+
+
+  it("supports batchSize alias", () => {
+    const result = validateSearchPlansInput({
+      location: { lat: 37.77, lng: -122.41 },
+      radiusMeters: 1200,
+      batchSize: 35
+    } as never);
+
+    expect(result.limit).toBe(35);
   });
 
   it("rejects invalid timeWindow values", () => {

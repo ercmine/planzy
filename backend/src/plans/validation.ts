@@ -4,7 +4,7 @@ import type { Category, PriceLevel, SearchPlansInput, TimeWindow } from "./types
 const MIN_RADIUS_METERS = 100;
 const MAX_RADIUS_METERS = 50_000;
 const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
+const MAX_LIMIT = 100;
 const MAX_TIME_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
 export interface SearchPlansInputNormalized {
@@ -25,6 +25,8 @@ export function validateSearchPlansInput(input: SearchPlansInput): SearchPlansIn
   if (!input || typeof input !== "object") {
     throw new ValidationError(["input must be an object"]);
   }
+
+  const rawInput = input as SearchPlansInput & { batchSize?: unknown };
 
   const latCandidate = input.location?.lat;
   const lngCandidate = input.location?.lng;
@@ -48,12 +50,16 @@ export function validateSearchPlansInput(input: SearchPlansInput): SearchPlansIn
     radiusMeters = Math.max(MIN_RADIUS_METERS, Math.min(MAX_RADIUS_METERS, Math.round(radiusMeters)));
   }
 
-  let limit = input.limit ?? DEFAULT_LIMIT;
-  if (typeof limit !== "number" || Number.isNaN(limit) || !Number.isFinite(limit)) {
-    details.push("limit must be a finite number");
+  const rawLimit = rawInput.batchSize ?? input.limit;
+  let limit = DEFAULT_LIMIT;
+  if (rawLimit === undefined) {
     limit = DEFAULT_LIMIT;
+  } else if (typeof rawLimit !== "number" || Number.isNaN(rawLimit) || !Number.isFinite(rawLimit)) {
+    details.push("limit must be a finite number");
+  } else {
+    limit = Math.round(rawLimit);
   }
-  limit = Math.max(1, Math.min(MAX_LIMIT, Math.round(limit)));
+  limit = Math.max(1, Math.min(MAX_LIMIT, limit));
 
   const cursor = input.cursor ?? null;
   if (cursor !== null && typeof cursor !== "string") {
