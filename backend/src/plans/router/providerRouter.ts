@@ -1,4 +1,6 @@
 import type { AppConfig, ProviderName } from "../../config/schema.js";
+import { defaultLogger } from "../../logging/logger.js";
+import { coarseGeo, hashString } from "../../logging/redact.js";
 import { ProviderError, RateLimitError, TimeoutError } from "../errors.js";
 import { isAbortError, type ProviderContext } from "../provider.js";
 import { validatePlanArray } from "../planValidation.js";
@@ -116,6 +118,21 @@ function getPrimaryCategory(input: SearchPlansInput): Category | undefined {
   return input.categories?.[0];
 }
 
+function getSessionHint(sessionId: string | undefined): string | undefined {
+  if (!sessionId) {
+    return undefined;
+  }
+  return hashString(sessionId);
+}
+
+function getGeoCell(input: SearchPlansInput): { cell: string } | undefined {
+  const { location } = input;
+  if (!location) {
+    return undefined;
+  }
+  return coarseGeo(location.lat, location.lng);
+}
+
 function formatRetryAfterMs(retryAfterMs: number | undefined): string {
   if (retryAfterMs === undefined || !Number.isFinite(retryAfterMs)) {
     return "Retry later.";
@@ -195,8 +212,34 @@ export class ProviderRouter {
     const normalizedInput = validateSearchPlansInput(input);
     const cachedDeck = this.planSearchCache.get(normalizedInput, ctx);
     const cacheHit = cachedDeck !== null;
+    const logger = ctx?.logger ?? defaultLogger;
 
     if (cacheHit) {
+      logger.info("provider_request_start", {
+        requestId: ctx?.requestId,
+        provider: "cache",
+        module: "providerRouter",
+        geo: getGeoCell(normalizedInput),
+        radiusMeters: normalizedInput.radiusMeters,
+        categories: normalizedInput.categories ?? [],
+        openNow: normalizedInput.openNow,
+        priceLevelMax: normalizedInput.priceLevelMax,
+        hasTimeWindow: normalizedInput.timeWindow !== undefined,
+        timeoutMs: 0,
+        cacheHit: true,
+        sessionHash: getSessionHint(ctx?.sessionId)
+      });
+
+      logger.info("provider_request_end", {
+        requestId: ctx?.requestId,
+        provider: "cache",
+        module: "providerRouter",
+        ok: true,
+        tookMs: Date.now() - started,
+        returned: cachedDeck.length,
+        retryable: false,
+        cacheHit: true
+      });
       const batchResult = this.deckBatcher.batch(cachedDeck, {
         cursor: normalizedInput.cursor,
         requestedBatchSize: normalizedInput.limit,
@@ -250,6 +293,25 @@ export class ProviderRouter {
             `Provider quota exceeded (${reason}). ${formatRetryAfterMs(decision.retryAfterMs)}`
           );
 
+          logger.warn("provider_request_skipped", {
+            requestId: ctx?.requestId,
+            provider: provider.name,
+            module: "providerRouter",
+            reason: "quota",
+            retryAfterMs: decision.retryAfterMs,
+            sessionHash: getSessionHint(ctx?.sessionId)
+          });
+          logger.warn("provider_request_end", {
+            requestId: ctx?.requestId,
+            provider: provider.name,
+            module: "providerRouter",
+            ok: false,
+            tookMs: Date.now() - callStarted,
+            returned: 0,
+            skippedReason: "quota",
+            retryable: true
+          });
+
           providerErrors.push({ provider: provider.name, error: quotaError });
           callsDebug.push({
             provider: provider.name,
@@ -284,6 +346,25 @@ export class ProviderRouter {
             retryable: true
           });
 
+          logger.warn("provider_request_skipped", {
+            requestId: ctx?.requestId,
+            provider: provider.name,
+            module: "providerRouter",
+            reason: "health",
+            retryAfterMs,
+            sessionHash: getSessionHint(ctx?.sessionId)
+          });
+          logger.warn("provider_request_end", {
+            requestId: ctx?.requestId,
+            provider: provider.name,
+            module: "providerRouter",
+            ok: false,
+            tookMs: Date.now() - callStarted,
+            returned: 0,
+            skippedReason: "health",
+            retryable: true
+          });
+
           providerErrors.push({ provider: provider.name, error: healthError });
           callsDebug.push({
             provider: provider.name,
@@ -305,6 +386,21 @@ export class ProviderRouter {
         }
       }
 
+      logger.info("provider_request_start", {
+        requestId: ctx?.requestId,
+        provider: provider.name,
+        module: "providerRouter",
+        geo: getGeoCell(normalizedInput),
+        radiusMeters: normalizedInput.radiusMeters,
+        categories: normalizedInput.categories ?? [],
+        openNow: normalizedInput.openNow,
+        priceLevelMax: normalizedInput.priceLevelMax,
+        hasTimeWindow: normalizedInput.timeWindow !== undefined,
+        timeoutMs,
+        cacheHit: false,
+        sessionHash: getSessionHint(ctx?.sessionId)
+      });
+
       const combined = createCombinedController(ctx?.signal, timeoutMs);
       const semaphore = this.semaphores.get(provider.name) ?? new ProviderSemaphore(Number.POSITIVE_INFINITY);
       let release: (() => void) | undefined;
@@ -313,6 +409,17 @@ export class ProviderRouter {
         release = await semaphore.acquire();
       } catch (error) {
         const budgetError = asProviderError(provider.name, error);
+        logger.warn("provider_request_end", {
+          requestId: ctx?.requestId,
+          provider: provider.name,
+          module: "providerRouter",
+          ok: false,
+          tookMs: Date.now() - callStarted,
+          returned: 0,
+          errorCode: budgetError.code,
+          retryable: budgetError.retryable
+        });
+
         providerErrors.push({ provider: provider.name, error: budgetError });
         callsDebug.push({
           provider: provider.name,
@@ -345,6 +452,16 @@ export class ProviderRouter {
           returned: result.plans.length
         });
 
+        logger.info("provider_request_end", {
+          requestId: ctx?.requestId,
+          provider: provider.name,
+          module: "providerRouter",
+          ok: true,
+          tookMs,
+          returned: result.plans.length,
+          retryable: false
+        });
+
         if (this.enforceHealth) {
           this.healthMonitor.record({
             provider: provider.name,
@@ -371,6 +488,17 @@ export class ProviderRouter {
             message: wrapped.message,
             retryable: wrapped.retryable
           }
+        });
+
+        logger.warn("provider_request_end", {
+          requestId: ctx?.requestId,
+          provider: provider.name,
+          module: "providerRouter",
+          ok: false,
+          tookMs,
+          returned: 0,
+          errorCode: wrapped.code,
+          retryable: wrapped.retryable
         });
 
         if (this.enforceHealth) {
