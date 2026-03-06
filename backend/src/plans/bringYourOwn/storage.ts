@@ -1,5 +1,6 @@
 import type { Category, PriceLevel } from "../types.js";
 import { ValidationError } from "../errors.js";
+import { sanitizeText } from "../../sanitize/text.js";
 
 export interface UserIdeaInput {
   title: string;
@@ -52,10 +53,24 @@ export function validateUserIdeaInput(input: UserIdeaInput): UserIdeaInput {
     throw new ValidationError(details);
   }
 
+  const title = sanitizeText(input.title, {
+    source: "user",
+    maxLen: 140,
+    allowNewlines: false
+  });
+
+  if (!title) {
+    throw new ValidationError(["title must be a non-empty string"]);
+  }
+
   return {
     ...input,
-    title: input.title.trim(),
-    description: input.description?.trim() || undefined,
+    title,
+    description: sanitizeText(input.description, {
+      source: "user",
+      maxLen: 400,
+      allowNewlines: true
+    }),
     website: input.website?.trim() || undefined,
     phone: input.phone?.trim() || undefined
   };

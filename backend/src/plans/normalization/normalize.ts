@@ -8,6 +8,7 @@ import { mapProviderCategory } from "./categoryMap.js";
 import { normalizePriceLevel } from "./price.js";
 import { buildMapsLink, normalizeBookingUrl, normalizeHttpUrl, normalizeTelUrl, normalizeTicketUrl, normalizeWebsiteUrl } from "./urls.js";
 import { normalizeDeepLinks } from "../deeplinks/deepLinkNormalize.js";
+import { sanitizeText } from "../../sanitize/text.js";
 
 export interface NormalizeOptions {
   provider: string;
@@ -110,7 +111,16 @@ function sanitizeMetadataValue(value: unknown, seen: WeakSet<object>): unknown {
   }
 
   const type = typeof value;
-  if (type === "string" || type === "number" || type === "boolean") {
+  if (type === "string") {
+    return sanitizeText(value, {
+      source: "provider",
+      maxLen: 300,
+      allowNewlines: true,
+      profanityMode: "none"
+    });
+  }
+
+  if (type === "number" || type === "boolean") {
     return value;
   }
 
@@ -189,24 +199,67 @@ export function normalizeBasePlan(
   const logger = opts.logger ?? defaultLogger;
   const lat = toNumberSafe(fields.location?.lat);
   const lng = toNumberSafe(fields.location?.lng);
+  const title =
+    sanitizeText(fields.title, {
+      source: "provider",
+      maxLen: 140,
+      allowNewlines: false,
+      profanityMode: "none"
+    }) ?? "";
+
+  if (title.length === 0) {
+    throw new ValidationError(["title is required"]);
+  }
+
+  const providerCategories = Array.isArray(fields.categoryInput?.categories)
+    ? fields.categoryInput.categories
+        .map((entry) =>
+          sanitizeText(entry, {
+            source: "provider",
+            maxLen: 80,
+            allowNewlines: false,
+            profanityMode: "none"
+          })
+        )
+        .filter((entry): entry is string => entry !== undefined)
+    : undefined;
+
+  const primaryCategory = sanitizeText(fields.categoryInput?.primary, {
+    source: "provider",
+    maxLen: 80,
+    allowNewlines: false,
+    profanityMode: "none"
+  });
+
+  const sanitizedAddress = sanitizeText(fields.location?.address, {
+    source: "provider",
+    maxLen: 200,
+    allowNewlines: true,
+    profanityMode: "none"
+  });
 
   const plan: Plan = {
     id: planId(opts.provider, opts.sourceId),
     source: opts.provider,
     sourceId: opts.sourceId,
-    title: toStringSafe(fields.title) ?? "",
+    title,
     category: mapProviderCategory(opts.provider, {
-      categories: toStringArray(fields.categoryInput?.categories),
-      primary: toStringSafe(fields.categoryInput?.primary) ?? null
+      categories: providerCategories,
+      primary: primaryCategory ?? null
     }),
     location: {
       lat: lat ?? Number.NaN,
       lng: lng ?? Number.NaN,
-      address: toStringSafe(fields.location?.address)
+      address: sanitizedAddress
     }
   };
 
-  const description = toStringSafe(fields.description);
+  const description = sanitizeText(fields.description, {
+    source: "provider",
+    maxLen: 400,
+    allowNewlines: true,
+    profanityMode: "none"
+  });
   if (description) {
     plan.description = description;
   }
@@ -237,12 +290,24 @@ export function normalizeBasePlan(
   }
 
   const openNow = typeof fields.hoursOpenNow === "boolean" ? fields.hoursOpenNow : undefined;
-  const weekdayText = toStringArray(fields.hoursWeekdayText);
-  if (openNow !== undefined || weekdayText) {
-    plan.hours = { openNow, weekdayText };
+  const weekdayText = Array.isArray(fields.hoursWeekdayText)
+    ? fields.hoursWeekdayText
+        .map((entry) =>
+          sanitizeText(entry, {
+            source: "provider",
+            maxLen: 120,
+            allowNewlines: false,
+            profanityMode: "none"
+          })
+        )
+        .filter((entry): entry is string => entry !== undefined)
+    : undefined;
+  const normalizedWeekdayText = weekdayText && weekdayText.length > 0 ? weekdayText : undefined;
+  if (openNow !== undefined || normalizedWeekdayText) {
+    plan.hours = { openNow, weekdayText: normalizedWeekdayText };
   }
 
-  const maps = lat !== undefined && lng !== undefined ? buildMapsLink(lat, lng, toStringSafe(fields.title)) : undefined;
+  const maps = lat !== undefined && lng !== undefined ? buildMapsLink(lat, lng, title) : undefined;
   const websiteLink = normalizeWebsiteUrl(fields.website);
   const callLink = normalizeTelUrl(fields.phone);
   const bookingLink = normalizeBookingUrl(fields.booking);

@@ -64,3 +64,5 @@ export * from "./merchant/index.js";
 export * from "./policy/index.js";
 
 export * from "./retention/index.js";
+
+export * from "./sanitize/index.js";
