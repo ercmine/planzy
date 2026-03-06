@@ -3,6 +3,7 @@ import type { PlanProvider } from "../provider.js";
 import type { AppConfig } from "../../config/schema.js";
 import type { BoosterDebug } from "./boosterTypes.js";
 import type { FallbackDebug, NeverEmptyOptions } from "./fallbackTypes.js";
+import type { QuotaManager } from "./quotas/quotaManager.js";
 
 export interface ProviderRouterOptions {
   providers: PlanProvider[];
@@ -11,6 +12,9 @@ export interface ProviderRouterOptions {
   maxFanout?: number;
   allowPartial?: boolean;
   includeDebug?: boolean;
+  quotaManager?: QuotaManager;
+  enforceQuotas?: boolean;
+  gracefulOnQuota?: boolean;
   config?: AppConfig;
   neverEmpty?: NeverEmptyOptions;
   cache?: {
@@ -24,7 +28,7 @@ export interface ProviderCallDebug {
   provider: string;
   tookMs: number;
   returned: number;
-  error?: { code: string; message: string; retryable?: boolean };
+  error?: { code: string; message: string; retryable?: boolean; retryAfterMs?: number };
 }
 
 export interface RouterDebug {

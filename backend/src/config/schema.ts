@@ -5,12 +5,20 @@ export type ProviderName = string;
 export interface ProviderQuotaConfig {
   requestsPerMinute?: number;
   requestsPerDay?: number;
+  /**
+   * Token bucket capacity for instantaneous spikes.
+   * Defaults to requestsPerMinute when omitted.
+   */
   burst?: number;
 }
 
 export interface ProviderBudgetConfig {
   maxConcurrent?: number;
   timeoutMs?: number;
+  /**
+   * Logical request cost used by router-level quota enforcement.
+   * Defaults to 1.
+   */
   requestCost?: number;
 }
 

@@ -1,5 +1,5 @@
 import type { AppConfig, ProviderName } from "../../config/schema.js";
-import { ProviderError, TimeoutError } from "../errors.js";
+import { ProviderError, RateLimitError, TimeoutError } from "../errors.js";
 import { isAbortError, type ProviderContext } from "../provider.js";
 import { validatePlanArray } from "../planValidation.js";
 import type { Category, SearchPlansInput } from "../types.js";
@@ -12,6 +12,7 @@ import { applyColdStartBooster } from "./coldStartBooster.js";
 import type { NeverEmptyOptions } from "./fallbackTypes.js";
 import type { ProviderCallDebug, ProviderRouterOptions, RouterSearchResult } from "./routerTypes.js";
 import { DeckBatcher } from "./pagination/deckBatcher.js";
+import { QuotaManager } from "./quotas/quotaManager.js";
 
 const DEFAULT_TIMEOUT_MS = 2_500;
 const MAX_PROVIDER_QUEUE = 100;
@@ -113,6 +114,15 @@ function getPrimaryCategory(input: SearchPlansInput): Category | undefined {
   return input.categories?.[0];
 }
 
+function formatRetryAfterMs(retryAfterMs: number | undefined): string {
+  if (retryAfterMs === undefined || !Number.isFinite(retryAfterMs)) {
+    return "Retry later.";
+  }
+
+  const seconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+  return `Retry after ${seconds}s.`;
+}
+
 export class ProviderRouter {
   private readonly providers;
   private readonly defaultTimeoutMs;
@@ -126,6 +136,9 @@ export class ProviderRouter {
   private readonly deckBatcher: DeckBatcher;
   private readonly planSearchCache: PlanSearchCache;
   private readonly optionsCacheTtlMs?: number;
+  private readonly quotaManager: QuotaManager;
+  private readonly enforceQuotas: boolean;
+  private readonly gracefulOnQuota: boolean;
 
   constructor(opts: ProviderRouterOptions) {
     this.providers = opts.providers;
@@ -144,6 +157,9 @@ export class ProviderRouter {
     this.maxFanout = opts.maxFanout ?? this.config?.plans.router.maxFanout;
     this.allowPartial = opts.allowPartial ?? this.config?.plans.router.allowPartial ?? true;
     this.includeDebug = opts.includeDebug ?? false;
+    this.enforceQuotas = opts.enforceQuotas ?? true;
+    this.gracefulOnQuota = opts.gracefulOnQuota ?? true;
+    this.quotaManager = opts.quotaManager ?? new QuotaManager();
     this.neverEmpty = opts.neverEmpty ?? {};
     this.deckBatcher = new DeckBatcher();
     this.optionsCacheTtlMs = opts.cache?.ttlMs;
@@ -159,7 +175,6 @@ export class ProviderRouter {
       this.semaphores.set(provider.name, new ProviderSemaphore(maxConcurrent));
     }
   }
-
 
   private resolveCacheTtlMs(fallbackHit: boolean): number {
     const ttlMs = this.config?.plans.providers.router?.cache?.ttlMs ?? this.optionsCacheTtlMs ?? 30_000;
@@ -208,8 +223,48 @@ export class ProviderRouter {
     const providerErrors: { provider: string; error: unknown }[] = [];
 
     const tasks = fanoutProviders.map(async (provider) => {
+      const providerConfig = (ctx?.config ?? this.config)?.plans.providers[provider.name];
+      const quotaConfig = providerConfig?.quota;
       const timeoutMs = this.perProviderTimeoutMs[provider.name] ?? this.defaultTimeoutMs;
       const callStarted = Date.now();
+
+      if (this.enforceQuotas) {
+        this.quotaManager.configure(provider.name, {
+          requestsPerMinute: quotaConfig?.requestsPerMinute,
+          requestsPerDay: quotaConfig?.requestsPerDay,
+          burst: quotaConfig?.burst,
+          costPerRequest: providerConfig?.budget?.requestCost ?? 1
+        });
+
+        const decision = this.quotaManager.decide(provider.name, providerConfig?.budget?.requestCost ?? 1);
+        if (!decision.allowed) {
+          const reason = decision.reason ?? "rpm";
+          const quotaError = new RateLimitError(
+            provider.name,
+            `Provider quota exceeded (${reason}). ${formatRetryAfterMs(decision.retryAfterMs)}`
+          );
+
+          providerErrors.push({ provider: provider.name, error: quotaError });
+          callsDebug.push({
+            provider: provider.name,
+            tookMs: Date.now() - callStarted,
+            returned: 0,
+            error: {
+              code: "QUOTA_DENIED",
+              message: quotaError.message,
+              retryable: true,
+              retryAfterMs: decision.retryAfterMs
+            }
+          });
+
+          if (!(this.allowPartial && this.gracefulOnQuota)) {
+            throw quotaError;
+          }
+
+          return null;
+        }
+      }
+
       const combined = createCombinedController(ctx?.signal, timeoutMs);
       const semaphore = this.semaphores.get(provider.name) ?? new ProviderSemaphore(Number.POSITIVE_INFINITY);
       let release: (() => void) | undefined;
@@ -329,7 +384,6 @@ export class ProviderRouter {
       plans: batchResult.items,
       nextCursor: batchResult.nextCursor,
       sources: fanoutProviders.map((provider) => provider.name)
-      // TODO: wire quotas and costs against provider budgets.
     };
 
     if (this.includeDebug) {
