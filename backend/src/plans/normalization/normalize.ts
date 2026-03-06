@@ -6,7 +6,8 @@ import { type Plan, planId, type PlanPhoto } from "../plan.js";
 import { validatePlan } from "../planValidation.js";
 import { mapProviderCategory } from "./categoryMap.js";
 import { normalizePriceLevel } from "./price.js";
-import { buildMapsLink, normalizeHttpUrl, normalizeTelUrl } from "./urls.js";
+import { buildMapsLink, normalizeBookingUrl, normalizeHttpUrl, normalizeTelUrl, normalizeTicketUrl, normalizeWebsiteUrl } from "./urls.js";
+import { normalizeDeepLinks } from "../deeplinks/deepLinkNormalize.js";
 
 export interface NormalizeOptions {
   provider: string;
@@ -242,12 +243,13 @@ export function normalizeBasePlan(
   }
 
   const maps = lat !== undefined && lng !== undefined ? buildMapsLink(lat, lng, toStringSafe(fields.title)) : undefined;
-  const website = normalizeHttpUrl(fields.website);
-  const call = normalizeTelUrl(fields.phone);
-  const booking = normalizeHttpUrl(fields.booking);
-  const ticket = normalizeHttpUrl(fields.ticket);
-  if (maps || website || call || booking || ticket) {
-    plan.deepLinks = { maps, website, call, booking, ticket };
+  const websiteLink = normalizeWebsiteUrl(fields.website);
+  const callLink = normalizeTelUrl(fields.phone);
+  const bookingLink = normalizeBookingUrl(fields.booking);
+  const ticketLink = normalizeTicketUrl(fields.ticket);
+  const normalizedDeepLinks = normalizeDeepLinks({ mapsLink: maps, websiteLink, callLink, bookingLink, ticketLink });
+  if (normalizedDeepLinks) {
+    plan.deepLinks = normalizedDeepLinks;
   }
 
   const metadata = normalizeMetadata(fields.metadata);
@@ -269,7 +271,7 @@ export function normalizeBasePlan(
         fieldSummary: {
           hasTitle: toStringSafe(fields.title) !== undefined,
           hasLocation: fields.location !== undefined,
-          hasWebsite: normalizeHttpUrl(fields.website) !== undefined,
+          hasWebsite: normalizeWebsiteUrl(fields.website) !== undefined,
           hasPhone: normalizeTelUrl(fields.phone) !== undefined,
           photosCount: Array.isArray(fields.photos) ? Math.min(fields.photos.length, 1000) : 0
         }

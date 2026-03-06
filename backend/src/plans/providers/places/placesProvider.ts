@@ -356,9 +356,9 @@ export class PlacesProvider implements PlanProvider {
       },
       photos: undefined,
       deepLinks: {
-        website: normalizeHttpUrl(place.websiteUri),
-        maps: normalizeHttpUrl(place.googleMapsUri) ?? buildMapsLink(lat, lng, title),
-        call: normalizeTelUrl(place.internationalPhoneNumber)
+        websiteLink: normalizeHttpUrl(place.websiteUri),
+        mapsLink: normalizeHttpUrl(place.googleMapsUri) ?? buildMapsLink(lat, lng, title),
+        callLink: normalizeTelUrl(place.internationalPhoneNumber)
       },
       metadata: {
         googlePhotoRefs: place.photos?.map((photo) => ({ name: photo.name, widthPx: photo.widthPx, heightPx: photo.heightPx }))
@@ -394,9 +394,9 @@ export class PlacesProvider implements PlanProvider {
       photos: normalizeHttpUrl(business.image_url) ? [{ url: normalizeHttpUrl(business.image_url) as string }] : undefined,
       hours: openNowRequested ? { openNow: true } : undefined,
       deepLinks: {
-        website: normalizeHttpUrl(business.url),
-        maps: buildMapsLink(lat, lng, title),
-        call: normalizeTelUrl(business.display_phone ?? business.phone)
+        websiteLink: normalizeHttpUrl(business.url),
+        mapsLink: buildMapsLink(lat, lng, title),
+        callLink: normalizeTelUrl(business.display_phone ?? business.phone)
       }
     };
   }

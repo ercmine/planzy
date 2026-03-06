@@ -40,7 +40,7 @@ describe("plan validation", () => {
         title: "Bad Link",
         category: "food",
         location: { lat: 37.775, lng: -122.418 },
-        deepLinks: { website: "javascript:alert(1)" }
+        deepLinks: { websiteLink: "javascript:alert(1)" }
       })
     ).toThrowError(ValidationError);
   });

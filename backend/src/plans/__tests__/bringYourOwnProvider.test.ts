@@ -99,8 +99,8 @@ describe("BringYourOwnProvider", () => {
     const result = await provider.searchPlans(baseInput, { sessionId: "session-1" });
     const plan = result.plans[0];
 
-    expect(plan?.deepLinks?.website).toBeUndefined();
-    expect(plan?.deepLinks?.call).toBe("tel:4155551234");
+    expect(plan?.deepLinks?.websiteLink).toBeUndefined();
+    expect(plan?.deepLinks?.callLink).toBe("tel:4155551234");
     expect(() => validatePlanArray(result.plans)).not.toThrow();
   });
 });

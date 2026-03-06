@@ -1,3 +1,5 @@
+import { isSafeCallUrl, isSafeHttpUrl } from "../deeplinks/deepLinkValidation.js";
+
 const MAX_URL_LENGTH = 1000;
 
 function asTrimmedString(input: unknown): string | undefined {
@@ -16,10 +18,8 @@ export function normalizeHttpUrl(url: unknown): string | undefined {
 
   try {
     const parsed = new URL(value);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return undefined;
-    }
-    return parsed.toString();
+    const normalized = parsed.toString();
+    return isSafeHttpUrl(normalized) ? normalized : undefined;
   } catch {
     return undefined;
   }
@@ -27,24 +27,36 @@ export function normalizeHttpUrl(url: unknown): string | undefined {
 
 export function normalizeTelUrl(url: unknown): string | undefined {
   const value = asTrimmedString(url);
-  if (!value) {
+  if (!value || value.length > MAX_URL_LENGTH) {
     return undefined;
   }
 
+  let digits = "";
   if (value.startsWith("tel:")) {
-    const normalized = value.slice(4).replace(/[^+\d]/g, "");
-    if (!normalized) {
-      return undefined;
-    }
-    return `tel:${normalized}`;
+    digits = value.slice(4).replace(/[^\d+]/g, "");
+  } else if (value.startsWith("sms:")) {
+    digits = value.slice(4).replace(/[^\d+]/g, "");
+    const sms = `sms:${digits}`;
+    return isSafeCallUrl(sms) ? sms : undefined;
+  } else {
+    digits = value.replace(/[^\d+]/g, "");
   }
 
-  const digits = value.replace(/[^+\d]/g, "");
-  if (!digits) {
-    return undefined;
-  }
+  const normalizedDigits = digits.startsWith("+") ? `+${digits.slice(1).replace(/\+/g, "")}` : digits.replace(/\+/g, "");
+  const tel = `tel:${normalizedDigits}`;
+  return isSafeCallUrl(tel) ? tel : undefined;
+}
 
-  return `tel:${digits}`;
+export function normalizeBookingUrl(url: unknown): string | undefined {
+  return normalizeHttpUrl(url);
+}
+
+export function normalizeTicketUrl(url: unknown): string | undefined {
+  return normalizeHttpUrl(url);
+}
+
+export function normalizeWebsiteUrl(url: unknown): string | undefined {
+  return normalizeHttpUrl(url);
 }
 
 export function buildMapsLink(lat: number, lng: number, label?: string): string {

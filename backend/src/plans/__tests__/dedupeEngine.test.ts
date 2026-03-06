@@ -32,7 +32,7 @@ describe("dedupeAndMergePlans", () => {
         sourceId: "1",
         title: "Starbucks",
         location: { lat: 37.7749, lng: -122.4194, address: "123 Main Street" },
-        deepLinks: { website: "https://starbucks.com" }
+        deepLinks: { websiteLink: "https://starbucks.com" }
       }),
       makePlan({
         id: "yelp:9",
@@ -40,7 +40,7 @@ describe("dedupeAndMergePlans", () => {
         sourceId: "9",
         title: "Starbucks Coffee",
         location: { lat: 37.77502, lng: -122.41941, address: "123 Main St" },
-        deepLinks: { call: "tel:+14155550123" }
+        deepLinks: { callLink: "tel:+14155550123" }
       })
     ];
 
@@ -48,8 +48,8 @@ describe("dedupeAndMergePlans", () => {
 
     expect(result.plans).toHaveLength(1);
     expect(result.plans[0]?.source).toBe("deduped");
-    expect(result.plans[0]?.deepLinks?.website).toBe("https://starbucks.com");
-    expect(result.plans[0]?.deepLinks?.call).toBe("tel:+14155550123");
+    expect(result.plans[0]?.deepLinks?.websiteLink).toBe("https://starbucks.com");
+    expect(result.plans[0]?.deepLinks?.callLink).toBe("tel:+14155550123");
   });
 
   it("does not merge same name when far apart", () => {
@@ -109,7 +109,7 @@ describe("dedupeAndMergePlans", () => {
         location: { lat: 37.7749, lng: -122.4194, address: "77 Howard St" },
         rating: 4.9,
         reviewCount: 10,
-        deepLinks: { website: "http://cafemocha.example" }
+        deepLinks: { websiteLink: "http://cafemocha.example" }
       }),
       makePlan({
         id: "yelp-a",
@@ -119,7 +119,7 @@ describe("dedupeAndMergePlans", () => {
         location: { lat: 37.775, lng: -122.41945, address: "77 Howard Street" },
         rating: 4.0,
         reviewCount: 90,
-        deepLinks: { call: "tel:+14155550111" }
+        deepLinks: { callLink: "tel:+14155550111" }
       })
     ];
 
@@ -127,8 +127,8 @@ describe("dedupeAndMergePlans", () => {
     const merged = result.plans[0];
 
     expect(result.plans).toHaveLength(1);
-    expect(merged?.deepLinks?.website).toBe("http://cafemocha.example");
-    expect(merged?.deepLinks?.call).toBe("tel:+14155550111");
+    expect(merged?.deepLinks?.websiteLink).toBe("http://cafemocha.example");
+    expect(merged?.deepLinks?.callLink).toBe("tel:+14155550111");
     expect(merged?.rating).toBeCloseTo(4.09, 2);
     expect(merged?.reviewCount).toBe(90);
   });

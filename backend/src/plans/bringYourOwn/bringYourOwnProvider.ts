@@ -104,9 +104,9 @@ export class BringYourOwnProvider implements PlanProvider {
       location,
       priceLevel: idea.data.priceLevel,
       deepLinks: {
-        maps: buildMapsLink(location.lat, location.lng, title),
-        website: normalizeHttpUrl(idea.data.website),
-        call: normalizeTelUrl(idea.data.phone)
+        mapsLink: buildMapsLink(location.lat, location.lng, title),
+        websiteLink: normalizeHttpUrl(idea.data.website),
+        callLink: normalizeTelUrl(idea.data.phone)
       },
       metadata
     };
