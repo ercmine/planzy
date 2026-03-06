@@ -38,4 +38,8 @@ export interface RouterSearchResult {
   debug?: RouterDebug;
 }
 
+/**
+ * Opaque router cursor string. Current implementation uses versioned base64url payloads;
+ * callers must treat this as an opaque token.
+ */
 export type RouterCursor = string;
