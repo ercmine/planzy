@@ -5,7 +5,7 @@ import { validatePlanArray } from "../planValidation.js";
 import type { Category, SearchPlansInput } from "../types.js";
 import { validateSearchPlansInput } from "../validation.js";
 import { dedupePlans } from "./dedupe.js";
-import { rankPlans } from "./ranking.js";
+import { rankPlansAdvanced } from "./ranking.js";
 import type { ProviderCallDebug, ProviderRouterOptions, RouterSearchResult } from "./routerTypes.js";
 
 const DEFAULT_TIMEOUT_MS = 2_500;
@@ -255,7 +255,7 @@ export class ProviderRouter {
     const mergedPlans = results.flatMap((result) => result?.plans ?? []);
     const validatedPlans = validatePlanArray(mergedPlans);
     const dedupedPlans = dedupePlans(validatedPlans);
-    const rankedPlans = rankPlans(dedupedPlans, { input: normalizedInput, now: new Date() });
+    const rankedPlans = rankPlansAdvanced(dedupedPlans, { input: normalizedInput, now: new Date(), signals: ctx?.ranking }).plans;
 
     const offset = decodeCursor(normalizedInput.cursor);
     const plans = rankedPlans.slice(offset, offset + normalizedInput.limit);

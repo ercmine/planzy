@@ -1,5 +1,16 @@
 import type { AppConfig } from "../config/schema.js";
+import type { Category, PriceLevel } from "./plan.js";
 import type { SearchPlansInput, SearchPlansResult } from "./types.js";
+
+export interface RankingSignals {
+  sessionId?: string;
+  seenPlanIds?: string[];
+  seenSignatures?: string[];
+  preferredCategories?: Category[];
+  avoidedCategories?: Category[];
+  priceComfortMax?: PriceLevel;
+  noveltyWindowSize?: number;
+}
 
 export interface ProviderContext {
   requestId?: string;
@@ -8,6 +19,7 @@ export interface ProviderContext {
   sessionId?: string;
   userId?: string;
   config?: AppConfig;
+  ranking?: RankingSignals;
 }
 
 export interface PlanProvider {
