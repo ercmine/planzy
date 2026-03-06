@@ -20,6 +20,7 @@ import { DeckBatcher } from "./pagination/deckBatcher.js";
 import { QuotaManager } from "./quotas/quotaManager.js";
 import { ProviderHealthMonitor } from "./health/healthMonitor.js";
 import type { ProviderHealthSnapshot } from "./health/healthTypes.js";
+import { NoScrapePolicy, PolicyViolationError, defaultNoScrapePolicy } from "../../policy/noScrapePolicy.js";
 
 const DEFAULT_TIMEOUT_MS = 2_500;
 const MAX_PROVIDER_QUEUE = 100;
@@ -172,6 +173,8 @@ export class ProviderRouter {
   private readonly healthMonitor: ProviderHealthMonitor;
   private readonly enforceHealth: boolean;
   private readonly sponsoredPlacement: ProviderRouterOptions["sponsoredPlacement"];
+  private readonly noScrapePolicy: NoScrapePolicy;
+  private readonly enforceNoScrape: boolean;
 
   constructor(opts: ProviderRouterOptions) {
     this.providers = opts.providers;
@@ -197,6 +200,8 @@ export class ProviderRouter {
     this.enforceHealth = opts.enforceHealth ?? true;
     this.neverEmpty = opts.neverEmpty ?? {};
     this.sponsoredPlacement = opts.sponsoredPlacement;
+    this.enforceNoScrape = opts.enforceNoScrape ?? true;
+    this.noScrapePolicy = opts.noScrapePolicy ?? new NoScrapePolicy(defaultNoScrapePolicy());
     this.deckBatcher = new DeckBatcher();
     this.optionsCacheTtlMs = opts.cache?.ttlMs;
     this.planSearchCache = new PlanSearchCache(undefined, {
@@ -287,10 +292,45 @@ export class ProviderRouter {
     const providerErrors: { provider: string; error: unknown }[] = [];
 
     const tasks = fanoutProviders.map(async (provider) => {
+      const callStarted = Date.now();
       const providerConfig = (ctx?.config ?? this.config)?.plans.providers[provider.name];
+
+      if (this.enforceNoScrape) {
+        try {
+          this.noScrapePolicy.assertProviderAllowed(provider.name);
+        } catch (error) {
+          if (error instanceof PolicyViolationError) {
+            logger.warn("provider_request_skipped", {
+              requestId: ctx?.requestId,
+              provider: provider.name,
+              module: "providerRouter",
+              reason: "policy_provider_blocked",
+              policyKind: error.details.kind,
+              policyValue: error.details.value
+            });
+
+            providerErrors.push({ provider: provider.name, error });
+            callsDebug.push({
+              provider: provider.name,
+              tookMs: Date.now() - callStarted,
+              returned: 0,
+              error: {
+                code: "POLICY_PROVIDER_BLOCKED",
+                message: error.message,
+                retryable: false
+              }
+            });
+
+            if (this.allowPartial) {
+              return null;
+            }
+          }
+
+          throw error;
+        }
+      }
       const quotaConfig = providerConfig?.quota;
       const timeoutMs = this.perProviderTimeoutMs[provider.name] ?? this.defaultTimeoutMs;
-      const callStarted = Date.now();
 
       if (this.enforceQuotas) {
         this.quotaManager.configure(provider.name, {
@@ -553,10 +593,38 @@ export class ProviderRouter {
     }
 
     const mergedPlans = results.flatMap((result) => result?.plans ?? []);
+    let policyDroppedPlans = 0;
+    const policyFilteredPlans = this.enforceNoScrape
+      ? mergedPlans.filter((plan) => {
+          try {
+            this.noScrapePolicy.assertPlanSourceAllowed(plan.source);
+            return true;
+          } catch (error) {
+            if (error instanceof PolicyViolationError) {
+              policyDroppedPlans += 1;
+              logger.warn("policy_violation", {
+                module: "providerRouter",
+                kind: error.details.kind,
+                value: error.details.value,
+                provider: "router"
+              });
+              return false;
+            }
+            throw error;
+          }
+        })
+      : mergedPlans;
+
+    if (this.enforceNoScrape && policyFilteredPlans.length === 0 && mergedPlans.length > 0 && !this.allowPartial) {
+      throw new PolicyViolationError("All plans were blocked by no-scrape policy", {
+        kind: "plan_source",
+        value: "all"
+      });
+    }
     const fallback = await applyNeverEmptyFallback({
       input: normalizedInput,
       ctx,
-      basePlans: mergedPlans,
+      basePlans: policyFilteredPlans,
       providers: orderedProviders,
       providerErrors,
       opts: {
@@ -606,6 +674,7 @@ export class ProviderRouter {
         booster: boosted.debug,
         sponsored: sponsored.debug,
         fallback: fallback.debug,
+        policyDroppedPlans,
         tookMs: Date.now() - started
       };
     }

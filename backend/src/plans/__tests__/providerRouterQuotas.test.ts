@@ -64,6 +64,7 @@ describe("ProviderRouter quota integration", () => {
     const p1 = new CountingProvider("p1", [mkPlan("p1-a", "p1")]);
     const p2 = new CountingProvider("p2", [mkPlan("p2-a", "p2")]);
     const router = new ProviderRouter({
+      enforceNoScrape: false,
       providers: [p1, p2],
       config: makeConfig(),
       quotaManager,
@@ -88,6 +89,7 @@ describe("ProviderRouter quota integration", () => {
     const p1 = new CountingProvider("p1", [mkPlan("p1-a", "p1")]);
     const p2 = new CountingProvider("p2", [mkPlan("p2-a", "p2")]);
     const router = new ProviderRouter({
+      enforceNoScrape: false,
       providers: [p1, p2],
       config: makeConfig(),
       quotaManager,
@@ -111,6 +113,7 @@ describe("ProviderRouter quota integration", () => {
     cfg.plans.providers.p2.quota = { requestsPerMinute: 1 };
 
     const router = new ProviderRouter({
+      enforceNoScrape: false,
       providers: [p1, p2, curated, byo],
       config: cfg,
       quotaManager,

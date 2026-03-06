@@ -1,5 +1,7 @@
 import { ProviderError, RateLimitError, TimeoutError } from "../../errors.js";
 import { isAbortError } from "../../provider.js";
+import { NoScrapePolicy, defaultNoScrapePolicy } from "../../../policy/noScrapePolicy.js";
+import { createPolicyFetch } from "../../../policy/policyFetch.js";
 
 const TMDB_NOW_PLAYING_URL = "https://api.themoviedb.org/3/movie/now_playing";
 
@@ -62,9 +64,10 @@ export class TmdbClient {
   private readonly cfg: TmdbConfig;
   private readonly fetchFn: typeof fetch;
 
-  constructor(cfg: TmdbConfig, opts?: { fetchFn?: typeof fetch }) {
+  constructor(cfg: TmdbConfig, opts?: { fetchFn?: typeof fetch; policy?: NoScrapePolicy }) {
     this.cfg = cfg;
-    this.fetchFn = opts?.fetchFn ?? fetch;
+    const policy = opts?.policy ?? new NoScrapePolicy(defaultNoScrapePolicy());
+    this.fetchFn = createPolicyFetch({ policy, kind: "api", fetchFn: opts?.fetchFn ?? fetch });
   }
 
   public async nowPlaying(ctx?: { signal?: AbortSignal }): Promise<{ results: TmdbMovieLite[] }> {

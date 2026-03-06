@@ -1,5 +1,7 @@
 import { ProviderError, RateLimitError, TimeoutError } from "../../errors.js";
 import { isAbortError } from "../../provider.js";
+import { NoScrapePolicy, defaultNoScrapePolicy } from "../../../policy/noScrapePolicy.js";
+import { createPolicyFetch } from "../../../policy/policyFetch.js";
 
 const TICKETMASTER_EVENTS_URL = "https://app.ticketmaster.com/discovery/v2/events.json";
 
@@ -125,13 +127,14 @@ export class TicketmasterClient {
   private readonly cfg: TicketmasterConfig;
   private readonly fetchFn: typeof fetch;
 
-  constructor(cfg: TicketmasterConfig, opts?: { fetchFn?: typeof fetch }) {
+  constructor(cfg: TicketmasterConfig, opts?: { fetchFn?: typeof fetch; policy?: NoScrapePolicy }) {
     this.cfg = {
       ...cfg,
       timeoutMs: Math.max(1, cfg.timeoutMs),
       size: clampSize(cfg.size)
     };
-    this.fetchFn = opts?.fetchFn ?? fetch;
+    const policy = opts?.policy ?? new NoScrapePolicy(defaultNoScrapePolicy());
+    this.fetchFn = createPolicyFetch({ policy, kind: "api", fetchFn: opts?.fetchFn ?? fetch });
   }
 
   public async search(params: TicketmasterSearchParams, ctx?: { signal?: AbortSignal }): Promise<TicketmasterEventLite[]> {

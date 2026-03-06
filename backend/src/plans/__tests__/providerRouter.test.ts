@@ -78,7 +78,8 @@ describe("ProviderRouter", () => {
       ]
     });
 
-    const router = new ProviderRouter({ providers: [p1, p2] });
+    const router = new ProviderRouter({
+      enforceNoScrape: false, providers: [p1, p2] });
     const result = await router.search(baseInput);
 
     expect(result.plans).toHaveLength(3);
@@ -87,6 +88,7 @@ describe("ProviderRouter", () => {
 
   it("ranks using categories, openNow, and distance", async () => {
     const router = new ProviderRouter({
+      enforceNoScrape: false,
       providers: [
         new FakeProvider({
           name: "rank",
@@ -114,7 +116,8 @@ describe("ProviderRouter", () => {
       plans: [plan({ id: "ok-1", source: "ok", sourceId: "1", title: "OK", category: "food" })]
     });
     const bad = new FakeProvider({ name: "bad", failWith: new RateLimitError("bad") });
-    const router = new ProviderRouter({ providers: [ok, bad], allowPartial: true, includeDebug: true });
+    const router = new ProviderRouter({
+      enforceNoScrape: false, providers: [ok, bad], allowPartial: true, includeDebug: true });
 
     const result = await router.search(baseInput);
 
@@ -125,7 +128,8 @@ describe("ProviderRouter", () => {
   it("throws when allowPartial=false and any provider fails", async () => {
     const ok = new FakeProvider({ name: "ok", plans: [] });
     const bad = new FakeProvider({ name: "bad", failWith: new RateLimitError("bad") });
-    const router = new ProviderRouter({ providers: [ok, bad], allowPartial: false });
+    const router = new ProviderRouter({
+      enforceNoScrape: false, providers: [ok, bad], allowPartial: false });
 
     await expect(router.search(baseInput)).rejects.toThrow("Provider fanout failed");
   });
@@ -139,7 +143,8 @@ describe("ProviderRouter", () => {
         plan({ id: "3", source: "p", sourceId: "3", title: "C", category: "food" })
       ]
     });
-    const router = new ProviderRouter({ providers: [p] });
+    const router = new ProviderRouter({
+      enforceNoScrape: false, providers: [p] });
 
     const page1 = await router.search({ ...baseInput, limit: 2 });
     const page2 = await router.search({ ...baseInput, limit: 2, cursor: page1.nextCursor ?? null });
@@ -157,6 +162,7 @@ describe("ProviderRouter", () => {
     const slow = new FakeProvider({ name: "slow", delayMs: 100 });
 
     const router = new ProviderRouter({
+      enforceNoScrape: false,
       providers: [fast, slow],
       allowPartial: true,
       includeDebug: true,

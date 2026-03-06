@@ -1,5 +1,7 @@
 import { ProviderError, RateLimitError, TimeoutError } from "../../errors.js";
 import { isAbortError } from "../../provider.js";
+import { NoScrapePolicy, defaultNoScrapePolicy } from "../../../policy/noScrapePolicy.js";
+import { createPolicyFetch } from "../../../policy/policyFetch.js";
 
 const YELP_SEARCH_URL = "https://api.yelp.com/v3/businesses/search";
 
@@ -81,9 +83,10 @@ export class YelpClient {
   private readonly cfg: YelpConfig;
   private readonly fetchFn: typeof fetch;
 
-  constructor(cfg: YelpConfig, opts?: { fetchFn?: typeof fetch }) {
+  constructor(cfg: YelpConfig, opts?: { fetchFn?: typeof fetch; policy?: NoScrapePolicy }) {
     this.cfg = cfg;
-    this.fetchFn = opts?.fetchFn ?? fetch;
+    const policy = opts?.policy ?? new NoScrapePolicy(defaultNoScrapePolicy());
+    this.fetchFn = createPolicyFetch({ policy, kind: "api", fetchFn: opts?.fetchFn ?? fetch });
   }
 
   public async search(params: YelpSearchParams, ctx?: { signal?: AbortSignal }): Promise<{ businesses: YelpBusinessLite[]; total?: number }> {
