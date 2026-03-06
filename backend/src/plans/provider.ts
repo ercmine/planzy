@@ -4,6 +4,8 @@ export interface ProviderContext {
   requestId?: string;
   timeoutMs?: number;
   signal?: AbortSignal;
+  sessionId?: string;
+  userId?: string;
 }
 
 export interface PlanProvider {

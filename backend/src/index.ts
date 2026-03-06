@@ -18,3 +18,4 @@ export * from "./plans/router/ranking.js";
 export * from "./plans/router/providerRouter.js";
 export * from "./config/index.js";
 export * from "./plans/curated/index.js";
+export * from "./plans/bringYourOwn/index.js";

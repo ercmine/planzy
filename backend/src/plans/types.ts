@@ -41,3 +41,12 @@ export type { NormalizeOptions } from "./normalization/normalize.js";
 export type { RouterSearchResult } from "./router/routerTypes.js";
 
 export type { AppConfig, PlansRouterConfig, ProviderConfig, ProviderName } from "../config/schema.js";
+
+export type {
+  IdeasStore,
+  ListIdeasOptions,
+  ListIdeasResult,
+  StoredIdea,
+  UserIdeaInput
+} from "./bringYourOwn/storage.js";
+export type { BringYourOwnProviderOptions } from "./bringYourOwn/bringYourOwnProvider.js";
