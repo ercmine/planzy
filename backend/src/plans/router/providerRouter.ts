@@ -4,9 +4,11 @@ import { isAbortError, type ProviderContext } from "../provider.js";
 import { validatePlanArray } from "../planValidation.js";
 import type { Category, SearchPlansInput } from "../types.js";
 import { validateSearchPlansInput } from "../validation.js";
+import { applyNeverEmptyFallback } from "./fallback.js";
 import { dedupePlans } from "./dedupe.js";
 import { rankPlansAdvanced } from "./ranking.js";
 import { applyColdStartBooster } from "./coldStartBooster.js";
+import type { NeverEmptyOptions } from "./fallbackTypes.js";
 import type { ProviderCallDebug, ProviderRouterOptions, RouterSearchResult } from "./routerTypes.js";
 
 const DEFAULT_TIMEOUT_MS = 2_500;
@@ -138,6 +140,7 @@ export class ProviderRouter {
   private readonly includeDebug;
   private readonly config?: AppConfig;
   private readonly semaphores = new Map<ProviderName, ProviderSemaphore>();
+  private readonly neverEmpty: NeverEmptyOptions;
 
   constructor(opts: ProviderRouterOptions) {
     this.providers = opts.providers;
@@ -156,6 +159,7 @@ export class ProviderRouter {
     this.maxFanout = opts.maxFanout ?? this.config?.plans.router.maxFanout;
     this.allowPartial = opts.allowPartial ?? this.config?.plans.router.allowPartial ?? true;
     this.includeDebug = opts.includeDebug ?? false;
+    this.neverEmpty = opts.neverEmpty ?? {};
 
     for (const provider of this.providers) {
       const maxConcurrent = this.config?.plans.providers[provider.name]?.budget?.maxConcurrent ?? Number.POSITIVE_INFINITY;
@@ -167,8 +171,10 @@ export class ProviderRouter {
     const started = Date.now();
     const normalizedInput = validateSearchPlansInput(input);
     const orderedProviders = this.orderProvidersForInput(normalizedInput);
-    const fanoutProviders = this.maxFanout ? orderedProviders.slice(0, this.maxFanout) : orderedProviders;
+    const primaryProviders = this.selectPrimaryProviders(orderedProviders);
+    const fanoutProviders = this.maxFanout ? primaryProviders.slice(0, this.maxFanout) : primaryProviders;
     const callsDebug: ProviderCallDebug[] = [];
+    const providerErrors: { provider: string; error: unknown }[] = [];
 
     const tasks = fanoutProviders.map(async (provider) => {
       const timeoutMs = this.perProviderTimeoutMs[provider.name] ?? this.defaultTimeoutMs;
@@ -181,6 +187,7 @@ export class ProviderRouter {
         release = await semaphore.acquire();
       } catch (error) {
         const budgetError = asProviderError(provider.name, error);
+        providerErrors.push({ provider: provider.name, error: budgetError });
         callsDebug.push({
           provider: provider.name,
           tookMs: Date.now() - callStarted,
@@ -217,6 +224,7 @@ export class ProviderRouter {
           ? new TimeoutError(provider.name, `Provider ${provider.name} timed out after ${timeoutMs}ms`, error)
           : asProviderError(provider.name, error);
 
+        providerErrors.push({ provider: provider.name, error: wrapped });
         callsDebug.push({
           provider: provider.name,
           tookMs: Date.now() - callStarted,
@@ -254,7 +262,19 @@ export class ProviderRouter {
     }
 
     const mergedPlans = results.flatMap((result) => result?.plans ?? []);
-    const validatedPlans = validatePlanArray(mergedPlans);
+    const fallback = await applyNeverEmptyFallback({
+      input: normalizedInput,
+      ctx,
+      basePlans: mergedPlans,
+      providers: orderedProviders,
+      providerErrors,
+      opts: {
+        ...this.neverEmpty,
+        includeDebug: this.includeDebug
+      }
+    });
+
+    const validatedPlans = validatePlanArray(fallback.plans);
     const dedupedPlans = dedupePlans(validatedPlans);
     const rankedPlans = rankPlansAdvanced(dedupedPlans, { input: normalizedInput, now: new Date(), signals: ctx?.ranking }).plans;
     const boosted = applyColdStartBooster(
@@ -281,11 +301,20 @@ export class ProviderRouter {
         deduped: { before: validatedPlans.length, after: dedupedPlans.length },
         ranked: { count: rankedPlans.length },
         booster: boosted.debug,
+        fallback: fallback.debug,
         tookMs: Date.now() - started
       };
     }
 
     return response;
+  }
+
+  private selectPrimaryProviders(providers: ProviderRouterOptions["providers"]): ProviderRouterOptions["providers"] {
+    const fallbackProviderNames = new Set([
+      this.neverEmpty.curatedProviderName ?? "curated",
+      this.neverEmpty.byoProviderName ?? "byo"
+    ]);
+    return providers.filter((provider) => !fallbackProviderNames.has(provider.name));
   }
 
   private orderProvidersForInput(input: SearchPlansInput) {
