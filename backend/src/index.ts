@@ -27,6 +27,8 @@ export * as rankingEngine from "./plans/router/rankingEngine.js";
 export * from "./plans/router/ranking.js";
 export * from "./plans/router/boosterTypes.js";
 export * from "./plans/router/coldStartBooster.js";
+export * from "./plans/router/sponsored/sponsoredTypes.js";
+export * from "./plans/router/sponsored/sponsoredPlacement.js";
 export * from "./plans/router/fallbackTypes.js";
 export * from "./plans/router/fallback.js";
 export * from "./plans/router/providerRouter.js";
