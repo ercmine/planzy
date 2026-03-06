@@ -2,6 +2,7 @@ import type { Plan } from "../plan.js";
 import type { PlanProvider } from "../provider.js";
 import type { AppConfig } from "../../config/schema.js";
 import type { BoosterDebug } from "./boosterTypes.js";
+import type { FallbackDebug, NeverEmptyOptions } from "./fallbackTypes.js";
 
 export interface ProviderRouterOptions {
   providers: PlanProvider[];
@@ -11,6 +12,7 @@ export interface ProviderRouterOptions {
   allowPartial?: boolean;
   includeDebug?: boolean;
   config?: AppConfig;
+  neverEmpty?: NeverEmptyOptions;
 }
 
 export interface ProviderCallDebug {
@@ -25,6 +27,7 @@ export interface RouterDebug {
   deduped: { before: number; after: number };
   ranked: { count: number };
   booster?: BoosterDebug;
+  fallback?: FallbackDebug;
   tookMs: number;
 }
 
