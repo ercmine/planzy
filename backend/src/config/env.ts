@@ -1,3 +1,5 @@
+import { coerceAffiliateConfig, defaultAffiliateConfig } from "../affiliate/config.js";
+import type { DomainRule } from "../affiliate/types.js";
 import type { AppConfig, ProviderConfig, ProviderName } from "./schema.js";
 
 export interface EnvReadResult {
@@ -40,6 +42,14 @@ function parseJsonObject(value: string | undefined): Record<string, unknown> | u
   return undefined;
 }
 
+function parseJsonArray(value: string | undefined): unknown[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = JSON.parse(value) as unknown;
+  return Array.isArray(parsed) ? parsed : undefined;
+}
+
 function ensureProvider(config: Partial<AppConfig>, providerName: ProviderName): ProviderConfig {
   if (!config.plans) {
     config.plans = {} as AppConfig["plans"];
@@ -61,7 +71,11 @@ function ensureProvider(config: Partial<AppConfig>, providerName: ProviderName):
  * PROVIDER_<NAME>_API_KEY, PROVIDER_<NAME>_TIMEOUT_MS, PROVIDER_<NAME>_MAX_CONCURRENT,
  * PROVIDER_<NAME>_CACHE_TTL_MS, PROVIDER_<NAME>_RPM, PROVIDER_<NAME>_RPD,
  * PROVIDER_<NAME>_CATEGORY_WEIGHTS (JSON),
- * PLANS_ROUTER_CATEGORY_ORDER (JSON)
+ * PLANS_ROUTER_CATEGORY_ORDER (JSON),
+ * AFFILIATE_ENABLED, AFFILIATE_MODE, AFFILIATE_REDIRECT_BASE_URL,
+ * AFFILIATE_DEFAULT_PARAMS (JSON), AFFILIATE_DOMAIN_RULES (JSON),
+ * AFFILIATE_WRAP_BOOKING, AFFILIATE_WRAP_TICKET, AFFILIATE_WRAP_WEBSITE,
+ * AFFILIATE_INCLUDE_SESSION, AFFILIATE_INCLUDE_PLAN
  */
 export function readEnvConfigWithWarnings(processEnv: NodeJS.ProcessEnv): EnvReadResult {
   const warnings: string[] = [];
@@ -231,6 +245,91 @@ export function readEnvConfigWithWarnings(processEnv: NodeJS.ProcessEnv): EnvRea
     } catch {
       warnings.push("Invalid JSON for PLANS_ROUTER_CATEGORY_ORDER.");
     }
+  }
+
+  const affiliatePartial: Record<string, unknown> = {};
+  let hasAffiliateSetting = false;
+
+  const affiliateEnabled = parseBoolean(processEnv.AFFILIATE_ENABLED);
+  if (affiliateEnabled !== undefined) {
+    affiliatePartial.enabled = affiliateEnabled;
+    hasAffiliateSetting = true;
+  }
+
+  const affiliateMode = processEnv.AFFILIATE_MODE;
+  if (affiliateMode) {
+    affiliatePartial.mode = affiliateMode;
+    hasAffiliateSetting = true;
+  }
+
+  const redirectBaseUrl = processEnv.AFFILIATE_REDIRECT_BASE_URL;
+  if (redirectBaseUrl) {
+    affiliatePartial.redirectBaseUrl = redirectBaseUrl;
+    hasAffiliateSetting = true;
+  }
+
+  const wrapBooking = parseBoolean(processEnv.AFFILIATE_WRAP_BOOKING);
+  if (wrapBooking !== undefined) {
+    affiliatePartial.wrapBooking = wrapBooking;
+    hasAffiliateSetting = true;
+  }
+
+  const wrapTicket = parseBoolean(processEnv.AFFILIATE_WRAP_TICKET);
+  if (wrapTicket !== undefined) {
+    affiliatePartial.wrapTicket = wrapTicket;
+    hasAffiliateSetting = true;
+  }
+
+  const wrapWebsite = parseBoolean(processEnv.AFFILIATE_WRAP_WEBSITE);
+  if (wrapWebsite !== undefined) {
+    affiliatePartial.wrapWebsite = wrapWebsite;
+    hasAffiliateSetting = true;
+  }
+
+  const includeSession = parseBoolean(processEnv.AFFILIATE_INCLUDE_SESSION);
+  if (includeSession !== undefined) {
+    affiliatePartial.includeSession = includeSession;
+    hasAffiliateSetting = true;
+  }
+
+  const includePlan = parseBoolean(processEnv.AFFILIATE_INCLUDE_PLAN);
+  if (includePlan !== undefined) {
+    affiliatePartial.includePlan = includePlan;
+    hasAffiliateSetting = true;
+  }
+
+  const defaultParamsRaw = processEnv.AFFILIATE_DEFAULT_PARAMS;
+  if (defaultParamsRaw) {
+    hasAffiliateSetting = true;
+    try {
+      const parsed = parseJsonObject(defaultParamsRaw);
+      if (!parsed) {
+        warnings.push("Expected object JSON for AFFILIATE_DEFAULT_PARAMS.");
+      } else {
+        affiliatePartial.defaultParams = parsed;
+      }
+    } catch {
+      warnings.push("Invalid JSON for AFFILIATE_DEFAULT_PARAMS.");
+    }
+  }
+
+  const domainRulesRaw = processEnv.AFFILIATE_DOMAIN_RULES;
+  if (domainRulesRaw) {
+    hasAffiliateSetting = true;
+    try {
+      const parsed = parseJsonArray(domainRulesRaw);
+      if (!parsed) {
+        warnings.push("Expected array JSON for AFFILIATE_DOMAIN_RULES.");
+      } else {
+        affiliatePartial.domainRules = parsed as DomainRule[];
+      }
+    } catch {
+      warnings.push("Invalid JSON for AFFILIATE_DOMAIN_RULES.");
+    }
+  }
+
+  if (hasAffiliateSetting) {
+    config.affiliate = { ...defaultAffiliateConfig(), ...coerceAffiliateConfig(affiliatePartial) };
   }
 
   return { config, warnings };

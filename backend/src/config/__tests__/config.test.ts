@@ -60,4 +60,26 @@ describe("config", () => {
     expect(config.plans.providers.stub).toBeDefined();
     expect(warnings.some((warning) => warning.includes("Invalid JSON"))).toBe(true);
   });
+
+  it("env overlay parses affiliate settings", () => {
+    const result = readEnvConfigWithWarnings({
+      AFFILIATE_ENABLED: "true",
+      AFFILIATE_MODE: "append_params",
+      AFFILIATE_DEFAULT_PARAMS: '{"utm_source":"planzy"}',
+      AFFILIATE_DOMAIN_RULES: '[{"matchDomain":"ticketmaster.com","params":{"utm_campaign":"tm"}}]',
+      AFFILIATE_WRAP_BOOKING: "true",
+      AFFILIATE_WRAP_TICKET: "false",
+      AFFILIATE_WRAP_WEBSITE: "true",
+      AFFILIATE_INCLUDE_SESSION: "false",
+      AFFILIATE_INCLUDE_PLAN: "true"
+    });
+
+    expect(result.config.affiliate?.enabled).toBe(true);
+    expect(result.config.affiliate?.mode).toBe("append_params");
+    expect(result.config.affiliate?.defaultParams).toEqual({ utm_source: "planzy" });
+    expect(result.config.affiliate?.domainRules?.[0]?.matchDomain).toBe("ticketmaster.com");
+    expect(result.config.affiliate?.wrapTicket).toBe(false);
+    expect(result.warnings).toHaveLength(0);
+  });
+
 });
