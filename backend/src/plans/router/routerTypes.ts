@@ -5,6 +5,7 @@ import type { BoosterDebug } from "./boosterTypes.js";
 import type { FallbackDebug, NeverEmptyOptions } from "./fallbackTypes.js";
 import type { QuotaManager } from "./quotas/quotaManager.js";
 import type { ProviderHealthMonitor } from "./health/healthMonitor.js";
+import type { SponsoredPlacementDebug, SponsoredPlacementOptions } from "./sponsored/sponsoredTypes.js";
 
 export interface ProviderRouterOptions {
   providers: PlanProvider[];
@@ -25,6 +26,7 @@ export interface ProviderRouterOptions {
     ttlMs?: number;
     precision?: 3 | 4 | 5;
   };
+  sponsoredPlacement?: SponsoredPlacementOptions;
 }
 
 export interface ProviderCallDebug {
@@ -40,6 +42,7 @@ export interface RouterDebug {
   deduped: { before: number; after: number };
   ranked: { count: number };
   booster?: BoosterDebug;
+  sponsored?: SponsoredPlacementDebug;
   fallback?: FallbackDebug;
   tookMs: number;
 }

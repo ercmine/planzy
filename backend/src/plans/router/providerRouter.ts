@@ -13,6 +13,7 @@ import { applyNeverEmptyFallback } from "./fallback.js";
 import { dedupePlans } from "./dedupe.js";
 import { rankPlansAdvanced } from "./ranking.js";
 import { applyColdStartBooster } from "./coldStartBooster.js";
+import { applySponsoredPlacement } from "./sponsored/sponsoredPlacement.js";
 import type { NeverEmptyOptions } from "./fallbackTypes.js";
 import type { ProviderCallDebug, ProviderRouterOptions, RouterSearchResult } from "./routerTypes.js";
 import { DeckBatcher } from "./pagination/deckBatcher.js";
@@ -170,6 +171,7 @@ export class ProviderRouter {
   private readonly gracefulOnQuota: boolean;
   private readonly healthMonitor: ProviderHealthMonitor;
   private readonly enforceHealth: boolean;
+  private readonly sponsoredPlacement: ProviderRouterOptions["sponsoredPlacement"];
 
   constructor(opts: ProviderRouterOptions) {
     this.providers = opts.providers;
@@ -194,6 +196,7 @@ export class ProviderRouter {
     this.healthMonitor = opts.healthMonitor ?? new ProviderHealthMonitor();
     this.enforceHealth = opts.enforceHealth ?? true;
     this.neverEmpty = opts.neverEmpty ?? {};
+    this.sponsoredPlacement = opts.sponsoredPlacement;
     this.deckBatcher = new DeckBatcher();
     this.optionsCacheTtlMs = opts.cache?.ttlMs;
     this.planSearchCache = new PlanSearchCache(undefined, {
@@ -570,14 +573,18 @@ export class ProviderRouter {
       { input: normalizedInput, signals: ctx?.ranking },
       { includeDebug: this.includeDebug }
     );
+    const sponsored = applySponsoredPlacement(boosted.plans, { input: normalizedInput }, {
+      ...this.sponsoredPlacement,
+      includeDebug: this.includeDebug || this.sponsoredPlacement?.includeDebug
+    });
 
     const cacheTtlMs = this.resolveCacheTtlMs(fallback.debug?.triggered ?? false);
     if (!ctx?.signal?.aborted) {
-      this.planSearchCache.set(normalizedInput, ctx, boosted.plans, cacheTtlMs);
+      this.planSearchCache.set(normalizedInput, ctx, sponsored.plans, cacheTtlMs);
     }
 
     const affiliateConfig = (ctx?.config ?? this.config)?.affiliate;
-    const wrappedPlans = applyAffiliateWrapping(boosted.plans, affiliateConfig, ctx?.sessionId);
+    const wrappedPlans = applyAffiliateWrapping(sponsored.plans, affiliateConfig, ctx?.sessionId);
     const batchResult = this.deckBatcher.batch(wrappedPlans, {
       cursor: normalizedInput.cursor,
       requestedBatchSize: normalizedInput.limit,
@@ -597,6 +604,7 @@ export class ProviderRouter {
         deduped: { before: validatedPlans.length, after: dedupedPlans.length },
         ranked: { count: rankedPlans.length },
         booster: boosted.debug,
+        sponsored: sponsored.debug,
         fallback: fallback.debug,
         tookMs: Date.now() - started
       };
