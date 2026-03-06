@@ -41,6 +41,7 @@ export * from "./plans/router/pagination/cursor.js";
 export * from "./plans/router/pagination/deckSnapshotStore.js";
 export * from "./plans/router/pagination/deckBatcher.js";
 export * from "./config/index.js";
+export * from "./affiliate/index.js";
 export * from "./plans/curated/index.js";
 export * from "./plans/bringYourOwn/index.js";
 export * from "./plans/providers/places/index.js";

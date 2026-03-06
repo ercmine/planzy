@@ -1,3 +1,5 @@
+import { wrapPlanLinks } from "../../affiliate/wrap.js";
+import type { AffiliateConfig } from "../../affiliate/types.js";
 import type { AppConfig, ProviderName } from "../../config/schema.js";
 import { defaultLogger } from "../../logging/logger.js";
 import { coarseGeo, hashString } from "../../logging/redact.js";
@@ -142,6 +144,14 @@ function formatRetryAfterMs(retryAfterMs: number | undefined): string {
   return `Retry after ${seconds}s.`;
 }
 
+function applyAffiliateWrapping(plans: ReturnType<typeof validatePlanArray>, affiliate: AffiliateConfig | undefined, sessionId?: string) {
+  if (!affiliate?.enabled) {
+    return plans;
+  }
+
+  return plans.map((plan) => wrapPlanLinks(plan, affiliate, { sessionId }));
+}
+
 export class ProviderRouter {
   private readonly providers;
   private readonly defaultTimeoutMs;
@@ -240,7 +250,9 @@ export class ProviderRouter {
         retryable: false,
         cacheHit: true
       });
-      const batchResult = this.deckBatcher.batch(cachedDeck, {
+      const affiliateConfig = (ctx?.config ?? this.config)?.affiliate;
+      const wrappedCachedDeck = applyAffiliateWrapping(cachedDeck, affiliateConfig, ctx?.sessionId);
+      const batchResult = this.deckBatcher.batch(wrappedCachedDeck, {
         cursor: normalizedInput.cursor,
         requestedBatchSize: normalizedInput.limit,
         sessionId: ctx?.sessionId
@@ -564,7 +576,9 @@ export class ProviderRouter {
       this.planSearchCache.set(normalizedInput, ctx, boosted.plans, cacheTtlMs);
     }
 
-    const batchResult = this.deckBatcher.batch(boosted.plans, {
+    const affiliateConfig = (ctx?.config ?? this.config)?.affiliate;
+    const wrappedPlans = applyAffiliateWrapping(boosted.plans, affiliateConfig, ctx?.sessionId);
+    const batchResult = this.deckBatcher.batch(wrappedPlans, {
       cursor: normalizedInput.cursor,
       requestedBatchSize: normalizedInput.limit,
       sessionId: ctx?.sessionId

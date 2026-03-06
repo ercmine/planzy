@@ -1,4 +1,6 @@
 import type { Category } from "../plans/plan.js";
+import { defaultAffiliateConfig } from "../affiliate/config.js";
+import type { AffiliateConfig } from "../affiliate/types.js";
 
 export type ProviderName = string;
 
@@ -55,6 +57,7 @@ export interface PlansRouterConfig {
 
 export interface AppConfig {
   env: "dev" | "stage" | "prod";
+  affiliate?: AffiliateConfig;
   remoteConfig?: {
     url?: string;
     ttlMs: number;
@@ -70,6 +73,7 @@ export interface AppConfig {
 export function defaultConfig(env: AppConfig["env"]): AppConfig {
   return {
     env,
+    affiliate: defaultAffiliateConfig(),
     remoteConfig: {
       ttlMs: 60_000,
       timeoutMs: 2_000,
