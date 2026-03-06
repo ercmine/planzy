@@ -1,3 +1,4 @@
+import type { AppConfig } from "../config/schema.js";
 import type { SearchPlansInput, SearchPlansResult } from "./types.js";
 
 export interface ProviderContext {
@@ -6,6 +7,7 @@ export interface ProviderContext {
   signal?: AbortSignal;
   sessionId?: string;
   userId?: string;
+  config?: AppConfig;
 }
 
 export interface PlanProvider {

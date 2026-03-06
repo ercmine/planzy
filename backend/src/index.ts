@@ -19,3 +19,4 @@ export * from "./plans/router/providerRouter.js";
 export * from "./config/index.js";
 export * from "./plans/curated/index.js";
 export * from "./plans/bringYourOwn/index.js";
+export * from "./plans/providers/places/index.js";

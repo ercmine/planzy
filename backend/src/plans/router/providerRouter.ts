@@ -199,6 +199,7 @@ export class ProviderRouter {
       try {
         const result = await provider.searchPlans(normalizedInput, {
           ...ctx,
+          config: ctx?.config ?? this.config,
           signal: combined.controller.signal,
           timeoutMs
         });
