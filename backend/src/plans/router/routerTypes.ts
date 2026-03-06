@@ -13,6 +13,11 @@ export interface ProviderRouterOptions {
   includeDebug?: boolean;
   config?: AppConfig;
   neverEmpty?: NeverEmptyOptions;
+  cache?: {
+    enabled?: boolean;
+    ttlMs?: number;
+    precision?: 3 | 4 | 5;
+  };
 }
 
 export interface ProviderCallDebug {
@@ -23,6 +28,7 @@ export interface ProviderCallDebug {
 }
 
 export interface RouterDebug {
+  cacheHit?: boolean;
   calls: ProviderCallDebug[];
   deduped: { before: number; after: number };
   ranked: { count: number };

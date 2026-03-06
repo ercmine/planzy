@@ -3,6 +3,7 @@ import { ProviderError, TimeoutError } from "../errors.js";
 import { isAbortError, type ProviderContext } from "../provider.js";
 import { validatePlanArray } from "../planValidation.js";
 import type { Category, SearchPlansInput } from "../types.js";
+import { PlanSearchCache } from "../cache/planSearchCache.js";
 import { validateSearchPlansInput } from "../validation.js";
 import { applyNeverEmptyFallback } from "./fallback.js";
 import { dedupePlans } from "./dedupe.js";
@@ -123,6 +124,8 @@ export class ProviderRouter {
   private readonly semaphores = new Map<ProviderName, ProviderSemaphore>();
   private readonly neverEmpty: NeverEmptyOptions;
   private readonly deckBatcher: DeckBatcher;
+  private readonly planSearchCache: PlanSearchCache;
+  private readonly optionsCacheTtlMs?: number;
 
   constructor(opts: ProviderRouterOptions) {
     this.providers = opts.providers;
@@ -143,6 +146,13 @@ export class ProviderRouter {
     this.includeDebug = opts.includeDebug ?? false;
     this.neverEmpty = opts.neverEmpty ?? {};
     this.deckBatcher = new DeckBatcher();
+    this.optionsCacheTtlMs = opts.cache?.ttlMs;
+    this.planSearchCache = new PlanSearchCache(undefined, {
+      ttlMs: this.optionsCacheTtlMs,
+      enabled: opts.cache?.enabled ?? true,
+      precision: opts.cache?.precision ?? 3,
+      providerName: "router"
+    });
 
     for (const provider of this.providers) {
       const maxConcurrent = this.config?.plans.providers[provider.name]?.budget?.maxConcurrent ?? Number.POSITIVE_INFINITY;
@@ -150,9 +160,47 @@ export class ProviderRouter {
     }
   }
 
+
+  private resolveCacheTtlMs(fallbackHit: boolean): number {
+    const ttlMs = this.config?.plans.providers.router?.cache?.ttlMs ?? this.optionsCacheTtlMs ?? 30_000;
+    if (fallbackHit) {
+      return Math.min(ttlMs, 5_000);
+    }
+    return ttlMs;
+  }
+
   public async search(input: SearchPlansInput, ctx?: ProviderContext): Promise<RouterSearchResult> {
     const started = Date.now();
     const normalizedInput = validateSearchPlansInput(input);
+    const cachedDeck = this.planSearchCache.get(normalizedInput, ctx);
+    const cacheHit = cachedDeck !== null;
+
+    if (cacheHit) {
+      const batchResult = this.deckBatcher.batch(cachedDeck, {
+        cursor: normalizedInput.cursor,
+        requestedBatchSize: normalizedInput.limit,
+        sessionId: ctx?.sessionId
+      });
+
+      const response: RouterSearchResult = {
+        plans: batchResult.items,
+        nextCursor: batchResult.nextCursor,
+        sources: ["cache"]
+      };
+
+      if (this.includeDebug) {
+        response.debug = {
+          cacheHit: true,
+          calls: [],
+          deduped: { before: cachedDeck.length, after: cachedDeck.length },
+          ranked: { count: cachedDeck.length },
+          tookMs: Date.now() - started
+        };
+      }
+
+      return response;
+    }
+
     const orderedProviders = this.orderProvidersForInput(normalizedInput);
     const primaryProviders = this.selectPrimaryProviders(orderedProviders);
     const fanoutProviders = this.maxFanout ? primaryProviders.slice(0, this.maxFanout) : primaryProviders;
@@ -266,6 +314,11 @@ export class ProviderRouter {
       { includeDebug: this.includeDebug }
     );
 
+    const cacheTtlMs = this.resolveCacheTtlMs(fallback.debug?.triggered ?? false);
+    if (!ctx?.signal?.aborted) {
+      this.planSearchCache.set(normalizedInput, ctx, boosted.plans, cacheTtlMs);
+    }
+
     const batchResult = this.deckBatcher.batch(boosted.plans, {
       cursor: normalizedInput.cursor,
       requestedBatchSize: normalizedInput.limit,
@@ -281,6 +334,7 @@ export class ProviderRouter {
 
     if (this.includeDebug) {
       response.debug = {
+        cacheHit: false,
         calls: callsDebug,
         deduped: { before: validatedPlans.length, after: dedupedPlans.length },
         ranked: { count: rankedPlans.length },
@@ -291,6 +345,10 @@ export class ProviderRouter {
     }
 
     return response;
+  }
+
+  public invalidateCache(params: { provider?: string; cellPrefix?: string; category?: Category; sessionId?: string }): number {
+    return this.planSearchCache.invalidate(params);
   }
 
   private selectPrimaryProviders(providers: ProviderRouterOptions["providers"]): ProviderRouterOptions["providers"] {
