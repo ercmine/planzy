@@ -20,3 +20,4 @@ export * from "./config/index.js";
 export * from "./plans/curated/index.js";
 export * from "./plans/bringYourOwn/index.js";
 export * from "./plans/providers/places/index.js";
+export * from "./plans/providers/events/index.js";
