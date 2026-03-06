@@ -4,6 +4,7 @@ import type { AppConfig } from "../../config/schema.js";
 import type { BoosterDebug } from "./boosterTypes.js";
 import type { FallbackDebug, NeverEmptyOptions } from "./fallbackTypes.js";
 import type { QuotaManager } from "./quotas/quotaManager.js";
+import type { ProviderHealthMonitor } from "./health/healthMonitor.js";
 
 export interface ProviderRouterOptions {
   providers: PlanProvider[];
@@ -13,6 +14,8 @@ export interface ProviderRouterOptions {
   allowPartial?: boolean;
   includeDebug?: boolean;
   quotaManager?: QuotaManager;
+  healthMonitor?: ProviderHealthMonitor;
+  enforceHealth?: boolean;
   enforceQuotas?: boolean;
   gracefulOnQuota?: boolean;
   config?: AppConfig;

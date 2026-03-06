@@ -13,6 +13,8 @@ import type { NeverEmptyOptions } from "./fallbackTypes.js";
 import type { ProviderCallDebug, ProviderRouterOptions, RouterSearchResult } from "./routerTypes.js";
 import { DeckBatcher } from "./pagination/deckBatcher.js";
 import { QuotaManager } from "./quotas/quotaManager.js";
+import { ProviderHealthMonitor } from "./health/healthMonitor.js";
+import type { ProviderHealthSnapshot } from "./health/healthTypes.js";
 
 const DEFAULT_TIMEOUT_MS = 2_500;
 const MAX_PROVIDER_QUEUE = 100;
@@ -139,6 +141,8 @@ export class ProviderRouter {
   private readonly quotaManager: QuotaManager;
   private readonly enforceQuotas: boolean;
   private readonly gracefulOnQuota: boolean;
+  private readonly healthMonitor: ProviderHealthMonitor;
+  private readonly enforceHealth: boolean;
 
   constructor(opts: ProviderRouterOptions) {
     this.providers = opts.providers;
@@ -160,6 +164,8 @@ export class ProviderRouter {
     this.enforceQuotas = opts.enforceQuotas ?? true;
     this.gracefulOnQuota = opts.gracefulOnQuota ?? true;
     this.quotaManager = opts.quotaManager ?? new QuotaManager();
+    this.healthMonitor = opts.healthMonitor ?? new ProviderHealthMonitor();
+    this.enforceHealth = opts.enforceHealth ?? true;
     this.neverEmpty = opts.neverEmpty ?? {};
     this.deckBatcher = new DeckBatcher();
     this.optionsCacheTtlMs = opts.cache?.ttlMs;
@@ -265,6 +271,40 @@ export class ProviderRouter {
         }
       }
 
+
+      if (this.enforceHealth) {
+        const healthDecision = this.healthMonitor.shouldSkip(provider.name);
+        if (healthDecision.skip) {
+          const retryAfterMs = healthDecision.retryAfterMs;
+          const message = `Provider ${provider.name} temporarily disabled by health monitor. ${formatRetryAfterMs(retryAfterMs)}`;
+          const healthError = new ProviderError({
+            provider: provider.name,
+            code: "HEALTH_DISABLED",
+            message,
+            retryable: true
+          });
+
+          providerErrors.push({ provider: provider.name, error: healthError });
+          callsDebug.push({
+            provider: provider.name,
+            tookMs: Date.now() - callStarted,
+            returned: 0,
+            error: {
+              code: "HEALTH_DISABLED",
+              message,
+              retryable: true,
+              retryAfterMs
+            }
+          });
+
+          if (!this.allowPartial) {
+            throw healthError;
+          }
+
+          return null;
+        }
+      }
+
       const combined = createCombinedController(ctx?.signal, timeoutMs);
       const semaphore = this.semaphores.get(provider.name) ?? new ProviderSemaphore(Number.POSITIVE_INFINITY);
       let release: (() => void) | undefined;
@@ -298,11 +338,21 @@ export class ProviderRouter {
           timeoutMs
         });
 
+        const tookMs = Date.now() - callStarted;
         callsDebug.push({
           provider: provider.name,
-          tookMs: Date.now() - callStarted,
+          tookMs,
           returned: result.plans.length
         });
+
+        if (this.enforceHealth) {
+          this.healthMonitor.record({
+            provider: provider.name,
+            ok: true,
+            tookMs,
+            returned: result.plans.length
+          });
+        }
 
         return result;
       } catch (error) {
@@ -310,10 +360,11 @@ export class ProviderRouter {
           ? new TimeoutError(provider.name, `Provider ${provider.name} timed out after ${timeoutMs}ms`, error)
           : asProviderError(provider.name, error);
 
+        const tookMs = Date.now() - callStarted;
         providerErrors.push({ provider: provider.name, error: wrapped });
         callsDebug.push({
           provider: provider.name,
-          tookMs: Date.now() - callStarted,
+          tookMs,
           returned: 0,
           error: {
             code: wrapped.code,
@@ -321,6 +372,17 @@ export class ProviderRouter {
             retryable: wrapped.retryable
           }
         });
+
+        if (this.enforceHealth) {
+          this.healthMonitor.record({
+            provider: provider.name,
+            ok: false,
+            tookMs,
+            returned: 0,
+            errorCode: wrapped.code ?? "UNKNOWN",
+            retryable: wrapped.retryable
+          });
+        }
 
         if (!this.allowPartial) {
           throw wrapped;
@@ -399,6 +461,10 @@ export class ProviderRouter {
     }
 
     return response;
+  }
+
+  public getHealthSnapshots(): ProviderHealthSnapshot[] {
+    return this.healthMonitor.snapshots();
   }
 
   public invalidateCache(params: { provider?: string; cellPrefix?: string; category?: Category; sessionId?: string }): number {
