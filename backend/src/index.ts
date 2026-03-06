@@ -50,3 +50,5 @@ export * as plansCache from "./plans/cache/index.js";
 export * from "./logging/loggerTypes.js";
 export * from "./logging/redact.js";
 export * from "./logging/logger.js";
+
+export * from "./analytics/clicks/index.js";
