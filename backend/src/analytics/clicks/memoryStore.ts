@@ -1,3 +1,4 @@
+import { RetentionPolicy } from "../../retention/policy.js";
 import { ValidationError } from "../../plans/errors.js";
 import type { ClickStore } from "./store.js";
 import { decodeOffsetCursor, encodeOffsetCursor } from "./store.js";
@@ -29,6 +30,11 @@ function emptyAggregate(): ClickAggregate {
 
 export class MemoryClickStore implements ClickStore {
   private readonly clicksBySession = new Map<string, OutboundClickRecord[]>();
+  private readonly retentionPolicy: RetentionPolicy;
+
+  constructor(retentionPolicy?: RetentionPolicy) {
+    this.retentionPolicy = retentionPolicy ?? new RetentionPolicy();
+  }
 
   public async record(click: OutboundClickRecord): Promise<void> {
     const existing = this.clicksBySession.get(click.sessionId) ?? [];
@@ -76,5 +82,27 @@ export class MemoryClickStore implements ClickStore {
     aggregate.total = clicks.length;
 
     return aggregate;
+  }
+
+  public prune(maxAgeMs = this.retentionPolicy.config.maxTtlByClass.analytics_clicks, now = new Date()): number {
+    const thresholdMs = now.getTime() - maxAgeMs;
+    let removed = 0;
+
+    for (const [sessionId, clicks] of this.clicksBySession.entries()) {
+      const kept = clicks.filter((click) => {
+        const clickAtMs = Date.parse(click.serverAtISO);
+        return Number.isFinite(clickAtMs) && clickAtMs >= thresholdMs;
+      });
+
+      removed += clicks.length - kept.length;
+
+      if (kept.length === 0) {
+        this.clicksBySession.delete(sessionId);
+      } else {
+        this.clicksBySession.set(sessionId, kept);
+      }
+    }
+
+    return removed;
   }
 }

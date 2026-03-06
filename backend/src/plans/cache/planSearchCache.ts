@@ -1,3 +1,5 @@
+import type { RetentionPolicy } from "../../retention/policy.js";
+import { RetentionPolicy as DefaultRetentionPolicy } from "../../retention/policy.js";
 import type { Plan } from "../plan.js";
 import type { ProviderContext } from "../provider.js";
 import type { Category, SearchPlansInput } from "../types.js";
@@ -19,9 +21,15 @@ const DEFAULT_TTL_MS = 30_000;
 export class PlanSearchCache {
   private readonly cache: MemoryCache<Plan[]>;
   private readonly opts: Required<PlanSearchCacheOptions>;
+  private readonly retentionPolicy: RetentionPolicy;
 
-  constructor(cache?: MemoryCache<Plan[]>, opts?: PlanSearchCacheOptions, deps?: { now?: () => number }) {
+  constructor(
+    cache?: MemoryCache<Plan[]>,
+    opts?: PlanSearchCacheOptions,
+    deps?: { now?: () => number; retentionPolicy?: RetentionPolicy }
+  ) {
     this.cache = cache ?? new MemoryCache<Plan[]>(undefined, deps);
+    this.retentionPolicy = deps?.retentionPolicy ?? new DefaultRetentionPolicy();
     this.opts = {
       enabled: opts?.enabled ?? true,
       ttlMs: opts?.ttlMs ?? DEFAULT_TTL_MS,
@@ -53,7 +61,8 @@ export class PlanSearchCache {
     const keyParts = this.toParts(input, ctx);
     const tags = makeTags(keyParts);
     const key = buildCacheKey(keyParts);
-    this.cache.set(key, validPlans, ttlMs ?? this.opts.ttlMs, tags);
+    const effectiveTtlMs = this.retentionPolicy.clampTtl("router_deck_cache", ttlMs ?? this.opts.ttlMs);
+    this.cache.set(key, validPlans, effectiveTtlMs, tags);
   }
 
   public invalidate(params: { provider?: string; cellPrefix?: string; category?: Category; sessionId?: string }): number {

@@ -1,6 +1,8 @@
-import type { Category } from "../plans/plan.js";
-import { defaultAffiliateConfig } from "../affiliate/config.js";
 import type { AffiliateConfig } from "../affiliate/types.js";
+import { defaultAffiliateConfig } from "../affiliate/config.js";
+import type { Category } from "../plans/plan.js";
+import { defaultRetentionConfig } from "../retention/policy.js";
+import type { RetentionConfig } from "../retention/types.js";
 
 export type ProviderName = string;
 
@@ -58,6 +60,7 @@ export interface PlansRouterConfig {
 export interface AppConfig {
   env: "dev" | "stage" | "prod";
   affiliate?: AffiliateConfig;
+  retention?: Partial<RetentionConfig>;
   remoteConfig?: {
     url?: string;
     ttlMs: number;
@@ -74,6 +77,7 @@ export function defaultConfig(env: AppConfig["env"]): AppConfig {
   return {
     env,
     affiliate: defaultAffiliateConfig(),
+    retention: defaultRetentionConfig(),
     remoteConfig: {
       ttlMs: 60_000,
       timeoutMs: 2_000,

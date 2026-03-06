@@ -1,3 +1,4 @@
+import { RetentionPolicy } from "../retention/policy.js";
 import type { MerchantStore } from "./store.js";
 import type {
   ListMerchantItemsOptions,
@@ -32,6 +33,11 @@ function statusRank(status: PromoStatus | SpecialStatus): number {
 export class MemoryMerchantStore implements MerchantStore {
   private readonly promoted = new Map<string, PromotedPlanRecord>();
   private readonly specials = new Map<string, SpecialRecord>();
+  private readonly retentionPolicy: RetentionPolicy;
+
+  constructor(retentionPolicy?: RetentionPolicy) {
+    this.retentionPolicy = retentionPolicy ?? new RetentionPolicy();
+  }
 
   async createPromoted(record: PromotedPlanRecord): Promise<void> {
     this.promoted.set(record.promoId, structuredClone(record));
@@ -124,5 +130,35 @@ export class MemoryMerchantStore implements MerchantStore {
 
   async deleteSpecial(specialId: string): Promise<void> {
     this.specials.delete(specialId);
+  }
+
+  public prunePromos(maxAgeMs = this.retentionPolicy.config.maxTtlByClass.merchant_promos, now = new Date()): number {
+    const thresholdMs = now.getTime() - maxAgeMs;
+    let removed = 0;
+
+    for (const [promoId, promo] of this.promoted.entries()) {
+      const createdAtMs = Date.parse(promo.createdAtISO);
+      if (!Number.isFinite(createdAtMs) || createdAtMs < thresholdMs) {
+        this.promoted.delete(promoId);
+        removed += 1;
+      }
+    }
+
+    return removed;
+  }
+
+  public pruneSpecials(maxAgeMs = this.retentionPolicy.config.maxTtlByClass.merchant_specials, now = new Date()): number {
+    const thresholdMs = now.getTime() - maxAgeMs;
+    let removed = 0;
+
+    for (const [specialId, special] of this.specials.entries()) {
+      const createdAtMs = Date.parse(special.createdAtISO);
+      if (!Number.isFinite(createdAtMs) || createdAtMs < thresholdMs) {
+        this.specials.delete(specialId);
+        removed += 1;
+      }
+    }
+
+    return removed;
   }
 }
