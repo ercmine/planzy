@@ -1,6 +1,7 @@
 import type { Plan } from "../plan.js";
 import type { PlanProvider } from "../provider.js";
 import type { AppConfig } from "../../config/schema.js";
+import type { BoosterDebug } from "./boosterTypes.js";
 
 export interface ProviderRouterOptions {
   providers: PlanProvider[];
@@ -23,6 +24,7 @@ export interface RouterDebug {
   calls: ProviderCallDebug[];
   deduped: { before: number; after: number };
   ranked: { count: number };
+  booster?: BoosterDebug;
   tookMs: number;
 }
 

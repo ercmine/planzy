@@ -22,6 +22,8 @@ export * from "./plans/router/novelty.js";
 export * from "./plans/router/score.js";
 export * as rankingEngine from "./plans/router/rankingEngine.js";
 export * from "./plans/router/ranking.js";
+export * from "./plans/router/boosterTypes.js";
+export * from "./plans/router/coldStartBooster.js";
 export * from "./plans/router/providerRouter.js";
 export * from "./config/index.js";
 export * from "./plans/curated/index.js";

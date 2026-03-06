@@ -6,6 +6,7 @@ import type { Category, SearchPlansInput } from "../types.js";
 import { validateSearchPlansInput } from "../validation.js";
 import { dedupePlans } from "./dedupe.js";
 import { rankPlansAdvanced } from "./ranking.js";
+import { applyColdStartBooster } from "./coldStartBooster.js";
 import type { ProviderCallDebug, ProviderRouterOptions, RouterSearchResult } from "./routerTypes.js";
 
 const DEFAULT_TIMEOUT_MS = 2_500;
@@ -256,11 +257,16 @@ export class ProviderRouter {
     const validatedPlans = validatePlanArray(mergedPlans);
     const dedupedPlans = dedupePlans(validatedPlans);
     const rankedPlans = rankPlansAdvanced(dedupedPlans, { input: normalizedInput, now: new Date(), signals: ctx?.ranking }).plans;
+    const boosted = applyColdStartBooster(
+      rankedPlans,
+      { input: normalizedInput, signals: ctx?.ranking },
+      { includeDebug: this.includeDebug }
+    );
 
     const offset = decodeCursor(normalizedInput.cursor);
-    const plans = rankedPlans.slice(offset, offset + normalizedInput.limit);
+    const plans = boosted.plans.slice(offset, offset + normalizedInput.limit);
     const nextOffset = offset + plans.length;
-    const nextCursor = nextOffset < rankedPlans.length ? encodeCursor(nextOffset) : null;
+    const nextCursor = nextOffset < boosted.plans.length ? encodeCursor(nextOffset) : null;
 
     const response: RouterSearchResult = {
       plans,
@@ -274,6 +280,7 @@ export class ProviderRouter {
         calls: callsDebug,
         deduped: { before: validatedPlans.length, after: dedupedPlans.length },
         ranked: { count: rankedPlans.length },
+        booster: boosted.debug,
         tookMs: Date.now() - started
       };
     }
