@@ -1,6 +1,7 @@
 import { ValidationError } from "../plans/errors.js";
 import { PLAN_CATEGORIES, type Category } from "../plans/plan.js";
 import { isSafeHttpUrl, isSafeCallUrl } from "../plans/deeplinks/deepLinkValidation.js";
+import { sanitizeText } from "../sanitize/text.js";
 import type {
   ListMerchantItemsOptionsNormalized,
   PromoStatus,
@@ -22,28 +23,33 @@ function asOptionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function requireString(value: unknown, field: string, maxLen: number): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
+function requireString(value: unknown, field: string, maxLen: number, allowNewlines = false): string {
+  const cleaned = sanitizeText(value, {
+    source: "user",
+    maxLen,
+    allowNewlines,
+    profanityMode: "none"
+  });
+
+  if (!cleaned) {
     throw new ValidationError([`${field} is required`]);
   }
-  const trimmed = value.trim();
-  if (trimmed.length > maxLen) {
-    throw new ValidationError([`${field} must be <= ${maxLen} chars`]);
-  }
-  return trimmed;
+
+  return cleaned;
 }
 
-function validateOptionalString(value: unknown, field: string, maxLen: number): string | undefined {
+function validateOptionalString(value: unknown, field: string, maxLen: number, allowNewlines = false): string | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "string") {
     throw new ValidationError([`${field} must be a string`]);
   }
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return undefined;
-  if (trimmed.length > maxLen) {
-    throw new ValidationError([`${field} must be <= ${maxLen} chars`]);
-  }
-  return trimmed;
+
+  return sanitizeText(value, {
+    source: "user",
+    maxLen,
+    allowNewlines,
+    profanityMode: "none"
+  });
 }
 
 function validateDateWindow(startsAtISO?: string, endsAtISO?: string): void {
@@ -149,7 +155,7 @@ export function validatePromotedPlanInput(x: unknown): PromotedPlanInput {
     venueId: validateVenueId(x.venueId),
     provider: validateOptionalString(x.provider, "provider", 40),
     title: requireString(x.title, "title", 140),
-    description: validateOptionalString(x.description, "description", 400),
+    description: validateOptionalString(x.description, "description", 400, true),
     category: validateCategory(x.category),
     websiteLink: validateOptionalHttp(x.websiteLink, "websiteLink"),
     bookingLink: validateOptionalHttp(x.bookingLink, "bookingLink"),
@@ -177,7 +183,7 @@ export function validateSpecialInput(x: unknown): SpecialInput {
     venueId: validateVenueId(x.venueId),
     provider: validateOptionalString(x.provider, "provider", 40),
     headline: requireString(x.headline, "headline", 120),
-    details: validateOptionalString(x.details, "details", 400),
+    details: validateOptionalString(x.details, "details", 400, true),
     startsAtISO,
     endsAtISO,
     status: validateStatus<SpecialStatus>(x.status, "status", ["active", "paused", "ended"]),

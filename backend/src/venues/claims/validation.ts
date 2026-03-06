@@ -1,4 +1,5 @@
 import { ValidationError } from "../../plans/errors.js";
+import { sanitizeText } from "../../sanitize/text.js";
 import type { ListClaimsOptionsNormalized, VerificationStatus, VenueClaimLeadInput } from "./types.js";
 
 const STATUS_VALUES: VerificationStatus[] = ["pending", "verified", "rejected"];
@@ -11,7 +12,8 @@ function readOptionalString(
   source: Record<string, unknown>,
   key: string,
   details: string[],
-  maxLength: number
+  maxLength: number,
+  opts?: { source?: "provider" | "user"; allowNewlines?: boolean; profanityMode?: "none" | "mask" | "block" }
 ): string | undefined {
   const value = source[key];
   if (value === undefined) {
@@ -21,11 +23,15 @@ function readOptionalString(
     details.push(`${key} must be a string`);
     return undefined;
   }
-  const trimmed = value.trim();
-  if (trimmed.length > maxLength) {
-    details.push(`${key} must be <= ${maxLength} characters`);
-  }
-  return trimmed;
+
+  const cleaned = sanitizeText(value, {
+    source: opts?.source ?? "user",
+    maxLen: maxLength,
+    allowNewlines: opts?.allowNewlines ?? false,
+    profanityMode: opts?.profanityMode
+  });
+
+  return cleaned;
 }
 
 function isValidEmail(email: string): boolean {
@@ -67,10 +73,19 @@ export function validateVenueClaimLeadInput(x: unknown): VenueClaimLeadInput {
     details.push("contactEmail must be a valid email address");
   }
 
-  const message = readOptionalString(x, "message", details, 400);
-  const userId = readOptionalString(x, "userId", details, 120);
-  const planId = readOptionalString(x, "planId", details, 120);
-  const provider = readOptionalString(x, "provider", details, 120);
+  let message: string | undefined;
+  try {
+    message = readOptionalString(x, "message", details, 400, { source: "user", allowNewlines: true, profanityMode: "block" });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      details.push(...error.details);
+    } else {
+      throw error;
+    }
+  }
+  const userId = readOptionalString(x, "userId", details, 120, { source: "user", allowNewlines: false, profanityMode: "none" });
+  const planId = readOptionalString(x, "planId", details, 120, { source: "user", allowNewlines: false, profanityMode: "none" });
+  const provider = readOptionalString(x, "provider", details, 120, { source: "user", allowNewlines: false, profanityMode: "none" });
 
   if (details.length > 0) {
     throw new ValidationError(details);
