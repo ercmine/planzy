@@ -56,3 +56,5 @@ export * from "./analytics/clicks/index.js";
 
 export * from "./venues/claims/index.js";
 export * from "./server/index.js";
+
+export * from "./merchant/index.js";
