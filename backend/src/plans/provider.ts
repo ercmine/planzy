@@ -1,4 +1,5 @@
 import type { AppConfig } from "../config/schema.js";
+import type { Logger } from "../logging/loggerTypes.js";
 import type { Category, PriceLevel } from "./plan.js";
 import type { SearchPlansInput, SearchPlansResult } from "./types.js";
 
@@ -14,6 +15,7 @@ export interface RankingSignals {
 
 export interface ProviderContext {
   requestId?: string;
+  logger?: Logger;
   timeoutMs?: number;
   signal?: AbortSignal;
   sessionId?: string;

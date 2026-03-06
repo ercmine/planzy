@@ -1,3 +1,6 @@
+import { defaultLogger } from "../../logging/logger.js";
+import { hashString } from "../../logging/redact.js";
+import type { Logger } from "../../logging/loggerTypes.js";
 import { ValidationError } from "../errors.js";
 import { type Plan, planId, type PlanPhoto } from "../plan.js";
 import { validatePlan } from "../planValidation.js";
@@ -9,6 +12,8 @@ export interface NormalizeOptions {
   provider: string;
   sourceId: string;
   now?: Date;
+  logger?: Logger;
+  requestId?: string;
 }
 
 function toStringSafe(value: unknown): string | undefined {
@@ -180,6 +185,7 @@ export function normalizeBasePlan(
   },
   opts: NormalizeOptions
 ): Plan {
+  const logger = opts.logger ?? defaultLogger;
   const lat = toNumberSafe(fields.location?.lat);
   const lng = toNumberSafe(fields.location?.lng);
 
@@ -253,6 +259,21 @@ export function normalizeBasePlan(
     return validatePlan(plan);
   } catch (error) {
     if (error instanceof ValidationError) {
+      logger.warn("plan_normalization_failed", {
+        requestId: opts.requestId,
+        provider: opts.provider,
+        module: "normalizeBasePlan",
+        sourceIdHash: hashString(opts.sourceId),
+        categoryGuess: plan.category,
+        errors: error.details.slice(0, 10),
+        fieldSummary: {
+          hasTitle: toStringSafe(fields.title) !== undefined,
+          hasLocation: fields.location !== undefined,
+          hasWebsite: normalizeHttpUrl(fields.website) !== undefined,
+          hasPhone: normalizeTelUrl(fields.phone) !== undefined,
+          photosCount: Array.isArray(fields.photos) ? Math.min(fields.photos.length, 1000) : 0
+        }
+      });
       throw error;
     }
     throw new ValidationError([error instanceof Error ? error.message : "unknown normalization error"]);
