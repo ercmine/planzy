@@ -1,10 +1,10 @@
 import { ValidationError } from "./errors.js";
 import { PLAN_CATEGORIES, type Category, type Plan, type PriceLevel } from "./plan.js";
+import { validatePlanDeepLinks } from "./deeplinks/deepLinkValidation.js";
 
 const MAX_TITLE_LENGTH = 140;
 const MAX_ADDRESS_LENGTH = 200;
 const MAX_DISTANCE_METERS = 500_000;
-const MAX_URL_LENGTH = 1_000;
 const MAX_PHOTOS = 20;
 const MAX_WEEKDAY_LINES = 14;
 const MAX_WEEKDAY_LINE_LENGTH = 120;
@@ -48,25 +48,6 @@ function isPriceLevel(value: unknown): value is PriceLevel {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 4;
 }
 
-function isHttpUrl(value: string): boolean {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function asUrl(value: unknown, path: string, allowTel = false): string {
-  const url = asNonEmptyString(value, path, MAX_URL_LENGTH);
-  if (allowTel && url.startsWith("tel:")) {
-    return url;
-  }
-  if (!isHttpUrl(url)) {
-    fail(path, "must be a valid http(s) URL");
-  }
-  return url;
-}
 
 export function validatePlan(plan: unknown): Plan {
   if (!isPlainObject(plan)) {
@@ -153,7 +134,15 @@ export function validatePlan(plan: unknown): Plan {
       if (!isPlainObject(photo)) {
         fail(`photos[${index}]`, "must be an object");
       }
-      const url = asUrl(photo.url, `photos[${index}].url`);
+      const url = asNonEmptyString(photo.url, `photos[${index}].url`, 1000);
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+          fail(`photos[${index}].url`, "must be a valid http(s) URL");
+        }
+      } catch {
+        fail(`photos[${index}].url`, "must be a valid http(s) URL");
+      }
       const width = photo.width === undefined ? undefined : asFiniteNumber(photo.width, `photos[${index}].width`);
       const height = photo.height === undefined ? undefined : asFiniteNumber(photo.height, `photos[${index}].height`);
       return { url, width, height };
@@ -188,16 +177,14 @@ export function validatePlan(plan: unknown): Plan {
   }
 
   if (plan.deepLinks !== undefined) {
-    if (!isPlainObject(plan.deepLinks)) {
-      fail("deepLinks", "must be an object");
+    try {
+      validated.deepLinks = validatePlanDeepLinks(plan.deepLinks);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      throw new ValidationError(["deepLinks invalid"]);
     }
-    validated.deepLinks = {
-      maps: plan.deepLinks.maps === undefined ? undefined : asUrl(plan.deepLinks.maps, "deepLinks.maps"),
-      website: plan.deepLinks.website === undefined ? undefined : asUrl(plan.deepLinks.website, "deepLinks.website"),
-      call: plan.deepLinks.call === undefined ? undefined : asUrl(plan.deepLinks.call, "deepLinks.call", true),
-      booking: plan.deepLinks.booking === undefined ? undefined : asUrl(plan.deepLinks.booking, "deepLinks.booking"),
-      ticket: plan.deepLinks.ticket === undefined ? undefined : asUrl(plan.deepLinks.ticket, "deepLinks.ticket")
-    };
   }
 
   if (plan.metadata !== undefined) {

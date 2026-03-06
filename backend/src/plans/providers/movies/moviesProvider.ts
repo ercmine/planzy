@@ -330,8 +330,8 @@ export class MoviesProvider implements PlanProvider {
         movie.backdrop_path ? { url: `https://image.tmdb.org/t/p/w780${movie.backdrop_path}` } : null
       ].filter((photo): photo is NonNullable<Plan["photos"]>[number] => photo !== null),
       deepLinks: {
-        website,
-        maps: includeMovieShowtimeLinks ? buildMovieShowtimesLink(title, lat, lng) : undefined
+        websiteLink: website,
+        mapsLink: includeMovieShowtimeLinks ? buildMovieShowtimesLink(title, lat, lng) : undefined
       },
       metadata: {
         kind: "movie",

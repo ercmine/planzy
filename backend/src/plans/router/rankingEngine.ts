@@ -68,7 +68,7 @@ function sourceQualityScore(source: string): number {
 function completenessScore(plan: Plan): number {
   let score = 0;
 
-  if (plan.deepLinks?.website) {
+  if (plan.deepLinks?.websiteLink) {
     score += 1;
   }
 

@@ -81,7 +81,7 @@ function chooseFallback(candidates: Plan[]): Plan {
       (candidate.reviewCount ?? 0) * 10 +
       (candidate.photos?.length ?? 0) * 2 +
       (candidate.description ? 1 : 0) +
-      (candidate.deepLinks?.website ? 1 : 0);
+      (candidate.deepLinks?.websiteLink ? 1 : 0);
     return { candidate, index, score };
   });
 

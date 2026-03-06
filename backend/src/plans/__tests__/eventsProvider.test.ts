@@ -53,7 +53,7 @@ describe("EventsProvider", () => {
     expect(result.source).toBe("events");
     expect(result.plans).toHaveLength(1);
     expect(result.plans[0]?.metadata?.startTimeISO).toBe("2026-01-01T18:00:00Z");
-    expect(result.plans[0]?.deepLinks?.ticket).toBe("https://ticketmaster.example.com/e1");
+    expect(result.plans[0]?.deepLinks?.ticketLink).toBe("https://ticketmaster.example.com/e1");
   });
 
   it("translates timeWindow to startDateTime/endDateTime query params", async () => {

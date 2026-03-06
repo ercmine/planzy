@@ -149,7 +149,7 @@ export class CuratedProvider implements PlanProvider {
               lng: normalized.location.lng
             },
             deepLinks: {
-              maps: mapsSearchLink(query, normalized.location.lat, normalized.location.lng)
+              mapsLink: mapsSearchLink(query, normalized.location.lat, normalized.location.lng)
             },
             priceLevel: template.defaultPriceLevel,
             photos: template.imageUrls?.map((url) => ({ url })),

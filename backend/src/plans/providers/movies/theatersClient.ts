@@ -115,9 +115,9 @@ export class TheatersClient {
         weekdayText: place.regularOpeningHours?.weekdayDescriptions
       },
       deepLinks: {
-        maps: normalizeHttpUrl(place.googleMapsUri) ?? buildMapsLink(lat, lng, title),
-        website: normalizeHttpUrl(place.websiteUri),
-        call: normalizeTelUrl(place.internationalPhoneNumber)
+        mapsLink: normalizeHttpUrl(place.googleMapsUri) ?? buildMapsLink(lat, lng, title),
+        websiteLink: normalizeHttpUrl(place.websiteUri),
+        callLink: normalizeTelUrl(place.internationalPhoneNumber)
       },
       metadata: {
         kind: "theater",
@@ -163,9 +163,9 @@ export class TheatersClient {
       },
       photos: imageUrl ? [{ url: imageUrl }] : undefined,
       deepLinks: {
-        maps: buildMapsLink(lat, lng, title),
-        website: normalizeHttpUrl(business.url),
-        call: normalizeTelUrl(business.display_phone ?? business.phone)
+        mapsLink: buildMapsLink(lat, lng, title),
+        websiteLink: normalizeHttpUrl(business.url),
+        callLink: normalizeTelUrl(business.display_phone ?? business.phone)
       },
       metadata: {
         kind: "theater",

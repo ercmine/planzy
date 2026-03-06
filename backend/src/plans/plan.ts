@@ -1,4 +1,5 @@
 import { makePlanId } from "./provider.js";
+import type { PlanDeepLinksLegacy, PlanDeepLinksV2 } from "./deeplinks/deepLinkTypes.js";
 
 export const PLAN_CATEGORIES = [
   "food",
@@ -34,13 +35,9 @@ export interface PlanLocation {
   address?: string;
 }
 
-export interface PlanDeepLinks {
-  maps?: string;
-  website?: string;
-  call?: string;
-  booking?: string;
-  ticket?: string;
-}
+export interface PlanDeepLinks extends PlanDeepLinksV2 {}
+
+export type { PlanDeepLinksLegacy };
 
 export type PriceLevel = 0 | 1 | 2 | 3 | 4;
 

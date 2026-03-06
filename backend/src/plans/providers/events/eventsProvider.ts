@@ -198,9 +198,9 @@ function eventToPlan(event: TicketmasterEventLite): Plan | null {
     },
     photos: pickPhotos(event),
     deepLinks: {
-      ticket: eventUrl,
-      website: eventUrl,
-      maps: Number.isFinite(lat) && Number.isFinite(lng) ? buildMapsLink(lat, lng, title) : undefined
+      ticketLink: eventUrl,
+      websiteLink: eventUrl,
+      mapsLink: Number.isFinite(lat) && Number.isFinite(lng) ? buildMapsLink(lat, lng, title) : undefined
     },
     priceLevel: inferPriceLevel(event),
     metadata: {

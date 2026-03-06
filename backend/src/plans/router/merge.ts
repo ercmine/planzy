@@ -203,14 +203,14 @@ function pickWebsite(values: Array<string | undefined>): string | undefined {
 }
 
 function mergeDeepLinks(candidates: Plan[]): PlanDeepLinks | undefined {
-  const maps = pickFirstDefined(candidates.map((candidate) => candidate.deepLinks?.maps));
-  const website = pickWebsite(candidates.map((candidate) => candidate.deepLinks?.website));
-  const booking = pickFirstDefined(candidates.map((candidate) => candidate.deepLinks?.booking));
-  const ticket = pickFirstDefined(candidates.map((candidate) => candidate.deepLinks?.ticket));
-  const call = pickFirstDefined(candidates.map((candidate) => candidate.deepLinks?.call));
+  const mapsLink = pickFirstDefined(candidates.map((candidate) => candidate.deepLinks?.mapsLink));
+  const websiteLink = pickWebsite(candidates.map((candidate) => candidate.deepLinks?.websiteLink));
+  const bookingLink = pickFirstDefined(candidates.map((candidate) => candidate.deepLinks?.bookingLink));
+  const ticketLink = pickFirstDefined(candidates.map((candidate) => candidate.deepLinks?.ticketLink));
+  const callLink = pickFirstDefined(candidates.map((candidate) => candidate.deepLinks?.callLink));
 
-  const deepLinks: PlanDeepLinks = { maps, website, booking, ticket, call };
-  if (!maps && !website && !booking && !ticket && !call) {
+  const deepLinks: PlanDeepLinks = { mapsLink, websiteLink, bookingLink, ticketLink, callLink };
+  if (!mapsLink && !websiteLink && !bookingLink && !ticketLink && !callLink) {
     return undefined;
   }
   return deepLinks;

@@ -45,8 +45,8 @@ describe("normalization helpers", () => {
     );
 
     expect(plan.id).toBe("places:abc123");
-    expect(plan.deepLinks?.maps).toContain("google.com/maps");
-    expect(plan.deepLinks?.call).toBe("tel:+15553334444");
+    expect(plan.deepLinks?.mapsLink).toContain("google.com/maps");
+    expect(plan.deepLinks?.callLink).toBe("tel:+15553334444");
     expect(plan.metadata).toEqual({ safe: "ok" });
   });
 
@@ -71,7 +71,7 @@ describe("normalization helpers", () => {
     );
 
     expect(plan.category).toBe("music");
-    expect(plan.deepLinks?.ticket).toBe("https://tickets.example.com/e/1");
+    expect(plan.deepLinks?.ticketLink).toBe("https://tickets.example.com/e/1");
     expect(plan.metadata).toMatchObject({ promo: "SPRING" });
     expect(plan.metadata?._secret).toBeUndefined();
   });
