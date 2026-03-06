@@ -75,6 +75,7 @@ describe("ProviderRouter health integration", () => {
     const bad = new AlwaysFailProvider("bad");
     const good = new StaticProvider("good", [makePlan("good-1", "good")]);
     const router = new ProviderRouter({
+      enforceNoScrape: false,
       providers: [bad, good],
       allowPartial: true,
       includeDebug: true,
@@ -109,6 +110,7 @@ describe("ProviderRouter health integration", () => {
 
     const bad = new AlwaysFailProvider("solo");
     const router = new ProviderRouter({
+      enforceNoScrape: false,
       providers: [bad],
       allowPartial: false,
       healthMonitor: monitor,

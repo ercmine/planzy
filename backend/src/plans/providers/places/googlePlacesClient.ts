@@ -1,5 +1,7 @@
 import { ProviderError, RateLimitError, TimeoutError } from "../../errors.js";
 import { isAbortError } from "../../provider.js";
+import { NoScrapePolicy, defaultNoScrapePolicy } from "../../../policy/noScrapePolicy.js";
+import { createPolicyFetch } from "../../../policy/policyFetch.js";
 
 const GOOGLE_NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby";
 const GOOGLE_FIELD_MASK =
@@ -92,9 +94,10 @@ export class GooglePlacesClient {
   private readonly cfg: GooglePlacesConfig;
   private readonly fetchFn: typeof fetch;
 
-  constructor(cfg: GooglePlacesConfig, opts?: { fetchFn?: typeof fetch }) {
+  constructor(cfg: GooglePlacesConfig, opts?: { fetchFn?: typeof fetch; policy?: NoScrapePolicy }) {
     this.cfg = cfg;
-    this.fetchFn = opts?.fetchFn ?? fetch;
+    const policy = opts?.policy ?? new NoScrapePolicy(defaultNoScrapePolicy());
+    this.fetchFn = createPolicyFetch({ policy, kind: "api", fetchFn: opts?.fetchFn ?? fetch });
   }
 
   public async searchNearby(params: GoogleNearbySearchParams, ctx?: { signal?: AbortSignal }): Promise<GooglePlaceLite[]> {

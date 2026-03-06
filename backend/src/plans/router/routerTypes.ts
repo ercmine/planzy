@@ -6,6 +6,7 @@ import type { FallbackDebug, NeverEmptyOptions } from "./fallbackTypes.js";
 import type { QuotaManager } from "./quotas/quotaManager.js";
 import type { ProviderHealthMonitor } from "./health/healthMonitor.js";
 import type { SponsoredPlacementDebug, SponsoredPlacementOptions } from "./sponsored/sponsoredTypes.js";
+import type { NoScrapePolicy } from "../../policy/noScrapePolicy.js";
 
 export interface ProviderRouterOptions {
   providers: PlanProvider[];
@@ -27,6 +28,8 @@ export interface ProviderRouterOptions {
     precision?: 3 | 4 | 5;
   };
   sponsoredPlacement?: SponsoredPlacementOptions;
+  noScrapePolicy?: NoScrapePolicy;
+  enforceNoScrape?: boolean;
 }
 
 export interface ProviderCallDebug {
@@ -44,6 +47,7 @@ export interface RouterDebug {
   booster?: BoosterDebug;
   sponsored?: SponsoredPlacementDebug;
   fallback?: FallbackDebug;
+  policyDroppedPlans?: number;
   tookMs: number;
 }
 

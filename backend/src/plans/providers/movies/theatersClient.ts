@@ -4,6 +4,7 @@ import type { Plan } from "../../plan.js";
 import { validatePlanArray } from "../../planValidation.js";
 import { GooglePlacesClient, type GooglePlaceLite } from "../places/googlePlacesClient.js";
 import { YelpClient, type YelpBusinessLite } from "../places/yelpClient.js";
+import { NoScrapePolicy, defaultNoScrapePolicy } from "../../../policy/noScrapePolicy.js";
 
 export interface TheatersSearchParams {
   lat: number;
@@ -19,12 +20,14 @@ export class TheatersClient {
   private readonly yelpApiKey?: string;
   private readonly timeoutMs: number;
   private readonly fetchFn: typeof fetch;
+  private readonly policy: NoScrapePolicy;
 
-  constructor(opts: { googleApiKey?: string; yelpApiKey?: string; timeoutMs: number; fetchFn?: typeof fetch }) {
+  constructor(opts: { googleApiKey?: string; yelpApiKey?: string; timeoutMs: number; fetchFn?: typeof fetch; policy?: NoScrapePolicy }) {
     this.googleApiKey = opts.googleApiKey;
     this.yelpApiKey = opts.yelpApiKey;
     this.timeoutMs = opts.timeoutMs;
     this.fetchFn = opts.fetchFn ?? fetch;
+    this.policy = opts.policy ?? new NoScrapePolicy(defaultNoScrapePolicy());
   }
 
   public async search(params: TheatersSearchParams, ctx?: { signal?: AbortSignal }): Promise<Plan[]> {
@@ -38,7 +41,7 @@ export class TheatersClient {
           maxResults: limit,
           languageCode: params.locale
         },
-        { fetchFn: this.fetchFn }
+        { fetchFn: this.fetchFn, policy: this.policy }
       );
 
       const places = await googleClient.searchNearby(
@@ -64,7 +67,7 @@ export class TheatersClient {
           limit,
           locale: params.locale
         },
-        { fetchFn: this.fetchFn }
+        { fetchFn: this.fetchFn, policy: this.policy }
       );
 
       const response = await yelpClient.search(
