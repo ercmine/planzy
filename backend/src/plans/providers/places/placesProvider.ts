@@ -253,7 +253,7 @@ export class PlacesProvider implements PlanProvider {
       );
 
       const mapped = raw.map((item) => this.googleToPlan(item)).filter((plan): plan is Plan => plan !== null);
-      this.cache.set(cacheKey, mapped, nowMs, this.opts.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS);
+      this.cache.set(cacheKey, mapped, nowMs, this.opts.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS, "google");
       return mapped;
     } catch (error) {
       if (error instanceof ProviderError) {
@@ -314,7 +314,7 @@ export class PlacesProvider implements PlanProvider {
       );
 
       const mapped = raw.businesses.map((item) => this.yelpToPlan(item, input.openNow)).filter((plan): plan is Plan => plan !== null);
-      this.cache.set(cacheKey, mapped, nowMs, this.opts.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS);
+      this.cache.set(cacheKey, mapped, nowMs, this.opts.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS, "yelp");
       return mapped;
     } catch (error) {
       if (error instanceof ProviderError) {

@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 
+import type { RetentionPolicy } from "../../../retention/policy.js";
+import { RetentionPolicy as DefaultRetentionPolicy } from "../../../retention/policy.js";
+
 const MAX_KEY_LENGTH = 120;
 const SAFE_SESSION_ID = /[^a-zA-Z0-9_-]/g;
 
@@ -12,6 +15,11 @@ export interface DeckSnapshot {
 
 export class MemoryDeckSnapshotStore {
   private readonly snapshots = new Map<string, DeckSnapshot>();
+  private readonly retentionPolicy: RetentionPolicy;
+
+  constructor(retentionPolicy?: RetentionPolicy) {
+    this.retentionPolicy = retentionPolicy ?? new DefaultRetentionPolicy();
+  }
 
   public get(deckKey: string, nowMs: number): DeckSnapshot | null {
     this.evictExpired(nowMs);
@@ -30,11 +38,12 @@ export class MemoryDeckSnapshotStore {
 
   public set(deckKey: string, planIds: string[], nowMs: number, ttlMs: number): void {
     this.evictExpired(nowMs);
+    const effectiveTtlMs = this.retentionPolicy.clampTtl("pagination_snapshot", ttlMs);
     this.snapshots.set(deckKey, {
       deckKey,
       planIds: [...planIds],
       storedAtMs: nowMs,
-      ttlMs
+      ttlMs: effectiveTtlMs
     });
   }
 

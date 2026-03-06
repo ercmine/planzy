@@ -37,12 +37,12 @@ describe("PlanSearchCache", () => {
   it("expires entries based on ttl using injected clock", () => {
     let now = 1_000;
     const memory = new MemoryCache<Plan[]>({ pruneIntervalMs: 0 }, { now: () => now });
-    const cache = new PlanSearchCache(memory, { ttlMs: 50 }, { now: () => now });
+    const cache = new PlanSearchCache(memory, { ttlMs: 1_500 }, { now: () => now });
 
-    cache.set(baseInput, undefined, [makePlan("b")], 50);
+    cache.set(baseInput, undefined, [makePlan("b")], 1_500);
     expect(cache.get(baseInput)).not.toBeNull();
 
-    now += 60;
+    now += 1_600;
     expect(cache.get(baseInput)).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
+import { RetentionPolicy } from "../../retention/policy.js";
 import { ValidationError } from "../../plans/errors.js";
 import type { ListClaimsOptions, ListClaimsResult, VerificationStatus, VenueClaimLeadRecord } from "./types.js";
 import type { VenueClaimStore } from "./store.js";
-
 
 function encodeOffsetCursor(offset: number): string {
   return Buffer.from(String(offset), "utf8").toString("base64");
@@ -37,6 +37,11 @@ export class MemoryVenueClaimStore implements VenueClaimStore {
   private readonly claims: VenueClaimLeadRecord[] = [];
   private readonly byId = new Map<string, VenueClaimLeadRecord>();
   private readonly byVenueEmail = new Map<string, string>();
+  private readonly retentionPolicy: RetentionPolicy;
+
+  constructor(retentionPolicy?: RetentionPolicy) {
+    this.retentionPolicy = retentionPolicy ?? new RetentionPolicy();
+  }
 
   public async create(input: VenueClaimLeadRecord): Promise<void> {
     this.claims.push(input);
@@ -101,5 +106,25 @@ export class MemoryVenueClaimStore implements VenueClaimStore {
       return null;
     }
     return this.byId.get(claimId) ?? null;
+  }
+
+  public prune(maxAgeMs = this.retentionPolicy.config.maxTtlByClass.venue_claims, now = new Date()): number {
+    const thresholdMs = now.getTime() - maxAgeMs;
+    const kept: VenueClaimLeadRecord[] = [];
+    let removed = 0;
+
+    for (const claim of this.claims) {
+      const createdAtMs = Date.parse(claim.createdAtISO);
+      if (!Number.isFinite(createdAtMs) || createdAtMs < thresholdMs) {
+        removed += 1;
+        this.byId.delete(claim.claimId);
+        this.byVenueEmail.delete(dedupeKey(claim.venueId, claim.contactEmail));
+        continue;
+      }
+      kept.push(claim);
+    }
+
+    this.claims.splice(0, this.claims.length, ...kept);
+    return removed;
   }
 }
