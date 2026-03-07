@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import '../ads/ads_config.dart';
 import 'env_keys.dart';
 
 enum EnvFlavor { dev, stage, prod }
@@ -12,12 +13,14 @@ class EnvConfig {
     required this.apiBaseUrl,
     required this.enableDebugLogs,
     required this.associatedDomain,
+    required this.adsConfig,
   });
 
   final EnvFlavor flavor;
   final String apiBaseUrl;
   final bool enableDebugLogs;
   final String associatedDomain;
+  final AdsConfig adsConfig;
 }
 
 final envConfigProvider = Provider<EnvConfig>((ref) {
@@ -57,6 +60,7 @@ class Env {
       ),
       associatedDomain:
           dotenv.maybeGet(EnvKeys.associatedDomain) ?? 'ourplanplan.com',
+      adsConfig: AdsConfig.fromEnv(flavor: flavor),
     );
   }
 

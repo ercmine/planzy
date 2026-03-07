@@ -15,3 +15,6 @@ web/.env
 
 # Astro cache
 web/.astro/
+
+# Flutter app env files
+app/.env*

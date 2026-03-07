@@ -14,6 +14,32 @@ class DeckSwipeRecord {
   final int position;
 }
 
+class AdSlot {
+  const AdSlot({
+    required this.slotId,
+    required this.positionKey,
+  });
+
+  final String slotId;
+  final int positionKey;
+}
+
+abstract class DeckItem {
+  const DeckItem();
+}
+
+class DeckPlanItem extends DeckItem {
+  const DeckPlanItem(this.plan);
+
+  final Plan plan;
+}
+
+class DeckAdItem extends DeckItem {
+  const DeckAdItem(this.slot);
+
+  final AdSlot slot;
+}
+
 class DeckState {
   const DeckState({
     required this.sessionId,
@@ -21,6 +47,7 @@ class DeckState {
     this.isLoadingMore = false,
     this.errorMessage,
     this.plans = const <Plan>[],
+    this.items = const <DeckItem>[],
     this.nextCursor,
     this.hasMore = true,
     this.lastBatchMix,
@@ -39,6 +66,7 @@ class DeckState {
   final bool isLoadingMore;
   final String? errorMessage;
   final List<Plan> plans;
+  final List<DeckItem> items;
   final String? nextCursor;
   final bool hasMore;
   final DeckSourceMix? lastBatchMix;
@@ -55,6 +83,7 @@ class DeckState {
     String? errorMessage,
     bool clearError = false,
     List<Plan>? plans,
+    List<DeckItem>? items,
     String? nextCursor,
     bool clearCursor = false,
     bool? hasMore,
@@ -71,6 +100,7 @@ class DeckState {
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       plans: plans ?? this.plans,
+      items: items ?? this.items,
       nextCursor: clearCursor ? null : (nextCursor ?? this.nextCursor),
       hasMore: hasMore ?? this.hasMore,
       lastBatchMix: lastBatchMix ?? this.lastBatchMix,

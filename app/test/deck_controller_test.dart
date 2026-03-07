@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:ourplanplan/core/ads/ad_deck_injector.dart';
+import 'package:ourplanplan/core/ads/ads_config.dart';
 import 'package:ourplanplan/core/location/location_controller.dart';
 import 'package:ourplanplan/core/location/location_models.dart';
 import 'package:ourplanplan/core/location/location_service.dart';
@@ -119,6 +121,7 @@ void main() {
       telemetryDispatcher: dispatcher,
       sessionsRepository: sessionsRepository,
       locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
     );
 
     await Future<void>.microtask(() {});
@@ -154,6 +157,7 @@ void main() {
       telemetryDispatcher: dispatcher,
       sessionsRepository: sessionsRepository,
       locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
     );
 
     await Future<void>.microtask(() {});
@@ -202,6 +206,7 @@ void main() {
       telemetryDispatcher: dispatcher,
       sessionsRepository: sessionsRepository,
       locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
     );
 
     await Future<void>.microtask(() {});

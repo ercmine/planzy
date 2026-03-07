@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:ourplanplan/api/api_client.dart';
 import 'package:ourplanplan/api/api_error.dart';
 import 'package:ourplanplan/api/retry.dart';
+import 'package:ourplanplan/core/ads/ads_config.dart';
 import 'package:ourplanplan/core/env/env.dart';
 
 void main() {
@@ -14,6 +15,7 @@ void main() {
     apiBaseUrl: 'https://example.test',
     enableDebugLogs: true,
     associatedDomain: 'example.test',
+    adsConfig: const AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50),
   );
 
   test('retries on 502 then succeeds', () async {

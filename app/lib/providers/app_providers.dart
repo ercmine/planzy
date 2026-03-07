@@ -3,6 +3,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
+import '../core/ads/ad_deck_injector.dart';
+import '../core/ads/ads_config.dart';
+import '../core/ads/ads_service.dart';
 import '../core/cache/local_store.dart';
 import '../core/connectivity/connectivity_controller.dart';
 import '../core/connectivity/connectivity_state.dart';
@@ -41,6 +44,19 @@ import '../repositories/sessions_repository.dart';
 import '../repositories/swipes_repository.dart';
 import '../repositories/telemetry_repository.dart';
 import '../repositories/venue_claim_repository.dart';
+
+
+final adsConfigProvider = Provider<AdsConfig>((ref) {
+  return ref.watch(envConfigProvider).adsConfig;
+});
+
+final adsServiceProvider = Provider<AdsService>((ref) {
+  return AdsService(config: ref.watch(adsConfigProvider));
+});
+
+final adDeckInjectorProvider = Provider<AdDeckInjector>((ref) {
+  return AdDeckInjector(config: ref.watch(adsConfigProvider));
+});
 
 final httpClientProvider = Provider<http.Client>((ref) {
   final client = http.Client();
@@ -270,6 +286,7 @@ final deckControllerProvider =
     telemetryDispatcher: telemetryDispatcher,
     sessionsRepository: ref.watch(sessionsRepositoryProvider),
     locationController: ref.watch(locationControllerProvider.notifier),
+    adDeckInjector: ref.watch(adDeckInjectorProvider),
   );
 });
 

@@ -17,6 +17,7 @@ class OurPlanPlanApp extends ConsumerStatefulWidget {
 
 class _OurPlanPlanAppState extends ConsumerState<OurPlanPlanApp> {
   TelemetryDispatcher? _registeredDispatcher;
+  bool _adsInitialized = false;
 
   @override
   void didChangeDependencies() {
@@ -43,6 +44,7 @@ class _OurPlanPlanAppState extends ConsumerState<OurPlanPlanApp> {
     ref.watch(telemetryDispatcherProvider);
 
     _syncDispatcherRegistration();
+    _initializeAds();
 
     final router = ref.watch(routerProvider);
 
@@ -62,6 +64,15 @@ class _OurPlanPlanAppState extends ConsumerState<OurPlanPlanApp> {
         );
       },
     );
+  }
+
+
+  void _initializeAds() {
+    if (_adsInitialized) {
+      return;
+    }
+    _adsInitialized = true;
+    ref.read(adsServiceProvider).initialize();
   }
 
   void _syncDispatcherRegistration() {

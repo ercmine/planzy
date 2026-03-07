@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../core/ads/native_ad_controller.dart';
 import '../../core/env/env.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/widgets/retry_view.dart';
 import '../../providers/app_providers.dart';
+import 'deck_state.dart';
+import 'widgets/ad_deck_card.dart';
 import 'widgets/card_details_sheet.dart';
 import 'widgets/deck_actions_bar.dart';
 import 'widgets/deck_card.dart';
@@ -25,10 +28,14 @@ class DeckPage extends ConsumerStatefulWidget {
 
 class _DeckPageState extends ConsumerState<DeckPage> {
   final CardSwiperController _swiperController = CardSwiperController();
+  final Map<String, NativeAdController> _adControllers = <String, NativeAdController>{};
 
   @override
   void dispose() {
     _swiperController.dispose();
+    for (final c in _adControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -51,8 +58,9 @@ class _DeckPageState extends ConsumerState<DeckPage> {
     final controller = ref.read(deckControllerProvider(widget.sessionId).notifier);
     final envConfig = ref.watch(envConfigProvider);
 
-    ref.listen(deckControllerProvider(widget.sessionId).select((s) => s.showCachedResultsNotice),
-        (_, notice) {
+    ref.listen(
+        deckControllerProvider(widget.sessionId)
+            .select((s) => s.showCachedResultsNotice), (_, notice) {
       if (notice && mounted) {
         AppSnackbar.show(context, 'Showing cached results.');
         controller.clearCachedResultsNotice();
@@ -85,7 +93,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
       );
     }
 
-    if (state.errorMessage != null && state.plans.isEmpty) {
+    if (state.errorMessage != null && state.items.isEmpty) {
       return _scaffoldWithBody(
         RetryView(
           title: 'Could not load plans',
@@ -95,7 +103,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
       );
     }
 
-    if (state.plans.isEmpty) {
+    if (state.items.isEmpty) {
       return _scaffoldWithBody(
         RetryView(
           title: 'No more ideas right now',
@@ -114,8 +122,9 @@ class _DeckPageState extends ConsumerState<DeckPage> {
             Expanded(
               child: CardSwiper(
                 controller: _swiperController,
-                cardsCount: state.plans.length,
-                numberOfCardsDisplayed: state.plans.length >= 3 ? 3 : state.plans.length,
+                cardsCount: state.items.length,
+                numberOfCardsDisplayed:
+                    state.items.length >= 3 ? 3 : state.items.length,
                 allowedSwipeDirection: const AllowedSwipeDirection.only(
                   left: true,
                   right: true,
@@ -127,11 +136,28 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                   return true;
                 },
                 cardBuilder: (context, index, _, __) {
-                  final plan = state.plans[index];
-                  final prefetchUrls = state.plans
+                  final item = state.items[index];
+                  if (item is DeckAdItem) {
+                    final c = _adControllers.putIfAbsent(
+                      item.slot.slotId,
+                      () => NativeAdController(
+                        adsService: ref.read(adsServiceProvider),
+                        slotId: item.slot.slotId,
+                      ),
+                    );
+                    return AdDeckCard(
+                      key: ValueKey(item.slot.slotId),
+                      controller: c,
+                    );
+                  }
+                  final plan = (item as DeckPlanItem).plan;
+                  final prefetchUrls = state.items
                       .skip(index + 1)
+                      .whereType<DeckPlanItem>()
                       .take(2)
-                      .map((p) => p.photos?.isNotEmpty == true ? p.photos!.first.url : null)
+                      .map((p) => p.plan.photos?.isNotEmpty == true
+                          ? p.plan.photos!.first.url
+                          : null)
                       .whereType<String>()
                       .toList(growable: false);
 
@@ -160,7 +186,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
             ),
             const SizedBox(height: AppSpacing.m),
             DeckActionsBar(
-              disabled: state.plans.isEmpty,
+              disabled: state.items.isEmpty,
               canUndo: state.undoStack.isNotEmpty,
               onNo: () => _swiperController.swipe(CardSwiperDirection.left),
               onMaybe: () => _swiperController.swipe(CardSwiperDirection.top),
