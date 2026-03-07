@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../api/api_client.dart';
 import '../core/cache/local_store.dart';
 import '../core/env/env.dart';
+import '../core/identity/identity_provider.dart';
 import '../repositories/deck_repository.dart';
 import '../repositories/ideas_repository.dart';
 import '../repositories/telemetry_repository.dart';
@@ -18,20 +19,14 @@ final localStoreProvider = FutureProvider<LocalStore>((ref) async {
   return LocalStore.create();
 });
 
-final userIdProvider = FutureProvider<String>((ref) async {
-  final localStore = await ref.watch(localStoreProvider.future);
-  return localStore.getOrCreateUserId();
-});
-
 final apiClientProvider = FutureProvider<ApiClient>((ref) async {
   final envConfig = ref.watch(envConfigProvider);
   final httpClient = ref.watch(httpClientProvider);
-  final localStore = await ref.watch(localStoreProvider.future);
 
   return ApiClient(
     httpClient: httpClient,
     envConfig: envConfig,
-    localStore: localStore,
+    userIdResolver: () => ref.read(userIdProvider.future),
   );
 });
 
