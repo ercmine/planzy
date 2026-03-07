@@ -1,33 +1,60 @@
 import { fileURLToPath } from "node:url";
 
 import { createDeckHandler } from "../api/sessions/deckHandler.js";
+import { createIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { AppConfig } from "../config/schema.js";
 import type { Logger } from "../logging/loggerTypes.js";
 import { MemoryMerchantStore } from "../merchant/memoryStore.js";
 import { MerchantService } from "../merchant/service.js";
-import type { ProviderRouter } from "../plans/router/providerRouter.js";
+import { BringYourOwnProvider, MemoryIdeasStore } from "../plans/bringYourOwn/index.js";
+import { CuratedProvider } from "../plans/curated/index.js";
+import type { IdeasStore } from "../plans/bringYourOwn/storage.js";
+import { ProviderRouter } from "../plans/router/providerRouter.js";
+import type { ProviderRouter as ProviderRouterType } from "../plans/router/providerRouter.js";
 import { VenueClaimsService } from "../venues/claims/claimsService.js";
 import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
-  deckRouter?: ProviderRouter;
+  deckRouter?: ProviderRouterType;
+  ideasStore?: IdeasStore;
   logger?: Logger;
   config?: AppConfig;
+}
+
+function createDefaultDeckRouter(sharedIdeasStore: IdeasStore): ProviderRouter {
+  return new ProviderRouter({
+    providers: [new BringYourOwnProvider(sharedIdeasStore), new CuratedProvider()],
+    includeDebug: true,
+    cache: {
+      enabled: false
+    },
+    neverEmpty: {
+      enabled: true,
+      curatedProviderName: "curated",
+      minimumPlans: 1
+    }
+  });
 }
 
 export function createServer(options?: CreateServerOptions) {
   const service = new VenueClaimsService(new MemoryVenueClaimStore());
   const merchantService = new MerchantService(new MemoryMerchantStore());
-  const deckHandler = options?.deckRouter
-    ? createDeckHandler({
-      router: options.deckRouter,
-      logger: options.logger,
-      config: options.config
-    })
-    : undefined;
+  const ideasStore = options?.ideasStore ?? new MemoryIdeasStore();
+  const deckRouter = options?.deckRouter ?? createDefaultDeckRouter(ideasStore);
 
-  return createHttpServer(service, merchantService, { deckHandler });
+  const deckHandler = createDeckHandler({
+    router: deckRouter,
+    logger: options?.logger,
+    config: options?.config
+  });
+
+  const ideasHandlers = createIdeasHandlers({
+    ideasStore,
+    logger: options?.logger
+  });
+
+  return createHttpServer(service, merchantService, { deckHandler, ideasHandlers });
 }
 
 export function main(): void {
