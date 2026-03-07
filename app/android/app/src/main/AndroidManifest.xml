@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.ourplanplan.app">
+    package="com.perbug.app">
     <application>
         <!-- Use real IDs via env/build config in non-dev flavors. -->
         <meta-data

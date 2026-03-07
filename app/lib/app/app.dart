@@ -8,14 +8,14 @@ import '../providers/app_providers.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 
-class OurPlanPlanApp extends ConsumerStatefulWidget {
-  const OurPlanPlanApp({super.key});
+class PerbugApp extends ConsumerStatefulWidget {
+  const PerbugApp({super.key});
 
   @override
-  ConsumerState<OurPlanPlanApp> createState() => _OurPlanPlanAppState();
+  ConsumerState<PerbugApp> createState() => _PerbugAppState();
 }
 
-class _OurPlanPlanAppState extends ConsumerState<OurPlanPlanApp> {
+class _PerbugAppState extends ConsumerState<PerbugApp> {
   TelemetryDispatcher? _registeredDispatcher;
   bool _adsInitialized = false;
 
@@ -49,7 +49,7 @@ class _OurPlanPlanAppState extends ConsumerState<OurPlanPlanApp> {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'OurPlanPlan',
+      title: 'Perbug',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

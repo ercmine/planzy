@@ -56,7 +56,7 @@ class ResultsController extends StateNotifier<ResultsState> {
 
     await _shareService.shareText(
       _buildShareCard(plan),
-      subject: 'OurPlanPlan pick: ${plan.title}',
+      subject: 'Perbug pick: ${plan.title}',
     );
 
     state = state.copyWith(lockedPlanId: plan.id);
@@ -66,10 +66,10 @@ class ResultsController extends StateNotifier<ResultsState> {
     final mapsLink = plan.deepLinks?.mapsLink ?? 'N/A';
     final websiteLink = plan.deepLinks?.websiteLink ?? 'N/A';
 
-    return 'OurPlanPlan pick: ${plan.title}\n'
+    return 'Perbug pick: ${plan.title}\n'
         'Category: ${plan.category}\n'
         'Maps: $mapsLink\n'
         'Website: $websiteLink\n\n'
-        'Join session: https://ourplanplan.com/invite/$_sessionId';
+        'Join session: https://perbug.com/invite/$_sessionId';
   }
 }

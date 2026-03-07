@@ -7,7 +7,7 @@ class HomeState {
   });
 
   factory HomeState.initial() {
-    return const HomeState(counter: 0, statusMessage: 'Welcome to OurPlanPlan');
+    return const HomeState(counter: 0, statusMessage: 'Welcome to Perbug');
   }
 
   final int counter;

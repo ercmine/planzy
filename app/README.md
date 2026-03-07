@@ -1,4 +1,4 @@
-# OurPlanPlan Flutter App
+# Perbug Flutter App
 
 ## Setup
 
@@ -29,6 +29,7 @@ flutter create --platforms=android .
 ### Run on emulator/device
 
 ```bash
+flutter run -t lib/main_prod.dart --dart-define=API_BASE_URL=https://api.perbug.com
 ./scripts/run_android_dev.sh
 ./scripts/run_android_stage.sh
 ./scripts/run_android_prod.sh

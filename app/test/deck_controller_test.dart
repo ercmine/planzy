@@ -1,26 +1,26 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:ourplanplan/core/ads/ad_deck_injector.dart';
-import 'package:ourplanplan/core/ads/ads_config.dart';
-import 'package:ourplanplan/core/location/location_controller.dart';
-import 'package:ourplanplan/core/location/location_models.dart';
-import 'package:ourplanplan/core/location/location_service.dart';
-import 'package:ourplanplan/core/permissions/permission_service.dart';
-import 'package:ourplanplan/core/permissions/permission_state.dart';
-import 'package:ourplanplan/core/store/sessions_store.dart';
-import 'package:ourplanplan/core/store/swipes_store.dart';
-import 'package:ourplanplan/core/telemetry/telemetry_dispatcher.dart';
-import 'package:ourplanplan/features/deck/deck_controller.dart';
-import 'package:ourplanplan/models/deck_batch.dart';
-import 'package:ourplanplan/models/plan.dart';
-import 'package:ourplanplan/models/session.dart';
-import 'package:ourplanplan/models/session_filters.dart';
-import 'package:ourplanplan/models/swipe.dart';
-import 'package:ourplanplan/models/telemetry.dart';
-import 'package:ourplanplan/repositories/deck_repository.dart';
-import 'package:ourplanplan/repositories/sessions_repository.dart';
-import 'package:ourplanplan/repositories/swipes_repository.dart';
-import 'package:ourplanplan/repositories/telemetry_repository.dart';
+import 'package:perbug/core/ads/ad_deck_injector.dart';
+import 'package:perbug/core/ads/ads_config.dart';
+import 'package:perbug/core/location/location_controller.dart';
+import 'package:perbug/core/location/location_models.dart';
+import 'package:perbug/core/location/location_service.dart';
+import 'package:perbug/core/permissions/permission_service.dart';
+import 'package:perbug/core/permissions/permission_state.dart';
+import 'package:perbug/core/store/sessions_store.dart';
+import 'package:perbug/core/store/swipes_store.dart';
+import 'package:perbug/core/telemetry/telemetry_dispatcher.dart';
+import 'package:perbug/features/deck/deck_controller.dart';
+import 'package:perbug/models/deck_batch.dart';
+import 'package:perbug/models/plan.dart';
+import 'package:perbug/models/session.dart';
+import 'package:perbug/models/session_filters.dart';
+import 'package:perbug/models/swipe.dart';
+import 'package:perbug/models/telemetry.dart';
+import 'package:perbug/repositories/deck_repository.dart';
+import 'package:perbug/repositories/sessions_repository.dart';
+import 'package:perbug/repositories/swipes_repository.dart';
+import 'package:perbug/repositories/telemetry_repository.dart';
 
 class _MockDeckRepository extends Mock implements DeckRepository {}
 

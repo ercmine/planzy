@@ -44,6 +44,22 @@ class AdsConfig {
     );
   }
 
+
+
+  factory AdsConfig.disabled() {
+    return const AdsConfig(
+      enabled: false,
+      admobAppIdIos: '',
+      admobAppIdAndroid: '',
+      nativeUnitIdIos: '',
+      nativeUnitIdAndroid: '',
+      frequencyN: 10,
+      placeFirstAfter: 3,
+      maxAdsPerWindow: 3,
+      adsWindowSize: 50,
+    );
+  }
+
   final bool enabled;
   final String admobAppIdIos;
   final String admobAppIdAndroid;

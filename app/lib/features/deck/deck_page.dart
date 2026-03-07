@@ -195,9 +195,15 @@ class _DeckPageState extends ConsumerState<DeckPage> {
               onYes: () => _swiperController.swipe(CardSwiperDirection.right),
               onUndo: controller.undo,
             ),
-            if (state.usedFallback) ...[
+            if (state.usingOfflineCachedData) ...[
               const SizedBox(height: AppSpacing.s),
-              const Text('Showing fallback options for this area.'),
+              Text(
+                'Offline / Using cached data',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
             if (kDebugMode && envConfig.enableDebugLogs && state.lastBatchMix != null) ...[
               const SizedBox(height: AppSpacing.s),
