@@ -4,8 +4,12 @@ import '../../core/identity/identity_provider.dart';
 import 'onboarding_state.dart';
 
 class OnboardingController extends Notifier<OnboardingState> {
+  bool _disposed = false;
+
   @override
   OnboardingState build() {
+    _disposed = false;
+    ref.onDispose(() => _disposed = true);
     _load();
     return OnboardingState.initial();
   }
@@ -13,7 +17,7 @@ class OnboardingController extends Notifier<OnboardingState> {
   Future<void> _load() async {
     final identityStore = await ref.read(identityStoreProvider.future);
     final hasCompleted = await identityStore.isOnboardingCompleted();
-    if (!ref.mounted) {
+    if (_disposed) {
       return;
     }
 
