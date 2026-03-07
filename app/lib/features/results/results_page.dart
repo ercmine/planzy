@@ -28,9 +28,30 @@ class ResultsPage extends ConsumerWidget {
 
             if (state.topPicks.isEmpty) {
               return ListView(
-                children: const [
-                  SizedBox(height: 120),
-                  Center(child: Text('Start swiping to see results.')),
+                padding: const EdgeInsets.all(AppSpacing.m),
+                children: [
+                  if (state.errorMessage != null)
+                    Card(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.m),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Could not load plans'),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(state.errorMessage!),
+                            const SizedBox(height: AppSpacing.s),
+                            FilledButton(
+                              onPressed: controller.refresh,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    const Center(child: Text('No plans returned from API. Pull to refresh.')),
                 ],
               );
             }
@@ -54,10 +75,20 @@ class ResultsPage extends ConsumerWidget {
                     onTap: () => _showCardDetailsSheet(context, item.plan),
                     onLockIn: () => controller.lockIn(item.plan),
                   ),
-                if (state.errorMessage != null)
+                if (state.activeSessions != null || state.generatedAt != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.m),
-                    child: Text(state.errorMessage!),
+                    padding: const EdgeInsets.only(top: AppSpacing.s),
+                    child: Text(
+                      'Live summary: activeSessions=${state.activeSessions ?? '-'} generatedAt=${state.generatedAt ?? '-'}',
+                    ),
+                  ),
+                if (state.errorMessage != null)
+                  Card(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.s),
+                      child: Text(state.errorMessage!),
+                    ),
                   ),
               ],
             );

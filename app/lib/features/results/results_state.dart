@@ -21,6 +21,8 @@ class ResultsState {
     this.lockedPlanId,
     this.errorMessage,
     required this.swipeCount,
+    this.activeSessions,
+    this.generatedAt,
   });
 
   factory ResultsState.initial() => const ResultsState(
@@ -34,6 +36,8 @@ class ResultsState {
   final String? lockedPlanId;
   final String? errorMessage;
   final int swipeCount;
+  final int? activeSessions;
+  final String? generatedAt;
 
   ResultsState copyWith({
     bool? isLoading,
@@ -41,6 +45,8 @@ class ResultsState {
     String? lockedPlanId,
     String? errorMessage,
     int? swipeCount,
+    int? activeSessions,
+    String? generatedAt,
     bool clearError = false,
   }) {
     return ResultsState(
@@ -49,6 +55,8 @@ class ResultsState {
       lockedPlanId: lockedPlanId ?? this.lockedPlanId,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       swipeCount: swipeCount ?? this.swipeCount,
+      activeSessions: activeSessions ?? this.activeSessions,
+      generatedAt: generatedAt ?? this.generatedAt,
     );
   }
 }

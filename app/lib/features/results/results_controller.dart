@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/api_error.dart';
+import '../../api/models.dart';
 import '../../core/sharing/share_service.dart';
 import '../../models/plan.dart';
+import '../../repositories/live_results_repository.dart';
 import '../../repositories/swipes_repository.dart';
 import 'results_state.dart';
 
@@ -10,9 +13,11 @@ class ResultsController extends StateNotifier<ResultsState> {
     required String sessionId,
     required SwipesRepository swipesRepository,
     required ShareService shareService,
+    required LiveResultsRepository? liveResultsRepository,
   })  : _sessionId = sessionId,
         _swipesRepository = swipesRepository,
         _shareService = shareService,
+        _liveResultsRepository = liveResultsRepository,
         super(ResultsState.initial()) {
     Future<void>.microtask(refresh);
   }
@@ -20,6 +25,7 @@ class ResultsController extends StateNotifier<ResultsState> {
   final String _sessionId;
   final SwipesRepository _swipesRepository;
   final ShareService _shareService;
+  final LiveResultsRepository? _liveResultsRepository;
 
   Future<void> refresh() async {
     state = state.copyWith(isLoading: true, clearError: true);
@@ -27,6 +33,7 @@ class ResultsController extends StateNotifier<ResultsState> {
       final swipeCount = await _swipesRepository.getSwipeCount(_sessionId);
       final topPicks = await _swipesRepository.computeTopPicks(_sessionId);
       final lockedPlan = await _swipesRepository.getLockedPlan(_sessionId);
+      final liveResults = await _loadLiveResults();
 
       state = state.copyWith(
         isLoading: false,
@@ -42,13 +49,22 @@ class ResultsController extends StateNotifier<ResultsState> {
             )
             .toList(growable: false),
         lockedPlanId: lockedPlan?.planId,
+        activeSessions: liveResults?.summary.activeSessions,
+        generatedAt: liveResults?.summary.generatedAt,
       );
     } catch (error) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: error.toString(),
+        errorMessage: _formatError(error),
       );
     }
+  }
+
+  Future<LiveResultsResponse?> _loadLiveResults() async {
+    if (_liveResultsRepository == null) {
+      return null;
+    }
+    return _liveResultsRepository!.fetchLiveResults();
   }
 
   Future<void> lockIn(Plan plan) async {
@@ -71,5 +87,15 @@ class ResultsController extends StateNotifier<ResultsState> {
         'Maps: $mapsLink\n'
         'Website: $websiteLink\n\n'
         'Join session: https://perbug.com/invite/$_sessionId';
+  }
+
+  String _formatError(Object error) {
+    if (error is ApiError && error.kind == ApiErrorKind.http && error.statusCode != null) {
+      return 'Could not load results (HTTP ${error.statusCode})';
+    }
+    if (error is ApiError && error.kind == ApiErrorKind.decoding) {
+      return 'Parse error: ${error.details ?? error.message}';
+    }
+    return error.toString();
   }
 }

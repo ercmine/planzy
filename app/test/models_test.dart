@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:perbug/api/models.dart';
 import 'package:perbug/models/deck_batch.dart';
 import 'package:perbug/models/deep_links.dart';
 import 'package:perbug/models/plan.dart';
@@ -72,6 +73,43 @@ void main() {
       expect(withCursor.mix.planSourceCounts['google'], 1);
       expect(withoutCursor.nextCursor, isNull);
       expect(withoutCursor.mix.sponsoredCount, 1);
+    });
+  });
+
+
+
+  group('Backend API models', () {
+    test('parses plans array item shape', () {
+      final plan = PlanApiModel.fromJson({
+        'id': 'sample-plan-1',
+        'title': 'Coffee walk',
+        'category': 'coffee',
+        'source': 'stub',
+      });
+      expect(plan.id, 'sample-plan-1');
+      expect(plan.title, 'Coffee walk');
+      expect(plan.category, 'coffee');
+      expect(plan.source, 'stub');
+    });
+
+    test('parses live-results response shape', () {
+      final response = LiveResultsResponse.fromJson({
+        'results': [
+          {
+            'sessionId': 'demo-session',
+            'topPlanId': 'sample-plan-1',
+            'topPlanTitle': 'Coffee walk',
+            'score': 0.91,
+          }
+        ],
+        'summary': {
+          'activeSessions': 1,
+          'generatedAt': '2026-03-07T22:25:21.858Z',
+        }
+      });
+
+      expect(response.results.first.topPlanTitle, 'Coffee walk');
+      expect(response.summary.activeSessions, 1);
     });
   });
 

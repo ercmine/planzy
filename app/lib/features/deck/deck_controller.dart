@@ -11,6 +11,7 @@ import '../../models/deep_links.dart';
 import '../../models/plan.dart';
 import '../../models/swipe.dart';
 import '../../models/telemetry.dart';
+import '../../api/api_error.dart';
 import '../../repositories/deck_repository.dart';
 import '../../repositories/sessions_repository.dart';
 import '../../repositories/swipes_repository.dart';
@@ -287,7 +288,7 @@ class DeckController extends StateNotifier<DeckState> {
       state = state.copyWith(
         isLoadingInitial: false,
         isLoadingMore: false,
-        errorMessage: 'Could not load live results. ${error.toString()}',
+        errorMessage: _formatLoadError(error),
       );
     }
   }
@@ -330,6 +331,26 @@ class DeckController extends StateNotifier<DeckState> {
     _startViewingTopCard();
   }
 
+
+
+  String _formatLoadError(Object error) {
+    if (error is ApiError) {
+      if (error.kind == ApiErrorKind.http && error.statusCode != null) {
+        return 'Could not load plans (HTTP ${error.statusCode})';
+      }
+      if (error.kind == ApiErrorKind.decoding) {
+        return 'Parse error: ${error.details ?? error.message}';
+      }
+      if (error.kind == ApiErrorKind.network) {
+        return 'Could not load plans (network unavailable)';
+      }
+      return 'Could not load plans (${error.message})';
+    }
+    if (error is FormatException) {
+      return error.message;
+    }
+    return 'Could not load plans (${error.toString()})';
+  }
 
   Future<void> _ensureLocation() async {
     final existing = _locationController.state.effectiveLocation;

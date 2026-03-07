@@ -81,6 +81,37 @@ void main() {
     expect(calls, 1);
   });
 
+
+  test('getDecoded supports JSON array response', () async {
+    final client = ApiClient(
+      httpClient: MockClient((request) async => http.Response('[{"id":"p1"}]', 200)),
+      envConfig: env,
+      userIdResolver: () async => 'user-1',
+      retryPolicy: const RetryPolicy(maxRetries: 0, baseDelay: Duration.zero),
+    );
+
+    final response = await client.getDecoded('/plans');
+    expect(response, isA<List<dynamic>>());
+  });
+
+  test('returns http error for 500 even if body is not JSON', () async {
+    final client = ApiClient(
+      httpClient: MockClient((request) async => http.Response('server exploded', 500)),
+      envConfig: env,
+      userIdResolver: () async => 'user-1',
+      retryPolicy: const RetryPolicy(maxRetries: 0, baseDelay: Duration.zero),
+    );
+
+    expect(
+      () => client.getDecoded('/plans'),
+      throwsA(
+        isA<ApiError>()
+            .having((e) => e.kind, 'kind', ApiErrorKind.http)
+            .having((e) => e.statusCode, 'statusCode', 500),
+      ),
+    );
+  });
+
   test('throws decoding error on invalid JSON response', () async {
     final client = ApiClient(
       httpClient: MockClient((request) async => http.Response('not-json', 200)),
