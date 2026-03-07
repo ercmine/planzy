@@ -13,6 +13,7 @@ class SessionPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionAsync = ref.watch(sessionByIdProvider(sessionId));
+    final swipeCountAsync = ref.watch(swipeCountProvider(sessionId));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Session')),
@@ -51,11 +52,19 @@ class SessionPage extends ConsumerWidget {
               const SizedBox(height: AppSpacing.m),
               FilledButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Deck coming soon')),
-                  );
+                  context.push('/sessions/${session.sessionId}/deck');
                 },
                 child: const Text('Open Deck'),
+              ),
+              const SizedBox(height: AppSpacing.s),
+              OutlinedButton.icon(
+                onPressed: (swipeCountAsync.valueOrNull ?? 0) == 0
+                    ? null
+                    : () => context.push('/sessions/${session.sessionId}/results'),
+                icon: const Icon(Icons.insights_outlined),
+                label: Text(
+                  'Results${swipeCountAsync.valueOrNull == null ? '' : ' (${swipeCountAsync.valueOrNull})'}',
+                ),
               ),
               const SizedBox(height: AppSpacing.s),
               OutlinedButton.icon(

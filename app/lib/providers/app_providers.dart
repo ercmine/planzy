@@ -13,6 +13,10 @@ import '../core/location/location_service.dart';
 import '../core/permissions/permission_service.dart';
 import '../core/sharing/share_service.dart';
 import '../core/store/sessions_store.dart';
+import '../core/store/swipes_store.dart';
+import '../features/deck/deck_controller.dart';
+import '../features/results/results_controller.dart';
+import '../features/results/results_state.dart';
 import '../features/sessions/create_session/create_session_controller.dart';
 import '../features/sessions/join_session/join_session_controller.dart';
 import '../features/sessions/session_settings/session_settings_controller.dart';
@@ -21,6 +25,7 @@ import '../models/session.dart';
 import '../repositories/deck_repository.dart';
 import '../repositories/ideas_repository.dart';
 import '../repositories/sessions_repository.dart';
+import '../repositories/swipes_repository.dart';
 import '../repositories/telemetry_repository.dart';
 
 final httpClientProvider = Provider<http.Client>((ref) {
@@ -105,10 +110,18 @@ final sessionsStoreProvider = Provider<SessionsStore>((ref) {
   return SessionsStore();
 });
 
+final swipesStoreProvider = Provider<SwipesStore>((ref) {
+  return SwipesStore();
+});
+
 final sessionsRepositoryProvider = Provider<SessionsRepository>((ref) {
   return SessionsRepository(
     sessionsStore: ref.watch(sessionsStoreProvider),
   );
+});
+
+final swipesRepositoryProvider = Provider<SwipesRepository>((ref) {
+  return SwipesRepository(swipesStore: ref.watch(swipesStoreProvider));
 });
 
 final sessionsControllerProvider =
@@ -147,4 +160,38 @@ final joinSessionControllerProvider =
 
 final sessionByIdProvider = FutureProvider.family<Session?, String>((ref, sessionId) {
   return ref.watch(sessionsRepositoryProvider).getById(sessionId);
+});
+
+final swipeCountProvider = FutureProvider.family<int, String>((ref, sessionId) {
+  return ref.watch(swipesRepositoryProvider).getSwipeCount(sessionId);
+});
+
+final deckControllerProvider =
+    StateNotifierProvider.family<DeckController, DeckState, String>((ref, sessionId) {
+  final deckRepositoryAsync = ref.watch(deckRepositoryProvider);
+  final telemetryRepositoryAsync = ref.watch(telemetryRepositoryProvider);
+
+  final deckRepository = deckRepositoryAsync.valueOrNull;
+  final telemetryRepository = telemetryRepositoryAsync.valueOrNull;
+
+  if (deckRepository == null || telemetryRepository == null) {
+    throw StateError('Deck dependencies are not ready yet.');
+  }
+
+  return DeckController(
+    sessionId: sessionId,
+    deckRepository: deckRepository,
+    swipesRepository: ref.watch(swipesRepositoryProvider),
+    telemetryRepository: telemetryRepository,
+    sessionsRepository: ref.watch(sessionsRepositoryProvider),
+  );
+});
+
+final resultsControllerProvider =
+    StateNotifierProvider.family<ResultsController, ResultsState, String>((ref, sessionId) {
+  return ResultsController(
+    sessionId: sessionId,
+    swipesRepository: ref.watch(swipesRepositoryProvider),
+    shareService: ref.watch(shareServiceProvider),
+  );
 });
