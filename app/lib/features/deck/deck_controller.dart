@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/ads/ad_deck_injector.dart';
 import '../../core/location/location_controller.dart';
 import '../../core/telemetry/telemetry_dispatcher.dart';
 import '../../models/deck_batch.dart';
@@ -25,6 +26,7 @@ class DeckController extends StateNotifier<DeckState> {
     required TelemetryDispatcher telemetryDispatcher,
     required SessionsRepository sessionsRepository,
     required LocationController locationController,
+    required AdDeckInjector adDeckInjector,
   })  : _sessionId = sessionId,
         _deckRepository = deckRepository,
         _swipesRepository = swipesRepository,
@@ -32,6 +34,7 @@ class DeckController extends StateNotifier<DeckState> {
         _telemetryDispatcher = telemetryDispatcher,
         _sessionsRepository = sessionsRepository,
         _locationController = locationController,
+        _adDeckInjector = adDeckInjector,
         super(DeckState.initial(sessionId)) {
     _telemetryDispatcher.setActiveSession(_sessionId);
     Future<void>.microtask(initialize);
@@ -44,6 +47,7 @@ class DeckController extends StateNotifier<DeckState> {
   final TelemetryDispatcher _telemetryDispatcher;
   final SessionsRepository _sessionsRepository;
   final LocationController _locationController;
+  final AdDeckInjector _adDeckInjector;
 
   static const int _batchLimit = 25;
 
@@ -70,6 +74,7 @@ class DeckController extends StateNotifier<DeckState> {
       clearCursor: true,
       hasMore: true,
       plans: const <Plan>[],
+      items: const <DeckItem>[],
       undoStack: const <DeckSwipeRecord>[],
       shownPlanIds: const <String>[],
       locationRequired: false,
@@ -93,11 +98,20 @@ class DeckController extends StateNotifier<DeckState> {
   }
 
   Future<void> swipeTop(SwipeAction action) async {
-    if (state.plans.isEmpty) {
+    if (state.items.isEmpty) {
       return;
     }
 
-    final plan = state.plans.first;
+    final topItem = state.items.first;
+    if (topItem is DeckAdItem) {
+      final nextItems = [...state.items]..removeAt(0);
+      state = state.copyWith(items: nextItems, clearError: true);
+      _startViewingTopCard();
+      await loadMoreIfNeeded();
+      return;
+    }
+
+    final plan = (topItem as DeckPlanItem).plan;
     const position = 0;
 
     await _emitCardViewedIfNeeded(plan);
@@ -122,6 +136,7 @@ class DeckController extends StateNotifier<DeckState> {
 
     state = state.copyWith(
       plans: nextPlans,
+      items: _adDeckInjector.inject(plans: nextPlans),
       undoStack: undo,
       shownPlanIds: shownIds,
       clearError: true,
@@ -153,8 +168,10 @@ class DeckController extends StateNotifier<DeckState> {
 
     final record = state.undoStack.first;
     final remainingUndo = [...state.undoStack]..removeAt(0);
+    final nextPlans = [record.plan, ...state.plans];
     state = state.copyWith(
-      plans: [record.plan, ...state.plans],
+      plans: nextPlans,
+      items: _adDeckInjector.inject(plans: nextPlans),
       undoStack: remainingUndo,
     );
     _startViewingTopCard();
@@ -313,17 +330,20 @@ class DeckController extends StateNotifier<DeckState> {
     bool showCachedNotice = false,
   }) {
     final merged = reset ? batch.plans : [...state.plans, ...batch.plans];
-    final deduped = <String, Plan>{for (final plan in merged) plan.id: plan}.values.toList();
+    final deduped =
+        <String, Plan>{for (final plan in merged) plan.id: plan}.values.toList();
 
     final sourceCounts = batch.mix.planSourceCounts;
     final curatedFallbackCount =
         (sourceCounts['curated'] ?? 0) + (sourceCounts['byo'] ?? 0);
-    final usedFallback = batch.plans.isEmpty || curatedFallbackCount >= (batch.plans.length / 2);
+    final usedFallback =
+        batch.plans.isEmpty || curatedFallbackCount >= (batch.plans.length / 2);
 
     state = state.copyWith(
       isLoadingInitial: false,
       isLoadingMore: false,
       plans: deduped,
+      items: _adDeckInjector.inject(plans: deduped),
       nextCursor: batch.nextCursor,
       hasMore: batch.nextCursor != null,
       lastBatchMix: batch.mix,
@@ -365,13 +385,14 @@ class DeckController extends StateNotifier<DeckState> {
   }
 
   void _startViewingTopCard() {
-    if (state.plans.isEmpty) {
+    if (state.items.isEmpty || state.items.first is! DeckPlanItem) {
       _viewStartedAt = null;
       _viewPlanId = null;
       return;
     }
+    final topPlan = (state.items.first as DeckPlanItem).plan;
     _viewStartedAt = DateTime.now();
-    _viewPlanId = state.plans.first.id;
+    _viewPlanId = topPlan.id;
   }
 
   Future<void> _emitCardViewedIfNeeded(Plan plan) async {

@@ -157,6 +157,18 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
           _Section(
+            title: 'Privacy',
+            icon: Icons.privacy_tip_outlined,
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Ads may be shown. We do not sell personal info.'),
+                SizedBox(height: AppSpacing.xs),
+                Text('TODO: add consent manager for region-specific requirements.'),
+              ],
+            ),
+          ),
+          _Section(
             title: 'About',
             icon: Icons.info_outline,
             child: Column(
