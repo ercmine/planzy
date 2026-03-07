@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/spacing.dart';
 import '../../../core/format/formatters.dart';
 import '../../../models/plan.dart';
+import '../../ideas/widgets/friend_idea_badge.dart';
 import 'category_pill.dart';
 import 'price_pill.dart';
 import 'rating_row.dart';
-import '../../ideas/widgets/friend_idea_badge.dart';
 import 'specials_badge.dart';
 import 'sponsored_badge.dart';
 
@@ -23,11 +23,6 @@ class DeckCard extends StatelessWidget {
 
   bool get _isSponsored =>
       plan.metadata?['sponsored'] == true || plan.source.toLowerCase() == 'promoted';
-
-  bool get _hasSpecials {
-    final specials = plan.metadata?['specials'];
-    return specials is List && specials.isNotEmpty;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +76,8 @@ class DeckCard extends StatelessWidget {
                         const Text('Closed'),
                       if (isFriendIdea(plan)) const FriendIdeaBadge(),
                       if (_isSponsored) const SponsoredBadge(),
-                      if (_hasSpecials) const SpecialsBadge(),
+                      if (plan.hasSpecials) const SpecialsBadge(),
+                      if (plan.isVenueLike) const _ClaimBadge(),
                     ],
                   ),
                 ],
@@ -90,6 +86,22 @@ class DeckCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ClaimBadge extends StatelessWidget {
+  const _ClaimBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text('Claim'),
     );
   }
 }

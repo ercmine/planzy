@@ -63,6 +63,21 @@ class ApiClient {
     );
   }
 
+
+  Future<T> postJsonTyped<T>(
+    String path, {
+    Object? body,
+    Map<String, String?>? queryParameters,
+    required T Function(Map<String, dynamic>) fromJson,
+  }) async {
+    final response = await postJson(
+      path,
+      body: body,
+      queryParameters: queryParameters,
+    );
+    return fromJson(response);
+  }
+
   Future<JsonMap> deleteJson(String path, {Object? body}) {
     return _send(method: 'DELETE', path: path, body: body);
   }
