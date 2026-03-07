@@ -64,14 +64,9 @@ final ideasRepositoryProvider = FutureProvider<IdeasRepository>((ref) async {
 
 final ideasControllerProvider = StateNotifierProvider.family<IdeasController, IdeasState, String>(
   (ref, sessionId) {
-    final repositoryAsync = ref.watch(ideasRepositoryProvider);
-    final repository = repositoryAsync.valueOrNull;
-    if (repository == null) {
-      throw StateError('Ideas repository not ready');
-    }
     return IdeasController(
       sessionId: sessionId,
-      ideasRepository: repository,
+      repositoryResolver: () => ref.read(ideasRepositoryProvider.future),
     );
   },
 );

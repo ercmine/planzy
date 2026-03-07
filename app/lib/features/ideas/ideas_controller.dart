@@ -8,13 +8,13 @@ import 'ideas_state.dart';
 class IdeasController extends StateNotifier<IdeasState> {
   IdeasController({
     required String sessionId,
-    required IdeasRepository ideasRepository,
-  })  : _ideasRepository = ideasRepository,
+    required Future<IdeasRepository> Function() repositoryResolver,
+  })  : _repositoryResolver = repositoryResolver,
         super(IdeasState.initial(sessionId));
 
   static const int _defaultPageSize = 50;
 
-  final IdeasRepository _ideasRepository;
+  final Future<IdeasRepository> Function() _repositoryResolver;
 
   Future<void> initLoad() async {
     if (state.ideas.isNotEmpty || state.isLoading) {
@@ -27,7 +27,8 @@ class IdeasController extends StateNotifier<IdeasState> {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
 
     try {
-      final response = await _ideasRepository.listIdeas(
+      final repository = await _repositoryResolver();
+      final response = await repository.listIdeas(
         state.sessionId,
         limit: _defaultPageSize,
       );
@@ -54,7 +55,8 @@ class IdeasController extends StateNotifier<IdeasState> {
 
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
-      final response = await _ideasRepository.listIdeas(
+      final repository = await _repositoryResolver();
+      final response = await repository.listIdeas(
         state.sessionId,
         cursor: state.nextCursor,
         limit: _defaultPageSize,
@@ -90,7 +92,8 @@ class IdeasController extends StateNotifier<IdeasState> {
 
     state = state.copyWith(isSubmitting: true, clearErrorMessage: true);
     try {
-      await _ideasRepository.createIdea(state.sessionId, request);
+      final repository = await _repositoryResolver();
+      await repository.createIdea(state.sessionId, request);
       state = state.copyWith(isSubmitting: false);
       await refresh();
       return true;
@@ -107,7 +110,8 @@ class IdeasController extends StateNotifier<IdeasState> {
   Future<void> deleteIdea(String ideaId) async {
     state = state.copyWith(isLoading: true, clearErrorMessage: true);
     try {
-      await _ideasRepository.deleteIdea(state.sessionId, ideaId);
+      final repository = await _repositoryResolver();
+      await repository.deleteIdea(state.sessionId, ideaId);
       await refresh();
     } catch (error, stackTrace) {
       Log.error('Failed to delete idea', error: error, stackTrace: stackTrace);
