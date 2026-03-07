@@ -1,16 +1,18 @@
-class DeepLinks {
-  const DeepLinks({
-    required this.invitePath,
-    required this.sessionPath,
-  });
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  final String invitePath;
-  final String sessionPath;
+part 'deep_links.freezed.dart';
+part 'deep_links.g.dart';
 
-  factory DeepLinks.fromInviteCode(String code) {
-    return DeepLinks(
-      invitePath: '/invite/$code',
-      sessionPath: '/sessions',
-    );
-  }
+@freezed
+class DeepLinks with _$DeepLinks {
+  const factory DeepLinks({
+    String? mapsLink,
+    String? websiteLink,
+    String? callLink,
+    String? bookingLink,
+    String? ticketLink,
+  }) = _DeepLinks;
+
+  factory DeepLinks.fromJson(Map<String, dynamic> json) =>
+      _$DeepLinksFromJson(json);
 }
