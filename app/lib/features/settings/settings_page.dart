@@ -140,6 +140,23 @@ class SettingsPage extends ConsumerWidget {
               onChanged: controller.setNotificationsEnabled,
             ),
           ),
+          _Section(
+            title: 'Diagnostics',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Diagnostics logging'),
+                  subtitle: const Text(
+                    'Enable extra local logs to help troubleshoot app issues.',
+                  ),
+                  value: state.diagnosticsLoggingEnabled,
+                  onChanged: controller.setDiagnosticsLoggingEnabled,
+                ),
+              ],
+            ),
+          ),
           const _Section(
             title: 'Privacy',
             child: Text(
@@ -160,6 +177,17 @@ class SettingsPage extends ConsumerWidget {
                   onPressed: () => _copyDiagnostics(context, ref),
                   child: const Text('Copy diagnostics'),
                 ),
+              ],
+            ),
+          ),
+          _Section(
+            title: 'About',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('OurPlanPlan helps your group find plans together.'),
+                const SizedBox(height: AppSpacing.xs),
+                Text('Version: ${state.appVersion}'),
               ],
             ),
           ),

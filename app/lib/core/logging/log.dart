@@ -3,20 +3,28 @@ import 'dart:developer' as developer;
 class Log {
   const Log._();
 
-  static bool _enableDebugLogs = false;
+  static bool _envDebugLogsEnabled = false;
+  static bool _diagnosticsLoggingEnabled = false;
 
   static void configure({required bool enableDebugLogs}) {
-    _enableDebugLogs = enableDebugLogs;
+    _envDebugLogsEnabled = enableDebugLogs;
   }
 
+  static void setDiagnosticsLoggingEnabled(bool enabled) {
+    _diagnosticsLoggingEnabled = enabled;
+  }
+
+  static bool get _shouldLogDebug =>
+      _envDebugLogsEnabled || _diagnosticsLoggingEnabled;
+
   static void d(String message) {
-    if (_enableDebugLogs) {
+    if (_shouldLogDebug) {
       developer.log(message, name: 'DEBUG');
     }
   }
 
   static void info(String message) {
-    if (_enableDebugLogs) {
+    if (_shouldLogDebug) {
       developer.log(message, name: 'INFO');
     }
   }
