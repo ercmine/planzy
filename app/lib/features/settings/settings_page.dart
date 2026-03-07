@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../app/brand/logo.dart';
 import '../../app/theme/spacing.dart';
+import '../../app/theme/widgets.dart';
 import '../../core/diagnostics/diagnostics.dart';
 import '../../core/identity/identity_provider.dart';
 import '../../core/location/location_controller.dart';
@@ -24,34 +26,29 @@ class SettingsPage extends ConsumerWidget {
     final locationController = ref.read(locationControllerProvider.notifier);
     final userIdAsync = ref.watch(userIdProvider);
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.m),
         children: [
           _Section(
             title: 'Account',
+            icon: Icons.person_outline,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Expanded(
-                      child: Text('User ID: ${_mask(userIdAsync.valueOrNull)}'),
-                    ),
-                    IconButton(
+                    Expanded(child: Text('User ID: ${_mask(userIdAsync.valueOrNull)}')),
+                    AppIconButton(
                       onPressed: userIdAsync.valueOrNull == null
                           ? null
                           : () async {
-                              await Clipboard.setData(
-                                ClipboardData(text: userIdAsync.valueOrNull!),
-                              );
-                              if (!context.mounted) {
-                                return;
+                              await Clipboard.setData(ClipboardData(text: userIdAsync.valueOrNull!));
+                              if (context.mounted) {
+                                AppSnackbar.show(context, 'User ID copied.');
                               }
-                              AppSnackbar.show(context, 'User ID copied.');
                             },
-                      icon: const Icon(Icons.copy),
+                      icon: Icons.copy,
                     ),
                   ],
                 ),
@@ -62,35 +59,30 @@ class SettingsPage extends ConsumerWidget {
           ),
           _Section(
             title: 'Permissions',
+            icon: Icons.shield_outlined,
             child: Column(
               children: [
                 _PermissionRow(
                   label: 'Location',
                   state: state.locationPermission,
-                  onOpenSettings: state.locationPermission == PermissionState.permanentlyDenied
-                      ? openAppSettings
-                      : null,
+                  onOpenSettings: state.locationPermission == PermissionState.permanentlyDenied ? openAppSettings : null,
                 ),
                 const SizedBox(height: AppSpacing.s),
                 _PermissionRow(
                   label: 'Contacts',
                   state: state.contactsPermission,
-                  onOpenSettings: state.contactsPermission == PermissionState.permanentlyDenied
-                      ? openAppSettings
-                      : null,
+                  onOpenSettings: state.contactsPermission == PermissionState.permanentlyDenied ? openAppSettings : null,
                 ),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: controller.refreshPermissions,
-                    child: const Text('Refresh permissions'),
-                  ),
+                  child: TextButton(onPressed: controller.refreshPermissions, child: const Text('Refresh permissions')),
                 ),
               ],
             ),
           ),
           _Section(
             title: 'Location',
+            icon: Icons.my_location,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -104,28 +96,27 @@ class SettingsPage extends ConsumerWidget {
                   spacing: AppSpacing.s,
                   runSpacing: AppSpacing.s,
                   children: [
-                    OutlinedButton(
+                    SecondaryButton(
                       onPressed: () => _showManualLocationDialog(context, locationController),
-                      child: const Text('Set manual location'),
+                      label: 'Set manual location',
                     ),
-                    OutlinedButton(
+                    SecondaryButton(
                       onPressed: locationState.manualOverride == null
                           ? null
                           : () {
                               locationController.clearOverride();
                               AppSnackbar.show(context, 'Manual location cleared.');
                             },
-                      child: const Text('Clear override'),
+                      label: 'Clear override',
                     ),
-                    OutlinedButton(
+                    SecondaryButton(
                       onPressed: () async {
                         await locationController.loadCurrentLocation();
-                        if (!context.mounted) {
-                          return;
+                        if (context.mounted) {
+                          AppSnackbar.show(context, 'Live location refreshed.');
                         }
-                        AppSnackbar.show(context, 'Live location refreshed.');
                       },
-                      child: const Text('Refresh live location'),
+                      label: 'Refresh live location',
                     ),
                   ],
                 ),
@@ -134,6 +125,7 @@ class SettingsPage extends ConsumerWidget {
           ),
           _Section(
             title: 'Notifications',
+            icon: Icons.notifications_none,
             child: SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               title: const Text('Notify me when matches are found'),
@@ -143,50 +135,36 @@ class SettingsPage extends ConsumerWidget {
           ),
           _Section(
             title: 'Diagnostics',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Diagnostics logging'),
-                  subtitle: const Text(
-                    'Enable extra local logs to help troubleshoot app issues.',
-                  ),
-                  value: state.diagnosticsLoggingEnabled,
-                  onChanged: controller.setDiagnosticsLoggingEnabled,
-                ),
-              ],
-            ),
-          ),
-          const _Section(
-            title: 'Privacy',
-            child: Text(
-              'OurPlanPlan runs invite-only sessions, shares only what is needed to match plans, and does not sell your personal data.',
+            icon: Icons.monitor_heart_outlined,
+            child: SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Diagnostics logging'),
+              subtitle: const Text('Enable extra local logs to help troubleshoot app issues.'),
+              value: state.diagnosticsLoggingEnabled,
+              onChanged: controller.setDiagnosticsLoggingEnabled,
             ),
           ),
           _Section(
             title: 'Support',
+            icon: Icons.support_agent,
             child: Wrap(
               spacing: AppSpacing.s,
               runSpacing: AppSpacing.s,
               children: [
-                FilledButton.tonal(
-                  onPressed: () => _emailSupport(context, state.appVersion),
-                  child: const Text('Email support'),
-                ),
-                FilledButton.tonal(
-                  onPressed: () => _copyDiagnostics(context, ref),
-                  child: const Text('Copy diagnostics'),
-                ),
+                FilledButton.tonal(onPressed: () => _emailSupport(context, state.appVersion), child: const Text('Email support')),
+                FilledButton.tonal(onPressed: () => _copyDiagnostics(context, ref), child: const Text('Copy diagnostics')),
               ],
             ),
           ),
           _Section(
             title: 'About',
+            icon: Icons.info_outline,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('OurPlanPlan helps your group find plans together.'),
+                const PerbugLogo(size: 40, variant: PerbugLogoVariant.withWordmark),
+                const SizedBox(height: AppSpacing.s),
+                const Text('Perbug helps your group find plans together.'),
                 const SizedBox(height: AppSpacing.xs),
                 Text('Version: ${state.appVersion}'),
               ],
@@ -236,16 +214,12 @@ class SettingsPage extends ConsumerWidget {
     );
 
     await Clipboard.setData(ClipboardData(text: diagnostics));
-    if (!context.mounted) {
-      return;
+    if (context.mounted) {
+      AppSnackbar.show(context, 'Diagnostics copied.');
     }
-    AppSnackbar.show(context, 'Diagnostics copied.');
   }
 
-  Future<void> _showManualLocationDialog(
-    BuildContext context,
-    LocationController locationController,
-  ) async {
+  Future<void> _showManualLocationDialog(BuildContext context, LocationController locationController) async {
     final latController = TextEditingController();
     final lngController = TextEditingController();
 
@@ -257,23 +231,12 @@ class SettingsPage extends ConsumerWidget {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: latController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                decoration: const InputDecoration(labelText: 'Latitude'),
-              ),
-              TextField(
-                controller: lngController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                decoration: const InputDecoration(labelText: 'Longitude'),
-              ),
+              TextField(controller: latController, keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true), decoration: const InputDecoration(labelText: 'Latitude')),
+              TextField(controller: lngController, keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true), decoration: const InputDecoration(labelText: 'Longitude')),
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
             FilledButton(
               onPressed: () {
                 final lat = double.tryParse(latController.text.trim());
@@ -317,24 +280,27 @@ class SettingsPage extends ConsumerWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({
-    required this.title,
-    required this.child,
-  });
+  const _Section({required this.title, required this.child, required this.icon});
 
   final String title;
   final Widget child;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.m),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.m),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.m),
+      child: AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              children: [
+                Icon(icon, size: 18),
+                const SizedBox(width: AppSpacing.s),
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
             const SizedBox(height: AppSpacing.s),
             child,
           ],
@@ -345,11 +311,7 @@ class _Section extends StatelessWidget {
 }
 
 class _PermissionRow extends StatelessWidget {
-  const _PermissionRow({
-    required this.label,
-    required this.state,
-    this.onOpenSettings,
-  });
+  const _PermissionRow({required this.label, required this.state, this.onOpenSettings});
 
   final String label;
   final PermissionState state;

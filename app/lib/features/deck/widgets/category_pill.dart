@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/widgets.dart';
+
 class CategoryPill extends StatelessWidget {
   const CategoryPill({required this.category, super.key});
 
@@ -7,12 +9,6 @@ class CategoryPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      label: Text(
-        category,
-        style: Theme.of(context).textTheme.labelMedium,
-      ),
-      visualDensity: VisualDensity.compact,
-    );
+    return AppPill(label: category, icon: Icons.label_outline_rounded);
   }
 }

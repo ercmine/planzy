@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/brand/logo.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import 'onboarding_controller.dart';
@@ -24,14 +25,16 @@ class OnboardingPermissionsPage extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const Center(child: PerbugLogo(size: 56)),
+          const SizedBox(height: AppSpacing.m),
           Text(
-            'Before you start',
+            'Quick setup',
             style: Theme.of(context).textTheme.headlineSmall,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.s),
           Text(
-            'We will ask for a couple permissions later, only when needed.',
+            'We only ask for permissions when they help your session.',
             style: Theme.of(context).textTheme.bodyMedium,
             textAlign: TextAlign.center,
           ),
@@ -39,15 +42,13 @@ class OnboardingPermissionsPage extends ConsumerWidget {
           const PermissionInfoCard(
             icon: Icons.location_on_outlined,
             title: 'Location',
-            description:
-                'Helps us suggest nearby places that match your group plans.',
+            description: 'Find places that are close enough for everyone.',
           ),
           const SizedBox(height: AppSpacing.s),
           const PermissionInfoCard(
             icon: Icons.contacts_outlined,
             title: 'Contacts',
-            description:
-                'Lets you invite friends quickly without manually typing details.',
+            description: 'Invite friends quickly without manual typing.',
           ),
           const SizedBox(height: AppSpacing.l),
           PrimaryButton(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/widgets.dart';
+
 class SponsoredBadge extends StatelessWidget {
   const SponsoredBadge({super.key});
 
@@ -10,7 +12,7 @@ class SponsoredBadge extends StatelessWidget {
       onTap: () => showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Sponsored'),
+          title: const Text('Sponsored placement'),
           content: const Text('Sponsored means this venue paid for placement.'),
           actions: [
             TextButton(
@@ -20,21 +22,7 @@ class SponsoredBadge extends StatelessWidget {
           ],
         ),
       ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.tertiaryContainer,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Text('Sponsored'),
-            SizedBox(width: 4),
-            Icon(Icons.info_outline, size: 14),
-          ],
-        ),
-      ),
+      child: const AppPill(label: 'Sponsored', icon: Icons.info_outline),
     );
   }
 }

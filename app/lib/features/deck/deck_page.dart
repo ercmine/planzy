@@ -4,6 +4,7 @@ import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/spacing.dart';
+import '../../app/theme/widgets.dart';
 import '../../core/env/env.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/widgets/retry_view.dart';
@@ -104,7 +105,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
       );
     }
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('Deck')),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.m),
@@ -185,7 +186,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
   }
 
   Widget _scaffoldWithBody(Widget body) {
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('Deck')),
       body: body,
     );

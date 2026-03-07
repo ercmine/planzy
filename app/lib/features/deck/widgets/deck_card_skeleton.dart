@@ -9,22 +9,27 @@ class DeckCardSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme.surfaceContainerHighest;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.m),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _block(color, 220, 20),
-            const SizedBox(height: AppSpacing.s),
-            _block(color, 120, 16),
-            const SizedBox(height: AppSpacing.m),
-            _block(color, double.infinity, 180),
-            const SizedBox(height: AppSpacing.m),
-            _block(color, 170, 14),
-            const SizedBox(height: AppSpacing.s),
-            _block(color, 140, 14),
-          ],
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 280),
+      builder: (context, value, child) => Opacity(opacity: value, child: child),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.m),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _block(color, 220, 20),
+              const SizedBox(height: AppSpacing.s),
+              _block(color, 120, 16),
+              const SizedBox(height: AppSpacing.m),
+              _block(color, double.infinity, 180),
+              const SizedBox(height: AppSpacing.m),
+              _block(color, 170, 14),
+              const SizedBox(height: AppSpacing.s),
+              _block(color, 140, 14),
+            ],
+          ),
         ),
       ),
     );
@@ -36,7 +41,7 @@ class DeckCardSkeleton extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppSpacing.s),
       ),
     );
   }

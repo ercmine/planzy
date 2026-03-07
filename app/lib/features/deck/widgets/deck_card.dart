@@ -67,38 +67,59 @@ class _DeckCardState extends State<DeckCard> {
     final rating = formatRating(plan.rating, plan.reviewCount);
     final price = formatPriceLevel(plan.priceLevel);
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: widget.onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: plan.photos?.firstOrNull != null
-                  ? CachedNetworkImage(
-                      imageUrl: plan.photos!.first.url,
-                      fit: BoxFit.cover,
-                      memCacheWidth: 800,
-                      placeholder: (_, __) => const ColoredBox(color: Colors.black12),
-                      errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                    )
-                  : Container(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      child: const Icon(Icons.photo, size: 56),
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: Card(
+        key: ValueKey(plan.id),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: widget.onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (plan.photos?.firstOrNull != null)
+                      CachedNetworkImage(
+                        imageUrl: plan.photos!.first.url,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 800,
+                        placeholder: (_, __) => ColoredBox(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        ),
+                        errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                      )
+                    else
+                      Container(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        child: const Icon(Icons.photo, size: 56),
+                      ),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.center,
+                          colors: [Color(0x7A000000), Colors.transparent],
+                        ),
+                      ),
                     ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.m),
-              child: _CardMeta(
-                plan: plan,
-                distance: distance,
-                price: price,
-                rating: rating,
-                isSponsored: _isSponsored,
+                  ],
+                ),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.m),
+                child: _CardMeta(
+                  plan: plan,
+                  distance: distance,
+                  price: price,
+                  rating: rating,
+                  isSponsored: _isSponsored,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
