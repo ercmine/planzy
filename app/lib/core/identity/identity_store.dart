@@ -10,7 +10,7 @@ class IdentityStore {
   })  : _prefs = sharedPreferences,
         _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
-  static const userIdKey = 'ourplanplan_user_id';
+  static const userIdKey = 'perbug_user_id';
   static const onboardingCompletedKey = 'onboarding_completed';
 
   final SharedPreferences _prefs;

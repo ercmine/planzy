@@ -56,6 +56,7 @@ class DeckState {
     this.usedFallback = false,
     this.locationRequired = false,
     this.showCachedResultsNotice = false,
+    this.usingOfflineCachedData = false,
   });
 
   factory DeckState.initial(String sessionId) =>
@@ -75,6 +76,7 @@ class DeckState {
   final bool usedFallback;
   final bool locationRequired;
   final bool showCachedResultsNotice;
+  final bool usingOfflineCachedData;
 
   DeckState copyWith({
     String? sessionId,
@@ -93,6 +95,7 @@ class DeckState {
     bool? usedFallback,
     bool? locationRequired,
     bool? showCachedResultsNotice,
+    bool? usingOfflineCachedData,
   }) {
     return DeckState(
       sessionId: sessionId ?? this.sessionId,
@@ -110,6 +113,8 @@ class DeckState {
       locationRequired: locationRequired ?? this.locationRequired,
       showCachedResultsNotice:
           showCachedResultsNotice ?? this.showCachedResultsNotice,
+      usingOfflineCachedData:
+          usingOfflineCachedData ?? this.usingOfflineCachedData,
     );
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ourplanplan/core/ads/ad_deck_injector.dart';
-import 'package:ourplanplan/core/ads/ads_config.dart';
-import 'package:ourplanplan/features/deck/deck_state.dart';
-import 'package:ourplanplan/models/plan.dart';
+import 'package:perbug/core/ads/ad_deck_injector.dart';
+import 'package:perbug/core/ads/ads_config.dart';
+import 'package:perbug/features/deck/deck_state.dart';
+import 'package:perbug/models/plan.dart';
 
 void main() {
   const config = AdsConfig(

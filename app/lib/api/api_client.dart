@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../core/env/env.dart';
+import '../core/logging/log.dart';
 import '../core/utils/json.dart';
 import '../core/utils/uuid.dart';
 import '../models/error_payload.dart';
@@ -18,6 +19,7 @@ class ApiClient {
     required this.userIdResolver,
     this.retryPolicy = const RetryPolicy(),
     this.timeout = const Duration(seconds: 20),
+    this.reachabilityTimeout = const Duration(seconds: 10),
   });
 
   final http.Client httpClient;
@@ -25,6 +27,7 @@ class ApiClient {
   final Future<String> Function() userIdResolver;
   final RetryPolicy retryPolicy;
   final Duration timeout;
+  final Duration reachabilityTimeout;
 
   Uri buildUri(String path, [Map<String, String?>? queryParameters]) {
     final base = Uri.parse(envConfig.apiBaseUrl);
@@ -40,6 +43,16 @@ class ApiClient {
       path: '${base.path}${path.startsWith('/') ? path : '/$path'}',
       queryParameters: sanitized,
     );
+  }
+
+  Future<bool> checkBackendReachability() async {
+    final healthUri = buildUri('/health');
+    if (await _ping(healthUri)) {
+      return true;
+    }
+
+    final rootUri = buildUri('/');
+    return _ping(rootUri);
   }
 
   Future<JsonMap> getJson(String path, {Map<String, String?>? queryParameters}) {
@@ -62,7 +75,6 @@ class ApiClient {
       body: body,
     );
   }
-
 
   Future<T> postJsonTyped<T>(
     String path, {
@@ -114,41 +126,70 @@ class ApiClient {
         final decoded = _decodeBody(response.body);
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
+          Log.d('$method $uri -> ${response.statusCode}');
           return decoded is JsonMap ? decoded : <String, dynamic>{'data': decoded};
         }
 
+        _logHttpFailure(
+          method: method,
+          uri: uri,
+          statusCode: response.statusCode,
+          responseBody: response.body,
+        );
         throw ApiError.http(
           'HTTP ${response.statusCode}',
           statusCode: response.statusCode,
           serverPayload: decoded is JsonMap ? ErrorPayload.tryParse(decoded) : null,
           details: decoded,
         );
-      } on TimeoutException catch (error) {
+      } on TimeoutException catch (error, stackTrace) {
+        _logRequestException(method: method, uri: uri, error: error);
         if (attempt < retryPolicy.maxRetries) {
           await Future<void>.delayed(retryPolicy.delayForAttempt(attempt));
           attempt += 1;
           continue;
         }
+        Log.error('Timeout for $method $uri', error: error, stackTrace: stackTrace);
         throw ApiError.timeout('Request timed out', details: error);
-      } on SocketException catch (error) {
+      } on SocketException catch (error, stackTrace) {
+        _logRequestException(method: method, uri: uri, error: error);
         if (attempt < retryPolicy.maxRetries) {
           await Future<void>.delayed(retryPolicy.delayForAttempt(attempt));
           attempt += 1;
           continue;
         }
+        Log.error('Socket error for $method $uri', error: error, stackTrace: stackTrace);
         throw ApiError.network('Network error', details: error);
-      } on http.ClientException catch (error) {
+      } on http.ClientException catch (error, stackTrace) {
+        _logRequestException(method: method, uri: uri, error: error);
         if (retryPolicy.shouldRetryException(error) && attempt < retryPolicy.maxRetries) {
           await Future<void>.delayed(retryPolicy.delayForAttempt(attempt));
           attempt += 1;
           continue;
         }
+        Log.error('Client error for $method $uri', error: error, stackTrace: stackTrace);
         throw ApiError.network('HTTP client error', details: error);
       } on ApiError {
         rethrow;
-      } catch (error) {
+      } catch (error, stackTrace) {
+        _logRequestException(method: method, uri: uri, error: error);
+        Log.error('Unexpected API error for $method $uri',
+            error: error, stackTrace: stackTrace);
         throw ApiError.unknown('Unexpected API error', details: error);
       }
+    }
+  }
+
+  Future<bool> _ping(Uri uri) async {
+    try {
+      final response = await httpClient
+          .get(uri, headers: const {'Accept': 'application/json'})
+          .timeout(reachabilityTimeout);
+      Log.d('Reachability check GET $uri -> ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (error) {
+      _logRequestException(method: 'GET', uri: uri, error: error);
+      return false;
     }
   }
 
@@ -170,6 +211,26 @@ class ApiClient {
       default:
         throw UnsupportedError('Unsupported method $method');
     }
+  }
+
+  void _logHttpFailure({
+    required String method,
+    required Uri uri,
+    required int statusCode,
+    required String responseBody,
+  }) {
+    final snippet = responseBody.length > 200
+        ? '${responseBody.substring(0, 200)}...'
+        : responseBody;
+    Log.warn('$method $uri failed: status=$statusCode body="$snippet"');
+  }
+
+  void _logRequestException({
+    required String method,
+    required Uri uri,
+    required Object error,
+  }) {
+    Log.warn('$method $uri exception=${error.runtimeType} message=$error');
   }
 
   Object _decodeBody(String body) {

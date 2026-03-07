@@ -11,6 +11,7 @@ import '../../models/deep_links.dart';
 import '../../models/plan.dart';
 import '../../models/swipe.dart';
 import '../../models/telemetry.dart';
+import '../../api/api_error.dart';
 import '../../repositories/deck_repository.dart';
 import '../../repositories/sessions_repository.dart';
 import '../../repositories/swipes_repository.dart';
@@ -27,6 +28,8 @@ class DeckController extends StateNotifier<DeckState> {
     required SessionsRepository sessionsRepository,
     required LocationController locationController,
     required AdDeckInjector adDeckInjector,
+    required bool Function() isDeviceOnline,
+    required Future<bool> Function() isBackendReachable,
   })  : _sessionId = sessionId,
         _deckRepository = deckRepository,
         _swipesRepository = swipesRepository,
@@ -35,6 +38,8 @@ class DeckController extends StateNotifier<DeckState> {
         _sessionsRepository = sessionsRepository,
         _locationController = locationController,
         _adDeckInjector = adDeckInjector,
+        _isDeviceOnline = isDeviceOnline,
+        _isBackendReachable = isBackendReachable,
         super(DeckState.initial(sessionId)) {
     _telemetryDispatcher.setActiveSession(_sessionId);
     Future<void>.microtask(initialize);
@@ -48,6 +53,8 @@ class DeckController extends StateNotifier<DeckState> {
   final SessionsRepository _sessionsRepository;
   final LocationController _locationController;
   final AdDeckInjector _adDeckInjector;
+  final bool Function() _isDeviceOnline;
+  final Future<bool> Function() _isBackendReachable;
 
   static const int _batchLimit = 25;
 
@@ -79,6 +86,7 @@ class DeckController extends StateNotifier<DeckState> {
       shownPlanIds: const <String>[],
       locationRequired: false,
       showCachedResultsNotice: false,
+      usingOfflineCachedData: false,
     );
     await _loadBatch(reset: true);
   }
@@ -283,6 +291,8 @@ class DeckController extends StateNotifier<DeckState> {
       final batch = await _deckRepository.fetchDeckBatch(_sessionId, params);
       _applyBatch(batch, reset: reset, requestedCursor: requestedCursor);
     } catch (error) {
+      final canUseCached = await _shouldUseOfflineCache(error);
+
       final session = await _sessionsRepository.getById(_sessionId);
       final filters = session?.filters;
       final requestedCursor = reset ? null : state.nextCursor;
@@ -305,12 +315,13 @@ class DeckController extends StateNotifier<DeckState> {
               ),
             );
 
-      if (cached != null) {
+      if (canUseCached && cached != null) {
         _applyBatch(
           cached,
           reset: reset,
           requestedCursor: requestedCursor,
           showCachedNotice: true,
+          usingOfflineCachedData: true,
         );
         return;
       }
@@ -318,7 +329,7 @@ class DeckController extends StateNotifier<DeckState> {
       state = state.copyWith(
         isLoadingInitial: false,
         isLoadingMore: false,
-        errorMessage: error.toString(),
+        errorMessage: 'Could not load live results. ${error.toString()}',
       );
     }
   }
@@ -328,16 +339,11 @@ class DeckController extends StateNotifier<DeckState> {
     required bool reset,
     required String? requestedCursor,
     bool showCachedNotice = false,
+    bool usingOfflineCachedData = false,
   }) {
     final merged = reset ? batch.plans : [...state.plans, ...batch.plans];
     final deduped =
         <String, Plan>{for (final plan in merged) plan.id: plan}.values.toList();
-
-    final sourceCounts = batch.mix.planSourceCounts;
-    final curatedFallbackCount =
-        (sourceCounts['curated'] ?? 0) + (sourceCounts['byo'] ?? 0);
-    final usedFallback =
-        batch.plans.isEmpty || curatedFallbackCount >= (batch.plans.length / 2);
 
     state = state.copyWith(
       isLoadingInitial: false,
@@ -347,8 +353,9 @@ class DeckController extends StateNotifier<DeckState> {
       nextCursor: batch.nextCursor,
       hasMore: batch.nextCursor != null,
       lastBatchMix: batch.mix,
-      usedFallback: usedFallback,
+      usedFallback: false,
       showCachedResultsNotice: showCachedNotice,
+      usingOfflineCachedData: usingOfflineCachedData,
     );
 
     _enqueueTelemetry(
@@ -363,6 +370,24 @@ class DeckController extends StateNotifier<DeckState> {
     );
 
     _startViewingTopCard();
+  }
+
+  Future<bool> _shouldUseOfflineCache(Object error) async {
+    final isNetworkLikeError =
+        error is ApiError &&
+            (error.kind == ApiErrorKind.network ||
+                error.kind == ApiErrorKind.timeout);
+
+    if (!isNetworkLikeError) {
+      return false;
+    }
+
+    if (!_isDeviceOnline()) {
+      return true;
+    }
+
+    final backendReachable = await _isBackendReachable();
+    return !backendReachable;
   }
 
   Future<void> _ensureLocation() async {

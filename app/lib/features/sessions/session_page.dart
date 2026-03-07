@@ -24,7 +24,7 @@ class SessionPage extends ConsumerWidget {
           if (session == null) {
             return const Center(child: Text('Session not found'));
           }
-          final inviteLink = 'https://ourplanplan.com/invite/${session.sessionId}';
+          final inviteLink = 'https://perbug.com/invite/${session.sessionId}';
           return ListView(
             padding: const EdgeInsets.all(AppSpacing.m),
             children: [
@@ -78,8 +78,8 @@ class SessionPage extends ConsumerWidget {
               OutlinedButton.icon(
                 onPressed: () {
                   ref.read(shareServiceProvider).shareText(
-                        'Join my OurPlanPlan session: $inviteLink',
-                        subject: 'Join my OurPlanPlan session',
+                        'Join my Perbug session: $inviteLink',
+                        subject: 'Join my Perbug session',
                       );
                 },
                 icon: const Icon(Icons.share),

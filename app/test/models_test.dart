@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ourplanplan/models/deck_batch.dart';
-import 'package:ourplanplan/models/deep_links.dart';
-import 'package:ourplanplan/models/plan.dart';
-import 'package:ourplanplan/models/telemetry.dart';
+import 'package:perbug/models/deck_batch.dart';
+import 'package:perbug/models/deep_links.dart';
+import 'package:perbug/models/plan.dart';
+import 'package:perbug/models/telemetry.dart';
 
 void main() {
   group('Plan and DeepLinks JSON', () {

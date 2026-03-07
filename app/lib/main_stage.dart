@@ -8,15 +8,22 @@ import 'core/logging/log.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final envConfig = await Env.load(EnvFlavor.stage);
+  late final EnvConfig envConfig;
+  try {
+    envConfig = await Env.load(EnvFlavor.stage);
+  } catch (error, stackTrace) {
+    Log.error('Failed to load environment config. Using fallback defaults.', error: error, stackTrace: stackTrace);
+    envConfig = Env.fallbackConfig(EnvFlavor.stage);
+  }
   Log.configure(enableDebugLogs: envConfig.enableDebugLogs);
+  Log.info('App startup baseUrl=${envConfig.apiBaseUrl}');
 
   runApp(
     ProviderScope(
       overrides: [
         envConfigProvider.overrideWithValue(envConfig),
       ],
-      child: const OurPlanPlanApp(),
+      child: const PerbugApp(),
     ),
   );
 }

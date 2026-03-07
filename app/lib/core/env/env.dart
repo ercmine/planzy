@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../ads/ads_config.dart';
+import '../logging/log.dart';
 import 'env_keys.dart';
 
 enum EnvFlavor { dev, stage, prod }
@@ -30,6 +31,10 @@ final envConfigProvider = Provider<EnvConfig>((ref) {
 class Env {
   const Env._();
 
+  static const String _defaultApiBaseUrl = 'https://api.perbug.com';
+  static const String _apiBaseUrlFromDefine =
+      String.fromEnvironment(EnvKeys.apiBaseUrl, defaultValue: '');
+
   static Future<EnvConfig> load(EnvFlavor flavor) async {
     final fileName = switch (flavor) {
       EnvFlavor.dev => '.env.dev',
@@ -37,31 +42,62 @@ class Env {
       EnvFlavor.prod => '.env.prod',
     };
 
+    var dotenvLoaded = true;
     try {
       await dotenv.load(fileName: fileName);
     } catch (error) {
-      debugPrint('Could not load $fileName, using defaults. $error');
+      dotenvLoaded = false;
+      final message =
+          'Missing or unreadable $fileName. Falling back to compile-time/default config with API base URL $_defaultApiBaseUrl.';
+      if (kDebugMode) {
+        throw StateError(message);
+      }
+      Log.error(message, error: error);
     }
 
-    final defaultBaseUrl = switch (flavor) {
-      EnvFlavor.dev => 'http://localhost:8080',
-      EnvFlavor.stage => 'https://stage-api.ourplanplan.com',
-      EnvFlavor.prod => 'https://api.ourplanplan.com',
-    };
-
     final defaultDebug = flavor != EnvFlavor.prod;
+    final apiBaseUrl = _resolveApiBaseUrl();
+
+    if (kDebugMode) {
+      debugPrint(
+        'EnvConfig resolved: flavor=$flavor baseUrl=$apiBaseUrl dotenvLoaded=$dotenvLoaded',
+      );
+    }
 
     return EnvConfig(
       flavor: flavor,
-      apiBaseUrl: dotenv.maybeGet(EnvKeys.apiBaseUrl) ?? defaultBaseUrl,
+      apiBaseUrl: apiBaseUrl,
       enableDebugLogs: _parseBool(
         dotenv.maybeGet(EnvKeys.enableDebugLogs),
         fallback: defaultDebug,
       ),
-      associatedDomain:
-          dotenv.maybeGet(EnvKeys.associatedDomain) ?? 'ourplanplan.com',
+      associatedDomain: dotenv.maybeGet(EnvKeys.associatedDomain) ?? 'perbug.com',
       adsConfig: AdsConfig.fromEnv(flavor: flavor),
     );
+  }
+
+  static EnvConfig fallbackConfig(EnvFlavor flavor) {
+    final defaultDebug = flavor != EnvFlavor.prod;
+    return EnvConfig(
+      flavor: flavor,
+      apiBaseUrl: _resolveApiBaseUrl(),
+      enableDebugLogs: defaultDebug,
+      associatedDomain: 'perbug.com',
+      adsConfig: AdsConfig.disabled(),
+    );
+  }
+
+  static String _resolveApiBaseUrl() {
+    if (_apiBaseUrlFromDefine.isNotEmpty) {
+      return _apiBaseUrlFromDefine;
+    }
+
+    final fromDotenv = dotenv.maybeGet(EnvKeys.apiBaseUrl)?.trim();
+    if (fromDotenv != null && fromDotenv.isNotEmpty) {
+      return fromDotenv;
+    }
+
+    return _defaultApiBaseUrl;
   }
 
   static bool _parseBool(String? value, {required bool fallback}) {

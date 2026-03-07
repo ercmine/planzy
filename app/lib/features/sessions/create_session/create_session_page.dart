@@ -116,7 +116,7 @@ class _CreateSessionPageState extends ConsumerState<CreateSessionPage> {
                 const SizedBox(height: AppSpacing.s),
                 SecondaryButton(
                   onPressed: () async {
-                    await InviteFriendsSheet.show(context, inviteLink: 'https://ourplanplan.com/invite/preview');
+                    await InviteFriendsSheet.show(context, inviteLink: 'https://perbug.com/invite/preview');
                     if (!mounted) {
                       return;
                     }
@@ -164,7 +164,7 @@ class _CreateSessionPageState extends ConsumerState<CreateSessionPage> {
   }
 
   Future<void> _showInviteNowSheet(BuildContext context, WidgetRef ref, String sessionId) {
-    final link = 'https://ourplanplan.com/invite/$sessionId';
+    final link = 'https://perbug.com/invite/$sessionId';
     return showModalBottomSheet<void>(
       context: context,
       builder: (context) {
@@ -197,8 +197,8 @@ class _CreateSessionPageState extends ConsumerState<CreateSessionPage> {
                     child: PrimaryButton(
                       onPressed: () {
                         ref.read(shareServiceProvider).shareText(
-                              'Join my OurPlanPlan session: $link',
-                              subject: 'Join my OurPlanPlan session',
+                              'Join my Perbug session: $link',
+                              subject: 'Join my Perbug session',
                             );
                       },
                       icon: const Icon(Icons.share),
