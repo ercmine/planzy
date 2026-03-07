@@ -11,6 +11,7 @@ import '../features/onboarding/onboarding_intro_page.dart';
 import '../features/onboarding/onboarding_permissions_page.dart';
 import '../features/onboarding/onboarding_signin_page.dart';
 import '../features/results/results_page.dart';
+import '../features/settings/settings_page.dart';
 import '../features/sessions/create_session/create_session_page.dart';
 import '../features/sessions/join_session/join_session_page.dart';
 import '../features/sessions/session_page.dart';
@@ -96,6 +97,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/sessions',
         name: 'sessions',
         builder: (context, state) => const SessionsPage(),
+      ),
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        builder: (context, state) => const SettingsPage(),
       ),
       GoRoute(
         path: '/sessions/create',

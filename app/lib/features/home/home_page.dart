@@ -14,7 +14,16 @@ class HomePage extends ConsumerWidget {
     final state = ref.watch(homeControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('OurPlanPlan')),
+      appBar: AppBar(
+        title: const Text('OurPlanPlan'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: () => context.go('/settings'),
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.m),
         child: Column(

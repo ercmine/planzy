@@ -28,6 +28,7 @@ class DeckState {
     this.undoStack = const <DeckSwipeRecord>[],
     this.usedFallback = false,
     this.locationRequired = false,
+    this.showCachedResultsNotice = false,
   });
 
   factory DeckState.initial(String sessionId) =>
@@ -45,6 +46,7 @@ class DeckState {
   final List<DeckSwipeRecord> undoStack;
   final bool usedFallback;
   final bool locationRequired;
+  final bool showCachedResultsNotice;
 
   DeckState copyWith({
     String? sessionId,
@@ -61,6 +63,7 @@ class DeckState {
     List<DeckSwipeRecord>? undoStack,
     bool? usedFallback,
     bool? locationRequired,
+    bool? showCachedResultsNotice,
   }) {
     return DeckState(
       sessionId: sessionId ?? this.sessionId,
@@ -75,6 +78,8 @@ class DeckState {
       undoStack: undoStack ?? this.undoStack,
       usedFallback: usedFallback ?? this.usedFallback,
       locationRequired: locationRequired ?? this.locationRequired,
+      showCachedResultsNotice:
+          showCachedResultsNotice ?? this.showCachedResultsNotice,
     );
   }
 }

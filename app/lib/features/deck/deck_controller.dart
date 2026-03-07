@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/location/location_controller.dart';
 import '../../core/telemetry/telemetry_dispatcher.dart';
+import '../../models/deck_batch.dart';
 import '../../models/deep_links.dart';
 import '../../models/plan.dart';
 import '../../models/swipe.dart';
@@ -72,6 +73,7 @@ class DeckController extends StateNotifier<DeckState> {
       undoStack: const <DeckSwipeRecord>[],
       shownPlanIds: const <String>[],
       locationRequired: false,
+      showCachedResultsNotice: false,
     );
     await _loadBatch(reset: true);
   }
@@ -85,7 +87,7 @@ class DeckController extends StateNotifier<DeckState> {
   }
 
   Future<void> loadMoreIfNeeded() async {
-    if (state.plans.length <= 5 && state.hasMore && !state.isLoadingMore) {
+    if (state.plans.length <= 8 && state.hasMore && !state.isLoadingMore) {
       await _loadBatch();
     }
   }
@@ -96,7 +98,7 @@ class DeckController extends StateNotifier<DeckState> {
     }
 
     final plan = state.plans.first;
-    final position = 0;
+    const position = 0;
 
     await _emitCardViewedIfNeeded(plan);
 
@@ -202,6 +204,13 @@ class DeckController extends StateNotifier<DeckState> {
         .toList(growable: false);
   }
 
+  void clearCachedResultsNotice() {
+    if (!state.showCachedResultsNotice) {
+      return;
+    }
+    state = state.copyWith(showCachedResultsNotice: false);
+  }
+
   Future<void> _loadBatch({bool reset = false}) async {
     if (state.locationRequired) {
       return;
@@ -240,59 +249,99 @@ class DeckController extends StateNotifier<DeckState> {
 
       final filters = session.filters;
       final requestedCursor = reset ? null : state.nextCursor;
-      final batch = await _deckRepository.fetchDeckBatch(
-        _sessionId,
-        DeckQueryParams(
-          cursor: requestedCursor,
-          limit: _batchLimit,
-          lat: location.lat,
-          lng: location.lng,
-          radiusMeters: filters.radiusMeters,
-          categories: filters.categories.map((e) => e.name).toList(growable: false),
-          openNow: filters.openNow,
-          priceLevelMax: filters.priceLevelMax,
-          timeStart: filters.timeWindow?.startISO,
-          timeEnd: filters.timeWindow?.endISO,
-        ),
+      final params = DeckQueryParams(
+        cursor: requestedCursor,
+        limit: _batchLimit,
+        lat: location.lat,
+        lng: location.lng,
+        radiusMeters: filters.radiusMeters,
+        categories: filters.categories.map((e) => e.name).toList(growable: false),
+        openNow: filters.openNow,
+        priceLevelMax: filters.priceLevelMax,
+        timeStart: filters.timeWindow?.startISO,
+        timeEnd: filters.timeWindow?.endISO,
       );
 
-      final merged = reset ? batch.plans : [...state.plans, ...batch.plans];
-      final deduped = <String, Plan>{for (final plan in merged) plan.id: plan}.values.toList();
-
-      final sourceCounts = batch.mix.planSourceCounts;
-      final curatedFallbackCount =
-          (sourceCounts['curated'] ?? 0) + (sourceCounts['byo'] ?? 0);
-      final usedFallback = batch.plans.isEmpty || curatedFallbackCount >= (batch.plans.length / 2);
-
-      state = state.copyWith(
-        isLoadingInitial: false,
-        isLoadingMore: false,
-        plans: deduped,
-        nextCursor: batch.nextCursor,
-        hasMore: batch.nextCursor != null,
-        lastBatchMix: batch.mix,
-        usedFallback: usedFallback,
-      );
-
-      await _enqueueTelemetry(
-        TelemetryEventInput.deckLoaded(
-          batchSize: _batchLimit,
-          returned: batch.plans.length,
-          nextCursorPresent: batch.nextCursor != null,
-          planSourceCounts: batch.mix.planSourceCounts,
-          cursor: requestedCursor,
-          deckKey: batch.debug?.requestId,
-        ),
-      );
-
-      _startViewingTopCard();
+      final batch = await _deckRepository.fetchDeckBatch(_sessionId, params);
+      _applyBatch(batch, reset: reset, requestedCursor: requestedCursor);
     } catch (error) {
+      final session = await _sessionsRepository.getById(_sessionId);
+      final filters = session?.filters;
+      final requestedCursor = reset ? null : state.nextCursor;
+      final cached = filters == null
+          ? null
+          : _deckRepository.getCachedDeckBatch(
+              _sessionId,
+              DeckQueryParams(
+                cursor: requestedCursor,
+                limit: _batchLimit,
+                lat: location.lat,
+                lng: location.lng,
+                radiusMeters: filters.radiusMeters,
+                categories:
+                    filters.categories.map((e) => e.name).toList(growable: false),
+                openNow: filters.openNow,
+                priceLevelMax: filters.priceLevelMax,
+                timeStart: filters.timeWindow?.startISO,
+                timeEnd: filters.timeWindow?.endISO,
+              ),
+            );
+
+      if (cached != null) {
+        _applyBatch(
+          cached,
+          reset: reset,
+          requestedCursor: requestedCursor,
+          showCachedNotice: true,
+        );
+        return;
+      }
+
       state = state.copyWith(
         isLoadingInitial: false,
         isLoadingMore: false,
         errorMessage: error.toString(),
       );
     }
+  }
+
+  void _applyBatch(
+    DeckBatchResponse batch, {
+    required bool reset,
+    required String? requestedCursor,
+    bool showCachedNotice = false,
+  }) {
+    final merged = reset ? batch.plans : [...state.plans, ...batch.plans];
+    final deduped = <String, Plan>{for (final plan in merged) plan.id: plan}.values.toList();
+
+    final sourceCounts = batch.mix.planSourceCounts;
+    final curatedFallbackCount =
+        (sourceCounts['curated'] ?? 0) + (sourceCounts['byo'] ?? 0);
+    final usedFallback = batch.plans.isEmpty || curatedFallbackCount >= (batch.plans.length / 2);
+
+    state = state.copyWith(
+      isLoadingInitial: false,
+      isLoadingMore: false,
+      plans: deduped,
+      nextCursor: batch.nextCursor,
+      hasMore: batch.nextCursor != null,
+      lastBatchMix: batch.mix,
+      usedFallback: usedFallback,
+      showCachedResultsNotice: showCachedNotice,
+    );
+
+    _enqueueTelemetry(
+      TelemetryEventInput.deckLoaded(
+        batchSize: _batchLimit,
+        returned: batch.plans.length,
+        nextCursorPresent: batch.nextCursor != null,
+        planSourceCounts: batch.mix.planSourceCounts,
+        cursor: requestedCursor,
+        deckKey: batch.debug?.requestId,
+      ),
+    );
+
+    _startViewingTopCard();
   }
 
   Future<void> _ensureLocation() async {
