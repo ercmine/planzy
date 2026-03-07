@@ -283,11 +283,6 @@ final deckControllerProvider =
     throw StateError('Deck dependencies are not ready yet.');
   }
 
-  final apiClient = ref.watch(apiClientProvider).valueOrNull;
-  if (apiClient == null) {
-    throw StateError('API client is not ready yet.');
-  }
-
   return DeckController(
     sessionId: sessionId,
     deckRepository: deckRepository,
@@ -297,8 +292,6 @@ final deckControllerProvider =
     sessionsRepository: ref.watch(sessionsRepositoryProvider),
     locationController: ref.watch(locationControllerProvider.notifier),
     adDeckInjector: ref.watch(adDeckInjectorProvider),
-    isDeviceOnline: () => ref.read(connectivityControllerProvider).isOnline,
-    isBackendReachable: apiClient.checkBackendReachability,
   );
 });
 

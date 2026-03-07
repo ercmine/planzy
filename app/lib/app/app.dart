@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api/api_error.dart';
 import '../core/connectivity/offline_banner.dart';
 import '../core/identity/identity_provider.dart';
 import '../core/telemetry/telemetry_dispatcher.dart';
@@ -18,11 +19,14 @@ class PerbugApp extends ConsumerStatefulWidget {
 class _PerbugAppState extends ConsumerState<PerbugApp> {
   TelemetryDispatcher? _registeredDispatcher;
   bool _adsInitialized = false;
+  bool _healthCheckStarted = false;
+  String? _startupHealthError;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _syncDispatcherRegistration();
+    _checkStartupHealth();
   }
 
   @override
@@ -44,6 +48,7 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
     ref.watch(telemetryDispatcherProvider);
 
     _syncDispatcherRegistration();
+    _checkStartupHealth();
     _initializeAds();
 
     final router = ref.watch(routerProvider);
@@ -60,12 +65,65 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
           children: [
             if (child != null) child,
             const OfflineBanner(),
+            if (_startupHealthError != null)
+              Positioned(
+                left: 12,
+                right: 12,
+                top: 52,
+                child: Material(
+                  color: Colors.red.shade700,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      _startupHealthError!,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
           ],
         );
       },
     );
   }
 
+  Future<void> _checkStartupHealth() async {
+    if (_healthCheckStarted) {
+      return;
+    }
+
+    final apiClient = ref.read(apiClientProvider).valueOrNull;
+    if (apiClient == null) {
+      return;
+    }
+
+    _healthCheckStarted = true;
+
+    try {
+      await apiClient.pingHealth();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _startupHealthError = null;
+      });
+    } on ApiError catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _startupHealthError = 'API health check failed: ${error.message}';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _startupHealthError = 'API health check failed: $error';
+      });
+    }
+  }
 
   void _initializeAds() {
     if (_adsInitialized) {

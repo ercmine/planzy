@@ -42,9 +42,57 @@ export function createRoutes(
 
     const base = `http://${req.headers.host ?? "localhost"}`;
     const url = new URL(req.url ?? "/", base);
+    const normalizedPath = normalizeAliasPath(url.pathname);
 
     try {
-      const deckRouteMatch = /^\/sessions\/([^/]+)\/deck$/.exec(url.pathname);
+      if (req.method === "GET" && normalizedPath === "/") {
+        sendJson(res, 200, {
+          service: "perbug-api",
+          version: "1.0.0"
+        });
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/health") {
+        sendJson(res, 200, {
+          ok: true,
+          service: "perbug-api",
+          time: new Date().toISOString()
+        });
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/plans") {
+        sendJson(res, 200, [
+          {
+            id: "sample-plan-1",
+            title: "Coffee walk",
+            category: "coffee",
+            source: "stub"
+          }
+        ]);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/live-results") {
+        sendJson(res, 200, {
+          results: [
+            {
+              sessionId: "demo-session",
+              topPlanId: "sample-plan-1",
+              topPlanTitle: "Coffee walk",
+              score: 0.91
+            }
+          ],
+          summary: {
+            activeSessions: 1,
+            generatedAt: new Date().toISOString()
+          }
+        });
+        return;
+      }
+
+      const deckRouteMatch = /^\/sessions\/([^/]+)\/deck$/.exec(normalizedPath);
       if (req.method === "GET" && deckRouteMatch) {
         if (!deps?.deckHandler) {
           sendJson(res, 503, { error: "deck_unavailable" });
@@ -55,7 +103,7 @@ export function createRoutes(
         return;
       }
 
-      const telemetryIngestMatch = /^\/sessions\/([^/]+)\/telemetry$/.exec(url.pathname);
+      const telemetryIngestMatch = /^\/sessions\/([^/]+)\/telemetry$/.exec(normalizedPath);
       if (telemetryIngestMatch && telemetryHandlers) {
         const sessionId = decodeURIComponent(telemetryIngestMatch[1] ?? "");
         if (req.method === "POST") {
@@ -68,13 +116,13 @@ export function createRoutes(
         }
       }
 
-      const telemetryAggregateMatch = /^\/sessions\/([^/]+)\/telemetry\/aggregate$/.exec(url.pathname);
+      const telemetryAggregateMatch = /^\/sessions\/([^/]+)\/telemetry\/aggregate$/.exec(normalizedPath);
       if (telemetryAggregateMatch && telemetryHandlers && req.method === "GET") {
         await telemetryHandlers.aggregate(req, res, decodeURIComponent(telemetryAggregateMatch[1] ?? ""));
         return;
       }
 
-      const listOrCreateIdeasMatch = /^\/sessions\/([^/]+)\/ideas$/.exec(url.pathname);
+      const listOrCreateIdeasMatch = /^\/sessions\/([^/]+)\/ideas$/.exec(normalizedPath);
       if (listOrCreateIdeasMatch && deps?.ideasHandlers) {
         const sessionId = decodeURIComponent(listOrCreateIdeasMatch[1] ?? "");
 
@@ -89,7 +137,7 @@ export function createRoutes(
         }
       }
 
-      const deleteIdeaMatch = /^\/sessions\/([^/]+)\/ideas\/([^/]+)$/.exec(url.pathname);
+      const deleteIdeaMatch = /^\/sessions\/([^/]+)\/ideas\/([^/]+)$/.exec(normalizedPath);
       if (req.method === "DELETE" && deleteIdeaMatch && deps?.ideasHandlers) {
         await deps.ideasHandlers.deleteIdea(req, res, {
           sessionId: decodeURIComponent(deleteIdeaMatch[1] ?? ""),
@@ -98,64 +146,64 @@ export function createRoutes(
         return;
       }
 
-      if (req.method === "POST" && url.pathname === "/v1/venue-claims") {
+      if (req.method === "POST" && normalizedPath === "/v1/venue-claims") {
         await handlers.handleCreate(req, res);
         return;
       }
 
-      if (req.method === "GET" && url.pathname === "/v1/venue-claims") {
+      if (req.method === "GET" && normalizedPath === "/v1/venue-claims") {
         await handlers.handleList(req, res);
         return;
       }
 
-      const patchMatch = /^\/v1\/venue-claims\/([^/]+)\/status$/.exec(url.pathname);
+      const patchMatch = /^\/v1\/venue-claims\/([^/]+)\/status$/.exec(normalizedPath);
       if (req.method === "PATCH" && patchMatch) {
         await handlers.handlePatchStatus(req, res, decodeURIComponent(patchMatch[1]));
         return;
       }
 
-      if (url.pathname.startsWith("/v1/admin/")) {
+      if (normalizedPath.startsWith("/v1/admin/")) {
         if (!assertAdmin(req)) {
           sendJson(res, 401, { error: "Unauthorized" });
           return;
         }
 
-        if (req.method === "POST" && url.pathname === "/v1/admin/promoted") {
+        if (req.method === "POST" && normalizedPath === "/v1/admin/promoted") {
           await merchantHandlers.createPromoted(req, res);
           return;
         }
 
-        if (req.method === "GET" && url.pathname === "/v1/admin/promoted") {
+        if (req.method === "GET" && normalizedPath === "/v1/admin/promoted") {
           await merchantHandlers.listPromoted(req, res);
           return;
         }
 
-        if (req.method === "PATCH" && /^\/v1\/admin\/promoted\/[^/]+$/.test(url.pathname)) {
+        if (req.method === "PATCH" && /^\/v1\/admin\/promoted\/[^/]+$/.test(normalizedPath)) {
           await merchantHandlers.patchPromoted(req, res);
           return;
         }
 
-        if (req.method === "DELETE" && /^\/v1\/admin\/promoted\/[^/]+$/.test(url.pathname)) {
+        if (req.method === "DELETE" && /^\/v1\/admin\/promoted\/[^/]+$/.test(normalizedPath)) {
           await merchantHandlers.deletePromoted(req, res);
           return;
         }
 
-        if (req.method === "POST" && url.pathname === "/v1/admin/specials") {
+        if (req.method === "POST" && normalizedPath === "/v1/admin/specials") {
           await merchantHandlers.createSpecial(req, res);
           return;
         }
 
-        if (req.method === "GET" && url.pathname === "/v1/admin/specials") {
+        if (req.method === "GET" && normalizedPath === "/v1/admin/specials") {
           await merchantHandlers.listSpecials(req, res);
           return;
         }
 
-        if (req.method === "PATCH" && /^\/v1\/admin\/specials\/[^/]+$/.test(url.pathname)) {
+        if (req.method === "PATCH" && /^\/v1\/admin\/specials\/[^/]+$/.test(normalizedPath)) {
           await merchantHandlers.patchSpecial(req, res);
           return;
         }
 
-        if (req.method === "DELETE" && /^\/v1\/admin\/specials\/[^/]+$/.test(url.pathname)) {
+        if (req.method === "DELETE" && /^\/v1\/admin\/specials\/[^/]+$/.test(normalizedPath)) {
           await merchantHandlers.deleteSpecial(req, res);
           return;
         }
@@ -163,7 +211,7 @@ export function createRoutes(
 
       sendJson(res, 404, { error: "Not Found" });
     } catch (error) {
-      if (url.pathname.startsWith("/v1/admin/")) {
+      if (normalizedPath.startsWith("/v1/admin/")) {
         handleMerchantHttpError(res, error);
         return;
       }
@@ -176,4 +224,24 @@ export function createRoutes(
       sendJson(res, 500, { error: "Internal Server Error" });
     }
   };
+}
+
+function normalizeAliasPath(pathname: string): string {
+  if (pathname === "/api" || pathname === "/v1") {
+    return "/";
+  }
+
+  if (pathname.startsWith("/api/")) {
+    return pathname.slice("/api".length);
+  }
+
+  const v1AliasPaths = ["/plans", "/live-results", "/health"];
+  if (pathname.startsWith("/v1/")) {
+    const withoutPrefix = pathname.slice("/v1".length);
+    if (v1AliasPaths.some((aliasPath) => withoutPrefix === aliasPath || withoutPrefix.startsWith(`${aliasPath}/`))) {
+      return withoutPrefix;
+    }
+  }
+
+  return pathname;
 }
