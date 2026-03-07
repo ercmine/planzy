@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import { handleMerchantHttpError, createMerchantHttpHandlers } from "../merchant/http.js";
 import type { MerchantService } from "../merchant/service.js";
 import { ValidationError } from "../plans/errors.js";
@@ -8,7 +9,7 @@ import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 
 export function applyCors(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id, x-admin-key");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id, x-admin-key, x-request-id");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
 }
 
@@ -18,7 +19,11 @@ function assertAdmin(req: IncomingMessage): boolean {
   return readHeader(req, "x-admin-key") === expectedKey;
 }
 
-export function createRoutes(service: VenueClaimsService, merchantService: MerchantService) {
+export function createRoutes(
+  service: VenueClaimsService,
+  merchantService: MerchantService,
+  deps?: { deckHandler?: SessionDeckHandler }
+) {
   const handlers = createVenueClaimsHttpHandlers(service);
   const merchantHandlers = createMerchantHttpHandlers(merchantService);
 
@@ -35,6 +40,17 @@ export function createRoutes(service: VenueClaimsService, merchantService: Merch
     const url = new URL(req.url ?? "/", base);
 
     try {
+      const deckRouteMatch = /^\/sessions\/([^/]+)\/deck$/.exec(url.pathname);
+      if (req.method === "GET" && deckRouteMatch) {
+        if (!deps?.deckHandler) {
+          sendJson(res, 503, { error: "deck_unavailable" });
+          return;
+        }
+
+        await deps.deckHandler(req, res, { sessionId: decodeURIComponent(deckRouteMatch[1] ?? "") });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/v1/venue-claims") {
         await handlers.handleCreate(req, res);
         return;
