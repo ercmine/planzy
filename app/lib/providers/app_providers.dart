@@ -13,6 +13,8 @@ import '../core/location/location_service.dart';
 import '../core/permissions/permission_service.dart';
 import '../core/sharing/share_service.dart';
 import '../core/store/sessions_store.dart';
+import '../features/ideas/ideas_controller.dart';
+import '../features/ideas/ideas_state.dart';
 import '../features/sessions/create_session/create_session_controller.dart';
 import '../features/sessions/join_session/join_session_controller.dart';
 import '../features/sessions/session_settings/session_settings_controller.dart';
@@ -58,6 +60,16 @@ final ideasRepositoryProvider = FutureProvider<IdeasRepository>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);
   return IdeasRepository(apiClient: apiClient);
 });
+
+
+final ideasControllerProvider = StateNotifierProvider.family<IdeasController, IdeasState, String>(
+  (ref, sessionId) {
+    return IdeasController(
+      sessionId: sessionId,
+      repositoryResolver: () => ref.read(ideasRepositoryProvider.future),
+    );
+  },
+);
 
 final telemetryRepositoryProvider = FutureProvider<TelemetryRepository>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);

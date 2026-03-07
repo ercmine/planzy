@@ -19,8 +19,18 @@ class IdeasRepository {
     return CreateIdeaResponse.fromJson(response);
   }
 
-  Future<ListIdeasResponse> listIdeas(String sessionId) async {
-    final response = await apiClient.getJson(ApiEndpoints.ideas(sessionId));
+  Future<ListIdeasResponse> listIdeas(
+    String sessionId, {
+    String? cursor,
+    int limit = 50,
+  }) async {
+    final response = await apiClient.getJson(
+      ApiEndpoints.ideas(sessionId),
+      queryParameters: {
+        'cursor': cursor,
+        'limit': '$limit',
+      },
+    );
     return ListIdeasResponse.fromJson(response);
   }
 
