@@ -8,7 +8,10 @@ import '../features/invite/invite_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
 import '../features/onboarding/onboarding_permissions_page.dart';
 import '../features/onboarding/onboarding_signin_page.dart';
+import '../features/sessions/create_session/create_session_page.dart';
+import '../features/sessions/join_session/join_session_page.dart';
 import '../features/sessions/session_page.dart';
+import '../features/sessions/session_settings/session_settings_page.dart';
 import '../features/sessions/sessions_page.dart';
 
 final onboardingGateProvider = Provider<ChangeNotifier>((ref) {
@@ -79,9 +82,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/join/:id',
+        name: 'join',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return JoinSessionPage(sessionId: id);
+        },
+      ),
+      GoRoute(
         path: '/sessions',
         name: 'sessions',
         builder: (context, state) => const SessionsPage(),
+      ),
+      GoRoute(
+        path: '/sessions/create',
+        name: 'create-session',
+        builder: (context, state) => const CreateSessionPage(),
       ),
       GoRoute(
         path: '/sessions/:id',
@@ -89,6 +105,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final sessionId = state.pathParameters['id'] ?? '';
           return SessionPage(sessionId: sessionId);
+        },
+      ),
+      GoRoute(
+        path: '/sessions/:id/settings',
+        name: 'session-settings',
+        builder: (context, state) {
+          final sessionId = state.pathParameters['id'] ?? '';
+          return SessionSettingsPage(sessionId: sessionId);
         },
       ),
     ],
