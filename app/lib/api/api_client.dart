@@ -45,6 +45,26 @@ class ApiClient {
     );
   }
 
+  Future<void> pingHealth() async {
+    final uri = buildUri('/health');
+    final response = await httpClient
+        .get(uri, headers: const {'Accept': 'application/json'})
+        .timeout(reachabilityTimeout);
+
+    _logResponse(method: 'GET', uri: uri, response: response);
+    if (response.statusCode == 200) {
+      return;
+    }
+
+    final snippet = _bodySnippet(response.body);
+    final requestId = response.headers['x-request-id'];
+    throw ApiError.http(
+      'Health check failed (${response.statusCode})${requestId == null ? '' : ' requestId=$requestId'} body="$snippet"',
+      statusCode: response.statusCode,
+      details: response.body,
+    );
+  }
+
   Future<bool> checkBackendReachability() async {
     final healthUri = buildUri('/health');
     if (await _ping(healthUri)) {
@@ -115,6 +135,7 @@ class ApiClient {
 
       try {
         final response = await _request(method, uri, headers, body).timeout(timeout);
+        _logResponse(method: method, uri: uri, response: response);
 
         if (retryPolicy.shouldRetryStatusCode(response.statusCode) &&
             attempt < retryPolicy.maxRetries) {
@@ -126,7 +147,6 @@ class ApiClient {
         final decoded = _decodeBody(response.body);
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          Log.d('$method $uri -> ${response.statusCode}');
           return decoded is JsonMap ? decoded : <String, dynamic>{'data': decoded};
         }
 
@@ -137,7 +157,7 @@ class ApiClient {
           responseBody: response.body,
         );
         throw ApiError.http(
-          'HTTP ${response.statusCode}',
+          'HTTP ${response.statusCode} body="${_bodySnippet(response.body)}"',
           statusCode: response.statusCode,
           serverPayload: decoded is JsonMap ? ErrorPayload.tryParse(decoded) : null,
           details: decoded,
@@ -219,10 +239,24 @@ class ApiClient {
     required int statusCode,
     required String responseBody,
   }) {
-    final snippet = responseBody.length > 200
-        ? '${responseBody.substring(0, 200)}...'
-        : responseBody;
+    final snippet = _bodySnippet(responseBody);
     Log.warn('$method $uri failed: status=$statusCode body="$snippet"');
+  }
+
+  void _logResponse({
+    required String method,
+    required Uri uri,
+    required http.Response response,
+  }) {
+    final requestId = response.headers['x-request-id'];
+    Log.d('$method ${uri.path.isEmpty ? '/' : uri.path} url=$uri status=${response.statusCode} x-request-id=${requestId ?? '-'}');
+  }
+
+  String _bodySnippet(String responseBody) {
+    if (responseBody.length > 200) {
+      return '${responseBody.substring(0, 200)}...';
+    }
+    return responseBody;
   }
 
   void _logRequestException({
