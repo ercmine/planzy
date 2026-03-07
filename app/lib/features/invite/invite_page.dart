@@ -16,7 +16,7 @@ class InvitePage extends ConsumerWidget {
     final state = ref.watch(inviteControllerProvider(code));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Invite')),
+      appBar: AppBar(title: const Text('Session Invite')),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.m),
         child: AppCard(
@@ -26,14 +26,31 @@ class InvitePage extends ConsumerWidget {
             children: [
               Text('Invite code: ${state.code}'),
               const SizedBox(height: AppSpacing.s),
-              Text('Status: ${state.status}'),
+              const Text('Join this session to start planning together.'),
+              const SizedBox(height: AppSpacing.s),
+              Text('Status: ${state.status ?? 'Ready'}'),
+              if (state.errorMessage != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(state.errorMessage!),
+              ],
               const SizedBox(height: AppSpacing.m),
-              PrimaryButton(
-                label: 'Continue to Sessions',
-                onPressed: () {
-                  ref.read(inviteControllerProvider(code).notifier).acceptInvite();
-                  context.go('/sessions');
-                },
+              FilledButton(
+                onPressed: state.isValid && !state.isJoining
+                    ? () async {
+                        final sessionId = await ref
+                            .read(inviteControllerProvider(code).notifier)
+                            .joinSession();
+                        if (sessionId != null && context.mounted) {
+                          context.go('/sessions/$sessionId');
+                        }
+                      }
+                    : null,
+                child: state.isJoining
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Join Session'),
               ),
             ],
           ),

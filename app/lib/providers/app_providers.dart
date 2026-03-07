@@ -12,8 +12,15 @@ import '../core/location/location_controller.dart';
 import '../core/location/location_service.dart';
 import '../core/permissions/permission_service.dart';
 import '../core/sharing/share_service.dart';
+import '../core/store/sessions_store.dart';
+import '../features/sessions/create_session/create_session_controller.dart';
+import '../features/sessions/join_session/join_session_controller.dart';
+import '../features/sessions/session_settings/session_settings_controller.dart';
+import '../features/sessions/sessions_controller.dart';
+import '../models/session.dart';
 import '../repositories/deck_repository.dart';
 import '../repositories/ideas_repository.dart';
+import '../repositories/sessions_repository.dart';
 import '../repositories/telemetry_repository.dart';
 
 final httpClientProvider = Provider<http.Client>((ref) {
@@ -92,4 +99,52 @@ final shareServiceProvider = Provider<ShareService>((ref) {
 
 final linkLauncherProvider = Provider<LinkLauncher>((ref) {
   return LinkLauncher();
+});
+
+final sessionsStoreProvider = Provider<SessionsStore>((ref) {
+  return SessionsStore();
+});
+
+final sessionsRepositoryProvider = Provider<SessionsRepository>((ref) {
+  return SessionsRepository(
+    sessionsStore: ref.watch(sessionsStoreProvider),
+  );
+});
+
+final sessionsControllerProvider =
+    StateNotifierProvider<SessionsController, SessionsState>((ref) {
+  return SessionsController(
+    sessionsRepository: ref.watch(sessionsRepositoryProvider),
+  );
+});
+
+final createSessionControllerProvider =
+    StateNotifierProvider<CreateSessionController, CreateSessionState>((ref) {
+  return CreateSessionController(
+    sessionsRepository: ref.watch(sessionsRepositoryProvider),
+  );
+});
+
+final sessionSettingsControllerProvider = StateNotifierProvider.family<
+    SessionSettingsController,
+    SessionSettingsState,
+    String>((ref, sessionId) {
+  return SessionSettingsController(
+    sessionId: sessionId,
+    repository: ref.watch(sessionsRepositoryProvider),
+  );
+});
+
+final joinSessionControllerProvider =
+    StateNotifierProvider.family<JoinSessionController, JoinSessionState, String>(
+  (ref, code) {
+    return JoinSessionController(
+      code: code,
+      repository: ref.watch(sessionsRepositoryProvider),
+    );
+  },
+);
+
+final sessionByIdProvider = FutureProvider.family<Session?, String>((ref, sessionId) {
+  return ref.watch(sessionsRepositoryProvider).getById(sessionId);
 });

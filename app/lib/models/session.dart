@@ -1,4 +1,8 @@
+// Run: flutter pub run build_runner build --delete-conflicting-outputs
 import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'session_filters.dart';
+import 'session_member.dart';
 
 part 'session.freezed.dart';
 part 'session.g.dart';
@@ -6,11 +10,14 @@ part 'session.g.dart';
 @freezed
 class Session with _$Session {
   const factory Session({
-    required String id,
-    String? title,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    @Default(<String>[]) List<String> participants,
+    required String sessionId,
+    required String title,
+    required String createdAtISO,
+    required String updatedAtISO,
+    required SessionFilters filters,
+    @Default(<SessionMember>[]) List<SessionMember> members,
+    @Default('active') String status,
+    String? lastCursor,
   }) = _Session;
 
   factory Session.fromJson(Map<String, dynamic> json) =>

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
-import 'session_controller.dart';
+import '../../providers/app_providers.dart';
 
 class SessionsPage extends ConsumerWidget {
   const SessionsPage({super.key});
@@ -18,28 +19,49 @@ class SessionsPage extends ConsumerWidget {
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.m),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (state.isLoading) const LinearProgressIndicator(),
+            if (state.errorMessage != null) ...[
+              const SizedBox(height: AppSpacing.s),
+              Text(state.errorMessage!),
+            ],
             const SizedBox(height: AppSpacing.s),
             Expanded(
-              child: ListView.separated(
-                itemCount: state.sessions.length,
-                separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s),
-                itemBuilder: (context, index) {
-                  final sessionId = state.sessions[index];
-                  return AppCard(
-                    child: Row(
-                      children: [
-                        Expanded(child: Text('Session $sessionId')),
-                        SecondaryButton(
-                          label: 'Open',
-                          onPressed: () => context.go('/sessions/$sessionId'),
-                        ),
-                      ],
+              child: state.sessions.isEmpty
+                  ? const Center(
+                      child: Text('No sessions yet. Create your first session.'),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () => ref
+                          .read(sessionsControllerProvider.notifier)
+                          .loadSessions(),
+                      child: ListView.separated(
+                        itemCount: state.sessions.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s),
+                        itemBuilder: (context, index) {
+                          final session = state.sessions[index];
+                          return AppCard(
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(session.title),
+                              subtitle: Text(
+                                'Updated ${DateFormat.yMMMd().add_jm().format(DateTime.parse(session.updatedAtISO).toLocal())}',
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => context.go('/sessions/${session.sessionId}'),
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  );
-                },
+            ),
+            const SizedBox(height: AppSpacing.s),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => context.go('/sessions/create'),
+                icon: const Icon(Icons.add),
+                label: const Text('New Session'),
               ),
             ),
           ],
