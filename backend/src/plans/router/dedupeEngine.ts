@@ -74,6 +74,36 @@ function isMovieVenueMismatch(a: Plan, b: Plan): boolean {
   return !(aIsTheater && bIsTheater);
 }
 
+function tokenSetFromTitle(value: string): Set<string> {
+  return new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]+/g, " ")
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length > 0 && token !== "the" && token !== "a" && token !== "an")
+  );
+}
+
+function fallbackNameSimilarity(a: string, b: string): number {
+  const aTokens = tokenSetFromTitle(a);
+  const bTokens = tokenSetFromTitle(b);
+
+  if (aTokens.size === 0 || bTokens.size === 0) {
+    return 0;
+  }
+
+  let intersection = 0;
+  for (const token of aTokens) {
+    if (bTokens.has(token)) {
+      intersection += 1;
+    }
+  }
+
+  const union = aTokens.size + bTokens.size - intersection;
+  return union > 0 ? intersection / union : 0;
+}
+
 function chooseFallback(candidates: Plan[]): Plan {
   const scored = candidates.map((candidate, index) => {
     const score =
@@ -99,7 +129,8 @@ function canMerge(anchor: Plan, other: Plan, opts: Required<DedupeOptions>): { o
     return { ok: false, reason: `geo>${opts.geoThresholdMeters}` };
   }
 
-  const nameScore = nameSimilarity(anchor.title, other.title);
+  const baseNameScore = nameSimilarity(anchor.title, other.title);
+  const nameScore = baseNameScore > 0 ? baseNameScore : fallbackNameSimilarity(anchor.title, other.title);
   if (nameScore < opts.nameSimilarityMin) {
     return { ok: false, reason: `name<${opts.nameSimilarityMin}` };
   }
