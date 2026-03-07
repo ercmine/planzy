@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-import '../core/cache/local_store.dart';
 import '../core/env/env.dart';
 import '../core/utils/json.dart';
 import '../core/utils/uuid.dart';
@@ -16,14 +15,14 @@ class ApiClient {
   ApiClient({
     required this.httpClient,
     required this.envConfig,
-    required this.localStore,
+    required this.userIdResolver,
     this.retryPolicy = const RetryPolicy(),
     this.timeout = const Duration(seconds: 20),
   });
 
   final http.Client httpClient;
   final EnvConfig envConfig;
-  final LocalStore localStore;
+  final Future<String> Function() userIdResolver;
   final RetryPolicy retryPolicy;
   final Duration timeout;
 
@@ -75,7 +74,7 @@ class ApiClient {
     Object? body,
   }) async {
     final uri = buildUri(path, queryParameters);
-    final userId = await localStore.getOrCreateUserId();
+    final userId = await userIdResolver();
 
     var attempt = 0;
     while (true) {
