@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 
+import { ClickTracker, MemoryClickStore } from "../analytics/clicks/index.js";
 import { createDeckHandler } from "../api/sessions/deckHandler.js";
 import { createIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { AppConfig } from "../config/schema.js";
@@ -7,10 +8,12 @@ import type { Logger } from "../logging/loggerTypes.js";
 import { MemoryMerchantStore } from "../merchant/memoryStore.js";
 import { MerchantService } from "../merchant/service.js";
 import { BringYourOwnProvider, MemoryIdeasStore } from "../plans/bringYourOwn/index.js";
-import { CuratedProvider } from "../plans/curated/index.js";
 import type { IdeasStore } from "../plans/bringYourOwn/storage.js";
+import { CuratedProvider } from "../plans/curated/index.js";
 import { ProviderRouter } from "../plans/router/providerRouter.js";
 import type { ProviderRouter as ProviderRouterType } from "../plans/router/providerRouter.js";
+import { MemoryTelemetryStore } from "../telemetry/memoryStore.js";
+import { TelemetryService } from "../telemetry/telemetryService.js";
 import { VenueClaimsService } from "../venues/claims/claimsService.js";
 import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
 import { createHttpServer } from "./httpServer.js";
@@ -31,8 +34,7 @@ function createDefaultDeckRouter(sharedIdeasStore: IdeasStore): ProviderRouter {
     },
     neverEmpty: {
       enabled: true,
-      curatedProviderName: "curated",
-      minimumPlans: 1
+      curatedProviderName: "curated"
     }
   });
 }
@@ -42,6 +44,11 @@ export function createServer(options?: CreateServerOptions) {
   const merchantService = new MerchantService(new MemoryMerchantStore());
   const ideasStore = options?.ideasStore ?? new MemoryIdeasStore();
   const deckRouter = options?.deckRouter ?? createDefaultDeckRouter(ideasStore);
+
+  const clickStore = new MemoryClickStore();
+  const clickTracker = new ClickTracker(clickStore);
+  const telemetryStore = new MemoryTelemetryStore();
+  const telemetryService = new TelemetryService(telemetryStore, { clickTracker });
 
   const deckHandler = createDeckHandler({
     router: deckRouter,
@@ -54,7 +61,7 @@ export function createServer(options?: CreateServerOptions) {
     logger: options?.logger
   });
 
-  return createHttpServer(service, merchantService, { deckHandler, ideasHandlers });
+  return createHttpServer(service, merchantService, { deckHandler, ideasHandlers, telemetryService });
 }
 
 export function main(): void {
