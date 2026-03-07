@@ -5,6 +5,8 @@ import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import { handleMerchantHttpError, createMerchantHttpHandlers } from "../merchant/http.js";
 import type { MerchantService } from "../merchant/service.js";
 import { ValidationError } from "../plans/errors.js";
+import { createTelemetryHttpHandlers } from "../telemetry/http.js";
+import type { TelemetryService } from "../telemetry/telemetryService.js";
 import { createVenueClaimsHttpHandlers, readHeader, sendJson } from "../venues/claims/http.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 
@@ -23,10 +25,11 @@ function assertAdmin(req: IncomingMessage): boolean {
 export function createRoutes(
   service: VenueClaimsService,
   merchantService: MerchantService,
-  deps?: { deckHandler?: SessionDeckHandler; ideasHandlers?: SessionIdeasHandlers }
+  deps?: { deckHandler?: SessionDeckHandler; ideasHandlers?: SessionIdeasHandlers; telemetryService?: TelemetryService }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
   const merchantHandlers = createMerchantHttpHandlers(merchantService);
+  const telemetryHandlers = deps?.telemetryService ? createTelemetryHttpHandlers(deps.telemetryService) : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -49,6 +52,25 @@ export function createRoutes(
         }
 
         await deps.deckHandler(req, res, { sessionId: decodeURIComponent(deckRouteMatch[1] ?? "") });
+        return;
+      }
+
+      const telemetryIngestMatch = /^\/sessions\/([^/]+)\/telemetry$/.exec(url.pathname);
+      if (telemetryIngestMatch && telemetryHandlers) {
+        const sessionId = decodeURIComponent(telemetryIngestMatch[1] ?? "");
+        if (req.method === "POST") {
+          await telemetryHandlers.ingest(req, res, sessionId);
+          return;
+        }
+        if (req.method === "GET") {
+          await telemetryHandlers.list(req, res, sessionId);
+          return;
+        }
+      }
+
+      const telemetryAggregateMatch = /^\/sessions\/([^/]+)\/telemetry\/aggregate$/.exec(url.pathname);
+      if (telemetryAggregateMatch && telemetryHandlers && req.method === "GET") {
+        await telemetryHandlers.aggregate(req, res, decodeURIComponent(telemetryAggregateMatch[1] ?? ""));
         return;
       }
 

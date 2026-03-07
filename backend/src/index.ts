@@ -70,3 +70,8 @@ export * from "./sanitize/index.js";
 export * from "./api/sessions/index.js";
 export * from "./api/sessions/ideasTypes.js";
 export * from "./api/sessions/ideasHandler.js";
+
+export * from "./telemetry/types.js";
+export * from "./telemetry/telemetryService.js";
+export * from "./telemetry/memoryStore.js";
+export * from "./telemetry/validation.js";
