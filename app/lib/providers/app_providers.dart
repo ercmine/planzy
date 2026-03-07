@@ -13,6 +13,8 @@ import '../core/location/location_service.dart';
 import '../core/permissions/permission_service.dart';
 import '../core/sharing/share_service.dart';
 import '../core/store/sessions_store.dart';
+import '../features/deck/deck_controller.dart';
+import '../features/deck/deck_state.dart';
 import '../features/sessions/create_session/create_session_controller.dart';
 import '../features/sessions/join_session/join_session_controller.dart';
 import '../features/sessions/session_settings/session_settings_controller.dart';
@@ -148,3 +150,13 @@ final joinSessionControllerProvider =
 final sessionByIdProvider = FutureProvider.family<Session?, String>((ref, sessionId) {
   return ref.watch(sessionsRepositoryProvider).getById(sessionId);
 });
+
+final deckControllerProvider = StateNotifierProvider.family<DeckController, DeckState, String>(
+  (ref, sessionId) {
+    return DeckController(
+      ref: ref,
+      sessionId: sessionId,
+      sessionsRepository: ref.watch(sessionsRepositoryProvider),
+    );
+  },
+);
