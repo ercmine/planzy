@@ -54,7 +54,7 @@ class SessionPage extends ConsumerWidget {
                 onPressed: () {
                   context.push('/sessions/${session.sessionId}/deck');
                 },
-                child: const Text('Open Deck'),
+                child: const Text('Open Money Deck'),
               ),
               const SizedBox(height: AppSpacing.s),
               OutlinedButton.icon(

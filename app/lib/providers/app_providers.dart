@@ -15,6 +15,7 @@ import '../core/sharing/share_service.dart';
 import '../core/store/sessions_store.dart';
 import '../core/store/swipes_store.dart';
 import '../features/deck/deck_controller.dart';
+import '../features/deck/deck_state.dart';
 import '../features/results/results_controller.dart';
 import '../features/results/results_state.dart';
 import '../features/sessions/create_session/create_session_controller.dart';
@@ -184,6 +185,7 @@ final deckControllerProvider =
     swipesRepository: ref.watch(swipesRepositoryProvider),
     telemetryRepository: telemetryRepository,
     sessionsRepository: ref.watch(sessionsRepositoryProvider),
+    locationController: ref.watch(locationControllerProvider.notifier),
   );
 });
 
