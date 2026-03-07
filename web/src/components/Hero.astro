@@ -1,0 +1,25 @@
+---
+import CTAButtons from './CTAButtons.astro';
+import Container from './Container.astro';
+---
+
+<section class="py-20 sm:py-28">
+  <Container class="grid items-center gap-10 lg:grid-cols-2">
+    <div class="space-y-6">
+      <p class="text-sm font-semibold uppercase tracking-wide text-brand-600">Planning, in sync</p>
+      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Run better planning sessions with Perbug.</h1>
+      <p class="text-lg text-slate-600 dark:text-slate-300">
+        Guide teams from idea capture to aligned execution with transparent sessions, focused decisions, and lightweight telemetry.
+      </p>
+      <CTAButtons />
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-soft dark:border-slate-800 dark:bg-slate-900">
+      <h2 class="mb-3 text-xl font-semibold">Why teams choose Perbug</h2>
+      <ul class="space-y-3 text-slate-600 dark:text-slate-300">
+        <li>• Guided session flows to move from brainstorm to decision quickly.</li>
+        <li>• Shared visibility across facilitators, participants, and stakeholders.</li>
+        <li>• Mobile-first experience with fast onboarding and clear outcomes.</li>
+      </ul>
+    </div>
+  </Container>
+</section>

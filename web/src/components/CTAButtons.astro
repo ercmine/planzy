@@ -1,0 +1,29 @@
+---
+import { publicConfig } from '@/env/public';
+
+const links = [
+  { label: 'Download on the App Store', href: publicConfig.PERBUG_APPSTORE_URL },
+  { label: 'Get it on Google Play', href: publicConfig.PERBUG_PLAYSTORE_URL }
+];
+---
+
+<div class="flex flex-col gap-3 sm:flex-row">
+  {
+    links.map((link) =>
+      link.href ? (
+        <a
+          href={link.href}
+          class="rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft hover:bg-brand-700"
+          target="_blank"
+          rel="noreferrer"
+        >
+          {link.label}
+        </a>
+      ) : (
+        <span class="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          {link.label} (Coming soon)
+        </span>
+      )
+    )
+  }
+</div>

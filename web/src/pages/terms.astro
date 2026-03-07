@@ -1,0 +1,24 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import { createSeo } from '@/lib/seo';
+
+const seo = createSeo({
+  title: 'Terms of Service',
+  description: 'Terms governing the use of Perbug.',
+  path: '/terms/'
+});
+---
+
+<BaseLayout {...seo}>
+  <Container class="prose py-16 dark:prose-invert">
+    <h1>Terms of Service</h1>
+    <p>By using Perbug, you agree to these terms and all applicable laws.</p>
+    <h2>Use of Service</h2>
+    <p>You are responsible for maintaining account security and ensuring your use complies with organizational policies.</p>
+    <h2>Availability</h2>
+    <p>We strive for high availability but may perform maintenance or updates that impact access.</p>
+    <h2>Limitation of Liability</h2>
+    <p>Perbug is provided as-is to the extent permitted by law. See your commercial agreement for service commitments.</p>
+  </Container>
+</BaseLayout>

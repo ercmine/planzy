@@ -1,0 +1,23 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Sessions API
+description: Endpoints for creating and managing sessions.
+currentPath: /docs/api/sessions/
+editPath: src/pages/docs/api/sessions.mdx
+---
+
+# Sessions API
+
+Use session endpoints to create, update, and close planning sessions.
+
+## Create a session
+
+```http
+POST /api/v1/sessions
+```
+
+## Join a session
+
+```http
+POST /api/v1/sessions/:sessionId/join
+```

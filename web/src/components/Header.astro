@@ -1,0 +1,23 @@
+---
+import Container from './Container.astro';
+
+const links = [
+  { href: '/', label: 'Home' },
+  { href: '/downloads/', label: 'Downloads' },
+  { href: '/docs/', label: 'Docs' },
+  { href: '/privacy/', label: 'Privacy' },
+  { href: '/terms/', label: 'Terms' },
+  { href: '/support/', label: 'Support' }
+];
+---
+
+<header class="border-b border-slate-200/80 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+  <Container class="flex h-16 items-center justify-between">
+    <a href="/" class="flex items-center gap-3 font-semibold">
+      <img src="/logo.svg" alt="Perbug" class="h-7 w-auto" />
+    </a>
+    <nav class="hidden gap-5 text-sm text-slate-600 dark:text-slate-300 md:flex">
+      {links.map((link) => <a href={link.href} class="hover:text-brand-600">{link.label}</a>)}
+    </nav>
+  </Container>
+</header>
