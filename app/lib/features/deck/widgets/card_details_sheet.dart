@@ -7,6 +7,7 @@ import '../../../core/links/link_launcher.dart';
 import '../../../core/links/link_types.dart';
 import '../../../models/plan.dart';
 import '../../../providers/app_providers.dart';
+import '../../ideas/widgets/friend_idea_badge.dart';
 import 'category_pill.dart';
 
 class CardDetailsSheet extends ConsumerWidget {
@@ -31,7 +32,23 @@ class CardDetailsSheet extends ConsumerWidget {
           children: [
             Text(plan.title, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: AppSpacing.s),
-            CategoryPill(category: plan.category),
+            Wrap(
+              spacing: AppSpacing.s,
+              runSpacing: AppSpacing.s,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                CategoryPill(category: plan.category),
+                if (isFriendIdea(plan)) const FriendIdeaBadge(),
+              ],
+            ),
+            if (isFriendIdea(plan)) ...[
+              const SizedBox(height: AppSpacing.s),
+              MaterialBanner(
+                content: const Text('Added by someone in your session'),
+                leading: const Icon(Icons.groups_2_outlined),
+                actions: const [SizedBox.shrink()],
+              ),
+            ],
             const SizedBox(height: AppSpacing.m),
             if ((plan.photos ?? const <PlanPhoto>[]).isNotEmpty)
               SizedBox(
@@ -102,13 +119,24 @@ class CardDetailsSheet extends ConsumerWidget {
       );
     }
 
-    addButton('Maps', LinkType.maps, links?.mapsLink);
+    final mapsLink = links?.mapsLink ?? _fallbackMapsLink();
+
+    addButton('Maps', LinkType.maps, mapsLink);
     addButton('Website', LinkType.website, links?.websiteLink);
     addButton('Call', LinkType.call, links?.callLink);
     addButton('Booking', LinkType.booking, links?.bookingLink);
     addButton('Tickets', LinkType.ticket, links?.ticketLink);
 
     return widgets;
+  }
+
+  String _fallbackMapsLink() {
+    final address = plan.location.address;
+    if (address != null && address.isNotEmpty) {
+      return 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}';
+    }
+
+    return 'https://www.google.com/maps/search/?api=1&query=${plan.location.lat},${plan.location.lng}';
   }
 
   List<Widget> _buildSpecials(BuildContext context, LinkLauncher launcher) {

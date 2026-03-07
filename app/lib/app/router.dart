@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/identity/identity_provider.dart';
 import '../features/deck/deck_page.dart';
 import '../features/home/home_page.dart';
+import '../features/ideas/ideas_page.dart';
 import '../features/invite/invite_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
 import '../features/onboarding/onboarding_permissions_page.dart';
@@ -117,6 +118,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           return DeckPage(sessionId: sessionId);
         },
       ),
+      GoRoute(
+        path: '/sessions/:id/ideas',
+        name: 'session-ideas',
+        builder: (context, state) {
+          final sessionId = state.pathParameters['id'] ?? '';
+          return IdeasPage(sessionId: sessionId);
+        },
+      ),
+
       GoRoute(
         path: '/sessions/:id/results',
         name: 'session-results',
