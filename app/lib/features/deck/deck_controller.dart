@@ -4,6 +4,7 @@ import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/location/location_controller.dart';
+import '../../core/telemetry/telemetry_dispatcher.dart';
 import '../../models/deep_links.dart';
 import '../../models/plan.dart';
 import '../../models/swipe.dart';
@@ -20,15 +21,18 @@ class DeckController extends StateNotifier<DeckState> {
     required DeckRepository deckRepository,
     required SwipesRepository swipesRepository,
     required TelemetryRepository telemetryRepository,
+    required TelemetryDispatcher telemetryDispatcher,
     required SessionsRepository sessionsRepository,
     required LocationController locationController,
   })  : _sessionId = sessionId,
         _deckRepository = deckRepository,
         _swipesRepository = swipesRepository,
         _telemetryRepository = telemetryRepository,
+        _telemetryDispatcher = telemetryDispatcher,
         _sessionsRepository = sessionsRepository,
         _locationController = locationController,
         super(DeckState.initial(sessionId)) {
+    _telemetryDispatcher.setActiveSession(_sessionId);
     Future<void>.microtask(initialize);
   }
 
@@ -36,11 +40,20 @@ class DeckController extends StateNotifier<DeckState> {
   final DeckRepository _deckRepository;
   final SwipesRepository _swipesRepository;
   final TelemetryRepository _telemetryRepository;
+  final TelemetryDispatcher _telemetryDispatcher;
   final SessionsRepository _sessionsRepository;
   final LocationController _locationController;
 
+  static const int _batchLimit = 25;
+
   DateTime? _viewStartedAt;
   String? _viewPlanId;
+
+  @override
+  void dispose() {
+    _telemetryDispatcher.clearActiveSession();
+    super.dispose();
+  }
 
   Future<void> initialize() async {
     await _ensureLocation();
@@ -83,19 +96,18 @@ class DeckController extends StateNotifier<DeckState> {
     }
 
     final plan = state.plans.first;
-    final position = state.shownPlanIds.length;
+    final position = 0;
+
     await _emitCardViewedIfNeeded(plan);
 
     await _swipesRepository.recordSwipe(_sessionId, plan, action, position);
-    _telemetryRepository.enqueue(
-      _sessionId,
+    await _enqueueTelemetry(
       TelemetryEventInput.swipe(
         planId: plan.id,
         action: action.name,
         position: position,
         cursor: state.nextCursor,
         source: plan.source,
-        clientAtISO: DateTime.now().toUtc().toIso8601String(),
       ),
     );
 
@@ -114,7 +126,6 @@ class DeckController extends StateNotifier<DeckState> {
     );
 
     _startViewingTopCard();
-    await _telemetryRepository.flush(_sessionId);
     await loadMoreIfNeeded();
   }
 
@@ -147,35 +158,29 @@ class DeckController extends StateNotifier<DeckState> {
   }
 
   Future<void> onCardOpened(Plan plan) async {
-    await _emitCardViewedIfNeeded(plan);
-    _telemetryRepository.enqueue(
-      _sessionId,
+    await _enqueueTelemetry(
       TelemetryEventInput.cardOpened(
         planId: plan.id,
+        section: 'details',
         cursor: state.nextCursor,
         source: plan.source,
-        clientAtISO: DateTime.now().toUtc().toIso8601String(),
       ),
     );
-    await _telemetryRepository.flush(_sessionId);
-    _startViewingTopCard();
   }
 
   Future<void> onOutboundLinkTapped({
     required Plan plan,
     required String linkType,
   }) async {
-    _telemetryRepository.enqueue(
-      _sessionId,
+    await _enqueueTelemetry(
       TelemetryEventInput.outboundLinkClicked(
         planId: plan.id,
         linkType: linkType,
+        affiliate: false,
         cursor: state.nextCursor,
         source: plan.source,
-        clientAtISO: DateTime.now().toUtc().toIso8601String(),
       ),
     );
-    await _telemetryRepository.flush(_sessionId);
   }
 
   List<MapEntry<String, Uri>> availableLinks(DeepLinks? links) {
@@ -234,10 +239,12 @@ class DeckController extends StateNotifier<DeckState> {
       }
 
       final filters = session.filters;
+      final requestedCursor = reset ? null : state.nextCursor;
       final batch = await _deckRepository.fetchDeckBatch(
         _sessionId,
         DeckQueryParams(
-          cursor: reset ? null : state.nextCursor,
+          cursor: requestedCursor,
+          limit: _batchLimit,
           lat: location.lat,
           lng: location.lng,
           radiusMeters: filters.radiusMeters,
@@ -267,18 +274,17 @@ class DeckController extends StateNotifier<DeckState> {
         usedFallback: usedFallback,
       );
 
-      _telemetryRepository.enqueue(
-        _sessionId,
+      await _enqueueTelemetry(
         TelemetryEventInput.deckLoaded(
-          batchSize: batch.plans.length,
+          batchSize: _batchLimit,
           returned: batch.plans.length,
           nextCursorPresent: batch.nextCursor != null,
           planSourceCounts: batch.mix.planSourceCounts,
-          cursor: reset ? null : state.nextCursor,
-          clientAtISO: DateTime.now().toUtc().toIso8601String(),
+          cursor: requestedCursor,
+          deckKey: batch.debug?.requestId,
         ),
       );
-      await _telemetryRepository.flush(_sessionId);
+
       _startViewingTopCard();
     } catch (error) {
       state = state.copyWith(
@@ -324,15 +330,19 @@ class DeckController extends StateNotifier<DeckState> {
     }
 
     final viewMs = DateTime.now().difference(_viewStartedAt!).inMilliseconds;
-    _telemetryRepository.enqueue(
-      _sessionId,
+    await _enqueueTelemetry(
       TelemetryEventInput.cardViewed(
         planId: plan.id,
         viewMs: viewMs,
         cursor: state.nextCursor,
+        position: 0,
         source: plan.source,
-        clientAtISO: DateTime.now().toUtc().toIso8601String(),
       ),
     );
+  }
+
+  Future<void> _enqueueTelemetry(TelemetryEventInput event) async {
+    await _telemetryRepository.enqueueEvent(_sessionId, event);
+    await _telemetryDispatcher.notifyEventQueued(_sessionId);
   }
 }

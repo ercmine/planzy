@@ -11,6 +11,7 @@ class LinkLauncher {
     required Uri uri,
     required LinkType type,
     required String planTitle,
+    Future<void> Function()? onBeforeLaunch,
   }) async {
     if (!_isValid(uri: uri, type: type)) {
       _showError(context, 'Unsupported link type.');
@@ -27,6 +28,8 @@ class LinkLauncher {
     if (!confirmed) {
       return;
     }
+
+    await onBeforeLaunch?.call();
 
     final canLaunch = await canLaunchUrl(uri);
     if (!canLaunch) {

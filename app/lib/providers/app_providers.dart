@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../core/cache/local_store.dart';
@@ -14,6 +15,8 @@ import '../core/permissions/permission_service.dart';
 import '../core/sharing/share_service.dart';
 import '../core/store/sessions_store.dart';
 import '../core/store/swipes_store.dart';
+import '../core/telemetry/telemetry_dispatcher.dart';
+import '../core/telemetry/telemetry_queue_store.dart';
 import '../features/deck/deck_controller.dart';
 import '../features/deck/deck_state.dart';
 import '../features/ideas/ideas_controller.dart';
@@ -38,6 +41,10 @@ final httpClientProvider = Provider<http.Client>((ref) {
   final client = http.Client();
   ref.onDispose(client.close);
   return client;
+});
+
+final sharedPreferencesProvider = FutureProvider<SharedPreferences>((ref) async {
+  return SharedPreferences.getInstance();
 });
 
 final localStoreProvider = FutureProvider<LocalStore>((ref) async {
@@ -70,9 +77,29 @@ final ideasRepositoryProvider = FutureProvider<IdeasRepository>((ref) async {
   return IdeasRepository(apiClient: apiClient);
 });
 
+final telemetryQueueStoreProvider = FutureProvider<TelemetryQueueStore>((ref) async {
+  final prefs = await ref.watch(sharedPreferencesProvider.future);
+  return TelemetryQueueStore(sharedPreferences: prefs);
+});
+
 final telemetryRepositoryProvider = FutureProvider<TelemetryRepository>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);
-  return TelemetryRepository(apiClient: apiClient);
+  final queueStore = await ref.watch(telemetryQueueStoreProvider.future);
+  return TelemetryRepository(
+    apiClient: apiClient,
+    queueStore: queueStore,
+  );
+});
+
+final telemetryDispatcherProvider = Provider<TelemetryDispatcher?>((ref) {
+  final telemetryRepository = ref.watch(telemetryRepositoryProvider).valueOrNull;
+  if (telemetryRepository == null) {
+    return null;
+  }
+
+  final dispatcher = TelemetryDispatcher(telemetryRepository: telemetryRepository);
+  ref.onDispose(dispatcher.dispose);
+  return dispatcher;
 });
 
 final venueClaimRepositoryProvider = Provider<VenueClaimRepository?>((ref) {
@@ -192,11 +219,12 @@ final deckControllerProvider =
     StateNotifierProvider.family<DeckController, DeckState, String>((ref, sessionId) {
   final deckRepositoryAsync = ref.watch(deckRepositoryProvider);
   final telemetryRepositoryAsync = ref.watch(telemetryRepositoryProvider);
+  final telemetryDispatcher = ref.watch(telemetryDispatcherProvider);
 
   final deckRepository = deckRepositoryAsync.valueOrNull;
   final telemetryRepository = telemetryRepositoryAsync.valueOrNull;
 
-  if (deckRepository == null || telemetryRepository == null) {
+  if (deckRepository == null || telemetryRepository == null || telemetryDispatcher == null) {
     throw StateError('Deck dependencies are not ready yet.');
   }
 
@@ -205,6 +233,7 @@ final deckControllerProvider =
     deckRepository: deckRepository,
     swipesRepository: ref.watch(swipesRepositoryProvider),
     telemetryRepository: telemetryRepository,
+    telemetryDispatcher: telemetryDispatcher,
     sessionsRepository: ref.watch(sessionsRepositoryProvider),
     locationController: ref.watch(locationControllerProvider.notifier),
   );
