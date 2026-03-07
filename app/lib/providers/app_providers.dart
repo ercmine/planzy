@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../core/cache/local_store.dart';
+import '../core/connectivity/connectivity_controller.dart';
+import '../core/connectivity/connectivity_state.dart';
 import '../core/contacts/contacts_controller.dart';
 import '../core/contacts/contacts_service.dart';
 import '../core/env/env.dart';
@@ -23,6 +25,8 @@ import '../features/ideas/ideas_controller.dart';
 import '../features/ideas/ideas_state.dart';
 import '../features/results/results_controller.dart';
 import '../features/results/results_state.dart';
+import '../features/settings/settings_controller.dart';
+import '../features/settings/settings_state.dart';
 import '../features/sessions/create_session/create_session_controller.dart';
 import '../features/sessions/join_session/join_session_controller.dart';
 import '../features/sessions/session_settings/session_settings_controller.dart';
@@ -144,6 +148,24 @@ final contactsControllerProvider =
     StateNotifierProvider<ContactsController, ContactsState>((ref) {
   return ContactsController(
     contactsService: ref.watch(contactsServiceProvider),
+  );
+});
+
+final connectivityControllerProvider =
+    StateNotifierProvider<ConnectivityController, ConnectivityState>((ref) {
+  return ConnectivityController();
+});
+
+final settingsControllerProvider =
+    StateNotifierProvider<SettingsController, SettingsState>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider).valueOrNull;
+  if (prefs == null) {
+    throw StateError('Settings dependencies are not ready yet.');
+  }
+
+  return SettingsController(
+    permissionService: ref.watch(permissionServiceProvider),
+    preferences: prefs,
   );
 });
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/connectivity/offline_banner.dart';
 import '../core/identity/identity_provider.dart';
 import '../core/telemetry/telemetry_dispatcher.dart';
 import '../providers/app_providers.dart';
@@ -52,6 +53,14 @@ class _OurPlanPlanAppState extends ConsumerState<OurPlanPlanApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       routerConfig: router,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            if (child != null) child,
+            const OfflineBanner(),
+          ],
+        );
+      },
     );
   }
 

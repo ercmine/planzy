@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../core/env/env.dart';
+import '../../core/widgets/app_snackbar.dart';
+import '../../core/widgets/retry_view.dart';
 import '../../providers/app_providers.dart';
 import 'widgets/card_details_sheet.dart';
 import 'widgets/deck_actions_bar.dart';
@@ -48,26 +50,21 @@ class _DeckPageState extends ConsumerState<DeckPage> {
     final controller = ref.read(deckControllerProvider(widget.sessionId).notifier);
     final envConfig = ref.watch(envConfigProvider);
 
+    ref.listen(deckControllerProvider(widget.sessionId).select((s) => s.showCachedResultsNotice),
+        (_, notice) {
+      if (notice && mounted) {
+        AppSnackbar.show(context, 'Showing cached results.');
+        controller.clearCachedResultsNotice();
+      }
+    });
+
     if (state.locationRequired) {
       return _scaffoldWithBody(
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.m),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  state.errorMessage ?? 'Location required',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.m),
-                FilledButton(
-                  onPressed: controller.requestLocationAndReload,
-                  child: const Text('Enable location'),
-                ),
-              ],
-            ),
-          ),
+        RetryView(
+          title: 'Location required',
+          message: state.errorMessage ?? 'Location required',
+          retryLabel: 'Enable location',
+          onRetry: controller.requestLocationAndReload,
         ),
       );
     }
@@ -89,41 +86,20 @@ class _DeckPageState extends ConsumerState<DeckPage> {
 
     if (state.errorMessage != null && state.plans.isEmpty) {
       return _scaffoldWithBody(
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.m),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(state.errorMessage!, textAlign: TextAlign.center),
-                const SizedBox(height: AppSpacing.m),
-                FilledButton(
-                  onPressed: controller.refresh,
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
+        RetryView(
+          title: 'Could not load plans',
+          message: state.errorMessage!,
+          onRetry: controller.refresh,
         ),
       );
     }
 
     if (state.plans.isEmpty) {
       return _scaffoldWithBody(
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.m),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('No more ideas right now.'),
-                const SizedBox(height: AppSpacing.s),
-                const Text('Try retrying or adjusting your session filters.'),
-                const SizedBox(height: AppSpacing.m),
-                FilledButton(onPressed: controller.refresh, child: const Text('Retry')),
-              ],
-            ),
-          ),
+        RetryView(
+          title: 'No more ideas right now',
+          message: 'Try retrying or adjusting your session filters.',
+          onRetry: controller.refresh,
         ),
       );
     }
@@ -151,8 +127,17 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                 },
                 cardBuilder: (context, index, _, __) {
                   final plan = state.plans[index];
+                  final prefetchUrls = state.plans
+                      .skip(index + 1)
+                      .take(2)
+                      .map((p) => p.photos?.isNotEmpty == true ? p.photos!.first.url : null)
+                      .whereType<String>()
+                      .toList(growable: false);
+
                   return DeckCard(
                     plan: plan,
+                    isTopCard: index == 0,
+                    prefetchImageUrls: prefetchUrls,
                     onTap: () async {
                       await controller.onCardOpened(plan);
                       if (!context.mounted) {

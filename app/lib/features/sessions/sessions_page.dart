@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../core/widgets/retry_view.dart';
 import '../../providers/app_providers.dart';
 
 class SessionsPage extends ConsumerWidget {
@@ -21,17 +22,20 @@ class SessionsPage extends ConsumerWidget {
         child: Column(
           children: [
             if (state.isLoading) const LinearProgressIndicator(),
-            if (state.errorMessage != null) ...[
-              const SizedBox(height: AppSpacing.s),
-              Text(state.errorMessage!),
-            ],
+
             const SizedBox(height: AppSpacing.s),
             Expanded(
-              child: state.sessions.isEmpty
-                  ? const Center(
-                      child: Text('No sessions yet. Create your first session.'),
+              child: state.errorMessage != null && state.sessions.isEmpty
+                  ? RetryView(
+                      title: 'Sessions unavailable',
+                      message: state.errorMessage!,
+                      onRetry: () => ref.read(sessionsControllerProvider.notifier).loadSessions(),
                     )
-                  : RefreshIndicator(
+                  : state.sessions.isEmpty
+                      ? const Center(
+                          child: Text('No sessions yet. Create your first session.'),
+                        )
+                      : RefreshIndicator(
                       onRefresh: () => ref
                           .read(sessionsControllerProvider.notifier)
                           .loadSessions(),

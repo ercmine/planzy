@@ -75,13 +75,21 @@ class DeckRepository {
   final LocalStore localStore;
   final MemoryCache<String, DeckBatchResponse> _deckBatchCache;
 
+  DeckBatchResponse? getCachedDeckBatch(
+    String sessionId,
+    DeckQueryParams params,
+  ) {
+    final filtersHash = hashForCacheKey(params.toCacheMap());
+    return _deckBatchCache.get(_cacheKey(sessionId, params, filtersHash));
+  }
+
   Future<DeckBatchResponse> fetchDeckBatch(
     String sessionId,
     DeckQueryParams params, {
     bool forceRefresh = false,
   }) async {
     final filtersHash = hashForCacheKey(params.toCacheMap());
-    final cacheKey = '$sessionId::${params.cursor ?? ''}::$filtersHash';
+    final cacheKey = _cacheKey(sessionId, params, filtersHash);
 
     if (!forceRefresh) {
       final cached = _deckBatchCache.get(cacheKey);
@@ -103,5 +111,9 @@ class DeckRepository {
     await localStore.saveLastSeenDeckKey(sessionId, cacheKey);
 
     return deck;
+  }
+
+  String _cacheKey(String sessionId, DeckQueryParams params, String filtersHash) {
+    return '$sessionId::${params.cursor ?? ''}::$filtersHash';
   }
 }

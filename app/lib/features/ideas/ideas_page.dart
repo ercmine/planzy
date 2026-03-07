@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/spacing.dart';
+import '../../core/widgets/retry_view.dart';
 import '../../providers/app_providers.dart';
 import 'ideas_controller.dart';
 import 'widgets/add_idea_sheet.dart';
@@ -46,18 +47,10 @@ class IdeasPage extends ConsumerWidget {
             }
 
             if (state.errorMessage != null && state.ideas.isEmpty) {
-              return ListView(
-                children: [
-                  const SizedBox(height: 140),
-                  Center(child: Text(state.errorMessage!)),
-                  const SizedBox(height: AppSpacing.s),
-                  Center(
-                    child: FilledButton(
-                      onPressed: controller.refresh,
-                      child: const Text('Retry'),
-                    ),
-                  ),
-                ],
+              return RetryView(
+                title: 'Ideas unavailable',
+                message: state.errorMessage!,
+                onRetry: controller.refresh,
               );
             }
 
