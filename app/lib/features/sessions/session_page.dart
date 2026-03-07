@@ -50,11 +50,7 @@ class SessionPage extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.m),
               FilledButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Deck coming soon')),
-                  );
-                },
+                onPressed: () => context.go('/sessions/${session.sessionId}/deck'),
                 child: const Text('Open Deck'),
               ),
               const SizedBox(height: AppSpacing.s),
