@@ -16,6 +16,8 @@ import '../core/store/sessions_store.dart';
 import '../core/store/swipes_store.dart';
 import '../features/deck/deck_controller.dart';
 import '../features/deck/deck_state.dart';
+import '../features/ideas/ideas_controller.dart';
+import '../features/ideas/ideas_state.dart';
 import '../features/results/results_controller.dart';
 import '../features/results/results_state.dart';
 import '../features/sessions/create_session/create_session_controller.dart';
@@ -188,6 +190,20 @@ final deckControllerProvider =
     locationController: ref.watch(locationControllerProvider.notifier),
   );
 });
+
+final ideasControllerProvider =
+    StateNotifierProvider.family<IdeasController, IdeasState, String>((ref, sessionId) {
+  final ideasRepository = ref.watch(ideasRepositoryProvider).valueOrNull;
+  if (ideasRepository == null) {
+    throw StateError('Ideas dependencies are not ready yet.');
+  }
+
+  return IdeasController(
+    sessionId: sessionId,
+    ideasRepository: ideasRepository,
+  );
+});
+
 
 final resultsControllerProvider =
     StateNotifierProvider.family<ResultsController, ResultsState, String>((ref, sessionId) {

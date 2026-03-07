@@ -7,6 +7,7 @@ import '../../../models/plan.dart';
 import 'category_pill.dart';
 import 'price_pill.dart';
 import 'rating_row.dart';
+import '../../ideas/widgets/friend_idea_badge.dart';
 import 'specials_badge.dart';
 import 'sponsored_badge.dart';
 
@@ -78,6 +79,7 @@ class DeckCard extends StatelessWidget {
                         const Text('Open now')
                       else if (plan.hours?.openNow == false)
                         const Text('Closed'),
+                      if (isFriendIdea(plan)) const FriendIdeaBadge(),
                       if (_isSponsored) const SponsoredBadge(),
                       if (_hasSpecials) const SpecialsBadge(),
                     ],

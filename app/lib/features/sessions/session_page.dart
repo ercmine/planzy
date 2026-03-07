@@ -69,6 +69,14 @@ class SessionPage extends ConsumerWidget {
               const SizedBox(height: AppSpacing.s),
               OutlinedButton.icon(
                 onPressed: () {
+                  context.push('/sessions/${session.sessionId}/ideas');
+                },
+                icon: const Icon(Icons.lightbulb_outline),
+                label: const Text('Ideas'),
+              ),
+              const SizedBox(height: AppSpacing.s),
+              OutlinedButton.icon(
+                onPressed: () {
                   ref.read(shareServiceProvider).shareText(
                         'Join my OurPlanPlan session: $inviteLink',
                         subject: 'Join my OurPlanPlan session',
