@@ -1,0 +1,95 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import DocsSidebar from '@/components/DocsSidebar.astro';
+import { createSeo, defaultDescription } from '@/lib/seo';
+import { docsNav } from '@/lib/nav';
+import { getDocsSearchIndex } from '@/lib/search';
+import { publicConfig } from '@/env/public';
+
+interface Props {
+  title: string;
+  description?: string;
+  currentPath: string;
+  editPath?: string;
+}
+
+const { title, description = defaultDescription, currentPath, editPath } = Astro.props;
+const seo = createSeo({ title, description, path: currentPath });
+const docsPages = await Astro.glob('/src/pages/docs/**/*.mdx');
+const searchIndex = getDocsSearchIndex(docsPages);
+const editBase = publicConfig.PERBUG_DOCS_GITHUB_URL;
+const editHref = editBase && editPath ? `${editBase.replace(/\/$/, '')}/${editPath}` : undefined;
+---
+
+<BaseLayout {...seo}>
+  <Container class="py-10">
+    <div class="grid gap-8 lg:grid-cols-[280px_1fr]">
+      <DocsSidebar items={docsNav} currentPath={currentPath} />
+      <article>
+        <div class="mb-8 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <label for="docs-search" class="mb-2 block text-sm font-semibold">Search docs</label>
+          <input
+            id="docs-search"
+            type="search"
+            placeholder="Search by title or heading"
+            class="w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none ring-brand-500 focus:ring dark:border-slate-700"
+          />
+          <ul id="search-results" class="mt-3 space-y-2 text-sm"></ul>
+        </div>
+        <div class="prose max-w-none dark:prose-invert">
+          <slot />
+        </div>
+        {editHref && (
+          <p class="mt-10 text-sm text-slate-500 dark:text-slate-300">
+            <a href={editHref} target="_blank" rel="noreferrer" class="hover:text-brand-600">Edit this page on GitHub</a>
+          </p>
+        )}
+      </article>
+    </div>
+  </Container>
+
+  <script is:inline type="application/json" id="docs-search-index" set:html={JSON.stringify(searchIndex)} />
+  <script>
+    type DocRecord = { title: string; summary: string; href: string; headings?: string[] };
+
+    const input = document.querySelector<HTMLInputElement>('#docs-search');
+    const results = document.querySelector<HTMLUListElement>('#search-results');
+    const rawIndex = document.querySelector<HTMLScriptElement>('#docs-search-index');
+
+    if (input && results && rawIndex?.textContent) {
+      const index = JSON.parse(rawIndex.textContent) as DocRecord[];
+      const renderResults = (query: string) => {
+        const value = query.trim().toLowerCase();
+        if (!value) {
+          results.innerHTML = '';
+          return;
+        }
+
+        const matches = index
+          .filter((doc: DocRecord) =>
+            [doc.title, doc.summary, ...(doc.headings || [])]
+              .join(' ')
+              .toLowerCase()
+              .includes(value)
+          )
+          .slice(0, 8);
+
+        results.innerHTML =
+          matches.length > 0
+            ? matches
+                .map(
+                  (doc: DocRecord) =>
+                    `<li><a class=\"block rounded-lg border border-slate-200 px-3 py-2 hover:border-brand-400 dark:border-slate-700\" href=\"${doc.href}\"><strong>${doc.title}</strong><br/><span class=\"text-slate-500\">${doc.summary}</span></a></li>`
+                )
+                .join('')
+            : '<li class="text-slate-500">No docs found.</li>';
+      };
+
+      input.addEventListener('input', (event: Event) => {
+        const target = event.target as HTMLInputElement | null;
+        renderResults(target?.value ?? '');
+      });
+    }
+  </script>
+</BaseLayout>

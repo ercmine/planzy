@@ -1,0 +1,39 @@
+---
+import type { DocsNavItem } from '@/lib/nav';
+
+interface Props {
+  items: DocsNavItem[];
+  currentPath: string;
+}
+
+const { items, currentPath } = Astro.props;
+
+const isActive = (href: string) => currentPath === href;
+---
+
+<aside class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+  <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Documentation</h2>
+  <ul class="space-y-2 text-sm">
+    {items.map((item) => (
+      <li>
+        <a href={item.href} class={`block rounded-lg px-3 py-2 ${isActive(item.href) ? 'bg-brand-50 text-brand-700 dark:bg-slate-800 dark:text-brand-100' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+          {item.title}
+        </a>
+        {item.children && (
+          <ul class="mt-1 space-y-1 pl-4">
+            {item.children.map((child) => (
+              <li>
+                <a
+                  href={child.href}
+                  class={`block rounded-lg px-3 py-1.5 ${isActive(child.href) ? 'bg-brand-50 text-brand-700 dark:bg-slate-800 dark:text-brand-100' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+                >
+                  {child.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </li>
+    ))}
+  </ul>
+</aside>

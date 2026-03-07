@@ -1,0 +1,20 @@
+---
+interface Props {
+  type?: 'info' | 'warning';
+  title?: string;
+}
+
+const { type = 'info', title } = Astro.props;
+const styleMap = {
+  info: 'border-brand-200 bg-brand-50/80 text-brand-900 dark:border-brand-700 dark:bg-brand-900/20 dark:text-brand-100',
+  warning:
+    'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-100'
+};
+---
+
+<div class={`my-6 rounded-xl border px-4 py-3 text-sm ${styleMap[type]}`}>
+  {title && <p class="mb-1 font-semibold">{title}</p>}
+  <div class="prose prose-sm max-w-none dark:prose-invert">
+    <slot />
+  </div>
+</div>

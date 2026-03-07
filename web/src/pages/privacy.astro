@@ -1,0 +1,28 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import { createSeo } from '@/lib/seo';
+
+const seo = createSeo({
+  title: 'Privacy Policy',
+  description: 'How Perbug collects, uses, and protects your data.',
+  path: '/privacy/'
+});
+---
+
+<BaseLayout {...seo}>
+  <Container class="prose py-16 dark:prose-invert">
+    <h1>Privacy Policy</h1>
+    <p>Perbug is designed with privacy in mind. We only collect the minimum data needed to operate sessions and provide support.</p>
+    <h2>Data We Process</h2>
+    <ul>
+      <li>Account profile information needed for authentication.</li>
+      <li>Session content and collaboration metadata.</li>
+      <li>Optional product telemetry when explicitly enabled.</li>
+    </ul>
+    <h2>How We Use Data</h2>
+    <p>We use data to deliver the Perbug service, protect the platform, and improve reliability. We do not enable third-party tracking by default.</p>
+    <h2>Contact</h2>
+    <p>For privacy requests, please reach out via our support channel listed on the Support page.</p>
+  </Container>
+</BaseLayout>

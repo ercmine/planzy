@@ -1,0 +1,17 @@
+# JavaScript/Node
+node_modules/
+**/node_modules/
+
+# Build outputs
+web/dist/
+
+# Environment files
+.env
+*.env.local
+web/.env
+
+# Logs
+*.log
+
+# Astro cache
+web/.astro/

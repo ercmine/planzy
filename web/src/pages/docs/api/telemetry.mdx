@@ -1,0 +1,21 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Telemetry API
+description: Telemetry ingestion and controls.
+currentPath: /docs/api/telemetry/
+editPath: src/pages/docs/api/telemetry.mdx
+---
+
+# Telemetry API
+
+Telemetry endpoints are intended for aggregate product quality insights.
+
+## Ingest event
+
+```http
+POST /api/v1/telemetry/events
+```
+
+## Disable telemetry
+
+Set `PERBUG_ANALYTICS_ENABLED=false` to keep collection off by default.

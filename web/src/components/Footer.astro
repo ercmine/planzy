@@ -1,0 +1,21 @@
+---
+import Container from './Container.astro';
+import { publicConfig } from '@/env/public';
+---
+
+<footer class="mt-20 border-t border-slate-200 py-10 dark:border-slate-800">
+  <Container class="flex flex-col gap-4 text-sm text-slate-600 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+    <p>© {new Date().getFullYear()} Perbug. All rights reserved.</p>
+    <div class="flex flex-wrap gap-4">
+      <a href="/docs/" class="hover:text-brand-600">Docs</a>
+      <a href="/privacy/" class="hover:text-brand-600">Privacy</a>
+      <a href="/terms/" class="hover:text-brand-600">Terms</a>
+      <a href="/support/" class="hover:text-brand-600">Support</a>
+      {publicConfig.PERBUG_SUPPORT_EMAIL && (
+        <a href={`mailto:${publicConfig.PERBUG_SUPPORT_EMAIL}`} class="hover:text-brand-600">
+          Contact
+        </a>
+      )}
+    </div>
+  </Container>
+</footer>
