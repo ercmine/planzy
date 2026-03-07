@@ -10,6 +10,7 @@ import '../features/onboarding/onboarding_permissions_page.dart';
 import '../features/onboarding/onboarding_signin_page.dart';
 import '../features/sessions/create_session/create_session_page.dart';
 import '../features/sessions/join_session/join_session_page.dart';
+import '../features/ideas/ideas_page.dart';
 import '../features/sessions/session_page.dart';
 import '../features/sessions/session_settings/session_settings_page.dart';
 import '../features/sessions/sessions_page.dart';
@@ -107,6 +108,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           return SessionPage(sessionId: sessionId);
         },
       ),
+      GoRoute(
+        path: '/sessions/:id/ideas',
+        name: 'session-ideas',
+        builder: (context, state) {
+          final sessionId = state.pathParameters['id'] ?? '';
+          return IdeasPage(sessionId: sessionId);
+        },
+      ),
+
       GoRoute(
         path: '/sessions/:id/settings',
         name: 'session-settings',

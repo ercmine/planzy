@@ -73,6 +73,11 @@ class SessionPage extends ConsumerWidget {
                 onPressed: () => context.go('/sessions/${session.sessionId}/settings'),
                 child: const Text('Settings'),
               ),
+              const SizedBox(height: AppSpacing.s),
+              OutlinedButton(
+                onPressed: () => context.go('/sessions/${session.sessionId}/ideas'),
+                child: const Text('Ideas'),
+              ),
             ],
           );
         },
