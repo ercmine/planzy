@@ -1,8 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../permissions/permission_service.dart';
-import '../permissions/permission_state.dart';
 import 'location_models.dart';
+import 'location_permission_service.dart';
 import 'location_service.dart';
 
 class LocationControllerState {
@@ -11,6 +10,7 @@ class LocationControllerState {
     this.location,
     this.errorMessage,
     this.manualOverride,
+    this.lastPermissionResult,
   });
 
   factory LocationControllerState.initial() {
@@ -21,6 +21,7 @@ class LocationControllerState {
   final AppLocation? location;
   final String? errorMessage;
   final AppLocation? manualOverride;
+  final LocationPermissionResult? lastPermissionResult;
 
   AppLocation? get effectiveLocation => manualOverride ?? location;
 
@@ -29,6 +30,7 @@ class LocationControllerState {
     AppLocation? location,
     String? errorMessage,
     AppLocation? manualOverride,
+    LocationPermissionResult? lastPermissionResult,
     bool clearError = false,
     bool clearManualOverride = false,
   }) {
@@ -38,46 +40,60 @@ class LocationControllerState {
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       manualOverride:
           clearManualOverride ? null : (manualOverride ?? this.manualOverride),
+      lastPermissionResult: lastPermissionResult ?? this.lastPermissionResult,
     );
   }
 }
 
 class LocationController extends StateNotifier<LocationControllerState> {
   LocationController({
-    required PermissionService permissionService,
+    required LocationPermissionService locationPermissionService,
     required LocationService locationService,
-  })  : _permissionService = permissionService,
+  })  : _locationPermissionService = locationPermissionService,
         _locationService = locationService,
         super(LocationControllerState.initial());
 
-  final PermissionService _permissionService;
+  final LocationPermissionService _locationPermissionService;
   final LocationService _locationService;
 
   Future<void> requestPermissionAndLoad() async {
     state = state.copyWith(status: LocationStatus.loading, clearError: true);
 
-    final permission = await _permissionService.requestLocation();
-    if (permission != PermissionState.granted) {
-      state = state.copyWith(status: LocationStatus.permissionDenied);
+    final permissionResult =
+        await _locationPermissionService.ensureLocationPermission();
+    state = state.copyWith(lastPermissionResult: permissionResult);
+
+    if (!permissionResult.isGranted) {
+      state = state.copyWith(
+        status: permissionResult.outcome == LocationPermissionOutcome.servicesOff
+            ? LocationStatus.serviceDisabled
+            : LocationStatus.permissionDenied,
+        errorMessage: _errorForPermission(permissionResult),
+      );
       return;
     }
 
-    await loadCurrentLocation();
+    await loadCurrentLocation(skipPermissionCheck: true);
   }
 
-  Future<void> loadCurrentLocation() async {
+  Future<void> loadCurrentLocation({bool skipPermissionCheck = false}) async {
     state = state.copyWith(status: LocationStatus.loading, clearError: true);
 
-    final hasPermission = await _permissionService.checkLocation();
-    if (hasPermission != PermissionState.granted) {
-      state = state.copyWith(status: LocationStatus.permissionDenied);
-      return;
-    }
+    if (!skipPermissionCheck) {
+      final permissionResult =
+          await _locationPermissionService.checkPermissionStatus();
+      state = state.copyWith(lastPermissionResult: permissionResult);
 
-    final enabled = await _locationService.isLocationServiceEnabled();
-    if (!enabled) {
-      state = state.copyWith(status: LocationStatus.serviceDisabled);
-      return;
+      if (!permissionResult.isGranted) {
+        state = state.copyWith(
+          status:
+              permissionResult.outcome == LocationPermissionOutcome.servicesOff
+                  ? LocationStatus.serviceDisabled
+                  : LocationStatus.permissionDenied,
+          errorMessage: _errorForPermission(permissionResult),
+        );
+        return;
+      }
     }
 
     try {
@@ -117,5 +133,19 @@ class LocationController extends StateNotifier<LocationControllerState> {
       clearManualOverride: true,
       status: state.location != null ? LocationStatus.ready : state.status,
     );
+  }
+
+  String _errorForPermission(LocationPermissionResult result) {
+    return switch (result.outcome) {
+      LocationPermissionOutcome.servicesOff =>
+        'Location services are off. Turn on Location Services in Settings.',
+      LocationPermissionOutcome.deniedForever =>
+        'Location access is blocked for this app. Open Settings to allow access.',
+      LocationPermissionOutcome.denied =>
+        'Location permission was denied. Tap Enable location to try again.',
+      LocationPermissionOutcome.error =>
+        'Could not determine location permission. Please try again.',
+      LocationPermissionOutcome.granted => 'Location permission granted.',
+    };
   }
 }

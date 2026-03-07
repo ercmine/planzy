@@ -16,6 +16,7 @@ import '../core/identity/identity_provider.dart';
 import '../core/links/link_launcher.dart';
 import '../core/logging/log_settings.dart';
 import '../core/location/location_controller.dart';
+import '../core/location/location_permission_service.dart';
 import '../core/location/location_service.dart';
 import '../core/permissions/permission_service.dart';
 import '../core/sharing/share_service.dart';
@@ -143,6 +144,10 @@ final permissionServiceProvider = Provider<PermissionService>((ref) {
   return PermissionService();
 });
 
+final locationPermissionServiceProvider = Provider<LocationPermissionService>((ref) {
+  return LocationPermissionService();
+});
+
 final locationServiceProvider = Provider<LocationService>((ref) {
   return LocationService();
 });
@@ -150,7 +155,7 @@ final locationServiceProvider = Provider<LocationService>((ref) {
 final locationControllerProvider =
     StateNotifierProvider<LocationController, LocationControllerState>((ref) {
   return LocationController(
-    permissionService: ref.watch(permissionServiceProvider),
+    locationPermissionService: ref.watch(locationPermissionServiceProvider),
     locationService: ref.watch(locationServiceProvider),
   );
 });

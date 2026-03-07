@@ -7,9 +7,11 @@ import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import '../../core/ads/native_ad_controller.dart';
 import '../../core/env/env.dart';
+import '../../core/location/location_permission_service.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/widgets/retry_view.dart';
 import '../../providers/app_providers.dart';
+import 'deck_controller.dart';
 import 'deck_state.dart';
 import 'widgets/ad_deck_card.dart';
 import 'widgets/card_details_sheet.dart';
@@ -73,7 +75,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
           title: 'Location required',
           message: state.errorMessage ?? 'Location required',
           retryLabel: 'Enable location',
-          onRetry: controller.requestLocationAndReload,
+          onRetry: () => _onEnableLocationPressed(controller),
         ),
       );
     }
@@ -207,6 +209,92 @@ class _DeckPageState extends ConsumerState<DeckPage> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+
+  Future<void> _onEnableLocationPressed(DeckController controller) async {
+    await controller.requestLocationAndReload();
+
+    if (!mounted) {
+      return;
+    }
+
+    final locationState = ref.read(locationControllerProvider);
+    final permissionResult = locationState.lastPermissionResult;
+
+    if (permissionResult == null || permissionResult.isGranted) {
+      return;
+    }
+
+    if (permissionResult.canOpenAppSettings) {
+      await _showLocationActionDialog(
+        title: 'Location permission is blocked',
+        message:
+            'To find plans near you, allow location access in iOS Settings for this app.',
+        actionLabel: 'Open Settings',
+        onAction: () async {
+          final opened = await ref
+              .read(locationPermissionServiceProvider)
+              .openAppSettings();
+          if (!opened && mounted) {
+            AppSnackbar.show(context, 'Could not open Settings.', isError: true);
+          }
+        },
+      );
+      return;
+    }
+
+    if (permissionResult.canOpenLocationSettings) {
+      await _showLocationActionDialog(
+        title: 'Location Services are off',
+        message:
+            'Turn on Location Services to let the app fetch nearby plan options.',
+        actionLabel: 'Open Location Settings',
+        onAction: () async {
+          final opened = await ref
+              .read(locationPermissionServiceProvider)
+              .openLocationSettings();
+          if (!opened && mounted) {
+            AppSnackbar.show(context, 'Could not open Location Settings.', isError: true);
+          }
+        },
+      );
+      return;
+    }
+
+    AppSnackbar.show(
+      context,
+      'Location permission denied. Tap Enable location and choose Allow While Using App.',
+      isError: true,
+    );
+  }
+
+  Future<void> _showLocationActionDialog({
+    required String title,
+    required String message,
+    required String actionLabel,
+    required Future<void> Function() onAction,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              await onAction();
+            },
+            child: Text(actionLabel),
+          ),
+        ],
       ),
     );
   }
