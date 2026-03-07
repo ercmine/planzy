@@ -4,6 +4,7 @@ import '../core/cache/local_store.dart';
 import '../core/cache/memory_cache.dart';
 import '../core/utils/hashing.dart';
 import '../models/deck_batch.dart';
+import '../models/plan.dart';
 
 class DeckQueryParams {
   const DeckQueryParams({
@@ -98,12 +99,27 @@ class DeckRepository {
       }
     }
 
-    final response = await apiClient.getJson(
-      ApiEndpoints.sessionDeck(sessionId),
-      queryParameters: params.toQueryMap(defaultLocale: 'en-US'),
-    );
+    final response = await apiClient.getDecoded(ApiEndpoints.plans);
+    if (response is! List) {
+      throw FormatException('Parse error: expected list but got ${response.runtimeType}');
+    }
 
-    final deck = DeckBatchResponse.fromJson(response);
+    final plans = response
+        .whereType<Map<String, dynamic>>()
+        .map(_planFromApi)
+        .toList(growable: false);
+
+    final deck = DeckBatchResponse(
+      sessionId: sessionId,
+      plans: plans,
+      nextCursor: null,
+      mix: DeckSourceMix(
+        providersUsed: plans.map((p) => p.source).toSet().toList(growable: false),
+        planSourceCounts: _sourceCounts(plans),
+        categoryCounts: _categoryCounts(plans),
+        sponsoredCount: 0,
+      ),
+    );
     _deckBatchCache.set(cacheKey, deck);
 
     await localStore.saveLastSessionId(sessionId);
@@ -116,4 +132,40 @@ class DeckRepository {
   String _cacheKey(String sessionId, DeckQueryParams params, String filtersHash) {
     return '$sessionId::${params.cursor ?? ''}::$filtersHash';
   }
+}
+
+Map<String, int> _sourceCounts(List<Plan> plans) {
+  final out = <String, int>{};
+  for (final plan in plans) {
+    out.update(plan.source, (value) => value + 1, ifAbsent: () => 1);
+  }
+  return out;
+}
+
+Map<String, int> _categoryCounts(List<Plan> plans) {
+  final out = <String, int>{};
+  for (final plan in plans) {
+    out.update(plan.category, (value) => value + 1, ifAbsent: () => 1);
+  }
+  return out;
+}
+
+Plan _planFromApi(Map<String, dynamic> json) {
+  final id = (json['id'] ?? '').toString();
+  final title = (json['title'] ?? '').toString();
+  final category = (json['category'] ?? '').toString();
+  final source = (json['source'] ?? 'api').toString();
+  if (id.isEmpty || title.isEmpty || category.isEmpty) {
+    throw const FormatException('Parse error: missing required plan fields');
+  }
+
+  return Plan(
+    id: id,
+    source: source,
+    sourceId: id,
+    title: title,
+    category: category,
+    location: const PlanLocation(lat: 0, lng: 0),
+    metadata: const {'source': 'api.perbug.com'},
+  );
 }

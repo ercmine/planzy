@@ -41,6 +41,7 @@ import '../features/venue_claim/claim_venue_state.dart';
 import '../models/session.dart';
 import '../repositories/deck_repository.dart';
 import '../repositories/ideas_repository.dart';
+import '../repositories/live_results_repository.dart';
 import '../repositories/sessions_repository.dart';
 import '../repositories/swipes_repository.dart';
 import '../repositories/telemetry_repository.dart';
@@ -77,11 +78,13 @@ final apiClientProvider = FutureProvider<ApiClient>((ref) async {
   final envConfig = ref.watch(envConfigProvider);
   final httpClient = ref.watch(httpClientProvider);
 
-  return ApiClient(
+  final client = ApiClient(
     httpClient: httpClient,
     envConfig: envConfig,
     userIdResolver: () => ref.read(userIdProvider.future),
   );
+  await client.runStartupDebugChecklist();
+  return client;
 });
 
 final deckRepositoryProvider = FutureProvider<DeckRepository>((ref) async {
@@ -97,6 +100,12 @@ final deckRepositoryProvider = FutureProvider<DeckRepository>((ref) async {
 final ideasRepositoryProvider = FutureProvider<IdeasRepository>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);
   return IdeasRepository(apiClient: apiClient);
+});
+
+
+final liveResultsRepositoryProvider = FutureProvider<LiveResultsRepository>((ref) async {
+  final apiClient = await ref.watch(apiClientProvider.future);
+  return LiveResultsRepository(apiClient: apiClient);
 });
 
 final telemetryQueueStoreProvider = FutureProvider<TelemetryQueueStore>((ref) async {
@@ -310,9 +319,11 @@ final ideasControllerProvider =
 
 final resultsControllerProvider =
     StateNotifierProvider.family<ResultsController, ResultsState, String>((ref, sessionId) {
+  final liveResultsRepository = ref.watch(liveResultsRepositoryProvider).valueOrNull;
   return ResultsController(
     sessionId: sessionId,
     swipesRepository: ref.watch(swipesRepositoryProvider),
     shareService: ref.watch(shareServiceProvider),
+    liveResultsRepository: liveResultsRepository,
   );
 });

@@ -116,7 +116,16 @@ class _DeckPageState extends ConsumerState<DeckPage> {
     }
 
     return AppScaffold(
-      appBar: AppBar(title: const Text('Deck')),
+      appBar: AppBar(
+        title: const Text('Deck'),
+        actions: [
+          IconButton(
+            onPressed: controller.refresh,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.m),
         child: Column(
@@ -307,7 +316,16 @@ class _DeckPageState extends ConsumerState<DeckPage> {
 
   Widget _scaffoldWithBody(Widget body) {
     return AppScaffold(
-      appBar: AppBar(title: const Text('Deck')),
+      appBar: AppBar(
+        title: const Text('Deck'),
+        actions: [
+          IconButton(
+            onPressed: controller.refresh,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
       body: body,
     );
   }

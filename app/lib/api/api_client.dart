@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/env/env.dart';
@@ -45,6 +46,31 @@ class ApiClient {
     );
   }
 
+
+  Future<void> runStartupDebugChecklist() async {
+    if (!kDebugMode) {
+      return;
+    }
+
+    Log.info('Debug checklist API_BASE_URL=${envConfig.apiBaseUrl}');
+    await _debugProbe('/plans');
+    await _debugProbe('/live-results');
+  }
+
+  Future<void> _debugProbe(String path) async {
+    final uri = buildUri(path);
+    try {
+      final response = await httpClient
+          .get(uri, headers: const {'Accept': 'application/json'})
+          .timeout(reachabilityTimeout);
+      Log.info(
+        'Debug checklist GET $path status=${response.statusCode} body="${_bodySnippet120(response.body)}"',
+      );
+    } catch (error) {
+      Log.warn('Debug checklist GET $path failed error=$error');
+    }
+  }
+
   Future<void> pingHealth() async {
     final uri = buildUri('/health');
     final response = await httpClient
@@ -76,6 +102,14 @@ class ApiClient {
   }
 
   Future<JsonMap> getJson(String path, {Map<String, String?>? queryParameters}) {
+    return _sendForJsonMap(
+      method: 'GET',
+      path: path,
+      queryParameters: queryParameters,
+    );
+  }
+
+  Future<Object> getDecoded(String path, {Map<String, String?>? queryParameters}) {
     return _send(
       method: 'GET',
       path: path,
@@ -88,7 +122,7 @@ class ApiClient {
     Object? body,
     Map<String, String?>? queryParameters,
   }) {
-    return _send(
+    return _sendForJsonMap(
       method: 'POST',
       path: path,
       queryParameters: queryParameters,
@@ -111,10 +145,31 @@ class ApiClient {
   }
 
   Future<JsonMap> deleteJson(String path, {Object? body}) {
-    return _send(method: 'DELETE', path: path, body: body);
+    return _sendForJsonMap(method: 'DELETE', path: path, body: body);
   }
 
-  Future<JsonMap> _send({
+  Future<JsonMap> _sendForJsonMap({
+    required String method,
+    required String path,
+    Map<String, String?>? queryParameters,
+    Object? body,
+  }) async {
+    final decoded = await _send(
+      method: method,
+      path: path,
+      queryParameters: queryParameters,
+      body: body,
+    );
+    if (decoded is JsonMap) {
+      return decoded;
+    }
+    throw ApiError.decoding(
+      'Expected JSON object response but received ${decoded.runtimeType}',
+      details: decoded,
+    );
+  }
+
+  Future<Object> _send({
     required String method,
     required String path,
     Map<String, String?>? queryParameters,
@@ -144,10 +199,8 @@ class ApiClient {
           continue;
         }
 
-        final decoded = _decodeBody(response.body);
-
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          return decoded is JsonMap ? decoded : <String, dynamic>{'data': decoded};
+          return _decodeBody(response.body);
         }
 
         _logHttpFailure(
@@ -156,11 +209,13 @@ class ApiClient {
           statusCode: response.statusCode,
           responseBody: response.body,
         );
+        final decodedErrorBody = _tryDecodeBody(response.body);
         throw ApiError.http(
           'HTTP ${response.statusCode} body="${_bodySnippet(response.body)}"',
           statusCode: response.statusCode,
-          serverPayload: decoded is JsonMap ? ErrorPayload.tryParse(decoded) : null,
-          details: decoded,
+          serverPayload:
+              decodedErrorBody is JsonMap ? ErrorPayload.tryParse(decodedErrorBody) : null,
+          details: decodedErrorBody ?? response.body,
         );
       } on TimeoutException catch (error, stackTrace) {
         _logRequestException(method: method, uri: uri, error: error);
@@ -249,12 +304,22 @@ class ApiClient {
     required http.Response response,
   }) {
     final requestId = response.headers['x-request-id'];
-    Log.d('$method ${uri.path.isEmpty ? '/' : uri.path} url=$uri status=${response.statusCode} x-request-id=${requestId ?? '-'}');
+    final snippet = _bodySnippet(response.body);
+    Log.d(
+      '$method ${uri.path.isEmpty ? '/' : uri.path} url=$uri status=${response.statusCode} x-request-id=${requestId ?? '-'} body="$snippet"',
+    );
   }
 
   String _bodySnippet(String responseBody) {
     if (responseBody.length > 200) {
       return '${responseBody.substring(0, 200)}...';
+    }
+    return responseBody;
+  }
+
+  String _bodySnippet120(String responseBody) {
+    if (responseBody.length > 120) {
+      return '${responseBody.substring(0, 120)}...';
     }
     return responseBody;
   }
@@ -280,6 +345,17 @@ class ApiClient {
       throw const FormatException('Expected JSON object or array');
     } on FormatException catch (error) {
       throw ApiError.decoding('Invalid JSON response', details: error);
+    }
+  }
+
+  Object? _tryDecodeBody(String body) {
+    if (body.trim().isEmpty) {
+      return <String, dynamic>{};
+    }
+    try {
+      return jsonDecode(body);
+    } catch (_) {
+      return null;
     }
   }
 }
