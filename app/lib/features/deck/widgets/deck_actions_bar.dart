@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/spacing.dart';
+import '../../../app/theme/widgets.dart';
 
 class DeckActionsBar extends StatelessWidget {
   const DeckActionsBar({
@@ -29,31 +30,32 @@ class DeckActionsBar extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton.icon(
+          child: SecondaryButton(
             onPressed: onNoTap,
             icon: const Icon(Icons.close),
-            label: const Text('No'),
+            label: 'No',
           ),
         ),
         const SizedBox(width: AppSpacing.s),
         Expanded(
-          child: OutlinedButton.icon(
+          child: SecondaryButton(
             onPressed: onMaybeTap,
             icon: const Icon(Icons.keyboard_double_arrow_up_rounded),
-            label: const Text('Maybe'),
+            label: 'Maybe',
           ),
         ),
         const SizedBox(width: AppSpacing.s),
         Expanded(
-          child: FilledButton.icon(
+          child: PrimaryButton(
             onPressed: onYesTap,
             icon: const Icon(Icons.favorite),
-            label: const Text('Yes'),
+            label: 'Yes',
           ),
         ),
-        IconButton(
+        const SizedBox(width: AppSpacing.xs),
+        AppIconButton(
           onPressed: canUndo ? onUndo : null,
-          icon: const Icon(Icons.undo),
+          icon: Icons.undo,
           tooltip: 'Undo',
         ),
       ],

@@ -13,14 +13,28 @@ class OnboardingScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.l),
-              child: child,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scheme.primaryContainer.withOpacity(0.55),
+              scheme.surface,
+              scheme.secondaryContainer.withOpacity(0.35),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.l),
+                child: child,
+              ),
             ),
           ),
         ),
@@ -44,10 +58,7 @@ class OnboardingBenefit extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 2),
-            child: Icon(Icons.check_circle_outline),
-          ),
+          AppPill(label: '•', backgroundColor: Theme.of(context).colorScheme.primaryContainer),
           const SizedBox(width: AppSpacing.s),
           Expanded(child: Text(text)),
         ],
@@ -74,7 +85,11 @@ class PermissionInfoCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon),
+          AppPill(
+            label: '',
+            icon: icon,
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          ),
           const SizedBox(width: AppSpacing.s),
           Expanded(
             child: Column(

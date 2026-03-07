@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/brand/logo.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import 'onboarding_widgets.dart';
@@ -15,20 +16,16 @@ class OnboardingIntroPage extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            Icons.groups_rounded,
-            size: 72,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: AppSpacing.m),
+          const Center(child: PerbugLogo(size: 92, variant: PerbugLogoVariant.withWordmark)),
+          const SizedBox(height: AppSpacing.l),
           Text(
-            'OurPlanPlan',
+            'Plan faster with your people.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium,
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: AppSpacing.s),
           Text(
-            'Plan faster with people you care about.',
+            'Perbug keeps group decisions moving with less back-and-forth.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge,
           ),
@@ -37,9 +34,9 @@ class OnboardingIntroPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                OnboardingBenefit(text: 'Discover nearby ideas in seconds.'),
-                OnboardingBenefit(text: 'Invite friends without copy-paste friction.'),
-                OnboardingBenefit(text: 'Keep plans moving with less back-and-forth.'),
+                OnboardingBenefit(text: 'See nearby ideas in seconds.'),
+                OnboardingBenefit(text: 'Invite friends with one tap.'),
+                OnboardingBenefit(text: 'Vote quickly and pick together.'),
               ],
             ),
           ),
@@ -47,6 +44,7 @@ class OnboardingIntroPage extends StatelessWidget {
           PrimaryButton(
             label: 'Get Started',
             onPressed: () => context.go('/onboarding/permissions'),
+            icon: const Icon(Icons.arrow_forward_rounded),
           ),
         ],
       ),
