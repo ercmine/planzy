@@ -7,6 +7,10 @@ import { distanceScore, popularityScore, priceFitScore, safeNumber } from "./sco
 const HIGH_QUALITY_SOURCES = new Set(["google", "yelp", "ticketmaster", "tmdb"]);
 const STANDARD_SOURCES = new Set(["curated", "byo"]);
 const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const USER_IDEA_BASE_BOOST = 10;
+const RECENT_USER_IDEA_BOOST = 3;
+const USER_IDEA_BOOST_CAP = 12;
 
 export interface RankContext {
   input: SearchPlansInput;
@@ -51,6 +55,29 @@ function eventTimeScore(plan: Plan, now: Date): number {
   }
 
   return 2;
+}
+
+
+function userIdeaBoost(plan: Plan, now: Date): number {
+  const kind = typeof plan.metadata?.kind === "string" ? plan.metadata.kind : undefined;
+  const isUserIdea = kind === "user_idea" || plan.source === "byo";
+  if (!isUserIdea) {
+    return 0;
+  }
+
+  let boost = USER_IDEA_BASE_BOOST;
+  const createdAtISO = typeof plan.metadata?.createdAtISO === "string" ? plan.metadata.createdAtISO : undefined;
+  if (createdAtISO) {
+    const createdAtMs = Date.parse(createdAtISO);
+    if (Number.isFinite(createdAtMs)) {
+      const ageMs = now.getTime() - createdAtMs;
+      if (ageMs >= 0 && ageMs <= 7 * DAY_MS) {
+        boost += RECENT_USER_IDEA_BOOST;
+      }
+    }
+  }
+
+  return Math.min(USER_IDEA_BOOST_CAP, boost);
 }
 
 function sourceQualityScore(source: string): number {
@@ -130,6 +157,7 @@ export function scorePlan(plan: Plan, ctx: RankContext): PlanScorecard {
   parts.sourceQuality = sourceQualityScore(plan.source);
   parts.completeness = completenessScore(plan);
   parts.eventTime = eventTimeScore(plan, ctx.now);
+  parts.userIdeaBoost = userIdeaBoost(plan, ctx.now);
 
   const total = finiteScore(Object.values(parts).reduce((sum, value) => sum + finiteScore(value), 0));
 

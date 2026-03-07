@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
+import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import { handleMerchantHttpError, createMerchantHttpHandlers } from "../merchant/http.js";
 import type { MerchantService } from "../merchant/service.js";
 import { ValidationError } from "../plans/errors.js";
@@ -22,7 +23,7 @@ function assertAdmin(req: IncomingMessage): boolean {
 export function createRoutes(
   service: VenueClaimsService,
   merchantService: MerchantService,
-  deps?: { deckHandler?: SessionDeckHandler }
+  deps?: { deckHandler?: SessionDeckHandler; ideasHandlers?: SessionIdeasHandlers }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
   const merchantHandlers = createMerchantHttpHandlers(merchantService);
@@ -48,6 +49,30 @@ export function createRoutes(
         }
 
         await deps.deckHandler(req, res, { sessionId: decodeURIComponent(deckRouteMatch[1] ?? "") });
+        return;
+      }
+
+      const listOrCreateIdeasMatch = /^\/sessions\/([^/]+)\/ideas$/.exec(url.pathname);
+      if (listOrCreateIdeasMatch && deps?.ideasHandlers) {
+        const sessionId = decodeURIComponent(listOrCreateIdeasMatch[1] ?? "");
+
+        if (req.method === "POST") {
+          await deps.ideasHandlers.postIdea(req, res, { sessionId });
+          return;
+        }
+
+        if (req.method === "GET") {
+          await deps.ideasHandlers.listIdeas(req, res, { sessionId });
+          return;
+        }
+      }
+
+      const deleteIdeaMatch = /^\/sessions\/([^/]+)\/ideas\/([^/]+)$/.exec(url.pathname);
+      if (req.method === "DELETE" && deleteIdeaMatch && deps?.ideasHandlers) {
+        await deps.ideasHandlers.deleteIdea(req, res, {
+          sessionId: decodeURIComponent(deleteIdeaMatch[1] ?? ""),
+          ideaId: decodeURIComponent(deleteIdeaMatch[2] ?? "")
+        });
         return;
       }
 
