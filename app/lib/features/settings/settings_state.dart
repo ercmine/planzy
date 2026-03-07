@@ -6,6 +6,7 @@ class SettingsState {
     required this.locationPermission,
     required this.contactsPermission,
     required this.notificationsEnabled,
+    required this.diagnosticsLoggingEnabled,
     required this.appVersion,
     this.errorMessage,
   });
@@ -16,6 +17,7 @@ class SettingsState {
       locationPermission: PermissionState.unknown,
       contactsPermission: PermissionState.unknown,
       notificationsEnabled: false,
+      diagnosticsLoggingEnabled: false,
       appVersion: 'Unknown',
     );
   }
@@ -24,6 +26,7 @@ class SettingsState {
   final PermissionState locationPermission;
   final PermissionState contactsPermission;
   final bool notificationsEnabled;
+  final bool diagnosticsLoggingEnabled;
   final String appVersion;
   final String? errorMessage;
 
@@ -32,6 +35,7 @@ class SettingsState {
     PermissionState? locationPermission,
     PermissionState? contactsPermission,
     bool? notificationsEnabled,
+    bool? diagnosticsLoggingEnabled,
     String? appVersion,
     String? errorMessage,
     bool clearError = false,
@@ -41,6 +45,8 @@ class SettingsState {
       locationPermission: locationPermission ?? this.locationPermission,
       contactsPermission: contactsPermission ?? this.contactsPermission,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      diagnosticsLoggingEnabled:
+          diagnosticsLoggingEnabled ?? this.diagnosticsLoggingEnabled,
       appVersion: appVersion ?? this.appVersion,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );

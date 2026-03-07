@@ -11,6 +11,7 @@ import '../core/contacts/contacts_service.dart';
 import '../core/env/env.dart';
 import '../core/identity/identity_provider.dart';
 import '../core/links/link_launcher.dart';
+import '../core/logging/log_settings.dart';
 import '../core/location/location_controller.dart';
 import '../core/location/location_service.dart';
 import '../core/permissions/permission_service.dart';
@@ -166,7 +167,18 @@ final settingsControllerProvider =
   return SettingsController(
     permissionService: ref.watch(permissionServiceProvider),
     preferences: prefs,
+    logSettingsController: ref.watch(logSettingsControllerProvider.notifier),
   );
+});
+
+
+final logSettingsControllerProvider = StateNotifierProvider<LogSettingsController, bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider).valueOrNull;
+  if (prefs == null) {
+    throw StateError('Log settings dependencies are not ready yet.');
+  }
+
+  return LogSettingsController(preferences: prefs);
 });
 
 final shareServiceProvider = Provider<ShareService>((ref) {

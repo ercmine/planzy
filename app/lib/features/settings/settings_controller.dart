@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/logging/log_settings.dart';
 import '../../core/permissions/permission_service.dart';
 import 'settings_state.dart';
 
@@ -9,8 +10,10 @@ class SettingsController extends StateNotifier<SettingsState> {
   SettingsController({
     required PermissionService permissionService,
     required SharedPreferences preferences,
+    required LogSettingsController logSettingsController,
   })  : _permissionService = permissionService,
         _preferences = preferences,
+        _logSettingsController = logSettingsController,
         super(SettingsState.initial()) {
     Future<void>.microtask(load);
   }
@@ -19,6 +22,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
   final PermissionService _permissionService;
   final SharedPreferences _preferences;
+  final LogSettingsController _logSettingsController;
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true, clearError: true);
@@ -34,6 +38,7 @@ class SettingsController extends StateNotifier<SettingsState> {
         locationPermission: locationPermission,
         contactsPermission: contactsPermission,
         notificationsEnabled: notificationsEnabled,
+        diagnosticsLoggingEnabled: _logSettingsController.state,
       );
     } catch (error) {
       state = state.copyWith(
@@ -55,5 +60,10 @@ class SettingsController extends StateNotifier<SettingsState> {
   Future<void> setNotificationsEnabled(bool enabled) async {
     await _preferences.setBool(notificationsKey, enabled);
     state = state.copyWith(notificationsEnabled: enabled);
+  }
+
+  Future<void> setDiagnosticsLoggingEnabled(bool enabled) async {
+    await _logSettingsController.setDiagnosticsLoggingEnabled(enabled);
+    state = state.copyWith(diagnosticsLoggingEnabled: enabled);
   }
 }
