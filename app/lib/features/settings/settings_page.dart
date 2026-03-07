@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../core/diagnostics/diagnostics.dart';
+import '../../core/identity/identity_provider.dart';
 import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
 import '../../core/permissions/permission_state.dart';
@@ -226,7 +227,7 @@ class SettingsPage extends ConsumerWidget {
       queueSize = total;
     }
 
-    final userId = await ref.read(userIdProvider.future);
+    final String userId = await ref.read(userIdProvider.future);
     final diagnostics = await AppDiagnostics.build(
       connectivityState: connectivityState,
       sessionCount: sessions.length,

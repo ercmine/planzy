@@ -138,6 +138,7 @@ class DeckController extends StateNotifier<DeckState> {
       CardSwiperDirection.top => SwipeAction.maybe,
       CardSwiperDirection.none => null,
       CardSwiperDirection.bottom => null,
+      _ => SwipeAction.no,
     };
 
     if (action != null) {
