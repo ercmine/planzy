@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/identity/identity_provider.dart';
+import '../features/deck/deck_page.dart';
 import '../features/home/home_page.dart';
 import '../features/invite/invite_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
@@ -105,6 +106,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final sessionId = state.pathParameters['id'] ?? '';
           return SessionPage(sessionId: sessionId);
+        },
+      ),
+
+      GoRoute(
+        path: '/sessions/:id/deck',
+        name: 'session-deck',
+        builder: (context, state) {
+          final sessionId = state.pathParameters['id'] ?? '';
+          return DeckPage(sessionId: sessionId);
         },
       ),
       GoRoute(
