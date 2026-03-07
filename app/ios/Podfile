@@ -1,0 +1,83 @@
+platform :ios, '13.0'
+
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. Run flutter pub get first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise 'FLUTTER_ROOT not found in Generated.xcconfig. Try deleting Generated.xcconfig, then run flutter pub get'
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks! :linkage => :static
+  use_modular_headers!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
+
+  runner_project = installer.aggregate_targets
+    .map(&:user_project)
+    .compact
+    .find { |project| project.path.basename.to_s == 'Runner.xcodeproj' }
+
+  if runner_project
+    runner_target = runner_project.targets.find { |target| target.name == 'Runner' }
+
+    if runner_target
+      script_name = '[Planzy] Validate CFBundleVersion'
+      shell_script = <<~'SCRIPT'
+        set -euo pipefail
+
+        INFO_PLIST_PATH="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+        if [[ ! -f "${INFO_PLIST_PATH}" ]]; then
+          echo "error: Could not find built Info.plist at ${INFO_PLIST_PATH}."
+          exit 1
+        fi
+
+        BUNDLE_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${INFO_PLIST_PATH}" 2>/dev/null || true)
+        if [[ -z "${BUNDLE_VERSION}" ]]; then
+          echo 'error: CFBundleVersion is empty in built Info.plist. Set a numeric version in pubspec.yaml (e.g. version: 0.0.1+1).'
+          exit 1
+        fi
+
+        if ! [[ "${BUNDLE_VERSION}" =~ ^[0-9]+$ ]]; then
+          echo "error: CFBundleVersion must be numeric, got '${BUNDLE_VERSION}'."
+          exit 1
+        fi
+      SCRIPT
+
+      existing_phase = runner_target.shell_script_build_phases.find { |phase| phase.name == script_name }
+      if existing_phase
+        existing_phase.shell_script = shell_script
+      else
+        phase = runner_target.new_shell_script_build_phase(script_name)
+        phase.shell_script = shell_script
+        phase.show_env_vars_in_log = '0'
+      end
+
+      runner_project.save
+    end
+  end
+end
