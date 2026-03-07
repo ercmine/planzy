@@ -3,21 +3,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/location/location_controller.dart';
 import '../../models/plan.dart';
 import '../../models/telemetry.dart';
-import '../../providers/app_providers.dart';
 import '../../repositories/deck_repository.dart';
 import '../../repositories/sessions_repository.dart';
+import '../../repositories/telemetry_repository.dart';
 import 'deck_state.dart';
 
 class DeckController extends StateNotifier<DeckState> {
   DeckController({
-    required this.ref,
     required String sessionId,
     required SessionsRepository sessionsRepository,
+    required Future<DeckRepository> Function() deckRepository,
+    required Future<TelemetryRepository> Function() telemetryRepository,
+    required LocationControllerState Function() getLocationState,
+    required Future<void> Function() requestPermissionAndLoadLocation,
   })  : _sessionsRepository = sessionsRepository,
+        _deckRepository = deckRepository,
+        _telemetryRepository = telemetryRepository,
+        _getLocationState = getLocationState,
+        _requestPermissionAndLoadLocation = requestPermissionAndLoadLocation,
         super(DeckState.initial(sessionId));
 
-  final Ref ref;
   final SessionsRepository _sessionsRepository;
+  final Future<DeckRepository> Function() _deckRepository;
+  final Future<TelemetryRepository> Function() _telemetryRepository;
+  final LocationControllerState Function() _getLocationState;
+  final Future<void> Function() _requestPermissionAndLoadLocation;
 
   DateTime? _viewStartedAt;
 
@@ -34,12 +44,17 @@ class DeckController extends StateNotifier<DeckState> {
   }
 
   Future<void> requestLocation() async {
-    await ref.read(locationControllerProvider.notifier).requestPermissionAndLoad();
+    await _requestPermissionAndLoadLocation();
     await initialize();
   }
 
   Future<void> refresh() async {
-    state = state.copyWith(isLoadingInitial: true, clearError: true, plans: []);
+    state = state.copyWith(
+      isLoadingInitial: true,
+      plans: const [],
+      nextCursor: null,
+      errorMessage: null,
+    );
     await _fetchBatch(forceRefresh: true);
   }
 
@@ -48,7 +63,7 @@ class DeckController extends StateNotifier<DeckState> {
       return;
     }
 
-    state = state.copyWith(isLoadingMore: true, clearError: true);
+    state = state.copyWith(isLoadingMore: true, errorMessage: null);
     await _fetchBatch(cursor: state.nextCursor);
   }
 
@@ -62,10 +77,9 @@ class DeckController extends StateNotifier<DeckState> {
     }
 
     final restore = state.undoStack.last;
-    final undoStack = [...state.undoStack]..removeLast();
     state = state.copyWith(
       plans: [restore.plan, ...state.plans],
-      undoStack: undoStack,
+      undoStack: [...state.undoStack]..removeLast(),
     );
     _viewStartedAt = DateTime.now();
   }
@@ -96,22 +110,17 @@ class DeckController extends StateNotifier<DeckState> {
   }
 
   Future<void> _ensureLocation() async {
-    final locationController = ref.read(locationControllerProvider.notifier);
-    final locationState = ref.read(locationControllerProvider);
-
-    if (locationState.effectiveLocation != null) {
+    if (_getLocationState().effectiveLocation != null) {
       return;
     }
 
-    await locationController.requestPermissionAndLoad();
+    await _requestPermissionAndLoadLocation();
   }
 
-  bool get _hasEffectiveLocation {
-    return ref.read(locationControllerProvider).effectiveLocation != null;
-  }
+  bool get _hasEffectiveLocation => _getLocationState().effectiveLocation != null;
 
   Future<void> _fetchBatch({String? cursor, bool forceRefresh = false}) async {
-    final location = ref.read(locationControllerProvider).effectiveLocation;
+    final location = _getLocationState().effectiveLocation;
     if (location == null) {
       state = state.copyWith(
         isLoadingInitial: false,
@@ -132,7 +141,7 @@ class DeckController extends StateNotifier<DeckState> {
         return;
       }
 
-      final deckRepository = await ref.read(deckRepositoryProvider.future);
+      final deckRepository = await _deckRepository();
       final response = await deckRepository.fetchDeckBatch(
         state.sessionId,
         DeckQueryParams(
@@ -157,7 +166,7 @@ class DeckController extends StateNotifier<DeckState> {
       state = state.copyWith(
         isLoadingInitial: false,
         isLoadingMore: false,
-        clearError: true,
+        errorMessage: null,
         plans: mergedPlans,
         nextCursor: response.nextCursor,
         hasMore: response.nextCursor != null,
@@ -202,7 +211,7 @@ class DeckController extends StateNotifier<DeckState> {
   }
 
   void _enqueueTelemetry(TelemetryEventInput event) {
-    ref.read(telemetryRepositoryProvider.future).then((repo) async {
+    _telemetryRepository().then((repo) async {
       repo.enqueue(state.sessionId, event);
       await repo.flush(state.sessionId);
     });
@@ -225,11 +234,14 @@ class DeckController extends StateNotifier<DeckState> {
       ),
     );
 
-    final remaining = [...state.plans]..removeAt(0);
+    final shownPlanIds = [...state.shownPlanIds];
+    if (!shownPlanIds.contains(topPlan.id)) {
+      shownPlanIds.add(topPlan.id);
+    }
 
     state = state.copyWith(
-      plans: remaining,
-      shownPlanIds: {...state.shownPlanIds, topPlan.id}.toList(),
+      plans: [...state.plans]..removeAt(0),
+      shownPlanIds: shownPlanIds,
       undoStack: [
         ...state.undoStack,
         SwipeRecord(plan: topPlan, action: action),
@@ -237,7 +249,7 @@ class DeckController extends StateNotifier<DeckState> {
     );
 
     _viewStartedAt = DateTime.now();
-    if (remaining.length <= 5 && state.hasMore) {
+    if (state.plans.length <= 5 && state.hasMore) {
       loadNextBatch();
     }
   }

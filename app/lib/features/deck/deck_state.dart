@@ -1,6 +1,8 @@
 import '../../models/deck_batch.dart';
 import '../../models/plan.dart';
 
+const _unset = Object();
+
 class SwipeRecord {
   const SwipeRecord({
     required this.plan,
@@ -55,12 +57,11 @@ class DeckState {
     String? sessionId,
     bool? isLoadingInitial,
     bool? isLoadingMore,
-    String? errorMessage,
-    bool clearError = false,
+    Object? errorMessage = _unset,
     List<Plan>? plans,
-    String? nextCursor,
+    Object? nextCursor = _unset,
     bool? hasMore,
-    DeckSourceMix? lastBatchMix,
+    Object? lastBatchMix = _unset,
     List<String>? shownPlanIds,
     List<SwipeRecord>? undoStack,
     bool? usedFallback,
@@ -69,11 +70,14 @@ class DeckState {
       sessionId: sessionId ?? this.sessionId,
       isLoadingInitial: isLoadingInitial ?? this.isLoadingInitial,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      errorMessage:
+          identical(errorMessage, _unset) ? this.errorMessage : errorMessage as String?,
       plans: plans ?? this.plans,
-      nextCursor: nextCursor ?? this.nextCursor,
+      nextCursor: identical(nextCursor, _unset) ? this.nextCursor : nextCursor as String?,
       hasMore: hasMore ?? this.hasMore,
-      lastBatchMix: lastBatchMix ?? this.lastBatchMix,
+      lastBatchMix: identical(lastBatchMix, _unset)
+          ? this.lastBatchMix
+          : lastBatchMix as DeckSourceMix?,
       shownPlanIds: shownPlanIds ?? this.shownPlanIds,
       undoStack: undoStack ?? this.undoStack,
       usedFallback: usedFallback ?? this.usedFallback,

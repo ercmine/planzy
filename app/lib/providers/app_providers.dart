@@ -151,12 +151,15 @@ final sessionByIdProvider = FutureProvider.family<Session?, String>((ref, sessio
   return ref.watch(sessionsRepositoryProvider).getById(sessionId);
 });
 
-final deckControllerProvider = StateNotifierProvider.family<DeckController, DeckState, String>(
-  (ref, sessionId) {
-    return DeckController(
-      ref: ref,
-      sessionId: sessionId,
-      sessionsRepository: ref.watch(sessionsRepositoryProvider),
-    );
-  },
-);
+final deckControllerProvider =
+    StateNotifierProvider.family<DeckController, DeckState, String>((ref, sessionId) {
+  return DeckController(
+    sessionId: sessionId,
+    sessionsRepository: ref.watch(sessionsRepositoryProvider),
+    deckRepository: () => ref.read(deckRepositoryProvider.future),
+    telemetryRepository: () => ref.read(telemetryRepositoryProvider.future),
+    getLocationState: () => ref.read(locationControllerProvider),
+    requestPermissionAndLoadLocation: () =>
+        ref.read(locationControllerProvider.notifier).requestPermissionAndLoad(),
+  );
+});

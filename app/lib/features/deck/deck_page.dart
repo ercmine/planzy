@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../core/env/env.dart';
@@ -111,6 +112,11 @@ class _DeckPageState extends ConsumerState<DeckPage> {
             const Text('No more ideas'),
             const SizedBox(height: AppSpacing.s),
             FilledButton(onPressed: controller.refresh, child: const Text('Retry')),
+            const SizedBox(height: AppSpacing.s),
+            OutlinedButton(
+              onPressed: () => context.push('/sessions/${widget.sessionId}/settings'),
+              child: const Text('Adjust filters'),
+            ),
           ],
         ),
       );
