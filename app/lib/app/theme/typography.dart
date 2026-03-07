@@ -22,13 +22,13 @@ class AppTypography {
       headlineSmall: TextStyle(
         fontSize: 24,
         height: 1.2,
-        fontWeight: FontWeight.w650,
+        fontWeight: FontWeight.w600,
         color: colorScheme.onSurface,
       ),
       titleLarge: TextStyle(
         fontSize: 21,
         height: 1.2,
-        fontWeight: FontWeight.w650,
+        fontWeight: FontWeight.w600,
         color: colorScheme.onSurface,
       ),
       titleMedium: TextStyle(
