@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/spacing.dart';
 import '../../../app/theme/widgets.dart';
+import '../../../core/widgets/yes_no_maybe_buttons.dart';
 
 class DeckActionsBar extends StatelessWidget {
   const DeckActionsBar({
@@ -30,26 +31,10 @@ class DeckActionsBar extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: SecondaryButton(
-            onPressed: onNoTap,
-            icon: const Icon(Icons.close),
-            label: 'No',
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s),
-        Expanded(
-          child: SecondaryButton(
-            onPressed: onMaybeTap,
-            icon: const Icon(Icons.keyboard_double_arrow_up_rounded),
-            label: 'Maybe',
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s),
-        Expanded(
-          child: PrimaryButton(
-            onPressed: onYesTap,
-            icon: const Icon(Icons.favorite),
-            label: 'Yes',
+          child: YesNoMaybeButtons(
+            onNo: onNoTap,
+            onMaybe: onMaybeTap,
+            onYes: onYesTap,
           ),
         ),
         const SizedBox(width: AppSpacing.xs),
