@@ -8,6 +8,8 @@ import '../../../core/links/link_types.dart';
 import '../../../models/plan.dart';
 import '../../../providers/app_providers.dart';
 import '../../ideas/widgets/friend_idea_badge.dart';
+import '../../specials/specials_widgets.dart';
+import '../../venue_claim/claim_venue_sheet.dart';
 import 'category_pill.dart';
 
 class CardDetailsSheet extends ConsumerWidget {
@@ -79,13 +81,31 @@ class CardDetailsSheet extends ConsumerWidget {
               const SizedBox(height: AppSpacing.m),
               Text(plan.location.address!),
             ],
+            if (plan.isVenueLike) ...[
+              const SizedBox(height: AppSpacing.m),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => ClaimVenueSheet(plan: plan),
+                  );
+                },
+                icon: const Icon(Icons.verified_user_outlined),
+                label: const Text('Claim this venue'),
+              ),
+            ],
             const SizedBox(height: AppSpacing.m),
             Wrap(
               spacing: AppSpacing.s,
               runSpacing: AppSpacing.s,
               children: _buildLinkButtons(context, launcher),
             ),
-            ..._buildSpecials(context, launcher),
+            SpecialsSection(
+              plan: plan,
+              launcher: launcher,
+              onBookingTap: () => onLinkTap(plan: plan, linkType: 'booking'),
+            ),
           ],
         ),
       ),
@@ -137,67 +157,5 @@ class CardDetailsSheet extends ConsumerWidget {
     }
 
     return 'https://www.google.com/maps/search/?api=1&query=${plan.location.lat},${plan.location.lng}';
-  }
-
-  List<Widget> _buildSpecials(BuildContext context, LinkLauncher launcher) {
-    final specialsRaw = plan.metadata?['specials'];
-    if (specialsRaw is! List || specialsRaw.isEmpty) {
-      return const <Widget>[];
-    }
-
-    final topSpecials = specialsRaw.take(2).toList(growable: false);
-
-    return [
-      const SizedBox(height: AppSpacing.l),
-      Text('Specials', style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: AppSpacing.s),
-      ...topSpecials.map((dynamic item) {
-        if (item is! Map) {
-          return const SizedBox.shrink();
-        }
-        final headline = item['headline']?.toString() ?? 'Special offer';
-        final details = item['details']?.toString();
-        final couponCode = item['couponCode']?.toString();
-        final bookingLink = item['bookingLink']?.toString();
-
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.m),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(headline, style: Theme.of(context).textTheme.titleSmall),
-                if (details != null && details.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(details),
-                ],
-                if (couponCode != null && couponCode.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Text('Code: $couponCode'),
-                ],
-                if (bookingLink != null && bookingLink.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.s),
-                  OutlinedButton(
-                    onPressed: () async {
-                      await onLinkTap(plan: plan, linkType: 'booking');
-                      if (!context.mounted) {
-                        return;
-                      }
-                      await launcher.openLink(
-                        context,
-                        uri: Uri.parse(bookingLink),
-                        type: LinkType.booking,
-                        planTitle: plan.title,
-                      );
-                    },
-                    child: const Text('Book special'),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      }),
-    ];
   }
 }

@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'deep_links.dart';
+import 'special.dart';
 
 part 'plan.freezed.dart';
 part 'plan.g.dart';
@@ -61,4 +62,19 @@ class Plan with _$Plan {
   }) = _Plan;
 
   factory Plan.fromJson(Map<String, dynamic> json) => _$PlanFromJson(json);
+}
+
+extension PlanVenueHooksX on Plan {
+  List<Special> get specials => Special.fromPlanMetadata(metadata);
+
+  bool get hasSpecials => specials.isNotEmpty;
+
+  bool get isVenueLike {
+    const sources = <String>{'google', 'yelp', 'promoted', 'deduped'};
+    final sourceNormalized = source.toLowerCase();
+    final kind = metadata?['kind']?.toString().toLowerCase();
+    final hasAddress = location.address?.trim().isNotEmpty == true;
+
+    return hasAddress || sources.contains(sourceNormalized) || kind == 'theater';
+  }
 }
