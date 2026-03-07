@@ -1,47 +1,76 @@
 import '../api/api_client.dart';
+import '../api/api_error.dart';
 import '../api/endpoints.dart';
+import '../core/telemetry/telemetry_queue_store.dart';
 import '../models/telemetry.dart';
 
 class TelemetryRepository {
-  TelemetryRepository({required this.apiClient, this.maxBatchSize = 50});
+  TelemetryRepository({
+    required this.apiClient,
+    required this.queueStore,
+    DateTime Function()? now,
+    this.maxBatchSize = 50,
+  }) : _now = now ?? DateTime.now;
 
   final ApiClient apiClient;
+  final TelemetryQueueStore queueStore;
+  final DateTime Function() _now;
   final int maxBatchSize;
-  final Map<String, List<TelemetryEventInput>> _queueBySession =
-      <String, List<TelemetryEventInput>>{};
 
-  void enqueue(String sessionId, TelemetryEventInput event) {
-    _queueBySession.putIfAbsent(sessionId, () => <TelemetryEventInput>[]).add(event);
+  Future<void> enqueueEvent(String sessionId, TelemetryEventInput event) async {
+    final json = event.toJson();
+    json['clientAtISO'] ??= _now().toUtc().toIso8601String();
+
+    await queueStore.enqueue(sessionId, json);
+    await queueStore.pruneOld();
   }
 
-  Future<void> flush(String sessionId) async {
-    final queue = _queueBySession[sessionId];
-    if (queue == null || queue.isEmpty) {
-      return;
-    }
+  Future<int> queueSize(String sessionId) {
+    return queueStore.size(sessionId);
+  }
 
-    while (queue.isNotEmpty) {
-      final takeCount = queue.length >= maxBatchSize ? maxBatchSize : queue.length;
-      final batch = queue.take(takeCount).toList(growable: false);
+  Future<void> flushSession(String sessionId) async {
+    while (true) {
+      final batchJson = await queueStore.peekBatch(sessionId, maxBatchSize);
+      if (batchJson.isEmpty) {
+        return;
+      }
+
+      final batch =
+          batchJson.map(TelemetryEventInput.fromJson).toList(growable: false);
 
       try {
         await apiClient.postJson(
           ApiEndpoints.telemetry(sessionId),
           body: TelemetryBatchRequest(events: batch).toJson(),
         );
-        queue.removeRange(0, takeCount);
-      } catch (_) {
-        return;
+        await queueStore.removeBatch(sessionId, batch.length);
+      } on ApiError catch (error) {
+        if (_isNonRetryable(error)) {
+          await queueStore.removeBatch(sessionId, batch.length);
+          continue;
+        }
+        rethrow;
       }
     }
-
-    _queueBySession.remove(sessionId);
   }
 
-  Future<void> flushAll() async {
-    final sessions = _queueBySession.keys.toList(growable: false);
-    for (final sessionId in sessions) {
-      await flush(sessionId);
+  Future<void> flushAllActive({List<String>? sessionIds}) async {
+    final ids = sessionIds ?? await queueStore.sessionIdsWithQueuedEvents();
+    for (final sessionId in ids) {
+      await flushSession(sessionId);
     }
+  }
+
+  bool _isNonRetryable(ApiError error) {
+    final statusCode = error.statusCode;
+    if (statusCode == null) {
+      return false;
+    }
+
+    return statusCode == 400 ||
+        statusCode == 401 ||
+        statusCode == 403 ||
+        statusCode == 404;
   }
 }

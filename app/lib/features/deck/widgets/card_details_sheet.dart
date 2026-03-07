@@ -123,7 +123,6 @@ class CardDetailsSheet extends ConsumerWidget {
       widgets.add(
         FilledButton.tonal(
           onPressed: () async {
-            await onLinkTap(plan: plan, linkType: label.toLowerCase());
             if (!context.mounted) {
               return;
             }
@@ -132,6 +131,10 @@ class CardDetailsSheet extends ConsumerWidget {
               uri: Uri.parse(rawUrl),
               type: type,
               planTitle: plan.title,
+              onBeforeLaunch: () => onLinkTap(
+                plan: plan,
+                linkType: label.toLowerCase(),
+              ),
             );
           },
           child: Text(label),
