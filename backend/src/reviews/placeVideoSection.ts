@@ -1,3 +1,8 @@
+import {
+  getPlaceVideoShelf,
+  type PlaceMediaCandidate,
+  type RankedPlaceMediaItem
+} from "./placeMediaRanking.js";
 import type { PlaceReview, ReviewMedia, ReviewsStore } from "./store.js";
 
 export interface PlaceVideoQueryInput {
@@ -6,6 +11,7 @@ export interface PlaceVideoQueryInput {
   cursor?: string;
   limit?: number;
   filter?: "all" | "creator" | "user" | "trusted" | "verified";
+  debugScores?: boolean;
 }
 
 export interface PlaceVideoAuthorSummary {
@@ -32,6 +38,7 @@ export interface PlaceReviewVideoItem {
   labels: string[];
   helpfulCount: number;
   trustRank: number;
+  debugScoreBreakdown?: RankedPlaceMediaItem["breakdown"];
 }
 
 export interface PlaceReviewVideoSection {
@@ -42,7 +49,11 @@ export interface PlaceReviewVideoSection {
   totalVisibleVideos: number;
 }
 
-interface RankedVideo extends PlaceReviewVideoItem { score: number; dedupeKey: string; }
+interface VideoCandidateEnvelope {
+  candidate: PlaceMediaCandidate;
+  review: PlaceReview;
+  media: ReviewMedia;
+}
 
 function decodeCursor(cursor?: string): number {
   if (!cursor) return 0;
@@ -62,31 +73,85 @@ function labelsFor(review: PlaceReview): string[] {
   return labels;
 }
 
-function rankVideo(review: PlaceReview, media: ReviewMedia): number {
-  const ageDays = Math.max(0, (Date.now() - Date.parse(review.createdAt)) / 86_400_000);
-  const recency = Math.max(0, 16 - Math.min(ageDays, 16));
-  const creator = review.authorProfileType === "CREATOR" ? 18 : 0;
-  const trusted = ["trusted", "trusted_verified"].includes(review.trust.reviewTrustDesignation) ? 22 : 0;
-  const verified = review.trust.isVerifiedVisit ? 10 : 0;
-  const quality = media.variants.thumbnailUrl || media.posterUrl ? 6 : 0;
-  return trusted + creator + verified + review.helpfulCount + review.trust.rankingBoostWeight + recency + quality;
+function toVideoCandidate(review: PlaceReview, media: ReviewMedia): VideoCandidateEnvelope | null {
+  if (media.mediaType !== "video") return null;
+
+  const candidate: PlaceMediaCandidate = {
+    id: media.id,
+    reviewId: review.id,
+    placeId: review.placeId,
+    mediaType: "video",
+    sourceType: review.authorProfileType === "CREATOR" ? "review_creator" : review.authorProfileType === "BUSINESS" ? "review_business" : "review_user",
+    sourceId: review.id,
+    playbackUrl: media.playbackUrl,
+    thumbnailUrl: media.variants.thumbnailUrl,
+    posterUrl: media.posterUrl,
+    caption: media.caption,
+    title: media.caption,
+    createdAt: review.createdAt,
+    updatedAt: media.updatedAt,
+    relevanceScoreHint: 0.8,
+    placeAssociationConfidence: 1,
+    categoryRelevanceScore: 0.72,
+    author: {
+      profileId: review.authorProfileId,
+      profileType: review.authorProfileType,
+      uploaderTrustScore: Math.min(1, 0.35 + (review.trust.rankingBoostWeight / 100)),
+      historicalSpamPenalty: 0
+    },
+    trust: {
+      isTrusted: ["trusted", "trusted_verified"].includes(review.trust.reviewTrustDesignation),
+      isVerifiedVisit: review.trust.isVerifiedVisit,
+      moderationConfidence: media.moderationState === "published" ? 1 : 0,
+      reviewTrustWeight: review.trust.rankingBoostWeight,
+      isBusinessVerifiedOrigin: review.authorProfileType === "BUSINESS",
+      abusePenalty: 0
+    },
+    engagement: {
+      views: review.helpfulCount * 8,
+      helpfulVotes: review.helpfulCount,
+      saves: Math.floor(review.helpfulCount * 0.35),
+      watchCompletionRate: media.durationMs ? Math.max(0.3, Math.min(0.95, 25_000 / media.durationMs)) : 0.55,
+      watchCompletions: Math.floor(review.helpfulCount * 0.6),
+      reports: 0,
+      hides: 0,
+      skips: 0
+    },
+    quality: {
+      width: media.width,
+      height: media.height,
+      durationMs: media.durationMs,
+      fileSizeBytes: media.fileSizeBytes,
+      hasThumbnail: Boolean(media.variants.thumbnailUrl),
+      hasPoster: Boolean(media.posterUrl),
+      hasPlayableVideo: Boolean(media.playbackUrl),
+      hasPrimaryAsset: Boolean(media.playbackUrl),
+      processingState: media.processingState
+    },
+    moderation: {
+      moderationState: media.moderationState,
+      visibilityState: media.visibilityState,
+      removedAt: media.removedAt,
+      isDeleted: Boolean(media.removedAt),
+      isPrivate: media.visibilityState !== "public"
+    },
+    fingerprint: media.playbackUrl || media.checksum || `${review.authorProfileId}:${media.id}`
+  };
+
+  return { candidate, review, media };
 }
 
-function toVideoItem(review: PlaceReview, media: ReviewMedia): RankedVideo | null {
-  if (media.mediaType !== "video") return null;
-  if (!media.playbackUrl) return null;
-  if (media.processingState !== "ready") return null;
-  if (media.moderationState !== "published") return null;
-  if (media.visibilityState !== "public") return null;
-  if (media.removedAt) return null;
-
-  const labels = labelsFor(review);
-  const score = rankVideo(review, media);
+function toVideoItem(entry: RankedPlaceMediaItem, sourceMap: Map<string, VideoCandidateEnvelope>, includeDebug: boolean): PlaceReviewVideoItem {
+  const source = sourceMap.get(entry.item.id);
+  if (!source) {
+    throw new Error(`missing ranked video source for media ${entry.item.id}`);
+  }
+  const { review, media } = source;
   return {
     id: media.id,
     reviewId: review.id,
     placeId: review.placeId,
-    playbackUrl: media.playbackUrl,
+    playbackUrl: media.playbackUrl!,
     thumbnailUrl: media.variants.thumbnailUrl,
     posterUrl: media.posterUrl,
     durationMs: media.durationMs,
@@ -101,11 +166,10 @@ function toVideoItem(review: PlaceReview, media: ReviewMedia): RankedVideo | nul
       avatarUrl: review.author.avatarUrl
     },
     badges: review.trust.trustBadges,
-    labels,
+    labels: labelsFor(review),
     helpfulCount: review.helpfulCount,
     trustRank: review.trust.rankingBoostWeight,
-    score,
-    dedupeKey: `${review.authorProfileId}:${media.playbackUrl}`
+    debugScoreBreakdown: includeDebug ? entry.breakdown : undefined
   };
 }
 
@@ -116,59 +180,50 @@ export async function getPlaceReviewVideoSection(store: ReviewsStore, input: Pla
     placeId: input.placeId,
     viewerUserId: input.viewerUserId,
     sort: "trusted",
-    limit: 100
+    limit: 200
   });
 
-  const seen = new Set<string>();
-  const authorCounts = new Map<string, number>();
-  const ranked = response.reviews.flatMap((review) => {
+  const sourceMap = new Map<string, VideoCandidateEnvelope>();
+  const candidates: PlaceMediaCandidate[] = [];
+
+  for (const review of response.reviews) {
     const include = filter === "all"
       || (filter === "creator" && review.authorProfileType === "CREATOR")
       || (filter === "user" && review.authorProfileType !== "CREATOR")
       || (filter === "trusted" && (review.trust.reviewTrustDesignation === "trusted" || review.trust.reviewTrustDesignation === "trusted_verified"))
       || (filter === "verified" && review.trust.isVerifiedVisit);
-    if (!include) return [];
-    return review.media.map((media) => toVideoItem(review, media)).filter((item): item is RankedVideo => Boolean(item));
-  }).filter((item) => {
-    if (seen.has(item.dedupeKey)) return false;
-    seen.add(item.dedupeKey);
-    return true;
-  });
+    if (!include) continue;
 
-  ranked.sort((a, b) => (b.score - a.score) || b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
-
-  const diversified: RankedVideo[] = [];
-  const pool = [...ranked];
-  while (pool.length > 0) {
-    let bestIndex = 0;
-    let bestScore = -Infinity;
-    for (let i = 0; i < pool.length; i += 1) {
-      const candidate = pool[i]!;
-      const authorCount = authorCounts.get(candidate.author.profileId) ?? 0;
-      const effective = candidate.score - authorCount * 6;
-      if (effective > bestScore) {
-        bestScore = effective;
-        bestIndex = i;
-      }
+    for (const media of review.media) {
+      const wrapped = toVideoCandidate(review, media);
+      if (!wrapped) continue;
+      candidates.push(wrapped.candidate);
+      sourceMap.set(wrapped.candidate.id, wrapped);
     }
-    const [picked] = pool.splice(bestIndex, 1);
-    diversified.push(picked!);
-    authorCounts.set(picked!.author.profileId, (authorCounts.get(picked!.author.profileId) ?? 0) + 1);
   }
 
+  const rankedShelf = getPlaceVideoShelf(input.placeId, candidates, 200, Boolean(input.debugScores));
+
   const start = decodeCursor(input.cursor);
-  const page = diversified.slice(start, start + perPage);
+  const page = rankedShelf.slice(start, start + perPage);
   const nextOffset = start + page.length;
 
-  const items = page.map(({ score: _score, dedupeKey: _key, ...rest }) => rest);
-  const featuredVideo = diversified.find((item) => item.labels.includes("trusted") || item.labels.includes("creator_review")) ?? diversified[0];
-  const featured = featuredVideo ? (({ score: _s, dedupeKey: _k, ...rest }) => rest)(featuredVideo) : undefined;
+  const videos = page.map((entry) => toVideoItem(entry, sourceMap, Boolean(input.debugScores)));
+  const featuredRanked = rankedShelf.find((entry) => {
+    const source = sourceMap.get(entry.item.id);
+    if (!source) return false;
+    return source.review.authorProfileType === "CREATOR"
+      || source.review.trust.reviewTrustDesignation === "trusted"
+      || source.review.trust.reviewTrustDesignation === "trusted_verified"
+      || source.review.trust.isVerifiedVisit;
+  }) ?? rankedShelf[0];
+  const featuredVideo = featuredRanked ? toVideoItem(featuredRanked, sourceMap, Boolean(input.debugScores)) : undefined;
 
   return {
     placeId: input.placeId,
-    featuredVideo: featured,
-    videos: items,
-    nextCursor: nextOffset < diversified.length ? encodeCursor(nextOffset) : undefined,
-    totalVisibleVideos: diversified.length
+    featuredVideo,
+    videos,
+    nextCursor: nextOffset < rankedShelf.length ? encodeCursor(nextOffset) : undefined,
+    totalVisibleVideos: rankedShelf.length
   };
 }
