@@ -10,6 +10,8 @@ export interface CreatorStore {
   createFollow(follow: CreatorFollow): void;
   deleteFollow(creatorProfileId: string, followerUserId: string): void;
   getFollow(creatorProfileId: string, followerUserId: string): CreatorFollow | undefined;
+  listFollowedCreatorIds(followerUserId: string): string[];
+  listFollowsByCreator(creatorProfileId: string): CreatorFollow[];
   countFollowers(creatorProfileId: string): number;
   countFollowing(userId: string): number;
 

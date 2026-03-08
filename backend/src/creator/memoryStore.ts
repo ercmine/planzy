@@ -44,6 +44,17 @@ export class MemoryCreatorStore implements CreatorStore {
     return this.follows.get(`${creatorProfileId}:${followerUserId}`);
   }
 
+
+  listFollowedCreatorIds(followerUserId: string): string[] {
+    return [...this.follows.values()]
+      .filter((row) => row.followerUserId === followerUserId)
+      .map((row) => row.creatorProfileId);
+  }
+
+  listFollowsByCreator(creatorProfileId: string): CreatorFollow[] {
+    return [...this.follows.values()].filter((row) => row.creatorProfileId === creatorProfileId);
+  }
+
   countFollowers(creatorProfileId: string): number {
     return [...this.follows.values()].filter((row) => row.creatorProfileId === creatorProfileId).length;
   }

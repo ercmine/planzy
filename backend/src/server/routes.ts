@@ -729,6 +729,22 @@ export function createRoutes(
           return;
         }
 
+        if (req.method === "GET" && normalizedPath === "/v1/creator/follows") {
+          await creatorHandlers.listFollows(req, res);
+          return;
+        }
+
+        if (req.method === "GET" && normalizedPath === "/v1/creator/feed") {
+          await creatorHandlers.followingFeed(req, res);
+          return;
+        }
+
+        const placeCreatorContentMatch = /^\/places\/([^/]+)\/creator-content$/.exec(normalizedPath);
+        if (placeCreatorContentMatch && req.method === "GET") {
+          await creatorHandlers.placeCreatorContent(req, res, decodeURIComponent(placeCreatorContentMatch[1] ?? ""));
+          return;
+        }
+
         const creatorProfileMatch = /^\/v1\/creator\/profiles\/([^/]+)$/.exec(normalizedPath);
         if (creatorProfileMatch && req.method === "PATCH") {
           await creatorHandlers.updateProfile(req, res, decodeURIComponent(creatorProfileMatch[1] ?? ""));

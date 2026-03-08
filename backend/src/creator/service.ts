@@ -9,7 +9,7 @@ import { FEATURE_KEYS, type FeatureQuotaEngine } from "../subscriptions/accessEn
 import type { SubscriptionService } from "../subscriptions/service.js";
 import { SubscriptionTargetType } from "../subscriptions/types.js";
 import type { CreatorStore } from "./store.js";
-import type { CreatorAnalyticsSummary, CreatorGuide, PublicCreatorProfileView } from "./types.js";
+import type { CreatorAnalyticsSummary, CreatorFeedItem, CreatorFeedItemType, CreatorFeedResult, CreatorGuide, CreatorPlaceContentResult, FollowedCreatorSummary, PublicCreatorProfileView } from "./types.js";
 
 const RESERVED_SLUGS = new Set(["admin", "api", "creator", "creators", "settings", "support"]);
 const SOCIAL_HOSTS: Record<CreatorSocialPlatform, string[]> = {
@@ -34,6 +34,26 @@ function parseUrl(input: string): URL {
   }
   if (!url.protocol.startsWith("http")) throw new ValidationError(["url must use http or https"]);
   return url;
+}
+
+
+
+function encodeFeedCursor(item: { surfacedAt: string; key: string }): string {
+  return Buffer.from(JSON.stringify(item), "utf8").toString("base64url");
+}
+
+function decodeFeedCursor(cursor?: string): { surfacedAt: string; key: string } | null {
+  if (!cursor) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+    if (!parsed || typeof parsed !== "object") return null;
+    const surfacedAt = typeof parsed.surfacedAt === "string" ? parsed.surfacedAt : "";
+    const key = typeof parsed.key === "string" ? parsed.key : "";
+    if (!surfacedAt || !key) return null;
+    return { surfacedAt, key };
+  } catch {
+    return null;
+  }
 }
 
 function normalizeSocialLinks(links: Array<{ platform: CreatorSocialPlatform; url: string; label?: string }>, now: string): CreatorSocialLink[] {
@@ -146,6 +166,228 @@ export class CreatorService {
   async unfollowCreator(userId: string, creatorProfileId: string): Promise<{ followerCount: number; isFollowing: boolean }> {
     this.store.deleteFollow(creatorProfileId, userId);
     return { followerCount: this.store.countFollowers(creatorProfileId), isFollowing: false };
+  }
+
+  listFollowedCreators(userId: string, limit = 200): FollowedCreatorSummary[] {
+    const follows = this.store
+      .listFollowedCreatorIds(userId)
+      .map((creatorProfileId) => ({ follow: this.store.getFollow(creatorProfileId, userId), profile: this.store.getProfileById(creatorProfileId) }))
+      .filter((row): row is { follow: NonNullable<typeof row.follow>; profile: NonNullable<typeof row.profile> } => Boolean(row.follow && row.profile))
+      .sort((a, b) => b.follow.createdAt.localeCompare(a.follow.createdAt))
+      .slice(0, Math.max(1, Math.min(limit, 500)));
+
+    return follows.map((row) => ({
+      creatorProfileId: row.profile.id,
+      slug: row.profile.slug,
+      displayName: row.profile.displayName,
+      avatarUrl: row.profile.avatarUrl,
+      status: row.profile.status,
+      isPublic: row.profile.isPublic,
+      followedAt: row.follow.createdAt
+    }));
+  }
+
+  async getFollowingFeed(userId: string, input?: {
+    limit?: number;
+    cursor?: string;
+    type?: "all" | "reviews" | "videos" | "guides";
+  }): Promise<CreatorFeedResult> {
+    const limit = Math.max(1, Math.min(input?.limit ?? 20, 50));
+    const followedIds = this.store.listFollowedCreatorIds(userId);
+    if (!followedIds.length) return { items: [] };
+
+    const activeCreatorIds = followedIds.filter((id) => {
+      const profile = this.store.getProfileById(id);
+      return Boolean(profile && profile.isPublic && profile.status === CreatorProfileStatus.ACTIVE);
+    });
+    if (!activeCreatorIds.length) return { items: [] };
+
+    const profileMap = new Map(activeCreatorIds.map((id) => [id, this.store.getProfileById(id)!]));
+    const reviewItems = input?.type === "guides"
+      ? []
+      : (await Promise.all(activeCreatorIds.map((creatorProfileId) => this.listPublicReviewsByCreator(creatorProfileId, "latest", 40, userId)))).flat()
+          .filter((review) => review.moderationState === "published" && !review.deletedAt)
+          .map((review): CreatorFeedItem => {
+            const media = review.media.find((item) => item.mediaType === "video") ?? review.media.find((item) => item.mediaType === "photo");
+            const itemType: CreatorFeedItemType = media?.mediaType === "video" ? "video_review" : media?.mediaType === "photo" ? "photo_review" : "review";
+            return {
+              feedItemType: itemType,
+              contentId: review.id,
+              creatorProfileId: review.authorProfileId,
+              creator: {
+                id: review.authorProfileId,
+                slug: profileMap.get(review.authorProfileId)?.slug ?? "",
+                displayName: review.author.displayName,
+                avatarUrl: review.author.avatarUrl,
+                isFollowing: true
+              },
+              placeId: review.placeId,
+              summary: review.text.slice(0, 280),
+              media: media ? {
+                thumbnailUrl: media.variants.thumbnailUrl ?? media.posterUrl,
+                url: media.playbackUrl ?? media.variants.mediumUrl ?? media.variants.fullUrl,
+                mediaType: media.mediaType
+              } : undefined,
+              publishedAt: review.createdAt,
+              surfacedAt: review.createdAt
+            };
+          });
+
+    const guideItems = input?.type === "reviews" || input?.type === "videos"
+      ? []
+      : activeCreatorIds
+          .flatMap((creatorProfileId) => this.store.listGuidesByCreator(creatorProfileId))
+          .filter((guide) => guide.status === "published" && guide.visibility === "public")
+          .map((guide): CreatorFeedItem => ({
+            feedItemType: "guide",
+            contentId: guide.id,
+            creatorProfileId: guide.creatorProfileId,
+            creator: {
+              id: guide.creatorProfileId,
+              slug: profileMap.get(guide.creatorProfileId)?.slug ?? "",
+              displayName: profileMap.get(guide.creatorProfileId)?.displayName ?? "Creator",
+              avatarUrl: profileMap.get(guide.creatorProfileId)?.avatarUrl,
+              isFollowing: true
+            },
+            placeId: guide.placeIds[0],
+            title: guide.title,
+            summary: guide.summary,
+            media: guide.coverUrl ? { thumbnailUrl: guide.coverUrl, url: guide.coverUrl, mediaType: "photo" } : undefined,
+            publishedAt: guide.publishedAt ?? guide.createdAt,
+            surfacedAt: guide.publishedAt ?? guide.createdAt
+          }));
+
+    const all = [...reviewItems, ...guideItems]
+      .filter((item) => {
+        if (input?.type === "videos") return item.feedItemType === "video_review";
+        if (input?.type === "reviews") return ["review", "photo_review", "video_review"].includes(item.feedItemType);
+        if (input?.type === "guides") return item.feedItemType === "guide";
+        return true;
+      })
+      .sort((a, b) => {
+        if (b.surfacedAt !== a.surfacedAt) return b.surfacedAt.localeCompare(a.surfacedAt);
+        const ak = `${a.feedItemType}:${a.contentId}`;
+        const bk = `${b.feedItemType}:${b.contentId}`;
+        return bk.localeCompare(ak);
+      });
+
+    const deduped: CreatorFeedItem[] = [];
+    const seen = new Set<string>();
+    for (const item of all) {
+      const k = `${item.feedItemType}:${item.contentId}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      deduped.push(item);
+    }
+
+    const cursor = decodeFeedCursor(input?.cursor);
+    const startIndex = cursor
+      ? deduped.findIndex((row) => row.surfacedAt === cursor.surfacedAt && `${row.feedItemType}:${row.contentId}` === cursor.key) + 1
+      : 0;
+    const page = deduped.slice(Math.max(0, startIndex), Math.max(0, startIndex) + limit);
+    const tail = page.at(-1);
+
+    return {
+      items: page,
+      nextCursor: tail ? encodeFeedCursor({ surfacedAt: tail.surfacedAt, key: `${tail.feedItemType}:${tail.contentId}` }) : undefined
+    };
+  }
+
+  async getPlaceCreatorContent(placeId: string, viewerUserId?: string, input?: {
+    limit?: number;
+    cursor?: string;
+    type?: "all" | "reviews" | "videos" | "guides";
+  }): Promise<CreatorPlaceContentResult> {
+    const limit = Math.max(1, Math.min(input?.limit ?? 20, 50));
+    const reviewsResult = await this.reviews.listByPlace({
+      placeId,
+      viewerUserId,
+      sort: "most_helpful",
+      limit: 50
+    });
+
+    const reviewItems = reviewsResult.reviews
+      .filter((review) => review.authorProfileType === "CREATOR" && review.moderationState === "published" && !review.deletedAt)
+      .filter((review) => {
+        const profile = this.store.getProfileById(review.authorProfileId);
+        return Boolean(profile && profile.isPublic && profile.status === CreatorProfileStatus.ACTIVE);
+      })
+      .map((review): CreatorFeedItem => {
+        const profile = this.store.getProfileById(review.authorProfileId);
+        const media = review.media.find((item) => item.mediaType === "video") ?? review.media.find((item) => item.mediaType === "photo");
+        const itemType: CreatorFeedItemType = media?.mediaType === "video" ? "video_review" : media?.mediaType === "photo" ? "photo_review" : "review";
+        return {
+          feedItemType: itemType,
+          contentId: review.id,
+          creatorProfileId: review.authorProfileId,
+          creator: {
+            id: review.authorProfileId,
+            slug: profile?.slug ?? "",
+            displayName: review.author.displayName,
+            avatarUrl: review.author.avatarUrl,
+            isFollowing: viewerUserId ? Boolean(this.store.getFollow(review.authorProfileId, viewerUserId)) : false
+          },
+          placeId: review.placeId,
+          summary: review.text.slice(0, 280),
+          media: media ? {
+            thumbnailUrl: media.variants.thumbnailUrl ?? media.posterUrl,
+            url: media.playbackUrl ?? media.variants.mediumUrl ?? media.variants.fullUrl,
+            mediaType: media.mediaType
+          } : undefined,
+          publishedAt: review.createdAt,
+          surfacedAt: review.createdAt
+        };
+      });
+
+    const guides = this.store
+      .listProfiles()
+      .filter((profile) => profile.isPublic && profile.status === CreatorProfileStatus.ACTIVE)
+      .flatMap((profile) => this.store.listGuidesByCreator(profile.id).map((guide) => ({ profile, guide })))
+      .filter((row) => row.guide.status === "published" && row.guide.visibility === "public" && row.guide.placeIds.includes(placeId))
+      .map(({ profile, guide }): CreatorFeedItem => ({
+        feedItemType: "guide",
+        contentId: guide.id,
+        creatorProfileId: profile.id,
+        creator: {
+          id: profile.id,
+          slug: profile.slug,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+          isFollowing: viewerUserId ? Boolean(this.store.getFollow(profile.id, viewerUserId)) : false
+        },
+        placeId,
+        title: guide.title,
+        summary: guide.summary,
+        media: guide.coverUrl ? { thumbnailUrl: guide.coverUrl, url: guide.coverUrl, mediaType: "photo" } : undefined,
+        publishedAt: guide.publishedAt ?? guide.createdAt,
+        surfacedAt: guide.publishedAt ?? guide.createdAt
+      }));
+
+    const filtered = [...reviewItems, ...guides]
+      .filter((item) => {
+        if (input?.type === "videos") return item.feedItemType === "video_review";
+        if (input?.type === "reviews") return ["review", "photo_review", "video_review"].includes(item.feedItemType);
+        if (input?.type === "guides") return item.feedItemType === "guide";
+        return true;
+      })
+      .sort((a, b) => {
+        if (b.surfacedAt !== a.surfacedAt) return b.surfacedAt.localeCompare(a.surfacedAt);
+        const ak = `${a.feedItemType}:${a.contentId}`;
+        const bk = `${b.feedItemType}:${b.contentId}`;
+        return bk.localeCompare(ak);
+      });
+
+    const cursor = decodeFeedCursor(input?.cursor);
+    const startIndex = cursor
+      ? filtered.findIndex((row) => row.surfacedAt === cursor.surfacedAt && `${row.feedItemType}:${row.contentId}` === cursor.key) + 1
+      : 0;
+    const page = filtered.slice(Math.max(0, startIndex), Math.max(0, startIndex) + limit);
+    const tail = page.at(-1);
+
+    return {
+      items: page,
+      nextCursor: tail ? encodeFeedCursor({ surfacedAt: tail.surfacedAt, key: `${tail.feedItemType}:${tail.contentId}` }) : undefined
+    };
   }
 
   async getPublicProfile(slug: string, viewerUserId?: string, opts?: { reviewLimit?: number; guideLimit?: number; reviewSort?: "latest" | "top" }): Promise<PublicCreatorProfileView> {

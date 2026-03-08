@@ -72,3 +72,49 @@ export interface ListCreatorReviewsInput {
   limit?: number;
   cursor?: string;
 }
+
+
+export type CreatorFeedItemType = "review" | "photo_review" | "video_review" | "guide";
+
+export interface CreatorFeedItem {
+  feedItemType: CreatorFeedItemType;
+  contentId: string;
+  creatorProfileId: string;
+  creator: {
+    id: string;
+    slug: string;
+    displayName: string;
+    avatarUrl?: string;
+    isFollowing: boolean;
+  };
+  placeId?: string;
+  title?: string;
+  summary: string;
+  media?: {
+    thumbnailUrl?: string;
+    url?: string;
+    mediaType?: "photo" | "video";
+  };
+  publishedAt: string;
+  surfacedAt: string;
+}
+
+export interface CreatorFeedResult {
+  items: CreatorFeedItem[];
+  nextCursor?: string;
+}
+
+export interface CreatorPlaceContentResult {
+  items: CreatorFeedItem[];
+  nextCursor?: string;
+}
+
+export interface FollowedCreatorSummary {
+  creatorProfileId: string;
+  slug: string;
+  displayName: string;
+  avatarUrl?: string;
+  status: CreatorProfileStatus;
+  isPublic: boolean;
+  followedAt: string;
+}
