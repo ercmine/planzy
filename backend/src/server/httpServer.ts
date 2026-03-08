@@ -4,6 +4,7 @@ import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import type { AccountsService } from "../accounts/service.js";
 import type { CreatorService } from "../creator/service.js";
 import type { CreatorMonetizationService } from "../creatorMonetization/service.js";
+import type { CreatorPremiumService } from "../creatorPremium/service.js";
 import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
 import type { CollaborationService } from "../collaboration/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
@@ -63,6 +64,7 @@ export function createHttpServer(
     accountsService?: AccountsService;
     creatorService?: CreatorService;
     creatorMonetizationService?: CreatorMonetizationService;
+    creatorPremiumService?: CreatorPremiumService;
     businessAnalyticsService?: BusinessAnalyticsService;
     collaborationService?: CollaborationService;
     discovery?: DiscoveryHttpHandlerDeps;
