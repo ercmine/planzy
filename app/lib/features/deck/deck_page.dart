@@ -47,6 +47,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
   Widget build(BuildContext context) {
     final deckRepositoryAsync = ref.watch(deckRepositoryProvider);
     final telemetryRepositoryAsync = ref.watch(telemetryRepositoryProvider);
+    final telemetryDispatcher = ref.watch(telemetryDispatcherProvider);
 
     if (deckRepositoryAsync.isLoading || telemetryRepositoryAsync.isLoading) {
       return _scaffoldWithBody(const Center(child: CircularProgressIndicator()));
@@ -56,6 +57,10 @@ class _DeckPageState extends ConsumerState<DeckPage> {
       return _scaffoldWithBody(
         const Center(child: Text('Could not initialize deck dependencies.')),
       );
+    }
+
+    if (telemetryDispatcher == null) {
+      return _scaffoldWithBody(const Center(child: CircularProgressIndicator()));
     }
 
     final state = ref.watch(deckControllerProvider(widget.sessionId));
