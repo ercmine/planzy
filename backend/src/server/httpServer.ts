@@ -16,6 +16,7 @@ import type { TelemetryService } from "../telemetry/telemetryService.js";
 import type { ReviewsStore } from "../reviews/store.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 import type { SavedHttpHandlers } from "../saved/http.js";
+import type { OutingPlannerService } from "../outingPlanner/service.js";
 import { createRoutes } from "./routes.js";
 
 export function matchPath(pattern: string, pathname: string): Record<string, string> | null {
@@ -66,6 +67,7 @@ export function createHttpServer(
     collaborationService?: CollaborationService;
     discovery?: DiscoveryHttpHandlerDeps;
     savedHandlers?: SavedHttpHandlers;
+    outingPlannerService?: OutingPlannerService;
   }
 ): Server {
   const route = createRoutes(service, merchantService, deps);

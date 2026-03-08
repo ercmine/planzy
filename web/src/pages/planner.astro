@@ -1,0 +1,86 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Container from '../components/Container.astro';
+---
+
+<BaseLayout title="Outing Planner | Perbug" description="Generate structured outing itineraries with AI and real place data.">
+  <Header />
+  <main class="py-12">
+    <Container class="space-y-8">
+      <section class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
+        <h1 class="text-2xl font-semibold text-slate-100">AI Outing Planner</h1>
+        <p class="mt-2 text-slate-300">Build structured itineraries for date nights, coffee crawls, family trips, and more.</p>
+      </section>
+
+      <section class="grid gap-6 lg:grid-cols-2">
+        <form id="planner-form" class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 space-y-4">
+          <label class="block text-sm text-slate-300">Prompt
+            <input name="prompt" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100" placeholder="Plan a cute date night in Minneapolis" />
+          </label>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="block text-sm text-slate-300">City
+              <input name="city" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100" placeholder="Austin" />
+            </label>
+            <label class="block text-sm text-slate-300">Budget
+              <select name="budgetLevel" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100">
+                <option value="">Balanced</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+          </div>
+          <button class="rounded-lg bg-brand-500 px-4 py-2 font-semibold text-slate-950 hover:bg-brand-400" type="submit">Generate itinerary</button>
+          <p id="planner-status" class="text-sm text-slate-400"></p>
+        </form>
+
+        <section id="planner-result" class="rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
+          <h2 class="text-lg font-semibold text-slate-100">Structured itinerary</h2>
+          <p class="mt-2 text-sm text-slate-400">No itinerary yet. Submit a request to preview results.</p>
+        </section>
+      </section>
+    </Container>
+  </main>
+  <Footer />
+</BaseLayout>
+
+<script>
+  const form = document.getElementById('planner-form');
+  const status = document.getElementById('planner-status');
+  const result = document.getElementById('planner-result');
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!status || !result || !form) return;
+    status.textContent = 'Generating itinerary...';
+
+    const data = new FormData(form);
+    const payload = {
+      prompt: String(data.get('prompt') ?? ''),
+      city: String(data.get('city') ?? ''),
+      budgetLevel: String(data.get('budgetLevel') ?? '') || undefined
+    };
+
+    try {
+      const response = await fetch('/v1/outing-planner/create', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-user-id': 'demo-user' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error('Generation failed');
+      const itinerary = await response.json();
+      status.textContent = `Generated ${itinerary.stops?.length ?? 0} stops.`;
+      result.innerHTML = `
+        <h2 class="text-lg font-semibold text-slate-100">${itinerary.title}</h2>
+        <p class="mt-2 text-sm text-slate-300">${itinerary.summary}</p>
+        <ol class="mt-4 space-y-3">
+          ${(itinerary.stops ?? []).map((stop) => `<li class=\"rounded-lg border border-slate-700 p-3\"><div class=\"text-slate-100 font-medium\">${stop.sequence}. ${stop.placeTitle}</div><div class=\"text-sm text-slate-400\">${stop.reasonIncluded}</div></li>`).join('')}
+        </ol>
+      `;
+    } catch (error) {
+      status.textContent = 'Could not generate itinerary. Try again with broader filters.';
+    }
+  });
+</script>
