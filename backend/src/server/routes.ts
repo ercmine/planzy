@@ -285,8 +285,18 @@ export function createRoutes(
         const placeId = decodeURIComponent(reviewsMatch[1] ?? "");
 
         if (req.method === "GET") {
-          const reviews = await deps.reviewsStore.listByPlace(placeId);
-          sendJson(res, 200, { reviews });
+          const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+          const sort = String(url.searchParams.get("sort") ?? "most_helpful");
+          const cursor = String(url.searchParams.get("cursor") ?? "").trim() || undefined;
+          const limit = Number(url.searchParams.get("limit") ?? "20");
+          const result = await deps.reviewsStore.listByPlace({
+            placeId,
+            viewerUserId: userIdHeader || undefined,
+            sort: sort as never,
+            cursor,
+            limit
+          });
+          sendJson(res, 200, result);
           return;
         }
 
@@ -390,29 +400,28 @@ export function createRoutes(
               return;
             }
           }
-          const rating = Number(payload.rating);
-          const text = String(payload.text ?? "").trim();
-          const anonymous = Boolean(payload.anonymous);
+          const rating = payload.rating == null ? undefined : Number(payload.rating);
+          const text = String(payload.body ?? payload.text ?? "").trim();
           const userId = String(readHeader(req, "x-user-id") ?? payload.userId ?? "anonymous-user").trim();
-          const displayNameRaw = String(payload.displayName ?? "").trim();
-          const displayName = anonymous ? "Anonymous" : (displayNameRaw || "Perbug User");
+          const displayName = String(payload.displayName ?? "").trim() || "Perbug User";
 
-          if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+          if (rating != null && (!Number.isFinite(rating) || rating < 1 || rating > 5)) {
             throw new ValidationError(["rating must be between 1 and 5"], "Invalid review payload");
           }
           if (text.length < 5 || text.length > 1000) {
             throw new ValidationError(["text length must be between 5 and 1000 characters"], "Invalid review payload");
           }
 
-          const created = await deps.reviewsStore.create({
+          const created = await deps.reviewsStore.createOrReplace({
             placeId,
-            userId,
-            actingProfileType: actor.profileType,
-            actingProfileId: actor.profileId,
-            displayName,
-            rating: Math.round(rating),
-            text,
-            anonymous
+            canonicalPlaceId: placeId,
+            authorUserId: userId,
+            authorProfileType: actor.profileType,
+            authorProfileId: actor.profileId,
+            authorDisplayName: displayName,
+            rating: typeof rating === "number" ? Math.round(rating) : undefined,
+            body: text,
+            editWindowMinutes: Number(process.env.REVIEW_EDIT_WINDOW_MINUTES ?? 30)
           });
 
           if (deps?.accessEngine && deps?.subscriptionService) {
@@ -431,7 +440,121 @@ export function createRoutes(
             await subscriptionHandlers.recordReviewUsage(usageAccountId);
           }
 
-          sendJson(res, 201, { review: created });
+          sendJson(res, 201, { review: created, created: true });
+          return;
+        }
+      }
+
+      const myReviewMatch = /^\/places\/([^/]+)\/reviews\/me$/.exec(normalizedPath);
+      if (myReviewMatch && req.method === "GET" && deps?.reviewsStore) {
+        const placeId = decodeURIComponent(myReviewMatch[1] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        const review = await deps.reviewsStore.getByPlaceAndAuthor(placeId, userIdHeader);
+        sendJson(res, 200, { review });
+        return;
+      }
+
+      const reviewDetailMatch = /^\/places\/([^/]+)\/reviews\/([^/]+)$/.exec(normalizedPath);
+      if (reviewDetailMatch && deps?.reviewsStore) {
+        const reviewId = decodeURIComponent(reviewDetailMatch[2] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (req.method === "PATCH") {
+          if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+          const body = await parseJsonBody(req);
+          const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+          const text = payload.body == null ? undefined : String(payload.body).trim();
+          const rating = payload.rating == null ? undefined : Number(payload.rating);
+          if (text != null && (text.length < 5 || text.length > 1000)) {
+            throw new ValidationError(["text length must be between 5 and 1000 characters"], "Invalid review payload");
+          }
+          const updated = await deps.reviewsStore.update({ reviewId, actorUserId: userIdHeader, body: text, rating });
+          sendJson(res, 200, { review: updated });
+          return;
+        }
+        if (req.method === "DELETE") {
+          if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+          const deleted = await deps.reviewsStore.softDelete(reviewId, userIdHeader);
+          sendJson(res, 200, { review: deleted });
+          return;
+        }
+      }
+
+      const helpfulMatch = /^\/reviews\/([^/]+)\/helpful$/.exec(normalizedPath);
+      if (helpfulMatch && deps?.reviewsStore) {
+        const reviewId = decodeURIComponent(helpfulMatch[1] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        if (req.method === "POST") {
+          const review = await deps.reviewsStore.voteHelpful(reviewId, userIdHeader);
+          sendJson(res, 200, { review });
+          return;
+        }
+        if (req.method === "DELETE") {
+          const review = await deps.reviewsStore.unvoteHelpful(reviewId, userIdHeader);
+          sendJson(res, 200, { review });
+          return;
+        }
+      }
+
+      const reportMatch = /^\/reviews\/([^/]+)\/report$/.exec(normalizedPath);
+      if (reportMatch && req.method === "POST" && deps?.reviewsStore) {
+        const reviewId = decodeURIComponent(reportMatch[1] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const reason = String(payload.reason ?? "").trim() || "unspecified";
+        await deps.reviewsStore.reportReview(reviewId, userIdHeader, reason);
+        sendJson(res, 202, { ok: true });
+        return;
+      }
+
+      const businessReplyMatch = /^\/reviews\/([^/]+)\/business-reply$/.exec(normalizedPath);
+      if (businessReplyMatch && req.method === "POST" && deps?.reviewsStore) {
+        const reviewId = decodeURIComponent(businessReplyMatch[1] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        if (!deps.accountsService) throw new ValidationError(["accounts service required"]);
+        const actor = deps.accountsService.resolveActingContext(userIdHeader, {
+          profileType: ProfileType.BUSINESS,
+          profileId: String(readHeader(req, "x-acting-profile-id") ?? "").trim()
+        });
+        const decision = deps.accountsService.authorizeAction(actor, PermissionAction.BUSINESS_REPLY);
+        if (!decision.allowed) {
+          sendJson(res, 403, { decision });
+          return;
+        }
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const replyBody = String(payload.body ?? "").trim();
+        if (replyBody.length < 2 || replyBody.length > 1000) throw new ValidationError(["body length must be between 2 and 1000"]);
+        const reply = await deps.reviewsStore.createOrUpdateBusinessReply({ reviewId, businessProfileId: actor.profileId, ownerUserId: actor.userId, body: replyBody });
+        sendJson(res, 201, { reply });
+        return;
+      }
+
+      const businessReplyDetailMatch = /^\/reviews\/([^/]+)\/business-reply\/([^/]+)$/.exec(normalizedPath);
+      if (businessReplyDetailMatch && deps?.reviewsStore) {
+        const reviewId = decodeURIComponent(businessReplyDetailMatch[1] ?? "");
+        const replyId = decodeURIComponent(businessReplyDetailMatch[2] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader || !deps.accountsService) throw new ValidationError(["x-user-id header is required"]);
+        const actor = deps.accountsService.resolveActingContext(userIdHeader, {
+          profileType: ProfileType.BUSINESS,
+          profileId: String(readHeader(req, "x-acting-profile-id") ?? "").trim()
+        });
+        if (req.method === "PATCH") {
+          const body = await parseJsonBody(req);
+          const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+          const replyBody = String(payload.body ?? "").trim();
+          const reply = await deps.reviewsStore.createOrUpdateBusinessReply({ reviewId, businessProfileId: actor.profileId, ownerUserId: actor.userId, body: replyBody });
+          sendJson(res, 200, { reply });
+          return;
+        }
+        if (req.method === "DELETE") {
+          const reply = await deps.reviewsStore.deleteBusinessReply({ reviewId, replyId, actorUserId: actor.userId, businessProfileId: actor.profileId });
+          sendJson(res, 200, { reply });
           return;
         }
       }

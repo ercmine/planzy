@@ -191,6 +191,19 @@ class ApiClient {
     return _sendForJsonMap(method: 'DELETE', path: path, body: body);
   }
 
+  Future<JsonMap> patchJson(
+    String path, {
+    Object? body,
+    Map<String, String?>? queryParameters,
+  }) {
+    return _sendForJsonMap(
+      method: 'PATCH',
+      path: path,
+      queryParameters: queryParameters,
+      body: body,
+    );
+  }
+
   Future<JsonMap> _sendForJsonMap({
     required String method,
     required String path,
@@ -328,6 +341,8 @@ class ApiClient {
         return httpClient.post(uri, headers: headers, body: encodedBody);
       case 'DELETE':
         return httpClient.delete(uri, headers: headers, body: encodedBody);
+      case 'PATCH':
+        return httpClient.patch(uri, headers: headers, body: encodedBody);
       default:
         throw UnsupportedError('Unsupported method $method');
     }

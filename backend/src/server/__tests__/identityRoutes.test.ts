@@ -100,11 +100,11 @@ describe("identity and acting context routes", () => {
     });
 
     expect(allowed.status).toBe(201);
-    const payload = await allowed.json() as { review: { actingProfileType: string; actingProfileId: string; userId: string } };
+    const payload = await allowed.json() as { review: { authorProfileType: string; authorProfileId: string; authorUserId: string } };
     expect(payload.review).toMatchObject({
-      actingProfileType: "BUSINESS",
-      actingProfileId: biz.profile.id,
-      userId: "reply-owner"
+      authorProfileType: "BUSINESS",
+      authorProfileId: biz.profile.id,
+      authorUserId: "reply-owner"
     });
   });
 });
