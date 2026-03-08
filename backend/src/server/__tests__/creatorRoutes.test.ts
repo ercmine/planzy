@@ -7,6 +7,7 @@ describe("creator profile routes", () => {
   let baseUrl: string;
 
   beforeAll(async () => {
+    process.env.ADMIN_API_KEY = "test-admin";
     server = createServer();
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
     const address = server.address();
@@ -15,6 +16,7 @@ describe("creator profile routes", () => {
   });
 
   afterAll(async () => {
+    delete process.env.ADMIN_API_KEY;
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   });
 
@@ -197,6 +199,56 @@ describe("creator profile routes", () => {
     const emptyFeed = await fetch(`${baseUrl}/v1/creator/feed`, { headers: viewerHeaders });
     expect(emptyFeed.status).toBe(200);
     await expect(emptyFeed.json()).resolves.toMatchObject({ items: [] });
+  });
+
+  it("supports creator premium endpoints with entitlement enforcement", async () => {
+    const creatorHeaders = { "x-user-id": "creator-premium-1", "content-type": "application/json" };
+    await fetch(`${baseUrl}/v1/profiles/creator`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ creatorName: "Premium Creator" })
+    });
+    await fetch(`${baseUrl}/v1/creator/profiles`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ displayName: "Premium Creator", slug: "premium-creator" })
+    });
+
+    const identityRes = await fetch(`${baseUrl}/v1/identity`, { headers: { "x-user-id": "creator-premium-1" } });
+    const identity = await identityRes.json() as { creatorProfile?: { id: string } };
+    const creatorProfileId = identity.creatorProfile?.id;
+    expect(creatorProfileId).toBeTruthy();
+
+    const upgrade = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfileId ?? "")}/upgrade-context`);
+    expect(upgrade.status).toBe(200);
+
+    const premiumState = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfileId ?? "")}/premium-state`);
+    expect(premiumState.status).toBe(200);
+
+    const blockedBranding = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfileId ?? "")}/branding`, {
+      method: "PATCH",
+      headers: creatorHeaders,
+      body: JSON.stringify({ tagline: "Food specialist" })
+    });
+    expect(blockedBranding.status).toBe(403);
+
+    await fetch(`${baseUrl}/v1/admin/subscription/comp`, {
+      method: "POST",
+      headers: { "x-admin-key": "test-admin", "x-account-id": creatorProfileId ?? "", "content-type": "application/json" },
+      body: JSON.stringify({ planId: "creator-elite" })
+    });
+
+    const unlockedBranding = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfileId ?? "")}/branding`, {
+      method: "PATCH",
+      headers: creatorHeaders,
+      body: JSON.stringify({ tagline: "Food specialist", accentColor: "#AA44CC" })
+    });
+    expect(unlockedBranding.status).toBe(200);
+
+    const analyticsDenied = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfileId ?? "")}/premium-analytics/overview`, {
+      headers: { "x-user-id": "viewer-analytics" }
+    });
+    expect(analyticsDenied.status).toBe(200);
   });
 
 });

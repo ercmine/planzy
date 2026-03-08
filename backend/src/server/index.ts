@@ -4,6 +4,7 @@ import { MemoryAccountsStore } from "../accounts/memoryStore.js";
 import { AccountsService } from "../accounts/service.js";
 import { MemoryCreatorStore } from "../creator/memoryStore.js";
 import { CreatorService } from "../creator/service.js";
+import { CreatorPremiumService, MemoryCreatorPremiumStore } from "../creatorPremium/index.js";
 import { CreatorMonetizationService, MemoryCreatorMonetizationStore } from "../creatorMonetization/index.js";
 import { ClickTracker, MemoryClickStore } from "../analytics/clicks/index.js";
 import { BusinessAnalyticsService, MemoryBusinessAnalyticsStore } from "../businessAnalytics/index.js";
@@ -88,6 +89,9 @@ export function createServer(options?: CreateServerOptions) {
   const creatorStore = new MemoryCreatorStore();
   const monetizationService = new CreatorMonetizationService(new MemoryCreatorMonetizationStore(), accountsService, subscriptionService, creatorStore, accessEngine);
   const creatorService = new CreatorService(creatorStore, accountsService, reviewsStore, subscriptionService, accessEngine, monetizationService);
+  const creatorPremiumService = new CreatorPremiumService(new MemoryCreatorPremiumStore(), subscriptionService, {
+    getCreatorProfile: (creatorProfileId) => creatorStore.getProfileById(creatorProfileId)
+  });
   const savedService = new SavedService(new MemorySavedStore(), subscriptionService, accessEngine);
   const businessAnalyticsService = new BusinessAnalyticsService(new MemoryBusinessAnalyticsStore(), claimsStore, accessEngine);
   const collaborationService = new CollaborationService(new MemoryCollaborationStore(), accountsService, service, subscriptionService, accessEngine, businessAnalyticsService);
@@ -137,6 +141,7 @@ export function createServer(options?: CreateServerOptions) {
     accountsService,
     creatorService,
     creatorMonetizationService: monetizationService,
+    creatorPremiumService,
     businessAnalyticsService,
     collaborationService,
     savedHandlers: createSavedHttpHandlers(savedService),

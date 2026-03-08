@@ -5,11 +5,13 @@ import { createAccountsHttpHandlers } from "../accounts/http.js";
 import { createDiscoveryHttpHandlers } from "../discovery/http.js";
 import { createCreatorHttpHandlers } from "../creator/http.js";
 import { createCreatorMonetizationHttpHandlers } from "../creatorMonetization/http.js";
+import { createCreatorPremiumHttpHandlers } from "../creatorPremium/http.js";
 import { createBusinessAnalyticsHttpHandlers } from "../businessAnalytics/http.js";
 import { createCollaborationHttpHandlers } from "../collaboration/http.js";
 import type { AccountsService } from "../accounts/service.js";
 import type { CreatorService } from "../creator/service.js";
 import type { CreatorMonetizationService } from "../creatorMonetization/service.js";
+import type { CreatorPremiumService } from "../creatorPremium/service.js";
 import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
 import type { CollaborationService } from "../collaboration/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
@@ -77,6 +79,7 @@ export function createRoutes(
     accountsService?: AccountsService;
     creatorService?: CreatorService;
     creatorMonetizationService?: CreatorMonetizationService;
+    creatorPremiumService?: CreatorPremiumService;
     businessAnalyticsService?: BusinessAnalyticsService;
     collaborationService?: CollaborationService;
     discovery?: DiscoveryHttpHandlerDeps;
@@ -94,6 +97,7 @@ export function createRoutes(
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
   const creatorMonetizationHandlers = deps?.creatorMonetizationService ? createCreatorMonetizationHttpHandlers(deps.creatorMonetizationService) : null;
+  const creatorPremiumHandlers = deps?.creatorPremiumService ? createCreatorPremiumHttpHandlers(deps.creatorPremiumService) : null;
   const businessAnalyticsHandlers = deps?.businessAnalyticsService ? createBusinessAnalyticsHttpHandlers(deps.businessAnalyticsService) : null;
   const collaborationHandlers = deps?.collaborationService && deps?.accountsService ? createCollaborationHttpHandlers(deps.collaborationService, deps.accountsService) : null;
   const outingPlannerHandlers = deps?.outingPlannerService ? createOutingPlannerHandlers(deps.outingPlannerService) : null;
@@ -1123,6 +1127,67 @@ export function createRoutes(
       }
 
 
+
+
+      if (creatorPremiumHandlers) {
+        const creatorPremiumStateMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/premium-state$/);
+        if (req.method === "GET" && creatorPremiumStateMatch) {
+          await creatorPremiumHandlers.premiumState(req, res, decodeURIComponent(creatorPremiumStateMatch[1] ?? ""));
+          return;
+        }
+
+        const creatorAnalyticsOverviewMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/premium-analytics\/overview$/);
+        if (req.method === "GET" && creatorAnalyticsOverviewMatch) {
+          await creatorPremiumHandlers.analyticsOverview(req, res, decodeURIComponent(creatorAnalyticsOverviewMatch[1] ?? ""));
+          return;
+        }
+
+        const creatorAnalyticsAudienceMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/premium-analytics\/audience$/);
+        if (req.method === "GET" && creatorAnalyticsAudienceMatch) {
+          await creatorPremiumHandlers.analyticsAudience(req, res, decodeURIComponent(creatorAnalyticsAudienceMatch[1] ?? ""));
+          return;
+        }
+
+        const creatorAnalyticsTrackMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/premium-analytics\/events$/);
+        if (req.method === "POST" && creatorAnalyticsTrackMatch) {
+          await creatorPremiumHandlers.trackAnalytics(req, res, decodeURIComponent(creatorAnalyticsTrackMatch[1] ?? ""));
+          return;
+        }
+
+        const creatorQuotaMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/quotas\/([^/]+)$/);
+        if (req.method === "GET" && creatorQuotaMatch) {
+          await creatorPremiumHandlers.quotaState(req, res, decodeURIComponent(creatorQuotaMatch[1] ?? ""), decodeURIComponent(creatorQuotaMatch[2] ?? ""));
+          return;
+        }
+        if (req.method === "POST" && creatorQuotaMatch) {
+          await creatorPremiumHandlers.consumeQuota(req, res, decodeURIComponent(creatorQuotaMatch[1] ?? ""), decodeURIComponent(creatorQuotaMatch[2] ?? ""));
+          return;
+        }
+
+        const creatorDiscoverabilityMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/discoverability$/);
+        if (req.method === "GET" && creatorDiscoverabilityMatch) {
+          await creatorPremiumHandlers.discoverability(req, res, decodeURIComponent(creatorDiscoverabilityMatch[1] ?? ""));
+          return;
+        }
+
+        const creatorBrandingMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/branding$/);
+        if (req.method === "PATCH" && creatorBrandingMatch) {
+          await creatorPremiumHandlers.updateBranding(req, res, decodeURIComponent(creatorBrandingMatch[1] ?? ""));
+          return;
+        }
+
+        const creatorMonetizationControlsMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/premium-monetization$/);
+        if (req.method === "PATCH" && creatorMonetizationControlsMatch) {
+          await creatorPremiumHandlers.updateMonetization(req, res, decodeURIComponent(creatorMonetizationControlsMatch[1] ?? ""));
+          return;
+        }
+
+        const creatorUpgradeMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/upgrade-context$/);
+        if (req.method === "GET" && creatorUpgradeMatch) {
+          await creatorPremiumHandlers.upgradeContext(req, res, decodeURIComponent(creatorUpgradeMatch[1] ?? ""));
+          return;
+        }
+      }
 
       if (creatorMonetizationHandlers) {
         const monetizationProfileMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/monetization$/);
