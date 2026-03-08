@@ -36,12 +36,23 @@ class ResultsController extends StateNotifier<ResultsState> {
   static const double _debugDefaultLng = -93.5590;
 
   Future<void> refresh() async {
-    state = state.copyWith(isLoading: true, clearError: true, locationRequired: false);
+    state = state.copyWith(
+      isLoading: true,
+      clearError: true,
+      clearLiveResultsError: true,
+      locationRequired: false,
+    );
     try {
       final swipeCount = await _swipesRepository.getSwipeCount(_sessionId);
       final topPicks = await _swipesRepository.computeTopPicks(_sessionId);
       final lockedPlan = await _swipesRepository.getLockedPlan(_sessionId);
-      final liveResults = await _loadLiveResults();
+      LiveResultsResponse? liveResults;
+      String? liveResultsError;
+      try {
+        liveResults = await _loadLiveResults();
+      } catch (error) {
+        liveResultsError = _formatError(error);
+      }
 
       state = state.copyWith(
         isLoading: false,
@@ -59,6 +70,7 @@ class ResultsController extends StateNotifier<ResultsState> {
         lockedPlanId: lockedPlan?.planId,
         activeSessions: liveResults?.summary.activeSessions,
         generatedAt: liveResults?.summary.generatedAt,
+        liveResultsErrorMessage: liveResultsError,
       );
     } catch (error) {
       state = state.copyWith(

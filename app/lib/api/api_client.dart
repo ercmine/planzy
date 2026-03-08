@@ -32,6 +32,8 @@ class ApiClient {
 
   int? lastPlansStatus;
   int? lastLiveResultsStatus;
+  String? lastPlansBodySnippet;
+  String? lastLiveResultsBodySnippet;
 
   Uri buildUri(String path, [Map<String, String?>? queryParameters]) {
     final base = Uri.parse(envConfig.apiBaseUrl);
@@ -327,9 +329,11 @@ class ApiClient {
     final snippet = _bodySnippet(response.body);
     if (uri.path.endsWith('/plans')) {
       lastPlansStatus = response.statusCode;
+      lastPlansBodySnippet = snippet;
     }
     if (uri.path.endsWith('/live-results')) {
       lastLiveResultsStatus = response.statusCode;
+      lastLiveResultsBodySnippet = snippet;
     }
     if (kDebugMode) {
       print('[DEBUG] $method $uri status=${response.statusCode}');
@@ -380,7 +384,11 @@ class ApiClient {
       }
       throw const FormatException('Expected JSON object or array');
     } on FormatException catch (error) {
-      throw ApiError.decoding('Invalid JSON response', details: error);
+      Log.error('JSON decode failed. rawBody="${_bodySnippet500(body)}"', error: error);
+      throw ApiError.decoding(
+        'Invalid JSON response',
+        details: {'error': error.toString(), 'rawBodySnippet': _bodySnippet500(body)},
+      );
     }
   }
 

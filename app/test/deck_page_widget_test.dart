@@ -151,7 +151,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Yes'));
     await tester.pumpAndSettle();
 
-    expect(find.text('No more ideas right now'), findsOneWidget);
+    expect(find.text('No results nearby'), findsOneWidget);
   });
 }
 

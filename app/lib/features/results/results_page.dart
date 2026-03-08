@@ -59,6 +59,14 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
                 children: [
                   if (kDebugMode && envConfig.enableDebugLogs)
                     _DebugBanner(location: location, apiClient: apiClient),
+                  if (state.liveResultsErrorMessage != null)
+                    Card(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.s),
+                        child: Text('Live results unavailable: ${state.liveResultsErrorMessage!}'),
+                      ),
+                    ),
                   if (state.locationRequired)
                     Card(
                       child: Padding(
@@ -124,6 +132,14 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
                     padding: const EdgeInsets.only(top: AppSpacing.s),
                     child: Text(
                       'Live summary: activeSessions=${state.activeSessions ?? '-'} generatedAt=${state.generatedAt ?? '-'}',
+                    ),
+                  ),
+                if (state.liveResultsErrorMessage != null)
+                  Card(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.s),
+                      child: Text('Live results unavailable: ${state.liveResultsErrorMessage!}'),
                     ),
                   ),
                 if (state.locationRequired)
