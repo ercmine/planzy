@@ -20,9 +20,12 @@ import type {
 type ReviewRow = PlaceReview & { moderationReason?: string };
 
 const PUBLIC_STATES: ModerationState[] = ["published"];
-const PUBLIC_MEDIA_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const PUBLIC_MEDIA_MIME = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime", "video/webm"]);
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const MAX_PHOTOS_PER_REVIEW = 6;
+const MAX_VIDEOS_PER_REVIEW = 2;
+const MAX_VIDEO_BYTES = 256 * 1024 * 1024;
+const MAX_VIDEO_DURATION_MS = 180_000;
 const UPLOAD_TTL_MS = 15 * 60_000;
 
 function encodeCursor(item: { id: string; createdAt: string; helpfulCount: number }): string {
@@ -280,30 +283,77 @@ export class MemoryReviewsStore implements ReviewsStore {
 
   async createMediaUpload(input: CreateReviewMediaUploadInput): Promise<ReviewMediaUpload> {
     const nowDate = input.now ?? new Date();
-    const buffer = Buffer.from(input.base64Data, "base64");
-    if (!buffer.byteLength) throw new ValidationError(["upload cannot be empty"]);
-    if (buffer.byteLength > MAX_PHOTO_BYTES) throw new ValidationError(["file too large"]);
+    const mediaType = input.mediaType ?? (input.mimeType.startsWith("video/") ? "video" : "photo");
     if (!PUBLIC_MEDIA_MIME.has(input.mimeType)) throw new ValidationError(["unsupported mime type"]);
-    const dimensions = decodeImageDimensions(buffer, input.mimeType);
-    if (dimensions.width <= 0 || dimensions.height <= 0) throw new ValidationError(["invalid image dimensions"]);
 
-    const checksum = createHash("sha256").update(buffer).digest("hex");
+    let fileSizeBytes = Number(input.fileSizeBytes ?? 0);
+    let width = Number(input.width ?? 0);
+    let height = Number(input.height ?? 0);
+    let durationMs = Number(input.durationMs ?? 0) || undefined;
+    let checksum = "";
+    let status: ReviewMediaUpload["status"] = "pending";
+
+    if (mediaType === "photo") {
+      const buffer = Buffer.from(input.base64Data ?? "", "base64");
+      if (!buffer.byteLength) throw new ValidationError(["upload cannot be empty"]);
+      if (buffer.byteLength > MAX_PHOTO_BYTES) throw new ValidationError(["file too large"]);
+      const dimensions = decodeImageDimensions(buffer, input.mimeType);
+      if (dimensions.width <= 0 || dimensions.height <= 0) throw new ValidationError(["invalid image dimensions"]);
+      checksum = createHash("sha256").update(buffer).digest("hex");
+      fileSizeBytes = buffer.byteLength;
+      width = dimensions.width;
+      height = dimensions.height;
+      status = "uploaded";
+    } else {
+      if (!input.mimeType.startsWith("video/")) throw new ValidationError(["video mime type required"]);
+      if (fileSizeBytes <= 0 || fileSizeBytes > MAX_VIDEO_BYTES) throw new ValidationError(["invalid video file size"]);
+      if (durationMs != null && durationMs > MAX_VIDEO_DURATION_MS) throw new ValidationError(["video duration exceeds maximum"]);
+      if (width <= 0 || height <= 0) throw new ValidationError(["video dimensions are required"]);
+      checksum = String(input.fileName).length ? createHash("sha256").update(`${input.ownerUserId}:${input.fileName}:${fileSizeBytes}`).digest("hex") : randomUUID().replaceAll("-", "");
+    }
+
     const upload: ReviewMediaUpload = {
       id: randomUUID(),
+      mediaType,
       ownerUserId: input.ownerUserId,
       storageProvider: "memory",
       storageKey: `review-media/uploads/${input.ownerUserId}/${randomUUID()}-${input.fileName}`,
       fileName: input.fileName,
       mimeType: input.mimeType,
-      fileSizeBytes: buffer.byteLength,
-      width: dimensions.width,
-      height: dimensions.height,
+      fileSizeBytes,
+      width,
+      height,
+      durationMs,
       checksum,
-      status: "pending",
+      processingProfile: mediaType === "video" ? "review_video_v1" : undefined,
+      status,
       createdAt: nowDate.toISOString(),
       expiresAt: new Date(nowDate.getTime() + UPLOAD_TTL_MS).toISOString()
     };
     this.mediaUploadsById.set(upload.id, upload);
+    return upload;
+  }
+
+  async finalizeMediaUpload(input: { uploadId: string; ownerUserId: string; fileSizeBytes?: number; durationMs?: number; width?: number; height?: number; checksum?: string }): Promise<ReviewMediaUpload> {
+    const upload = this.mediaUploadsById.get(input.uploadId);
+    if (!upload) throw new ValidationError(["upload not found"]);
+    if (upload.ownerUserId !== input.ownerUserId) throw new ValidationError(["cannot finalize another user's upload"]);
+    if (upload.status !== "pending") throw new ValidationError(["upload cannot be finalized"]);
+    if (Date.parse(upload.expiresAt) < Date.now()) {
+      upload.status = "expired";
+      throw new ValidationError(["upload expired"]);
+    }
+    if (upload.mediaType !== "video") throw new ValidationError(["upload is already finalized"]);
+    upload.fileSizeBytes = Number(input.fileSizeBytes ?? upload.fileSizeBytes);
+    upload.durationMs = Number(input.durationMs ?? upload.durationMs ?? 0);
+    upload.width = Number(input.width ?? upload.width);
+    upload.height = Number(input.height ?? upload.height);
+    upload.checksum = String(input.checksum ?? upload.checksum);
+
+    if (upload.fileSizeBytes <= 0 || upload.fileSizeBytes > MAX_VIDEO_BYTES) throw new ValidationError(["invalid video file size"]);
+    if (upload.durationMs <= 0 || upload.durationMs > MAX_VIDEO_DURATION_MS) throw new ValidationError(["invalid video duration"]);
+    if (upload.width <= 0 || upload.height <= 0) throw new ValidationError(["invalid video dimensions"]);
+    upload.status = "uploaded";
     return upload;
   }
 
@@ -328,6 +378,7 @@ export class MemoryReviewsStore implements ReviewsStore {
     if (!target) throw new ValidationError(["review media not found"]);
     target.moderationState = state;
     target.moderationReason = reason;
+    target.visibilityState = state === "published" && target.processingState === "ready" ? "public" : "blocked";
     target.updatedAt = now.toISOString();
     if (state === "removed") target.removedAt = target.updatedAt;
     row.media = normalizeMediaOrdering(row.media.filter((item) => item.moderationState !== "removed"));
@@ -370,26 +421,30 @@ export class MemoryReviewsStore implements ReviewsStore {
 
   private attachUploadsToReview(review: ReviewRow, actorUserId: string, uploadIds: string[], now: Date, append = false): ReviewMedia[] {
     const nowIso = now.toISOString();
-    const activeCount = (append ? review.media : []).filter((item) => item.moderationState !== "removed").length;
-    const requested = uploadIds.length;
-    if (activeCount + requested > MAX_PHOTOS_PER_REVIEW) throw new ValidationError(["too many photos attached to review"]);
+    const activeMedia = (append ? review.media : []).filter((item) => item.moderationState !== "removed");
 
     const attached = uploadIds.map((uploadId, index) => {
       const upload = this.mediaUploadsById.get(uploadId);
       if (!upload) throw new ValidationError(["upload not found"]);
       if (upload.ownerUserId !== actorUserId) throw new ValidationError(["cannot attach another user's upload"]);
-      if (upload.status !== "pending") throw new ValidationError(["upload already attached or expired"]);
+      if (upload.status !== "uploaded") throw new ValidationError(["upload must be finalized before attach"]);
       if (Date.parse(upload.expiresAt) < now.getTime()) {
         upload.status = "expired";
         throw new ValidationError(["upload expired"]);
       }
 
+      const nextPhotos = activeMedia.filter((item) => item.mediaType === "photo").length + (upload.mediaType === "photo" ? 1 : 0);
+      const nextVideos = activeMedia.filter((item) => item.mediaType === "video").length + (upload.mediaType === "video" ? 1 : 0);
+      if (nextPhotos > MAX_PHOTOS_PER_REVIEW) throw new ValidationError(["too many photos attached to review"]);
+      if (nextVideos > MAX_VIDEOS_PER_REVIEW) throw new ValidationError(["too many videos attached to review"]);
+
       upload.status = "attached";
       upload.attachedReviewId = review.id;
+      const isVideo = upload.mediaType === "video";
       const media: ReviewMedia = {
         id: randomUUID(),
         reviewId: review.id,
-        mediaType: "photo",
+        mediaType: upload.mediaType,
         storageProvider: upload.storageProvider,
         storageKey: upload.storageKey,
         mimeType: upload.mimeType,
@@ -401,15 +456,25 @@ export class MemoryReviewsStore implements ReviewsStore {
         displayOrder: index,
         isPrimary: false,
         moderationState: "pending",
+        processingState: isVideo ? "queued" : "ready",
+        visibilityState: "owner_only",
         uploadedByUserId: actorUserId,
+        durationMs: upload.durationMs,
+        playbackUrl: isVideo ? `/v1/review-media/${upload.id}/playback` : undefined,
+        posterUrl: isVideo ? `/v1/review-media/${upload.id}/poster` : undefined,
         variants: {
-          thumbnailUrl: `/v1/review-media/${upload.id}?variant=thumbnail`,
-          mediumUrl: `/v1/review-media/${upload.id}?variant=medium`,
-          fullUrl: `/v1/review-media/${upload.id}?variant=full`
+          thumbnailUrl: isVideo ? `/v1/review-media/${upload.id}/poster` : `/v1/review-media/${upload.id}?variant=thumbnail`,
+          mediumUrl: isVideo ? `/v1/review-media/${upload.id}/playback` : `/v1/review-media/${upload.id}?variant=medium`,
+          fullUrl: isVideo ? `/v1/review-media/${upload.id}/playback` : `/v1/review-media/${upload.id}?variant=full`
         },
         createdAt: nowIso,
         updatedAt: nowIso
       };
+      if (isVideo) {
+        media.processingState = "processing";
+        media.processingState = "ready";
+        media.visibilityState = "public";
+      }
       return media;
     });
 
@@ -431,6 +496,7 @@ export class MemoryReviewsStore implements ReviewsStore {
       .filter((item) => {
         if (row.deletedAt || row.moderationState !== "published") return viewerUserId === row.authorUserId && item.uploadedByUserId === viewerUserId;
         if (viewerUserId === row.authorUserId) return item.moderationState !== "removed";
+        if (item.mediaType === "video") return item.moderationState === "published" && item.processingState === "ready";
         return item.moderationState === "published";
       });
     const media = normalizeMediaOrdering(mediaVisible);
