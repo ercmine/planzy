@@ -1,13 +1,17 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { ValidationError } from "../plans/errors.js";
 import type {
   BusinessReply,
   CreateReviewInput,
+  CreateReviewMediaUploadInput,
   ListReviewsInput,
   ListReviewsResult,
   ModerationState,
   PlaceReview,
+  ReviewMedia,
+  ReviewMediaReport,
+  ReviewMediaUpload,
   ReviewSort,
   ReviewsStore,
   UpdateReviewInput
@@ -16,6 +20,10 @@ import type {
 type ReviewRow = PlaceReview & { moderationReason?: string };
 
 const PUBLIC_STATES: ModerationState[] = ["published"];
+const PUBLIC_MEDIA_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
+const MAX_PHOTOS_PER_REVIEW = 6;
+const UPLOAD_TTL_MS = 15 * 60_000;
 
 function encodeCursor(item: { id: string; createdAt: string; helpfulCount: number }): string {
   return Buffer.from(JSON.stringify(item), "utf8").toString("base64url");
@@ -29,10 +37,65 @@ function decodeCursor(cursor?: string): { id: string; createdAt: string; helpful
   }
 }
 
+function normalizeMediaOrdering(media: ReviewMedia[]): ReviewMedia[] {
+  const sorted = [...media].sort((a, b) => {
+    if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+    if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+    return a.createdAt.localeCompare(b.createdAt);
+  });
+  return sorted.map((item, index) => ({ ...item, displayOrder: index, isPrimary: index === 0 }));
+}
+
+function decodeImageDimensions(buffer: Buffer, mimeType: string): { width: number; height: number } {
+  if (mimeType === "image/png") {
+    if (buffer.length < 24 || buffer.toString("hex", 0, 8) !== "89504e470d0a1a0a") {
+      throw new ValidationError(["invalid png data"]);
+    }
+    return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+  }
+
+  if (mimeType === "image/jpeg") {
+    if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) throw new ValidationError(["invalid jpeg data"]);
+    let offset = 2;
+    while (offset + 9 < buffer.length) {
+      if (buffer[offset] !== 0xff) {
+        offset += 1;
+        continue;
+      }
+      const marker = buffer[offset + 1];
+      const size = buffer.readUInt16BE(offset + 2);
+      if (marker >= 0xc0 && marker <= 0xc3) {
+        const height = buffer.readUInt16BE(offset + 5);
+        const width = buffer.readUInt16BE(offset + 7);
+        return { width, height };
+      }
+      offset += 2 + size;
+    }
+    throw new ValidationError(["jpeg size metadata missing"]);
+  }
+
+  if (mimeType === "image/webp") {
+    if (buffer.length < 30 || buffer.toString("ascii", 0, 4) !== "RIFF" || buffer.toString("ascii", 8, 12) !== "WEBP") {
+      throw new ValidationError(["invalid webp data"]);
+    }
+    const chunk = buffer.toString("ascii", 12, 16);
+    if (chunk === "VP8X") {
+      const width = 1 + buffer.readUIntLE(24, 3);
+      const height = 1 + buffer.readUIntLE(27, 3);
+      return { width, height };
+    }
+    throw new ValidationError(["unsupported webp encoding"]);
+  }
+
+  throw new ValidationError(["unsupported mime type"]);
+}
+
 export class MemoryReviewsStore implements ReviewsStore {
   private readonly byId = new Map<string, ReviewRow>();
   private readonly helpfulVotes = new Map<string, Set<string>>();
   private readonly reports = new Map<string, Array<{ userId: string; reason: string; createdAt: string }>>();
+  private readonly mediaUploadsById = new Map<string, ReviewMediaUpload>();
+  private readonly mediaReports: ReviewMediaReport[] = [];
 
   async listByPlace(input: ListReviewsInput): Promise<ListReviewsResult> {
     const sort = input.sort ?? "most_helpful";
@@ -69,7 +132,8 @@ export class MemoryReviewsStore implements ReviewsStore {
   }
 
   async createOrReplace(input: CreateReviewInput): Promise<PlaceReview> {
-    const now = (input.now ?? new Date()).toISOString();
+    const nowDate = input.now ?? new Date();
+    const now = nowDate.toISOString();
     const existing = [...this.byId.values()].find((item) => (item.placeId === input.placeId || item.canonicalPlaceId === input.placeId) && item.authorUserId === input.authorUserId && !item.deletedAt);
     if (existing) {
       existing.body = input.body;
@@ -78,6 +142,10 @@ export class MemoryReviewsStore implements ReviewsStore {
       existing.updatedAt = now;
       existing.editedAt = now;
       existing.moderationState = "pending";
+      if (input.mediaUploadIds?.length) {
+        existing.media = this.attachUploadsToReview(existing, input.authorUserId, input.mediaUploadIds, nowDate);
+        existing.mediaCount = existing.media.length;
+      }
       return this.toView(existing, input.authorUserId);
     }
 
@@ -101,9 +169,16 @@ export class MemoryReviewsStore implements ReviewsStore {
       moderationState: "published",
       createdAt: now,
       updatedAt: now,
-      editWindowEndsAt: new Date((input.now ?? new Date()).getTime() + input.editWindowMinutes * 60_000).toISOString(),
-      helpfulCount: 0
+      editWindowEndsAt: new Date(nowDate.getTime() + input.editWindowMinutes * 60_000).toISOString(),
+      helpfulCount: 0,
+      media: [],
+      mediaCount: 0
     };
+
+    if (input.mediaUploadIds?.length) {
+      review.media = this.attachUploadsToReview(review, input.authorUserId, input.mediaUploadIds, nowDate);
+      review.mediaCount = review.media.length;
+    }
 
     this.byId.set(review.id, review);
     return this.toView(review, input.authorUserId);
@@ -112,7 +187,8 @@ export class MemoryReviewsStore implements ReviewsStore {
   async update(input: UpdateReviewInput): Promise<PlaceReview> {
     const row = this.byId.get(input.reviewId);
     if (!row) throw new ValidationError(["review not found"]);
-    const now = (input.now ?? new Date()).toISOString();
+    const nowDate = input.now ?? new Date();
+    const now = nowDate.toISOString();
     const isOwner = row.authorUserId === input.actorUserId;
     if (!isOwner) throw new ValidationError(["cannot edit another user review"]);
     if (!input.allowExpiredEdit && Date.parse(row.editWindowEndsAt) < Date.now()) {
@@ -123,6 +199,25 @@ export class MemoryReviewsStore implements ReviewsStore {
       row.text = input.body;
     }
     if (typeof input.rating === "number") row.rating = input.rating;
+
+    if (input.removeMediaIds?.length) {
+      row.media = row.media.map((item) => input.removeMediaIds?.includes(item.id)
+        ? { ...item, moderationState: "removed", removedAt: now, updatedAt: now, isPrimary: false }
+        : item);
+    }
+    if (input.attachMediaUploadIds?.length) {
+      row.media = [...row.media, ...this.attachUploadsToReview(row, input.actorUserId, input.attachMediaUploadIds, nowDate, true)];
+    }
+    if (input.mediaOrder?.length) {
+      const orderMap = new Map(input.mediaOrder.map((id, idx) => [id, idx]));
+      row.media = row.media.map((item) => ({ ...item, displayOrder: orderMap.get(item.id) ?? item.displayOrder }));
+    }
+    if (input.primaryMediaId) {
+      row.media = row.media.map((item) => ({ ...item, isPrimary: item.id === input.primaryMediaId }));
+    }
+
+    row.media = normalizeMediaOrdering(row.media.filter((item) => item.moderationState !== "removed" || item.removedAt == null));
+    row.mediaCount = row.media.length;
     row.updatedAt = now;
     row.editedAt = now;
     return this.toView(row, input.actorUserId);
@@ -135,6 +230,8 @@ export class MemoryReviewsStore implements ReviewsStore {
     row.deletedAt = now.toISOString();
     row.moderationState = "removed";
     row.updatedAt = row.deletedAt;
+    row.media = row.media.map((item) => ({ ...item, moderationState: "removed", removedAt: row.deletedAt, updatedAt: row.deletedAt! }));
+    row.mediaCount = 0;
     return this.toView(row, actorUserId);
   }
 
@@ -144,7 +241,11 @@ export class MemoryReviewsStore implements ReviewsStore {
     row.moderationState = state;
     row.moderationReason = reason;
     row.updatedAt = now.toISOString();
-    if (state === "removed") row.deletedAt = row.updatedAt;
+    if (state === "removed") {
+      row.deletedAt = row.updatedAt;
+      row.media = row.media.map((item) => ({ ...item, moderationState: "removed", removedAt: row.updatedAt, updatedAt: row.updatedAt }));
+      row.mediaCount = 0;
+    }
     return this.toView(row);
   }
 
@@ -175,6 +276,63 @@ export class MemoryReviewsStore implements ReviewsStore {
     this.reports.set(reviewId, bucket);
     const review = this.byId.get(reviewId);
     if (review && review.moderationState === "published") review.moderationState = "flagged";
+  }
+
+  async createMediaUpload(input: CreateReviewMediaUploadInput): Promise<ReviewMediaUpload> {
+    const nowDate = input.now ?? new Date();
+    const buffer = Buffer.from(input.base64Data, "base64");
+    if (!buffer.byteLength) throw new ValidationError(["upload cannot be empty"]);
+    if (buffer.byteLength > MAX_PHOTO_BYTES) throw new ValidationError(["file too large"]);
+    if (!PUBLIC_MEDIA_MIME.has(input.mimeType)) throw new ValidationError(["unsupported mime type"]);
+    const dimensions = decodeImageDimensions(buffer, input.mimeType);
+    if (dimensions.width <= 0 || dimensions.height <= 0) throw new ValidationError(["invalid image dimensions"]);
+
+    const checksum = createHash("sha256").update(buffer).digest("hex");
+    const upload: ReviewMediaUpload = {
+      id: randomUUID(),
+      ownerUserId: input.ownerUserId,
+      storageProvider: "memory",
+      storageKey: `review-media/uploads/${input.ownerUserId}/${randomUUID()}-${input.fileName}`,
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      fileSizeBytes: buffer.byteLength,
+      width: dimensions.width,
+      height: dimensions.height,
+      checksum,
+      status: "pending",
+      createdAt: nowDate.toISOString(),
+      expiresAt: new Date(nowDate.getTime() + UPLOAD_TTL_MS).toISOString()
+    };
+    this.mediaUploadsById.set(upload.id, upload);
+    return upload;
+  }
+
+  async getMediaUpload(uploadId: string): Promise<ReviewMediaUpload | null> {
+    const upload = this.mediaUploadsById.get(uploadId);
+    return upload ?? null;
+  }
+
+  async reportReviewMedia(mediaId: string, userId: string, reason: string): Promise<void> {
+    const media = this.findMedia(mediaId);
+    if (!media) throw new ValidationError(["review media not found"]);
+    this.mediaReports.push({ mediaId: media.id, reviewId: media.reviewId, reporterUserId: userId, reason, createdAt: new Date().toISOString() });
+    if (media.moderationState === "published") {
+      await this.setReviewMediaModerationState(media.reviewId, media.id, "flagged", "reported_by_user");
+    }
+  }
+
+  async setReviewMediaModerationState(reviewId: string, mediaId: string, state: ModerationState, reason?: string, now = new Date()): Promise<ReviewMedia> {
+    const row = this.byId.get(reviewId);
+    if (!row) throw new ValidationError(["review not found"]);
+    const target = row.media.find((item) => item.id === mediaId);
+    if (!target) throw new ValidationError(["review media not found"]);
+    target.moderationState = state;
+    target.moderationReason = reason;
+    target.updatedAt = now.toISOString();
+    if (state === "removed") target.removedAt = target.updatedAt;
+    row.media = normalizeMediaOrdering(row.media.filter((item) => item.moderationState !== "removed"));
+    row.mediaCount = row.media.length;
+    return target;
   }
 
   async createOrUpdateBusinessReply(input: { reviewId: string; businessProfileId: string; ownerUserId: string; body: string; now?: Date }): Promise<BusinessReply> {
@@ -210,11 +368,76 @@ export class MemoryReviewsStore implements ReviewsStore {
     return row.businessReply;
   }
 
+  private attachUploadsToReview(review: ReviewRow, actorUserId: string, uploadIds: string[], now: Date, append = false): ReviewMedia[] {
+    const nowIso = now.toISOString();
+    const activeCount = (append ? review.media : []).filter((item) => item.moderationState !== "removed").length;
+    const requested = uploadIds.length;
+    if (activeCount + requested > MAX_PHOTOS_PER_REVIEW) throw new ValidationError(["too many photos attached to review"]);
+
+    const attached = uploadIds.map((uploadId, index) => {
+      const upload = this.mediaUploadsById.get(uploadId);
+      if (!upload) throw new ValidationError(["upload not found"]);
+      if (upload.ownerUserId !== actorUserId) throw new ValidationError(["cannot attach another user's upload"]);
+      if (upload.status !== "pending") throw new ValidationError(["upload already attached or expired"]);
+      if (Date.parse(upload.expiresAt) < now.getTime()) {
+        upload.status = "expired";
+        throw new ValidationError(["upload expired"]);
+      }
+
+      upload.status = "attached";
+      upload.attachedReviewId = review.id;
+      const media: ReviewMedia = {
+        id: randomUUID(),
+        reviewId: review.id,
+        mediaType: "photo",
+        storageProvider: upload.storageProvider,
+        storageKey: upload.storageKey,
+        mimeType: upload.mimeType,
+        fileName: upload.fileName,
+        fileSizeBytes: upload.fileSizeBytes,
+        width: upload.width,
+        height: upload.height,
+        checksum: upload.checksum,
+        displayOrder: index,
+        isPrimary: false,
+        moderationState: "pending",
+        uploadedByUserId: actorUserId,
+        variants: {
+          thumbnailUrl: `/v1/review-media/${upload.id}?variant=thumbnail`,
+          mediumUrl: `/v1/review-media/${upload.id}?variant=medium`,
+          fullUrl: `/v1/review-media/${upload.id}?variant=full`
+        },
+        createdAt: nowIso,
+        updatedAt: nowIso
+      };
+      return media;
+    });
+
+    return normalizeMediaOrdering(append ? [...review.media, ...attached] : attached);
+  }
+
+  private findMedia(mediaId: string): ReviewMedia | null {
+    for (const review of this.byId.values()) {
+      const media = review.media.find((item) => item.id === mediaId);
+      if (media) return media;
+    }
+    return null;
+  }
+
   private toView(row: ReviewRow, viewerUserId?: string): PlaceReview {
     const votes = this.helpfulVotes.get(row.id) ?? new Set<string>();
     row.helpfulCount = votes.size;
+    const mediaVisible = row.media
+      .filter((item) => {
+        if (row.deletedAt || row.moderationState !== "published") return viewerUserId === row.authorUserId && item.uploadedByUserId === viewerUserId;
+        if (viewerUserId === row.authorUserId) return item.moderationState !== "removed";
+        return item.moderationState === "published";
+      });
+    const media = normalizeMediaOrdering(mediaVisible);
     return {
       ...row,
+      media,
+      mediaCount: media.length,
       viewerHasHelpfulVote: viewerUserId ? votes.has(viewerUserId) : false,
       canEdit: viewerUserId === row.authorUserId && Date.parse(row.editWindowEndsAt) > Date.now()
     };

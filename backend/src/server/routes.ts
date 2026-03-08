@@ -280,6 +280,39 @@ export function createRoutes(
         return;
       }
 
+
+      const reviewMediaUploadMatch = /^\/v1\/reviews\/media\/uploads$/.exec(normalizedPath);
+      if (reviewMediaUploadMatch && req.method === "POST" && deps?.reviewsStore) {
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const fileName = String(payload.fileName ?? "upload").trim();
+        const mimeType = String(payload.mimeType ?? "").trim().toLowerCase();
+        const base64Data = String(payload.base64Data ?? "").trim();
+
+        if (deps?.accessEngine && deps?.subscriptionService) {
+          const actor = deps?.accountsService
+            ? deps.accountsService.resolveActingContext(userIdHeader)
+            : { userId: userIdHeader, profileType: ProfileType.PERSONAL, profileId: userIdHeader, roles: [] };
+          const resolvedTarget = deps?.accountsService
+            ? deps.accountsService.resolveSubscriptionTarget(actor)
+            : { accountId: userIdHeader, accountType: "USER" };
+          const target = { targetId: resolvedTarget.accountId, targetType: resolvedTarget.accountType as never };
+          deps.subscriptionService.ensureAccount(target.targetId, target.targetType);
+
+          const canUpload = await deps.accessEngine.checkFeatureAccess(target, FEATURE_KEYS.UPLOAD_PHOTOS);
+          if (!canUpload.allowed) {
+            sendJson(res, 403, { access: canUpload });
+            return;
+          }
+        }
+
+        const upload = await deps.reviewsStore.createMediaUpload({ ownerUserId: userIdHeader, fileName, mimeType, base64Data });
+        sendJson(res, 201, { upload });
+        return;
+      }
+
       const reviewsMatch = /^\/places\/([^/]+)\/reviews$/.exec(normalizedPath);
       if (reviewsMatch && deps?.reviewsStore) {
         const placeId = decodeURIComponent(reviewsMatch[1] ?? "");
@@ -331,6 +364,7 @@ export function createRoutes(
 
           const payload = body as Record<string, unknown>;
           const videoPayload = payload.video && typeof payload.video === "object" ? payload.video as Record<string, unknown> : undefined;
+          const mediaUploadIds = Array.isArray(payload.mediaUploadIds) ? payload.mediaUploadIds.map((item) => String(item ?? "").trim()).filter(Boolean) : [];
 
           if (deps?.accessEngine && deps?.subscriptionService) {
             const resolvedTarget = deps?.accountsService
@@ -355,6 +389,19 @@ export function createRoutes(
             if (!monthlyQuota.allowed) {
               sendJson(res, 403, { error: "USAGE_LIMIT_REACHED", access: monthlyQuota });
               return;
+            }
+
+            if (mediaUploadIds.length > 0) {
+              const perReviewPhotoQuota = await deps.accessEngine.checkQuotaAccess(target, QUOTA_KEYS.UPLOAD_PHOTOS_PER_PLACE, mediaUploadIds.length);
+              if (!perReviewPhotoQuota.allowed) {
+                sendJson(res, 403, { error: "USAGE_LIMIT_REACHED", access: { ...perReviewPhotoQuota, denialReason: "upload_limit_reached" } });
+                return;
+              }
+              const monthlyPhotoQuota = await deps.accessEngine.checkQuotaAccess(target, QUOTA_KEYS.UPLOAD_PHOTOS_PER_MONTH, mediaUploadIds.length);
+              if (!monthlyPhotoQuota.allowed) {
+                sendJson(res, 403, { error: "USAGE_LIMIT_REACHED", access: { ...monthlyPhotoQuota, denialReason: "upload_limit_reached" } });
+                return;
+              }
             }
 
             if (videoPayload) {
@@ -408,8 +455,8 @@ export function createRoutes(
           if (rating != null && (!Number.isFinite(rating) || rating < 1 || rating > 5)) {
             throw new ValidationError(["rating must be between 1 and 5"], "Invalid review payload");
           }
-          if (text.length < 5 || text.length > 1000) {
-            throw new ValidationError(["text length must be between 5 and 1000 characters"], "Invalid review payload");
+          if (text.length > 1000 || (text.length < 5 && mediaUploadIds.length === 0)) {
+            throw new ValidationError(["text length must be between 5 and 1000 characters unless photos are attached"], "Invalid review payload");
           }
 
           const created = await deps.reviewsStore.createOrReplace({
@@ -421,6 +468,7 @@ export function createRoutes(
             authorDisplayName: displayName,
             rating: typeof rating === "number" ? Math.round(rating) : undefined,
             body: text,
+            mediaUploadIds,
             editWindowMinutes: Number(process.env.REVIEW_EDIT_WINDOW_MINUTES ?? 30)
           });
 
@@ -431,6 +479,10 @@ export function createRoutes(
             const target = { targetId: resolvedTarget.accountId, targetType: resolvedTarget.accountType as never };
             await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.REVIEWS_WRITE_PER_DAY, 1);
             await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.REVIEWS_WRITE_PER_MONTH, 1);
+            if (mediaUploadIds.length > 0) {
+              await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.UPLOAD_PHOTOS_PER_PLACE, mediaUploadIds.length);
+              await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.UPLOAD_PHOTOS_PER_MONTH, mediaUploadIds.length);
+            }
             if (videoPayload) {
               await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.REVIEWS_VIDEO_PER_MONTH, 1);
               await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.UPLOAD_VIDEOS_PER_MONTH, 1);
@@ -465,10 +517,14 @@ export function createRoutes(
           const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
           const text = payload.body == null ? undefined : String(payload.body).trim();
           const rating = payload.rating == null ? undefined : Number(payload.rating);
-          if (text != null && (text.length < 5 || text.length > 1000)) {
+          const attachMediaUploadIds = Array.isArray(payload.attachMediaUploadIds) ? payload.attachMediaUploadIds.map((item) => String(item ?? "").trim()).filter(Boolean) : undefined;
+          const removeMediaIds = Array.isArray(payload.removeMediaIds) ? payload.removeMediaIds.map((item) => String(item ?? "").trim()).filter(Boolean) : undefined;
+          const mediaOrder = Array.isArray(payload.mediaOrder) ? payload.mediaOrder.map((item) => String(item ?? "").trim()).filter(Boolean) : undefined;
+          const primaryMediaId = payload.primaryMediaId == null ? undefined : String(payload.primaryMediaId).trim();
+          if (text != null && text.length > 1000) {
             throw new ValidationError(["text length must be between 5 and 1000 characters"], "Invalid review payload");
           }
-          const updated = await deps.reviewsStore.update({ reviewId, actorUserId: userIdHeader, body: text, rating });
+          const updated = await deps.reviewsStore.update({ reviewId, actorUserId: userIdHeader, body: text, rating, attachMediaUploadIds, removeMediaIds, mediaOrder, primaryMediaId });
           sendJson(res, 200, { review: updated });
           return;
         }
@@ -506,6 +562,19 @@ export function createRoutes(
         const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
         const reason = String(payload.reason ?? "").trim() || "unspecified";
         await deps.reviewsStore.reportReview(reviewId, userIdHeader, reason);
+        sendJson(res, 202, { ok: true });
+        return;
+      }
+
+      const mediaReportMatch = /^\/reviews\/media\/([^/]+)\/report$/.exec(normalizedPath);
+      if (mediaReportMatch && req.method === "POST" && deps?.reviewsStore) {
+        const mediaId = decodeURIComponent(mediaReportMatch[1] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const reason = String(payload.reason ?? "").trim() || "unspecified";
+        await deps.reviewsStore.reportReviewMedia(mediaId, userIdHeader, reason);
         sendJson(res, 202, { ok: true });
         return;
       }

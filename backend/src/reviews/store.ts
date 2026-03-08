@@ -1,5 +1,52 @@
 export type ModerationState = "pending" | "published" | "hidden" | "removed" | "flagged";
 export type ReviewSort = "newest" | "most_helpful" | "oldest";
+export type ReviewMediaType = "photo" | "video";
+
+export interface ReviewMedia {
+  id: string;
+  reviewId: string;
+  mediaType: ReviewMediaType;
+  storageProvider: "memory" | "s3" | "gcs";
+  storageKey: string;
+  mimeType: string;
+  fileName: string;
+  fileSizeBytes: number;
+  width: number;
+  height: number;
+  checksum: string;
+  caption?: string;
+  altText?: string;
+  displayOrder: number;
+  isPrimary: boolean;
+  moderationState: ModerationState;
+  moderationReason?: string;
+  uploadedByUserId: string;
+  variants: {
+    thumbnailUrl?: string;
+    mediumUrl?: string;
+    fullUrl?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+  removedAt?: string;
+}
+
+export interface ReviewMediaUpload {
+  id: string;
+  ownerUserId: string;
+  storageProvider: "memory" | "s3" | "gcs";
+  storageKey: string;
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  width: number;
+  height: number;
+  checksum: string;
+  status: "pending" | "attached" | "expired";
+  createdAt: string;
+  expiresAt: string;
+  attachedReviewId?: string;
+}
 
 export interface ReviewAuthorSnapshot {
   userId?: string;
@@ -43,6 +90,8 @@ export interface PlaceReview {
   editWindowEndsAt: string;
   deletedAt?: string;
   helpfulCount: number;
+  media: ReviewMedia[];
+  mediaCount: number;
   businessReply?: BusinessReply;
   viewerHasHelpfulVote?: boolean;
   canEdit?: boolean;
@@ -57,6 +106,7 @@ export interface CreateReviewInput {
   authorDisplayName: string;
   body: string;
   rating?: number;
+  mediaUploadIds?: string[];
   now?: Date;
   editWindowMinutes: number;
 }
@@ -66,8 +116,28 @@ export interface UpdateReviewInput {
   actorUserId: string;
   body?: string;
   rating?: number;
+  attachMediaUploadIds?: string[];
+  removeMediaIds?: string[];
+  mediaOrder?: string[];
+  primaryMediaId?: string;
   now?: Date;
   allowExpiredEdit?: boolean;
+}
+
+export interface CreateReviewMediaUploadInput {
+  ownerUserId: string;
+  fileName: string;
+  mimeType: string;
+  base64Data: string;
+  now?: Date;
+}
+
+export interface ReviewMediaReport {
+  mediaId: string;
+  reviewId: string;
+  reporterUserId: string;
+  reason: string;
+  createdAt: string;
 }
 
 export interface ListReviewsInput {
@@ -95,6 +165,10 @@ export interface ReviewsStore {
   voteHelpful(reviewId: string, userId: string): Promise<PlaceReview>;
   unvoteHelpful(reviewId: string, userId: string): Promise<PlaceReview>;
   reportReview(reviewId: string, userId: string, reason: string): Promise<void>;
+  createMediaUpload(input: CreateReviewMediaUploadInput): Promise<ReviewMediaUpload>;
+  getMediaUpload(uploadId: string): Promise<ReviewMediaUpload | null>;
+  reportReviewMedia(mediaId: string, userId: string, reason: string): Promise<void>;
+  setReviewMediaModerationState(reviewId: string, mediaId: string, state: ModerationState, reason?: string, now?: Date): Promise<ReviewMedia>;
   createOrUpdateBusinessReply(input: { reviewId: string; businessProfileId: string; ownerUserId: string; body: string; now?: Date }): Promise<BusinessReply>;
   deleteBusinessReply(input: { reviewId: string; replyId: string; actorUserId: string; businessProfileId: string; now?: Date }): Promise<BusinessReply>;
 }
