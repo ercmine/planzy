@@ -1,18 +1,22 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-import 'ads_config.dart';
+import '../../config/admob_config.dart';
 
 class AdsService {
-  AdsService({required AdsConfig config}) : _config = config;
+  AdsService();
 
-  final AdsConfig _config;
   bool _initialized = false;
 
   Future<void> initialize() async {
-    if (_initialized || !_config.isUsable) {
+    if (_initialized || !AdMobConfig.isSupportedPlatform) {
       return;
     }
+
+    await MobileAds.instance.updateRequestConfiguration(
+      AdMobConfig.requestConfiguration,
+    );
     await MobileAds.instance.initialize();
     _initialized = true;
   }
@@ -20,27 +24,39 @@ class AdsService {
   NativeAd buildNativeAd({
     required String slotId,
     required VoidCallback onLoaded,
-    required void Function(Object error) onFailed,
+    required void Function(LoadAdError error) onFailed,
     VoidCallback? onImpression,
     VoidCallback? onClicked,
   }) {
+    final adUnitId = AdMobConfig.nativeUnitId;
     return NativeAd(
-      adUnitId: _config.currentNativeUnitId(),
-      factoryId: 'deckNativeAd',
+      adUnitId: adUnitId,
+      factoryId: AdMobConfig.nativeFactoryId,
       request: const AdRequest(nonPersonalizedAds: true),
+      nativeAdOptions: NativeAdOptions(
+        adChoicesPlacement: AdChoicesPlacement.topRightCorner,
+        mediaAspectRatio: MediaAspectRatio.landscape,
+      ),
       listener: NativeAdListener(
-        onAdLoaded: (_) => onLoaded(),
-        onAdFailedToLoad: (_, error) => onFailed(error),
+        onAdLoaded: (_) {
+          if (kDebugMode) {
+            debugPrint('[AdMob] Native ad loaded. unitId=$adUnitId slot=$slotId');
+          }
+          onLoaded();
+        },
+        onAdFailedToLoad: (_, error) {
+          if (kDebugMode) {
+            debugPrint(
+              '[AdMob] Native ad failed. unitId=$adUnitId slot=$slotId code=${error.code} message=${error.message}',
+            );
+          }
+          onFailed(error);
+        },
         onAdImpression: (_) => onImpression?.call(),
         onAdClicked: (_) => onClicked?.call(),
-      ),
-      nativeTemplateStyle: NativeTemplateStyle(
-        templateType: TemplateType.medium,
-        mainBackgroundColor: const Color(0x00000000),
-        cornerRadius: 16,
       ),
     );
   }
 
-  bool get enabled => _config.isUsable;
+  bool get enabled => AdMobConfig.isSupportedPlatform;
 }

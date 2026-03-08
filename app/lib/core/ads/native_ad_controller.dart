@@ -32,7 +32,7 @@ class NativeAdController {
       onLoaded: () {
         state.value = NativeAdLoadState.ready;
       },
-      onFailed: (_) {
+      onFailed: (error) {
         state.value = NativeAdLoadState.failed;
         disposeAdOnly();
       },
