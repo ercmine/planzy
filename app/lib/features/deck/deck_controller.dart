@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -51,6 +52,8 @@ class DeckController extends StateNotifier<DeckState> {
   final AdDeckInjector _adDeckInjector;
 
   static const int _batchLimit = 25;
+  static const double _debugDefaultLat = 44.8620;
+  static const double _debugDefaultLng = -93.5590;
 
   DateTime? _viewStartedAt;
   String? _viewPlanId;
@@ -236,7 +239,11 @@ class DeckController extends StateNotifier<DeckState> {
       return;
     }
 
-    final location = _locationController.state.effectiveLocation;
+    var location = _locationController.state.effectiveLocation;
+    if (location == null && kDebugMode) {
+      _locationController.setManualOverride(_debugDefaultLat, _debugDefaultLng);
+      location = _locationController.state.effectiveLocation;
+    }
     if (location == null) {
       state = state.copyWith(
         isLoadingInitial: false,
@@ -362,7 +369,11 @@ class DeckController extends StateNotifier<DeckState> {
     await _locationController.requestPermissionAndLoad();
     final loaded = _locationController.state.effectiveLocation;
 
-    if (loaded == null) {
+    if (loaded == null && kDebugMode) {
+      _locationController.setManualOverride(_debugDefaultLat, _debugDefaultLng);
+    }
+
+    if (_locationController.state.effectiveLocation == null) {
       state = state.copyWith(
         isLoadingInitial: false,
         locationRequired: true,

@@ -85,11 +85,25 @@ void main() {
         'title': 'Coffee walk',
         'category': 'coffee',
         'source': 'stub',
+        'placeId': 'abc123',
+        'address': '123 Main',
+        'lat': 44.1,
+        'lng': -93.2,
+        'rating': 4.7,
+        'userRatingCount': 99,
+        'priceLevel': 2,
+        'googleMapsUri': 'https://maps.google.com',
+        'websiteUri': 'https://venue.example',
+        'photo': 'https://cdn.example/p.jpg',
+        'unexpected': 'ignored',
       });
       expect(plan.id, 'sample-plan-1');
       expect(plan.title, 'Coffee walk');
       expect(plan.category, 'coffee');
       expect(plan.source, 'stub');
+      expect(plan.placeId, 'abc123');
+      expect(plan.lat, 44.1);
+      expect(plan.googleMapsUri, contains('maps.google.com'));
     });
 
     test('parses live-results response shape', () {

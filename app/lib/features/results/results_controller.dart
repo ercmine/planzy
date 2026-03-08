@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
 import '../../api/models.dart';
+import '../../core/location/location_controller.dart';
 import '../../core/sharing/share_service.dart';
 import '../../models/plan.dart';
 import '../../repositories/live_results_repository.dart';
@@ -14,10 +16,12 @@ class ResultsController extends StateNotifier<ResultsState> {
     required SwipesRepository swipesRepository,
     required ShareService shareService,
     required LiveResultsRepository? liveResultsRepository,
+    required LocationController locationController,
   })  : _sessionId = sessionId,
         _swipesRepository = swipesRepository,
         _shareService = shareService,
         _liveResultsRepository = liveResultsRepository,
+        _locationController = locationController,
         super(ResultsState.initial()) {
     Future<void>.microtask(refresh);
   }
@@ -26,6 +30,10 @@ class ResultsController extends StateNotifier<ResultsState> {
   final SwipesRepository _swipesRepository;
   final ShareService _shareService;
   final LiveResultsRepository? _liveResultsRepository;
+  final LocationController _locationController;
+
+  static const double _debugDefaultLat = 44.8620;
+  static const double _debugDefaultLng = -93.5590;
 
   Future<void> refresh() async {
     state = state.copyWith(isLoading: true, clearError: true);
@@ -64,7 +72,21 @@ class ResultsController extends StateNotifier<ResultsState> {
     if (_liveResultsRepository == null) {
       return null;
     }
-    return _liveResultsRepository!.fetchLiveResults();
+
+    var location = _locationController.state.effectiveLocation;
+    if (location == null && kDebugMode) {
+      _locationController.setManualOverride(_debugDefaultLat, _debugDefaultLng);
+      location = _locationController.state.effectiveLocation;
+    }
+
+    if (location == null) {
+      throw const FormatException('Enable location to load live results.');
+    }
+
+    return _liveResultsRepository!.fetchLiveResults(
+      lat: location.lat,
+      lng: location.lng,
+    );
   }
 
   Future<void> lockIn(Plan plan) async {

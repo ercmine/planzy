@@ -32,8 +32,6 @@ class Env {
   const Env._();
 
   static const String _defaultApiBaseUrl = 'https://api.perbug.com';
-  static const String _apiBaseUrlFromDefine =
-      String.fromEnvironment(EnvKeys.apiBaseUrl, defaultValue: '');
 
   static Future<EnvConfig> load(EnvFlavor flavor) async {
     final fileName = switch (flavor) {
@@ -88,15 +86,6 @@ class Env {
   }
 
   static String _resolveApiBaseUrl() {
-    if (_apiBaseUrlFromDefine.isNotEmpty) {
-      return _apiBaseUrlFromDefine;
-    }
-
-    final fromDotenv = dotenv.maybeGet(EnvKeys.apiBaseUrl)?.trim();
-    if (fromDotenv != null && fromDotenv.isNotEmpty) {
-      return fromDotenv;
-    }
-
     return _defaultApiBaseUrl;
   }
 
