@@ -44,6 +44,7 @@ import '../repositories/reviews_repository.dart';
 import '../repositories/sessions_repository.dart';
 import '../repositories/swipes_repository.dart';
 import '../repositories/telemetry_repository.dart';
+import '../services/foursquare/foursquare_client.dart';
 
 
 final adsConfigProvider = Provider<AdsConfig>((ref) {
@@ -85,6 +86,16 @@ final apiClientProvider = FutureProvider<ApiClient>((ref) async {
   return client;
 });
 
+
+final foursquareClientProvider = Provider<FoursquareClient>((ref) {
+  final envConfig = ref.watch(envConfigProvider);
+  final apiKey = envConfig.fsqApiKey;
+  return FoursquareClient(
+    httpClient: ref.watch(httpClientProvider),
+    apiKey: apiKey ?? '',
+  );
+});
+
 final deckRepositoryProvider = FutureProvider<DeckRepository>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);
   final localStore = await ref.watch(localStoreProvider.future);
@@ -92,6 +103,7 @@ final deckRepositoryProvider = FutureProvider<DeckRepository>((ref) async {
   return DeckRepository(
     apiClient: apiClient,
     localStore: localStore,
+    foursquareClient: ref.watch(foursquareClientProvider),
   );
 });
 

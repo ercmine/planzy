@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/ads/ads_config.dart';
 import '../core/env/env.dart';
 import 'app_providers.dart';
 
@@ -14,7 +15,18 @@ List<Override> createBaseTestOverrides({
             apiBaseUrl: 'https://example.test',
             enableDebugLogs: true,
             associatedDomain: 'example.test',
-    adsConfig: const AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50),
+            fsqApiKey: null,
+            adsConfig: AdsConfig(
+              enabled: false,
+              admobAppIdIos: '',
+              admobAppIdAndroid: '',
+              nativeUnitIdIos: '',
+              nativeUnitIdAndroid: '',
+              frequencyN: 10,
+              placeFirstAfter: 3,
+              maxAdsPerWindow: 3,
+              adsWindowSize: 50,
+            ),
           ),
     ),
   ];

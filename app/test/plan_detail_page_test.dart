@@ -21,6 +21,7 @@ class _FakeApiClient extends ApiClient {
             apiBaseUrl: 'https://example.test',
             enableDebugLogs: false,
             associatedDomain: 'example.test',
+            fsqApiKey: null,
             adsConfig: AdsConfig.disabled(),
           ),
           userIdResolver: () async => 'user-1',

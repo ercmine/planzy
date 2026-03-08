@@ -115,6 +115,7 @@ void main() {
               apiBaseUrl: 'https://example.test',
               enableDebugLogs: true,
               associatedDomain: 'example.test',
+              fsqApiKey: null,
               adsConfig: const AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50),
             ),
           ),
@@ -132,7 +133,7 @@ void main() {
               telemetryDispatcher: telemetryDispatcher,
               sessionsRepository: sessionsRepository,
               locationController: locationController,
-      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+              adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
             );
           }),
         ],
