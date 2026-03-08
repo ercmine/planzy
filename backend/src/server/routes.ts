@@ -4,6 +4,7 @@ import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import { createAccountsHttpHandlers } from "../accounts/http.js";
 import { createDiscoveryHttpHandlers } from "../discovery/http.js";
 import { createCreatorHttpHandlers } from "../creator/http.js";
+import { createCreatorVerificationHttpHandlers } from "../creatorVerification/http.js";
 import { createCreatorMonetizationHttpHandlers } from "../creatorMonetization/http.js";
 import { createCreatorPremiumHttpHandlers } from "../creatorPremium/http.js";
 import { createBusinessAnalyticsHttpHandlers } from "../businessAnalytics/http.js";
@@ -11,6 +12,7 @@ import { createCollaborationHttpHandlers } from "../collaboration/http.js";
 import { createBusinessPremiumHttpHandlers } from "../businessPremium/http.js";
 import type { AccountsService } from "../accounts/service.js";
 import type { CreatorService } from "../creator/service.js";
+import type { CreatorVerificationService } from "../creatorVerification/service.js";
 import type { CreatorMonetizationService } from "../creatorMonetization/service.js";
 import type { CreatorPremiumService } from "../creatorPremium/service.js";
 import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
@@ -61,7 +63,7 @@ const PREMIUM_CONTENT: Record<string, PremiumContentDescriptor> = {
 export function applyCors(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id, x-admin-key, x-request-id, x-acting-profile-type, x-acting-profile-id");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
 }
 
 
@@ -104,6 +106,7 @@ export function createRoutes(
     accessEngine?: FeatureQuotaEngine;
     accountsService?: AccountsService;
     creatorService?: CreatorService;
+    creatorVerificationService?: CreatorVerificationService;
     creatorMonetizationService?: CreatorMonetizationService;
     creatorPremiumService?: CreatorPremiumService;
     businessAnalyticsService?: BusinessAnalyticsService;
@@ -124,6 +127,7 @@ export function createRoutes(
   const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
+  const creatorVerificationHandlers = deps?.creatorVerificationService ? createCreatorVerificationHttpHandlers(deps.creatorVerificationService) : null;
   const creatorMonetizationHandlers = deps?.creatorMonetizationService ? createCreatorMonetizationHttpHandlers(deps.creatorMonetizationService) : null;
   const creatorPremiumHandlers = deps?.creatorPremiumService ? createCreatorPremiumHttpHandlers(deps.creatorPremiumService) : null;
   const businessAnalyticsHandlers = deps?.businessAnalyticsService ? createBusinessAnalyticsHttpHandlers(deps.businessAnalyticsService) : null;
@@ -1436,6 +1440,57 @@ export function createRoutes(
         if (req.method === "PATCH" && adminMonetizationMatch) {
           if (!assertAdmin(req)) return sendJson(res, 403, { error: "forbidden" });
           await creatorMonetizationHandlers.adminStatus(req, res, decodeURIComponent(adminMonetizationMatch[1] ?? ""));
+          return;
+        }
+      }
+
+      if (creatorVerificationHandlers) {
+        if (req.method === "GET" && normalizedPath === "/v1/creator/verification/status") {
+          await creatorVerificationHandlers.status(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/creator/verification/eligibility") {
+          await creatorVerificationHandlers.eligibility(req, res);
+          return;
+        }
+        if (req.method === "PUT" && normalizedPath === "/v1/creator/verification/draft") {
+          await creatorVerificationHandlers.saveDraft(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/creator/verification/submit") {
+          await creatorVerificationHandlers.submit(req, res);
+          return;
+        }
+
+        if (req.method === "GET" && normalizedPath === "/v1/admin/creator/verification/applications") {
+          if (!assertAdmin(req)) return sendJson(res, 403, { error: "forbidden" });
+          await creatorVerificationHandlers.adminList(req, res);
+          return;
+        }
+
+        const verificationDetailMatch = /^\/v1\/admin\/creator\/verification\/applications\/([^/]+)$/.exec(normalizedPath);
+        if (verificationDetailMatch && req.method === "GET") {
+          if (!assertAdmin(req)) return sendJson(res, 403, { error: "forbidden" });
+          await creatorVerificationHandlers.adminDetail(req, res, decodeURIComponent(verificationDetailMatch[1] ?? ""));
+          return;
+        }
+
+        const verificationActionMatch = /^\/v1\/admin\/creator\/verification\/applications\/([^/]+)\/(under-review|needs-more-info|approve|reject)$/.exec(normalizedPath);
+        if (verificationActionMatch && req.method === "POST") {
+          if (!assertAdmin(req)) return sendJson(res, 403, { error: "forbidden" });
+          const applicationId = decodeURIComponent(verificationActionMatch[1] ?? "");
+          const action = verificationActionMatch[2];
+          if (action === "under-review") await creatorVerificationHandlers.adminUnderReview(req, res, applicationId);
+          if (action === "needs-more-info") await creatorVerificationHandlers.adminNeedsMoreInfo(req, res, applicationId);
+          if (action === "approve") await creatorVerificationHandlers.adminApprove(req, res, applicationId);
+          if (action === "reject") await creatorVerificationHandlers.adminReject(req, res, applicationId);
+          return;
+        }
+
+        const verificationRevokeMatch = /^\/v1\/admin\/creator\/verification\/profiles\/([^/]+)\/revoke$/.exec(normalizedPath);
+        if (verificationRevokeMatch && req.method === "POST") {
+          if (!assertAdmin(req)) return sendJson(res, 403, { error: "forbidden" });
+          await creatorVerificationHandlers.adminRevoke(req, res, decodeURIComponent(verificationRevokeMatch[1] ?? ""));
           return;
         }
       }

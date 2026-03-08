@@ -107,3 +107,5 @@ export * from "./collaboration/index.js";
 export * from "./outingPlanner/index.js";
 
 export * from "./moderation/index.js";
+
+export * from "./creatorVerification/index.js";

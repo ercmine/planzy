@@ -3,6 +3,7 @@ import { createServer as createNodeServer, type Server } from "node:http";
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import type { AccountsService } from "../accounts/service.js";
 import type { CreatorService } from "../creator/service.js";
+import type { CreatorVerificationService } from "../creatorVerification/service.js";
 import type { CreatorMonetizationService } from "../creatorMonetization/service.js";
 import type { CreatorPremiumService } from "../creatorPremium/service.js";
 import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
@@ -65,6 +66,7 @@ export function createHttpServer(
     accessEngine?: FeatureQuotaEngine;
     accountsService?: AccountsService;
     creatorService?: CreatorService;
+    creatorVerificationService?: CreatorVerificationService;
     creatorMonetizationService?: CreatorMonetizationService;
     creatorPremiumService?: CreatorPremiumService;
     businessAnalyticsService?: BusinessAnalyticsService;

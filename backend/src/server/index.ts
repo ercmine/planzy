@@ -4,6 +4,7 @@ import { MemoryAccountsStore } from "../accounts/memoryStore.js";
 import { AccountsService } from "../accounts/service.js";
 import { MemoryCreatorStore } from "../creator/memoryStore.js";
 import { CreatorService } from "../creator/service.js";
+import { CreatorVerificationService, MemoryCreatorVerificationStore } from "../creatorVerification/index.js";
 import { CreatorPremiumService, MemoryCreatorPremiumStore } from "../creatorPremium/index.js";
 import { CreatorMonetizationService, MemoryCreatorMonetizationStore } from "../creatorMonetization/index.js";
 import { ClickTracker, MemoryClickStore } from "../analytics/clicks/index.js";
@@ -91,7 +92,13 @@ export function createServer(options?: CreateServerOptions) {
   const accountsService = new AccountsService(new MemoryAccountsStore());
   const creatorStore = new MemoryCreatorStore();
   const monetizationService = new CreatorMonetizationService(new MemoryCreatorMonetizationStore(), accountsService, subscriptionService, creatorStore, accessEngine);
-  const creatorService = new CreatorService(creatorStore, accountsService, reviewsStore, subscriptionService, accessEngine, monetizationService);
+  const creatorVerificationService = new CreatorVerificationService(new MemoryCreatorVerificationStore(), {
+    getCreatorProfileByUserId: (userId) => creatorStore.listProfiles().find((profile) => profile.userId === userId) ?? accountsService.getIdentitySummary(userId).creatorProfile,
+    getCreatorProfileById: (creatorProfileId) => creatorStore.getProfileById(creatorProfileId),
+    updateCreatorProfile: (profile) => creatorStore.saveProfile(profile),
+    getUser: (userId) => accountsService.getIdentitySummary(userId).user
+  });
+  const creatorService = new CreatorService(creatorStore, accountsService, reviewsStore, subscriptionService, accessEngine, monetizationService, creatorVerificationService);
   const creatorPremiumService = new CreatorPremiumService(new MemoryCreatorPremiumStore(), subscriptionService, {
     getCreatorProfile: (creatorProfileId) => creatorStore.getProfileById(creatorProfileId)
   });
@@ -145,6 +152,7 @@ export function createServer(options?: CreateServerOptions) {
     accessEngine,
     accountsService,
     creatorService,
+    creatorVerificationService,
     creatorMonetizationService: monetizationService,
     creatorPremiumService,
     businessAnalyticsService,

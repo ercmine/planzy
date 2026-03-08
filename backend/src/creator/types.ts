@@ -1,4 +1,5 @@
 import type { CreatorProfileStatus, CreatorSocialLink } from "../accounts/types.js";
+import type { CreatorVerificationPublicBadge } from "../creatorVerification/types.js";
 
 export type GuideStatus = "draft" | "published" | "hidden" | "archived";
 export type GuideFormatType = "guide" | "collection" | "itinerary" | "list";
@@ -118,6 +119,7 @@ export interface PublicCreatorProfileView {
   publicReviewsCount: number;
   publicGuidesCount: number;
   badges: string[];
+  verification: CreatorVerificationPublicBadge;
   status: CreatorProfileStatus;
   isFollowing: boolean;
   reviews: unknown[];
@@ -143,6 +145,7 @@ export interface CreatorFeedItem {
     displayName: string;
     avatarUrl?: string;
     isFollowing: boolean;
+    verification: CreatorVerificationPublicBadge;
   };
   placeId?: string;
   title?: string;
