@@ -131,3 +131,57 @@ Permission denied envelope (example)
   }
 }
 ```
+
+## Place media ranking architecture
+
+Centralized place-level ranking now lives in `src/reviews/placeMediaRanking.ts` and should be reused by all place surfaces.
+
+### Key entry points
+
+- `rankPlaceMedia({ placeId, mediaItems, surface })`
+- `scorePlaceMediaItem(item, surface, debug)`
+- `selectPlaceHeroMedia(placeId, mediaItems)`
+- `getPlaceMediaGallery(placeId, mediaItems)`
+- `getPlaceCardMedia(placeId, mediaItems)`
+- `getPlaceVideoShelf(placeId, mediaItems)`
+
+### Scoring dimensions
+
+Weighted profile scoring uses:
+
+- quality
+- relevance
+- trust
+- freshness
+- engagement
+- duplicate penalties
+- spam penalties
+- diversity adjustments
+
+All profile weights and thresholds are centralized in `rankingConfig`.
+
+### Safety and filtering gates
+
+Media is excluded prior to ranking if it is:
+
+- deleted/removed/private/legal blocked
+- non-public or non-published
+- processing failed or not ready
+- missing required playable/visual assets
+
+### Surface profiles
+
+The engine currently supports:
+
+- `place_detail_hero`
+- `place_detail_gallery`
+- `place_video_section`
+- `search_result_card`
+
+### Explainability
+
+Pass `debug=true` to ranking helpers to include per-item score breakdowns.
+
+### Current integration
+
+`getPlaceReviewVideoSection` now builds normalized media candidates and delegates ordering + featured selection to the centralized ranking engine.
