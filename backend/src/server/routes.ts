@@ -1,6 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
+import { createAccountsHttpHandlers } from "../accounts/http.js";
+import type { AccountsService } from "../accounts/service.js";
+import { PermissionAction, ProfileType } from "../accounts/types.js";
+import type { ActorContextResolved } from "../accounts/types.js";
 import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import { handleMerchantHttpError, createMerchantHttpHandlers } from "../merchant/http.js";
 import type { MerchantService } from "../merchant/service.js";
@@ -26,7 +30,7 @@ const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.co
 
 export function applyCors(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id, x-admin-key, x-request-id");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id, x-admin-key, x-request-id, x-acting-profile-type, x-acting-profile-id");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
 }
 
@@ -46,6 +50,7 @@ export function createRoutes(
     reviewsStore?: ReviewsStore;
     subscriptionService?: SubscriptionService;
     entitlementPolicy?: EntitlementPolicyService;
+    accountsService?: AccountsService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -54,6 +59,7 @@ export function createRoutes(
   const subscriptionHandlers = deps?.subscriptionService && deps?.entitlementPolicy
     ? createSubscriptionHttpHandlers(deps.subscriptionService, deps.entitlementPolicy)
     : null;
+  const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -213,24 +219,57 @@ export function createRoutes(
         }
 
         if (req.method === "POST") {
+          const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+          if (!userIdHeader) {
+            throw new ValidationError(["x-user-id header is required"]);
+          }
+
+          let actor: ActorContextResolved = {
+            userId: userIdHeader,
+            profileType: ProfileType.PERSONAL,
+            profileId: userIdHeader,
+            roles: []
+          };
+
+          if (deps?.accountsService) {
+            const requestedProfileType = String(readHeader(req, "x-acting-profile-type") ?? "").trim();
+            const requestedProfileId = String(readHeader(req, "x-acting-profile-id") ?? "").trim();
+            actor = deps.accountsService.resolveActingContext(
+              userIdHeader,
+              requestedProfileType && requestedProfileId
+                ? { profileType: requestedProfileType as ProfileType, profileId: requestedProfileId }
+                : undefined
+            );
+          }
+
           if (deps?.entitlementPolicy && deps?.subscriptionService) {
-            const accountId = String(readHeader(req, "x-user-id") ?? "").trim();
-            if (!accountId) {
-              throw new ValidationError(["x-user-id header is required"]);
+            let subscriptionAccountId = userIdHeader;
+            let subscriptionAccountType: string = "USER";
+            if (deps?.accountsService) {
+              const target = deps.accountsService.resolveSubscriptionTarget(actor);
+              subscriptionAccountId = target.accountId;
+              subscriptionAccountType = target.accountType;
             }
 
-            const accountType = String(readHeader(req, "x-account-type") ?? "USER").trim();
-            deps.subscriptionService.ensureAccount(accountId, accountType as never);
-            const decision = await deps.entitlementPolicy.can(accountId, "create_review");
+            deps.subscriptionService.ensureAccount(subscriptionAccountId, subscriptionAccountType as never);
+            const decision = await deps.entitlementPolicy.can(subscriptionAccountId, "create_review");
             if (!decision.allowed) {
               sendJson(res, 403, { error: decision.reasonCode, message: decision.message, requiredPlan: decision.requiredPlan });
               return;
             }
 
-            const resolved = deps.subscriptionService.getCurrentEntitlements(accountId).values;
-            const quotaDecision = await deps.entitlementPolicy.checkQuota(accountId, "text_reviews", Number(resolved.max_text_reviews_per_month));
+            const resolved = deps.subscriptionService.getCurrentEntitlements(subscriptionAccountId).values;
+            const quotaDecision = await deps.entitlementPolicy.checkQuota(subscriptionAccountId, "text_reviews", Number(resolved.max_text_reviews_per_month));
             if (!quotaDecision.allowed) {
               sendJson(res, 403, { error: quotaDecision.reasonCode, message: quotaDecision.message, usage: quotaDecision.usage, limit: quotaDecision.limit });
+              return;
+            }
+          }
+
+          if (deps?.accountsService && actor.profileType === ProfileType.BUSINESS) {
+            const replyDecision = deps.accountsService.authorizeAction(actor, PermissionAction.BUSINESS_REPLY);
+            if (!replyDecision.allowed) {
+              sendJson(res, 403, { decision: replyDecision });
               return;
             }
           }
@@ -258,6 +297,8 @@ export function createRoutes(
           const created = await deps.reviewsStore.create({
             placeId,
             userId,
+            actingProfileType: actor.profileType,
+            actingProfileId: actor.profileId,
             displayName,
             rating: Math.round(rating),
             text,
@@ -265,11 +306,52 @@ export function createRoutes(
           });
 
           if (subscriptionHandlers) {
-            await subscriptionHandlers.recordReviewUsage(userId);
+            const usageAccountId = deps?.accountsService ? deps.accountsService.resolveSubscriptionTarget(actor).accountId : userId;
+            await subscriptionHandlers.recordReviewUsage(usageAccountId);
           }
 
           sendJson(res, 201, { review: created });
           return;
+        }
+      }
+
+      if (accountHandlers) {
+        if (req.method === "GET" && normalizedPath === "/v1/identity") {
+          await accountHandlers.getCurrentIdentity(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/identity/contexts") {
+          await accountHandlers.getActingContexts(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/identity/context/switch") {
+          await accountHandlers.switchContext(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/profiles/creator") {
+          await accountHandlers.createCreatorProfile(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/profiles/business") {
+          await accountHandlers.createBusinessProfile(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/identity/permissions") {
+          await accountHandlers.getPermissions(req, res);
+          return;
+        }
+
+        const businessMembersMatch = /^\/v1\/business-profiles\/([^/]+)\/members$/.exec(normalizedPath);
+        if (businessMembersMatch) {
+          const businessProfileId = decodeURIComponent(businessMembersMatch[1] ?? "");
+          if (req.method === "GET") {
+            await accountHandlers.listBusinessMembers(req, res, businessProfileId);
+            return;
+          }
+          if (req.method === "POST") {
+            await accountHandlers.inviteBusinessMember(req, res, businessProfileId);
+            return;
+          }
         }
       }
 

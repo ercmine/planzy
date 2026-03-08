@@ -1,6 +1,7 @@
 import { createServer as createNodeServer, type Server } from "node:http";
 
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
+import type { AccountsService } from "../accounts/service.js";
 import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { MerchantService } from "../merchant/service.js";
 import type { EntitlementPolicyService } from "../subscriptions/policy.js";
@@ -50,6 +51,7 @@ export function createHttpServer(
     reviewsStore?: ReviewsStore;
     subscriptionService?: SubscriptionService;
     entitlementPolicy?: EntitlementPolicyService;
+    accountsService?: AccountsService;
   }
 ): Server {
   const route = createRoutes(service, merchantService, deps);

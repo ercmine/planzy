@@ -14,6 +14,8 @@ export class MemoryReviewsStore implements ReviewsStore {
       id: randomUUID(),
       placeId: input.placeId,
       userId: input.userId,
+      actingProfileType: input.actingProfileType ?? "PERSONAL",
+      actingProfileId: input.actingProfileId ?? input.userId,
       displayName: input.displayName,
       rating: input.rating,
       text: input.text,
