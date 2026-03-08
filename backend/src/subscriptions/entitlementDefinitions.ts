@@ -8,6 +8,7 @@ export const ENTITLEMENT_DEFINITIONS: EntitlementDefinition[] = [
   { key: "priority_support", valueType: EntitlementValueType.BOOLEAN, description: "Priority support", defaultValue: false },
   { key: "max_saved_places", valueType: EntitlementValueType.INTEGER, description: "Saved places", defaultValue: 20 },
   { key: "max_custom_lists", valueType: EntitlementValueType.INTEGER, description: "Custom lists", defaultValue: 2 },
+  { key: "max_places_per_list", valueType: EntitlementValueType.INTEGER, description: "Places per list", defaultValue: 20 },
   { key: "max_text_reviews_per_month", valueType: EntitlementValueType.INTEGER, description: "Text reviews / month", defaultValue: 10 },
   { key: "max_photo_reviews_per_month", valueType: EntitlementValueType.INTEGER, description: "Photo reviews / month", defaultValue: 4 },
   { key: "max_video_reviews_per_month", valueType: EntitlementValueType.INTEGER, description: "Video reviews / month", defaultValue: 0 },

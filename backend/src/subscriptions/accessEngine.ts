@@ -25,7 +25,10 @@ export const FEATURE_KEYS = {
   BUSINESS_ANALYTICS_BASIC: "business.analytics_basic",
   BUSINESS_ANALYTICS_ADVANCED: "business.analytics_advanced",
   ADS_AD_FREE: "ads.ad_free",
-  MODERATION_PRIORITY_QUEUE: "moderation.priority_queue"
+  MODERATION_PRIORITY_QUEUE: "moderation.priority_queue",
+  LISTS_SAVE_PLACES: "lists.save_places",
+  LISTS_CREATE_CUSTOM: "lists.create_custom",
+  LISTS_CREATE_PUBLIC: "lists.create_public"
 } as const;
 
 export type FeatureKey = typeof FEATURE_KEYS[keyof typeof FEATURE_KEYS];
@@ -38,6 +41,7 @@ export const QUOTA_KEYS = {
   UPLOAD_VIDEO_SIZE_MB: "quota.upload.video_size_mb",
   LISTS_SAVED_LISTS: "quota.lists.saved_lists",
   LISTS_ITEMS_PER_LIST: "quota.lists.items_per_list",
+  LISTS_TOTAL_SAVED_PLACES: "quota.lists.total_saved_places",
   AI_REQUESTS_PER_DAY: "quota.ai.requests_per_day",
   AI_REQUESTS_PER_MONTH: "quota.ai.requests_per_month",
   REVIEWS_WRITE_PER_DAY: "quota.reviews.write_per_day",
@@ -150,6 +154,7 @@ const QUOTA_DEFAULTS: Record<QuotaKey, { limit: number; resetWindow: QuotaResetW
   [QUOTA_KEYS.UPLOAD_VIDEO_SIZE_MB]: { limit: 0, resetWindow: QuotaResetWindow.NONE, unit: "mb" },
   [QUOTA_KEYS.LISTS_SAVED_LISTS]: { limit: 5, resetWindow: QuotaResetWindow.NONE, unit: "count" },
   [QUOTA_KEYS.LISTS_ITEMS_PER_LIST]: { limit: 50, resetWindow: QuotaResetWindow.NONE, unit: "count" },
+  [QUOTA_KEYS.LISTS_TOTAL_SAVED_PLACES]: { limit: 50, resetWindow: QuotaResetWindow.NONE, unit: "count" },
   [QUOTA_KEYS.AI_REQUESTS_PER_DAY]: { limit: 2, resetWindow: QuotaResetWindow.DAILY, unit: "count" },
   [QUOTA_KEYS.AI_REQUESTS_PER_MONTH]: { limit: 30, resetWindow: QuotaResetWindow.MONTHLY, unit: "count" },
   [QUOTA_KEYS.REVIEWS_WRITE_PER_DAY]: { limit: 5, resetWindow: QuotaResetWindow.DAILY, unit: "count" },
@@ -229,7 +234,10 @@ function planFeatureMapping(plan: PlanDefinition, entitlements: Record<string, E
     [FEATURE_KEYS.BUSINESS_ANALYTICS_BASIC]: Boolean(entitlements.business_analytics),
     [FEATURE_KEYS.BUSINESS_ANALYTICS_ADVANCED]: Boolean(entitlements.business_analytics) && plan.tier === "ELITE",
     [FEATURE_KEYS.ADS_AD_FREE]: !Boolean(entitlements.ads_enabled),
-    [FEATURE_KEYS.MODERATION_PRIORITY_QUEUE]: Boolean(entitlements.priority_support)
+    [FEATURE_KEYS.MODERATION_PRIORITY_QUEUE]: Boolean(entitlements.priority_support),
+    [FEATURE_KEYS.LISTS_SAVE_PLACES]: Number(entitlements.max_saved_places ?? 0) > 0,
+    [FEATURE_KEYS.LISTS_CREATE_CUSTOM]: Number(entitlements.max_custom_lists ?? 0) > 0,
+    [FEATURE_KEYS.LISTS_CREATE_PUBLIC]: !Boolean(entitlements.ads_enabled)
   };
 }
 
@@ -241,7 +249,8 @@ function planQuotaMapping(entitlements: Record<string, EntitlementValue>): Recor
     [QUOTA_KEYS.UPLOAD_VIDEO_DURATION_SECONDS]: Number(entitlements.max_video_duration_seconds ?? QUOTA_DEFAULTS[QUOTA_KEYS.UPLOAD_VIDEO_DURATION_SECONDS].limit),
     [QUOTA_KEYS.UPLOAD_VIDEO_SIZE_MB]: Number(entitlements.max_video_duration_seconds ? 250 : QUOTA_DEFAULTS[QUOTA_KEYS.UPLOAD_VIDEO_SIZE_MB].limit),
     [QUOTA_KEYS.LISTS_SAVED_LISTS]: Number(entitlements.max_custom_lists ?? QUOTA_DEFAULTS[QUOTA_KEYS.LISTS_SAVED_LISTS].limit),
-    [QUOTA_KEYS.LISTS_ITEMS_PER_LIST]: Number(entitlements.max_saved_places ?? QUOTA_DEFAULTS[QUOTA_KEYS.LISTS_ITEMS_PER_LIST].limit),
+    [QUOTA_KEYS.LISTS_ITEMS_PER_LIST]: Number(entitlements.max_places_per_list ?? entitlements.max_saved_places ?? QUOTA_DEFAULTS[QUOTA_KEYS.LISTS_ITEMS_PER_LIST].limit),
+    [QUOTA_KEYS.LISTS_TOTAL_SAVED_PLACES]: Number(entitlements.max_saved_places ?? QUOTA_DEFAULTS[QUOTA_KEYS.LISTS_TOTAL_SAVED_PLACES].limit),
     [QUOTA_KEYS.AI_REQUESTS_PER_DAY]: Number(entitlements.ai_itinerary_generation ? 40 : entitlements.ai_recommendations ? 10 : QUOTA_DEFAULTS[QUOTA_KEYS.AI_REQUESTS_PER_DAY].limit),
     [QUOTA_KEYS.AI_REQUESTS_PER_MONTH]: Number(entitlements.ai_itinerary_generation ? 600 : entitlements.ai_recommendations ? 150 : QUOTA_DEFAULTS[QUOTA_KEYS.AI_REQUESTS_PER_MONTH].limit),
     [QUOTA_KEYS.REVIEWS_WRITE_PER_DAY]: Number(entitlements.max_text_reviews_per_month ? 20 : QUOTA_DEFAULTS[QUOTA_KEYS.REVIEWS_WRITE_PER_DAY].limit),
