@@ -21,6 +21,18 @@ class _SessionSettingsPageState extends ConsumerState<SessionSettingsPage> {
   late SessionFilters _draftFilters;
   bool _draftReady = false;
 
+  void _handleBackPress(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    if (widget.sessionId.isNotEmpty) {
+      context.go('/sessions/${widget.sessionId}');
+      return;
+    }
+    Navigator.of(context).maybePop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(sessionSettingsControllerProvider(widget.sessionId));
@@ -32,7 +44,14 @@ class _SessionSettingsPageState extends ConsumerState<SessionSettingsPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Session Settings')),
+      appBar: AppBar(
+        title: const Text('Session Settings'),
+        automaticallyImplyLeading: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new),
+          onPressed: () => _handleBackPress(context),
+        ),
+      ),
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())
           : state.session == null
