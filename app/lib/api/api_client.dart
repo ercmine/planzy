@@ -30,6 +30,9 @@ class ApiClient {
   final Duration timeout;
   final Duration reachabilityTimeout;
 
+  int? lastPlansStatus;
+  int? lastLiveResultsStatus;
+
   Uri buildUri(String path, [Map<String, String?>? queryParameters]) {
     final base = Uri.parse(envConfig.apiBaseUrl);
     final sanitized = queryParameters == null
@@ -45,7 +48,6 @@ class ApiClient {
       queryParameters: sanitized,
     );
   }
-
 
   Future<void> runStartupDebugChecklist() async {
     if (!kDebugMode) {
@@ -176,7 +178,8 @@ class ApiClient {
     Object? body,
   }) async {
     final uri = buildUri(path, queryParameters);
-    final userId = await userIdResolver();
+    final resolvedUserId = await userIdResolver();
+    final userId = kDebugMode ? 'dev-sim' : resolvedUserId;
 
     var attempt = 0;
     while (true) {
@@ -294,7 +297,10 @@ class ApiClient {
     required int statusCode,
     required String responseBody,
   }) {
-    final snippet = _bodySnippet(responseBody);
+    if (!kDebugMode) {
+      return;
+    }
+    final snippet = _bodySnippet300(responseBody);
     Log.warn('$method $uri failed: status=$statusCode body="$snippet"');
   }
 
@@ -305,6 +311,12 @@ class ApiClient {
   }) {
     final requestId = response.headers['x-request-id'];
     final snippet = _bodySnippet(response.body);
+    if (uri.path.endsWith('/plans')) {
+      lastPlansStatus = response.statusCode;
+    }
+    if (uri.path.endsWith('/live-results')) {
+      lastLiveResultsStatus = response.statusCode;
+    }
     Log.d(
       '$method ${uri.path.isEmpty ? '/' : uri.path} url=$uri status=${response.statusCode} x-request-id=${requestId ?? '-'} body="$snippet"',
     );
@@ -313,6 +325,13 @@ class ApiClient {
   String _bodySnippet(String responseBody) {
     if (responseBody.length > 200) {
       return '${responseBody.substring(0, 200)}...';
+    }
+    return responseBody;
+  }
+
+  String _bodySnippet300(String responseBody) {
+    if (responseBody.length > 300) {
+      return '${responseBody.substring(0, 300)}...';
     }
     return responseBody;
   }

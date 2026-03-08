@@ -24,12 +24,32 @@ class PlanApiModel {
     required this.title,
     required this.category,
     this.source,
+    this.placeId,
+    this.address,
+    this.lat,
+    this.lng,
+    this.rating,
+    this.userRatingCount,
+    this.priceLevel,
+    this.googleMapsUri,
+    this.websiteUri,
+    this.photo,
   });
 
   final String id;
   final String title;
   final String category;
   final String? source;
+  final String? placeId;
+  final String? address;
+  final double? lat;
+  final double? lng;
+  final double? rating;
+  final int? userRatingCount;
+  final int? priceLevel;
+  final String? googleMapsUri;
+  final String? websiteUri;
+  final String? photo;
 
   factory PlanApiModel.fromJson(Map<String, dynamic> json) {
     return PlanApiModel(
@@ -37,6 +57,16 @@ class PlanApiModel {
       title: (json['title'] ?? '').toString(),
       category: (json['category'] ?? '').toString(),
       source: json['source']?.toString(),
+      placeId: json['placeId']?.toString(),
+      address: json['address']?.toString(),
+      lat: _toDouble(json['lat']),
+      lng: _toDouble(json['lng']),
+      rating: _toDouble(json['rating']),
+      userRatingCount: (json['userRatingCount'] as num?)?.toInt(),
+      priceLevel: (json['priceLevel'] as num?)?.toInt(),
+      googleMapsUri: json['googleMapsUri']?.toString(),
+      websiteUri: json['websiteUri']?.toString(),
+      photo: json['photo']?.toString(),
     );
   }
 }
@@ -108,4 +138,14 @@ class LiveResultsResponse {
       summary: LiveResultsSummary.fromJson(rawSummary),
     );
   }
+}
+
+double? _toDouble(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is num) {
+    return value.toDouble();
+  }
+  return double.tryParse(value.toString());
 }

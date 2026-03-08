@@ -325,5 +325,6 @@ final resultsControllerProvider =
     swipesRepository: ref.watch(swipesRepositoryProvider),
     shareService: ref.watch(shareServiceProvider),
     liveResultsRepository: liveResultsRepository,
+    locationController: ref.watch(locationControllerProvider.notifier),
   );
 });

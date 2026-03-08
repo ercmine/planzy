@@ -59,6 +59,8 @@ class _DeckPageState extends ConsumerState<DeckPage> {
     final state = ref.watch(deckControllerProvider(widget.sessionId));
     final controller = ref.read(deckControllerProvider(widget.sessionId).notifier);
     final envConfig = ref.watch(envConfigProvider);
+    final location = ref.watch(locationControllerProvider).effectiveLocation;
+    final apiClient = ref.watch(apiClientProvider).valueOrNull;
 
     ref.listen(
         deckControllerProvider(widget.sessionId)
@@ -214,9 +216,19 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                 ),
               ),
             ],
-            if (kDebugMode && envConfig.enableDebugLogs && state.lastBatchMix != null) ...[
+            if (kDebugMode && envConfig.enableDebugLogs) ...[
               const SizedBox(height: AppSpacing.s),
-              Text('Sources: ${state.lastBatchMix!.planSourceCounts}'),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.s),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Text(
+                  'debug lat/lng=${location?.lat.toStringAsFixed(4) ?? '-'},${location?.lng.toStringAsFixed(4) ?? '-'} '
+                  'plansStatus=${apiClient?.lastPlansStatus?.toString() ?? '-'} '
+                  'liveStatus=${apiClient?.lastLiveResultsStatus?.toString() ?? '-'} '
+                  '${state.lastBatchMix != null ? 'sources=${state.lastBatchMix!.planSourceCounts}' : ''}',
+                ),
+              ),
             ],
             if (state.isLoadingMore) ...[
               const SizedBox(height: AppSpacing.s),

@@ -1,10 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ads/native_ad_card.dart';
+import '../../api/api_client.dart';
 import '../../app/theme/spacing.dart';
 import '../../config/admob_config.dart';
 import '../../core/ads/native_ad_controller.dart';
+import '../../core/env/env.dart';
+import '../../core/location/location_models.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
 import 'results_controller.dart';
@@ -35,6 +39,9 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(resultsControllerProvider(widget.sessionId));
     final controller = ref.read(resultsControllerProvider(widget.sessionId).notifier);
+    final envConfig = ref.watch(envConfigProvider);
+    final location = ref.watch(locationControllerProvider).effectiveLocation;
+    final apiClient = ref.watch(apiClientProvider).valueOrNull;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Results')),
@@ -50,6 +57,8 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
               return ListView(
                 padding: const EdgeInsets.all(AppSpacing.m),
                 children: [
+                  if (kDebugMode && envConfig.enableDebugLogs)
+                    _DebugBanner(location: location, apiClient: apiClient),
                   if (state.errorMessage != null)
                     Card(
                       color: Theme.of(context).colorScheme.errorContainer,
@@ -79,6 +88,8 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
             return ListView(
               padding: const EdgeInsets.all(AppSpacing.m),
               children: [
+                if (kDebugMode && envConfig.enableDebugLogs)
+                  _DebugBanner(location: location, apiClient: apiClient),
                 if (state.lockedPlanId != null) ...[
                   MaterialBanner(
                     content: Text(
@@ -154,6 +165,30 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
       context: context,
       isScrollControlled: true,
       builder: (_) => CardDetailsSheet(plan: plan),
+    );
+  }
+}
+
+class _DebugBanner extends StatelessWidget {
+  const _DebugBanner({required this.location, required this.apiClient});
+
+  final AppLocation? location;
+  final ApiClient? apiClient;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.s),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.s),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        child: Text(
+          'debug lat/lng=${location?.lat.toStringAsFixed(4) ?? '-'},${location?.lng.toStringAsFixed(4) ?? '-'} '
+          'plansStatus=${apiClient?.lastPlansStatus?.toString() ?? '-'} '
+          'liveStatus=${apiClient?.lastLiveResultsStatus?.toString() ?? '-'}',
+        ),
+      ),
     );
   }
 }

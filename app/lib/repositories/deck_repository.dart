@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
+
 import '../api/api_client.dart';
 import '../api/endpoints.dart';
 import '../core/cache/local_store.dart';
 import '../core/cache/memory_cache.dart';
 import '../core/utils/hashing.dart';
 import '../models/deck_batch.dart';
+import '../models/deep_links.dart';
 import '../models/plan.dart';
 
 class DeckQueryParams {
@@ -99,24 +102,81 @@ class DeckRepository {
       }
     }
 
-    final response = await apiClient.getDecoded(ApiEndpoints.plans);
-    if (response is! List) {
-      throw FormatException('Parse error: expected list but got ${response.runtimeType}');
+    if (params.lat == null || params.lng == null) {
+      throw const FormatException('Missing required lat/lng query params for /plans');
     }
 
-    final plans = response
-        .whereType<Map<String, dynamic>>()
-        .map(_planFromApi)
-        .toList(growable: false);
+    try {
+      final response = await apiClient.getDecoded(
+        ApiEndpoints.plans,
+        queryParameters: params.toQueryMap(defaultLocale: 'en-US'),
+      );
+      if (response is! List) {
+        throw FormatException('Parse error: expected list but got ${response.runtimeType}');
+      }
+
+      final plans = response
+          .whereType<Map<String, dynamic>>()
+          .map(_planFromApi)
+          .toList(growable: false);
+
+      if (plans.isEmpty && kDebugMode) {
+        return _fallbackDeck(sessionId, cacheKey, params);
+      }
+
+      final deck = DeckBatchResponse(
+        sessionId: sessionId,
+        plans: plans,
+        nextCursor: null,
+        mix: DeckSourceMix(
+          providersUsed: plans.map((p) => p.source).toSet().toList(growable: false),
+          planSourceCounts: _sourceCounts(plans),
+          categoryCounts: _categoryCounts(plans),
+          sponsoredCount: 0,
+        ),
+      );
+      _deckBatchCache.set(cacheKey, deck);
+
+      await localStore.saveLastSessionId(sessionId);
+      await localStore.saveLastCursor(sessionId, deck.nextCursor);
+      await localStore.saveLastSeenDeckKey(sessionId, cacheKey);
+
+      return deck;
+    } catch (_) {
+      if (kDebugMode) {
+        return _fallbackDeck(sessionId, cacheKey, params);
+      }
+      rethrow;
+    }
+  }
+
+  Future<DeckBatchResponse> _fallbackDeck(
+    String sessionId,
+    String cacheKey,
+    DeckQueryParams params,
+  ) async {
+    final lat = params.lat ?? 44.8620;
+    final lng = params.lng ?? -93.5590;
+    final plans = <Plan>[
+      Plan(
+        id: 'debug-fallback-1',
+        source: 'debug-fallback',
+        sourceId: 'debug-fallback-1',
+        title: 'Fallback coffee stop',
+        category: 'coffee',
+        location: PlanLocation(lat: lat, lng: lng, address: 'Debug fallback'),
+        metadata: const {'source': 'debug-fallback'},
+      ),
+    ];
 
     final deck = DeckBatchResponse(
       sessionId: sessionId,
       plans: plans,
       nextCursor: null,
-      mix: DeckSourceMix(
-        providersUsed: plans.map((p) => p.source).toSet().toList(growable: false),
-        planSourceCounts: _sourceCounts(plans),
-        categoryCounts: _categoryCounts(plans),
+      mix: const DeckSourceMix(
+        providersUsed: ['debug-fallback'],
+        planSourceCounts: {'debug-fallback': 1},
+        categoryCounts: {'coffee': 1},
         sponsoredCount: 0,
       ),
     );
@@ -159,13 +219,56 @@ Plan _planFromApi(Map<String, dynamic> json) {
     throw const FormatException('Parse error: missing required plan fields');
   }
 
+  final rawLocation = json['location'];
+  final double? lat = _toDouble(
+    rawLocation is Map<String, dynamic> ? rawLocation['lat'] : json['lat'],
+  );
+  final double? lng = _toDouble(
+    rawLocation is Map<String, dynamic> ? rawLocation['lng'] : json['lng'],
+  );
+
+  if (lat == null || lng == null) {
+    throw const FormatException('Parse error: missing lat/lng');
+  }
+
+  final address = (rawLocation is Map<String, dynamic>
+          ? rawLocation['address']
+          : json['address'])
+      ?.toString();
+
+  final photo = json['photo']?.toString();
+  final mapsUri = json['googleMapsUri']?.toString();
+  final websiteUri = json['websiteUri']?.toString();
+
   return Plan(
     id: id,
     source: source,
-    sourceId: id,
+    sourceId: (json['placeId'] ?? json['sourceId'] ?? id).toString(),
     title: title,
     category: category,
-    location: const PlanLocation(lat: 0, lng: 0),
-    metadata: const {'source': 'api.perbug.com'},
+    location: PlanLocation(lat: lat, lng: lng, address: address),
+    priceLevel: (json['priceLevel'] as num?)?.toInt(),
+    rating: _toDouble(json['rating']),
+    reviewCount: (json['userRatingCount'] as num?)?.toInt(),
+    photos: photo == null || photo.isEmpty ? null : [PlanPhoto(url: photo)],
+    deepLinks: (mapsUri != null && mapsUri.isNotEmpty) ||
+            (websiteUri != null && websiteUri.isNotEmpty)
+        ? DeepLinks(mapsLink: mapsUri, websiteLink: websiteUri)
+        : null,
+    metadata: {
+      'source': 'api.perbug.com',
+      'placeId': json['placeId']?.toString(),
+      'address': address,
+    },
   );
+}
+
+double? _toDouble(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is num) {
+    return value.toDouble();
+  }
+  return double.tryParse(value.toString());
 }
