@@ -11,6 +11,7 @@ import {
   RecommendationService,
   TrendingService
 } from "./services.js";
+import type { PremiumExperienceService } from "../subscriptions/premiumExperience.js";
 
 export interface DiscoveryHandlers {
   search(req: IncomingMessage, res: ServerResponse): Promise<void>;
@@ -23,6 +24,8 @@ export interface DiscoveryHandlers {
   suggestedCreators(req: IncomingMessage, res: ServerResponse): Promise<void>;
   suggestedGuides(req: IncomingMessage, res: ServerResponse): Promise<void>;
   feed(req: IncomingMessage, res: ServerResponse): Promise<void>;
+  premiumExperienceState(req: IncomingMessage, res: ServerResponse): Promise<void>;
+  premiumDiscoveryModules(req: IncomingMessage, res: ServerResponse): Promise<void>;
 }
 
 export interface DiscoveryHttpHandlerDeps {
@@ -33,6 +36,7 @@ export interface DiscoveryHttpHandlerDeps {
   recommendationService: RecommendationService;
   cityPageService: CityPageService;
   feedService: DiscoveryFeedService;
+  premiumExperience: PremiumExperienceService;
 }
 
 export function createDiscoveryHttpHandlers(deps: DiscoveryHttpHandlerDeps): DiscoveryHandlers {
@@ -90,6 +94,22 @@ export function createDiscoveryHttpHandlers(deps: DiscoveryHttpHandlerDeps): Dis
       const userId = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
       const mode = (url.searchParams.get("mode") ?? "for_you") as Parameters<typeof deps.feedService.feed>[1];
       sendJson(res, 200, await deps.feedService.feed(userId, mode, context));
+    },
+    async premiumExperienceState(req, res) {
+      const userId = String(readHeader(req, "x-user-id") ?? "").trim();
+      if (!userId) {
+        sendJson(res, 401, { error: "x-user-id header required" });
+        return;
+      }
+      sendJson(res, 200, { state: deps.premiumExperience.getPremiumExperienceState(userId) });
+    },
+    async premiumDiscoveryModules(req, res) {
+      const userId = String(readHeader(req, "x-user-id") ?? "").trim();
+      if (!userId) {
+        sendJson(res, 200, { modules: [] });
+        return;
+      }
+      sendJson(res, 200, { modules: deps.premiumExperience.getPremiumDiscoveryModules(userId) });
     }
   };
 }

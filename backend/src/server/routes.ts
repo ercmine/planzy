@@ -217,6 +217,17 @@ export function createRoutes(
       }
 
 
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/premium/experience") {
+        await discoveryHandlers.premiumExperienceState(req, res);
+        return;
+      }
+
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/premium/modules") {
+        await discoveryHandlers.premiumDiscoveryModules(req, res);
+        return;
+      }
+
+
       const relatedPlacesMatch = /^\/v1\/discovery\/places\/([^/]+)\/related$/.exec(normalizedPath);
       if (discoveryHandlers && req.method === "GET" && relatedPlacesMatch) {
         await discoveryHandlers.relatedPlaces(req, res, decodeURIComponent(relatedPlacesMatch[1] ?? ""));

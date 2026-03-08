@@ -38,14 +38,15 @@ export interface GuidePlaceItem {
 }
 
 
-export type ContentAccessVisibility = "public" | "followers" | "premium" | "membership";
+export type ContentAccessVisibility = "public" | "followers" | "premium" | "elite" | "membership";
 
 export interface ContentMonetizationMetadata {
-  mode: "free" | "premium" | "membership";
+  mode: "free" | "premium" | "elite" | "membership";
   access: ContentAccessVisibility;
   previewSummary?: string;
   lockedReasonCode?: string;
   gatingSource?: "creator_plan" | "creator_membership" | "future_bundle";
+  minimumPlanRequired?: "free" | "plus" | "elite";
 }
 
 export interface CreatorGuide {

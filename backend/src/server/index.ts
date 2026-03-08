@@ -33,6 +33,7 @@ import { MemoryTelemetryStore } from "../telemetry/memoryStore.js";
 import { MemoryReviewsStore } from "../reviews/memoryStore.js";
 import { DevBillingProvider } from "../subscriptions/billing/provider.js";
 import { EntitlementPolicyService } from "../subscriptions/policy.js";
+import { PremiumExperienceService } from "../subscriptions/premiumExperience.js";
 import { FeatureQuotaEngine, MemoryAccessUsageStore } from "../subscriptions/accessEngine.js";
 import { SubscriptionService } from "../subscriptions/service.js";
 import { MemoryUsageStore } from "../subscriptions/usage.js";
@@ -81,6 +82,7 @@ export function createServer(options?: CreateServerOptions) {
   const usageStore = new MemoryUsageStore();
   const subscriptionService = new SubscriptionService(usageStore, new DevBillingProvider());
   const entitlementPolicy = new EntitlementPolicyService(subscriptionService);
+  const premiumExperience = new PremiumExperienceService(subscriptionService);
   const accessEngine = new FeatureQuotaEngine(subscriptionService, new MemoryAccessUsageStore());
   const accountsService = new AccountsService(new MemoryAccountsStore());
   const creatorStore = new MemoryCreatorStore();
@@ -102,14 +104,15 @@ export function createServer(options?: CreateServerOptions) {
   const categoryBrowseService = new CategoryBrowseService(discoveryRepository);
   const nearbyService = new NearbyDiscoveryService(discoveryRepository);
   const trendingService = new TrendingService(discoveryRepository);
-  const recommendationService = new RecommendationService(discoveryRepository);
+  const recommendationService = new RecommendationService(discoveryRepository, premiumExperience);
   const cityPageService = new CityPageService(trendingService, recommendationService, categoryBrowseService);
   const discoveryFeedService = new DiscoveryFeedService(
     recommendationService,
     nearbyService,
     trendingService,
     categoryBrowseService,
-    placeSearchService
+    placeSearchService,
+    premiumExperience
   );
 
   const deckHandler = createDeckHandler({
@@ -145,7 +148,8 @@ export function createServer(options?: CreateServerOptions) {
       trendingService,
       recommendationService,
       cityPageService,
-      feedService: discoveryFeedService
+      feedService: discoveryFeedService,
+      premiumExperience
     }
   });
 }

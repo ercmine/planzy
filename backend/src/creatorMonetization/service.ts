@@ -157,7 +157,7 @@ export class CreatorMonetizationService {
     return { totalCount: tips.length, grossAmountMinor: tips.filter((t) => ["pending", "succeeded", "intent_created"].includes(t.status)).reduce((sum, row) => sum + row.amountMinor, 0) };
   }
 
-  setGuidePremiumMode(actorUserId: string, creatorProfileId: string, guideId: string, input: { mode: "free" | "premium" | "membership"; previewSummary?: string }): void {
+  setGuidePremiumMode(actorUserId: string, creatorProfileId: string, guideId: string, input: { mode: "free" | "premium" | "elite" | "membership"; previewSummary?: string }): void {
     const creator = this.creatorStore.getProfileById(creatorProfileId);
     if (!creator || creator.userId !== actorUserId) throw new Error("FORBIDDEN");
     const guide = this.creatorStore.getGuideById(guideId);
@@ -165,10 +165,11 @@ export class CreatorMonetizationService {
     if (input.mode !== "free" && !this.getCapabilities(creatorProfileId).capabilities.canPublishPremiumContent) throw new Error("CREATOR_PREMIUM_NOT_ELIGIBLE");
     guide.monetization = {
       mode: input.mode,
-      access: input.mode === "free" ? "public" : (input.mode === "premium" ? "premium" : "membership"),
+      access: input.mode === "free" ? "public" : (input.mode === "elite" ? "elite" : (input.mode === "premium" ? "premium" : "membership")),
       previewSummary: input.previewSummary,
       lockedReasonCode: input.mode === "free" ? undefined : "premium_access_required",
-      gatingSource: input.mode === "membership" ? "creator_membership" : (input.mode === "premium" ? "creator_plan" : undefined)
+      gatingSource: input.mode === "membership" ? "creator_membership" : (input.mode === "premium" || input.mode === "elite" ? "creator_plan" : undefined),
+      minimumPlanRequired: input.mode === "elite" ? "elite" : input.mode === "premium" ? "plus" : "free"
     };
     guide.updatedAt = new Date().toISOString();
     this.creatorStore.updateGuide(guide);
@@ -180,10 +181,19 @@ export class CreatorMonetizationService {
     const owner = this.creatorStore.getProfileById(creatorProfileId);
     if (viewerUserId && owner?.userId === viewerUserId) return { locked: false };
     if (!viewerUserId) return { locked: true, reasonCode: "viewer_entitlement_missing", previewSummary: guide.monetization.previewSummary ?? guide.summary };
+
     this.subscriptions.ensureAccount(viewerUserId, SubscriptionTargetType.USER);
+    const subscription = this.subscriptions.getSubscription(viewerUserId);
     const entitlements = this.subscriptions.getCurrentEntitlements(viewerUserId).values;
-    const hasPremium = !Boolean(entitlements.ads_enabled);
-    if (!hasPremium) return { locked: true, reasonCode: "viewer_entitlement_missing", previewSummary: guide.monetization.previewSummary ?? guide.summary };
+    const isPremium = !Boolean(entitlements.ads_enabled);
+    const isElite = subscription.planId.includes("elite") || subscription.planId.includes("pro");
+
+    if (guide.monetization.mode === "elite" && !isElite) {
+      return { locked: true, reasonCode: "viewer_entitlement_missing", previewSummary: guide.monetization.previewSummary ?? guide.summary };
+    }
+    if ((guide.monetization.mode === "premium" || guide.monetization.mode === "membership") && !isPremium) {
+      return { locked: true, reasonCode: "viewer_entitlement_missing", previewSummary: guide.monetization.previewSummary ?? guide.summary };
+    }
     return { locked: false };
   }
 
