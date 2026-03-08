@@ -8,6 +8,7 @@ import 'package:perbug/core/ads/ads_config.dart';
 import 'package:perbug/core/env/env.dart';
 import 'package:perbug/features/deck/plan_detail_page.dart';
 import 'package:perbug/models/place_review.dart';
+import 'package:perbug/models/place_review_video.dart';
 import 'package:perbug/models/plan.dart';
 import 'package:perbug/providers/app_providers.dart';
 import 'package:perbug/repositories/reviews_repository.dart';
@@ -67,29 +68,38 @@ class _FakeReviewsRepository extends ReviewsRepository {
     PlaceReview(
       id: 'r1',
       placeId: 'src-1',
-      userId: 'u1',
-      displayName: 'Pat',
+      author: ReviewAuthor(displayName: 'Pat', profileType: 'PERSONAL', profileId: 'p1'),
+      body: 'Great place',
       rating: 4,
-      text: 'Great place',
       createdAt: DateTime.utc(2024, 1, 1),
-      anonymous: false,
+      moderationState: 'published',
+      helpfulCount: 0,
+      viewerHasHelpfulVote: false,
+      canEdit: false,
     )
   ];
 
   @override
-  Future<List<PlaceReview>> fetchForPlace(String placeId) async => reviews;
+  Future<List<PlaceReview>> fetchForPlace(String placeId, {String sort = 'most_helpful'}) async => reviews;
+
 
   @override
-  Future<PlaceReview> createReview({required String placeId, required int rating, required String text, required String displayName, required bool anonymous}) async {
+  Future<PlaceReviewVideoSection> fetchVideoSection(String placeId, {String filter = 'all', String? cursor, int limit = 12}) async {
+    return PlaceReviewVideoSection(placeId: placeId, videos: const [], totalVisibleVideos: 0);
+  }
+  @override
+  Future<PlaceReview> createReview({required String placeId, int? rating, required String body, required String displayName}) async {
     final created = PlaceReview(
       id: 'r-new',
       placeId: placeId,
-      userId: 'u2',
-      displayName: anonymous ? 'Anonymous' : (displayName.isEmpty ? 'Perbug User' : displayName),
+      author: ReviewAuthor(displayName: displayName.isEmpty ? 'Perbug User' : displayName, profileType: 'PERSONAL', profileId: 'p2'),
+      body: body,
       rating: rating,
-      text: text,
       createdAt: DateTime.utc(2024, 1, 2),
-      anonymous: anonymous,
+      moderationState: 'published',
+      helpfulCount: 0,
+      viewerHasHelpfulVote: false,
+      canEdit: true,
     );
     reviews.insert(0, created);
     return created;
@@ -180,6 +190,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('5').last);
     await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Display name (optional)'), 'Robin');
     await tester.enterText(find.widgetWithText(TextFormField, 'Write your review'), 'Excellent experience');
     await tester.tap(find.text('Submit review'));
     await tester.pumpAndSettle();
