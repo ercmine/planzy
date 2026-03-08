@@ -1,4 +1,4 @@
-import type { ReviewTrustDesignation, ReviewTrustSignals, ReviewerTrustProfile, ReviewerTrustStatus, TrustAuditLog, VerificationEvidence, VerificationEvidenceType, VerificationLevel } from "./trust.js";
+import type { EvidencePrivacyClass, ReviewTrustDesignation, ReviewTrustSignals, ReviewVerificationSummary, ReviewerTrustProfile, ReviewerTrustStatus, TrustAuditLog, VerificationEvidence, VerificationEvidenceStatus, VerificationEvidenceType, VerificationLevel, VerificationSourceType } from "./trust.js";
 
 export type ModerationState = "pending" | "published" | "hidden" | "removed" | "flagged";
 export type ReviewSort = "newest" | "most_helpful" | "oldest" | "trusted";
@@ -88,6 +88,8 @@ export interface ReviewPublicTrustSummary {
   reviewerTrustStatus: ReviewerTrustStatus;
   reviewTrustDesignation: ReviewTrustDesignation;
   verificationLevel: VerificationLevel;
+  verificationLabel: string;
+  isVerifiedVisit: boolean;
   trustBadges: string[];
   rankingBoostWeight: number;
 }
@@ -201,6 +203,24 @@ export interface ListReviewsByAuthorProfileInput {
   limit?: number;
 }
 
+export interface VisitSessionInput {
+  userId: string;
+  placeId?: string;
+  startedAt: string;
+  endedAt?: string;
+  confidenceScore: number;
+  sourceType: "gps" | "check_in" | "media" | "partner";
+  sessionStatus?: "active" | "ended" | "invalid";
+  metadata?: Record<string, unknown>;
+}
+
+export interface ReviewVerificationOverrideInput {
+  reviewId: string;
+  actorUserId: string;
+  status: "verified" | "rejected";
+  reason?: string;
+}
+
 export interface ReviewsStore {
   listByPlace(input: ListReviewsInput): Promise<ListReviewsResult>;
   listByAuthorProfile(input: ListReviewsByAuthorProfileInput): Promise<PlaceReview[]>;
@@ -224,7 +244,11 @@ export interface ReviewsStore {
   listTrustAuditLogs(userId: string): Promise<TrustAuditLog[]>;
   applyTrustOverride(input: TrustOverrideInput): Promise<ReviewerTrustProfile>;
   getReviewTrustSignals(reviewId: string): Promise<ReviewTrustSignals | null>;
+  getReviewVerificationSummary(reviewId: string): Promise<ReviewVerificationSummary | null>;
   upsertVerificationEvidence(input: UpsertVerificationEvidenceInput): Promise<VerificationEvidence>;
+  listEligibleEvidenceForUser(input: { userId: string; placeId: string; reviewId?: string }): Promise<VerificationEvidence[]>;
+  createVisitSession(input: VisitSessionInput): Promise<{ id: string }>;
+  applyReviewVerificationOverride(input: ReviewVerificationOverrideInput): Promise<ReviewVerificationSummary>;
 }
 
 
@@ -241,8 +265,16 @@ export interface UpsertVerificationEvidenceInput {
   placeId: string;
   evidenceType: VerificationEvidenceType;
   evidenceStrength: number;
-  source?: VerificationEvidence["source"];
+  sourceType?: VerificationSourceType;
+  sourceId?: string;
   linkedReviewId?: string;
+  evidenceStatus?: VerificationEvidenceStatus;
+  confidenceScore?: number;
+  strengthLevel?: "weak" | "medium" | "strong";
+  observedAt?: string;
+  startsAt?: string;
+  endsAt?: string;
   expiresAt?: string;
+  privacyClass?: EvidencePrivacyClass;
   metadata?: Record<string, unknown>;
 }

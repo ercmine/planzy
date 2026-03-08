@@ -55,6 +55,31 @@ class BusinessReply {
   }
 }
 
+
+class ReviewTrustSummary {
+  ReviewTrustSummary({
+    required this.verificationLevel,
+    required this.verificationLabel,
+    required this.isVerifiedVisit,
+    required this.trustBadges,
+  });
+
+  final String verificationLevel;
+  final String verificationLabel;
+  final bool isVerifiedVisit;
+  final List<String> trustBadges;
+
+  factory ReviewTrustSummary.fromJson(Map<String, dynamic> json) {
+    final badges = (json['trustBadges'] as List?)?.map((item) => item.toString()).toList(growable: false) ?? const <String>[];
+    return ReviewTrustSummary(
+      verificationLevel: (json['verificationLevel'] ?? 'none').toString(),
+      verificationLabel: (json['verificationLabel'] ?? 'Not verified').toString(),
+      isVerifiedVisit: json['isVerifiedVisit'] == true,
+      trustBadges: badges,
+    );
+  }
+}
+
 class PlaceReview {
   PlaceReview({
     required this.id,
@@ -70,6 +95,7 @@ class PlaceReview {
     this.editedAt,
     this.editWindowEndsAt,
     this.businessReply,
+    this.trust,
   });
 
   final String id;
@@ -85,6 +111,7 @@ class PlaceReview {
   final bool viewerHasHelpfulVote;
   final bool canEdit;
   final BusinessReply? businessReply;
+  final ReviewTrustSummary? trust;
 
   factory PlaceReview.fromJson(Map<String, dynamic> json) {
     return PlaceReview(
@@ -102,6 +129,9 @@ class PlaceReview {
       canEdit: json['canEdit'] == true,
       businessReply: json['businessReply'] is Map<String, dynamic>
           ? BusinessReply.fromJson(json['businessReply'] as Map<String, dynamic>)
+          : null,
+      trust: json['trust'] is Map<String, dynamic>
+          ? ReviewTrustSummary.fromJson(json['trust'] as Map<String, dynamic>)
           : null,
     );
   }

@@ -235,7 +235,7 @@ export function createRoutes(
         const place = await fetchPlaceDetail(placeId);
         const publicApiBaseUrl = process.env.PUBLIC_API_BASE_URL ?? DEFAULT_PUBLIC_API_BASE_URL;
         const photos = (place.photos ?? [])
-          .map((photo, index) => {
+          .map((photo: any, index) => {
             if (!photo.name) {
               return undefined;
             }
@@ -622,15 +622,81 @@ export function createRoutes(
           placeId: String(payload.placeId ?? ""),
           linkedReviewId: payload.linkedReviewId == null ? undefined : String(payload.linkedReviewId),
           evidenceType: String(payload.evidenceType ?? "behavioral_heuristic") as never,
-          evidenceStrength: Number(payload.evidenceStrength ?? 10),
-          source: payload.source == null ? undefined : String(payload.source) as never,
+          evidenceStrength: Number(payload.evidenceStrength ?? payload.confidenceScore ?? 10),
+          confidenceScore: payload.confidenceScore == null ? undefined : Number(payload.confidenceScore),
+          sourceType: payload.sourceType == null ? undefined : String(payload.sourceType) as never,
+          sourceId: payload.sourceId == null ? undefined : String(payload.sourceId),
+          evidenceStatus: payload.evidenceStatus == null ? undefined : String(payload.evidenceStatus) as never,
+          strengthLevel: payload.strengthLevel == null ? undefined : String(payload.strengthLevel) as never,
+          observedAt: payload.observedAt == null ? undefined : String(payload.observedAt),
+          startsAt: payload.startsAt == null ? undefined : String(payload.startsAt),
+          endsAt: payload.endsAt == null ? undefined : String(payload.endsAt),
           expiresAt: payload.expiresAt == null ? undefined : String(payload.expiresAt),
+          privacyClass: payload.privacyClass == null ? undefined : String(payload.privacyClass) as never,
           metadata: payload.metadata && typeof payload.metadata === "object" ? payload.metadata as Record<string, unknown> : undefined
         });
         sendJson(res, 201, { evidence });
         return;
       }
 
+
+      const verificationSummaryMatch = /^\/v1\/trust\/reviews\/([^/]+)\/verification$/.exec(normalizedPath);
+      if (verificationSummaryMatch && req.method === "GET" && deps?.reviewsStore) {
+        const reviewId = decodeURIComponent(verificationSummaryMatch[1] ?? "");
+        const summary = await deps.reviewsStore.getReviewVerificationSummary(reviewId);
+        sendJson(res, 200, { summary });
+        return;
+      }
+
+      if (verificationSummaryMatch && req.method === "POST" && deps?.reviewsStore) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 403, { error: "admin key required" });
+          return;
+        }
+        const reviewId = decodeURIComponent(verificationSummaryMatch[1] ?? "");
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const actorUserId = String(payload.actorUserId ?? "admin").trim();
+        const status = String(payload.status ?? "").trim();
+        const summary = await deps.reviewsStore.applyReviewVerificationOverride({
+          reviewId,
+          actorUserId,
+          status: status as never,
+          reason: payload.reason == null ? undefined : String(payload.reason)
+        });
+        sendJson(res, 200, { summary });
+        return;
+      }
+
+      if (normalizedPath === "/v1/trust/evidence/eligible" && req.method === "GET" && deps?.reviewsStore) {
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        const placeId = String(url.searchParams.get("placeId") ?? "").trim();
+        if (!placeId) throw new ValidationError(["placeId is required"]);
+        const reviewId = String(url.searchParams.get("reviewId") ?? "").trim() || undefined;
+        const evidence = await deps.reviewsStore.listEligibleEvidenceForUser({ userId: userIdHeader, placeId, reviewId });
+        sendJson(res, 200, { evidence });
+        return;
+      }
+
+      if (normalizedPath === "/v1/trust/visit-sessions" && req.method === "POST" && deps?.reviewsStore) {
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const session = await deps.reviewsStore.createVisitSession({
+          userId: userIdHeader,
+          placeId: payload.placeId == null ? undefined : String(payload.placeId),
+          startedAt: String(payload.startedAt ?? new Date().toISOString()),
+          endedAt: payload.endedAt == null ? undefined : String(payload.endedAt),
+          confidenceScore: Number(payload.confidenceScore ?? 50),
+          sourceType: String(payload.sourceType ?? "gps") as never,
+          sessionStatus: payload.sessionStatus == null ? undefined : String(payload.sessionStatus) as never,
+          metadata: payload.metadata && typeof payload.metadata === "object" ? payload.metadata as Record<string, unknown> : undefined
+        });
+        sendJson(res, 201, { session });
+        return;
+      }
       const helpfulMatch = /^\/reviews\/([^/]+)\/helpful$/.exec(normalizedPath);
       if (helpfulMatch && deps?.reviewsStore) {
         const reviewId = decodeURIComponent(helpfulMatch[1] ?? "");
