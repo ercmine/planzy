@@ -221,6 +221,11 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                           builder: (_) => PlanDetailPage(
                             plan: plan,
                             sessionId: widget.sessionId,
+                            relatedSeed: state.items
+                                .whereType<DeckPlanItem>()
+                                .map((item) => item.plan)
+                                .where((candidate) => candidate.id != plan.id)
+                                .toList(growable: false),
                             sessionLat: location?.lat,
                             sessionLng: location?.lng,
                             heroTag: 'plan-photo-${plan.id}',
