@@ -137,7 +137,7 @@ class DeckRepository {
                 details: item,
               );
             }
-            return _planFromApi(item);
+            return _planFromApi(item, apiClient: apiClient);
           })
           .toList(growable: false);
 
@@ -252,7 +252,7 @@ Map<String, int> _categoryCounts(List<Plan> plans) {
   return out;
 }
 
-Plan _planFromApi(Map<String, dynamic> json) {
+Plan _planFromApi(Map<String, dynamic> json, {required ApiClient apiClient}) {
   final id = (json['id'] ?? '').toString();
   final title = (json['title'] ?? '').toString();
   final category = (json['category'] ?? '').toString();

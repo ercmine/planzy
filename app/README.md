@@ -7,6 +7,16 @@ flutter pub get
 dart run build_runner build --delete-conflicting-outputs
 ```
 
+## iOS local setup order
+
+Always install Flutter packages before CocoaPods so `ios/Flutter/Generated.xcconfig` exists:
+
+```bash
+flutter clean
+flutter pub get
+cd ios && pod install && cd ..
+```
+
 ## Android scripts (flavors)
 
 These scripts live under `scripts/` and are designed for copy/paste usage on macOS with Flutter installed.
