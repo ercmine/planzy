@@ -3,6 +3,7 @@ import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ads/native_ad_card.dart';
+import '../../core/ads/ad_placement.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import '../../core/ads/native_ad_controller.dart';
@@ -184,13 +185,15 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                     final c = _adControllers.putIfAbsent(
                       item.slot.slotId,
                       () => NativeAdController(
-                        adsService: ref.read(adsServiceProvider),
+                        adsManager: ref.read(adsManagerProvider),
                         slotId: item.slot.slotId,
+                        placement: AdPlacement.deckInlineNative,
                       ),
                     );
                     return NativeAdCard(
                       key: ValueKey(item.slot.slotId),
                       controller: c,
+                      placement: AdPlacement.deckInlineNative,
                     );
                   }
                   final plan = (item as DeckPlanItem).plan;

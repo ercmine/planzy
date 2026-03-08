@@ -5,7 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api/api_client.dart';
 import '../core/ads/ad_deck_injector.dart';
 import '../core/ads/ads_config.dart';
+import '../core/ads/ads_diagnostics.dart';
+import '../core/ads/ads_manager.dart';
 import '../core/ads/ads_service.dart';
+import '../core/ads/ads_visibility.dart';
 import '../core/cache/local_store.dart';
 import '../core/connectivity/connectivity_controller.dart';
 import '../core/connectivity/connectivity_state.dart';
@@ -57,6 +60,23 @@ final adsServiceProvider = Provider<AdsService>((ref) {
 
 final adDeckInjectorProvider = Provider<AdDeckInjector>((ref) {
   return AdDeckInjector(config: ref.watch(adsConfigProvider));
+});
+
+
+final adsDiagnosticsProvider = Provider<AdsDiagnostics>((ref) {
+  return const AdsDiagnostics();
+});
+
+final adsVisibilityProvider = Provider<AdsVisibility>((ref) {
+  return AdsVisibility(config: ref.watch(adsConfigProvider));
+});
+
+final adsManagerProvider = Provider<AdsManager>((ref) {
+  return AdsManager(
+    adsService: ref.watch(adsServiceProvider),
+    visibility: ref.watch(adsVisibilityProvider),
+    diagnostics: ref.watch(adsDiagnosticsProvider),
+  );
 });
 
 final httpClientProvider = Provider<http.Client>((ref) {
@@ -327,5 +347,6 @@ final resultsControllerProvider =
     shareService: ref.watch(shareServiceProvider),
     liveResultsRepository: liveResultsRepository,
     locationController: ref.watch(locationControllerProvider.notifier),
+    adsVisibility: ref.watch(adsVisibilityProvider),
   );
 });

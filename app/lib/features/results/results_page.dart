@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ads/native_ad_card.dart';
+import '../../core/ads/ad_placement.dart';
 import '../../app/theme/spacing.dart';
 import '../../core/ads/native_ad_controller.dart';
 import '../../models/plan.dart';
@@ -86,13 +87,14 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
                         final adController = _adControllers.putIfAbsent(
                           feedItem.slotId,
                           () => NativeAdController(
-                            adsService: ref.read(adsServiceProvider),
+                            adsManager: ref.read(adsManagerProvider),
                             slotId: feedItem.slotId,
+                            placement: AdPlacement.resultsInlineBanner,
                           ),
                         );
                         return Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.s),
-                          child: NativeAdCard(controller: adController),
+                          child: NativeAdCard(controller: adController, placement: AdPlacement.resultsInlineBanner),
                         );
                       }
 

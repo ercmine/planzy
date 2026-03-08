@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
 import '../../api/models.dart';
-import '../../config/admob_config.dart';
+import '../../core/ads/ad_placement.dart';
+import '../../core/ads/ads_visibility.dart';
+import '../../core/ads/feed_ad_inserter.dart';
 import '../../core/location/location_controller.dart';
 import '../../core/sharing/share_service.dart';
 import '../../models/plan.dart';
@@ -20,11 +22,15 @@ class ResultsController extends StateNotifier<ResultsState> {
     required ShareService shareService,
     required LiveResultsRepository? liveResultsRepository,
     required LocationController locationController,
+    required AdsVisibility adsVisibility,
+    FeedAdInserter feedAdInserter = const FeedAdInserter(),
   })  : _sessionId = sessionId,
         _swipesRepository = swipesRepository,
         _shareService = shareService,
         _liveResultsRepository = liveResultsRepository,
         _locationController = locationController,
+        _adsVisibility = adsVisibility,
+        _feedAdInserter = feedAdInserter,
         super(ResultsState.initial()) {
     Future<void>.microtask(refresh);
   }
@@ -38,6 +44,8 @@ class ResultsController extends StateNotifier<ResultsState> {
   final ShareService _shareService;
   final LiveResultsRepository? _liveResultsRepository;
   final LocationController _locationController;
+  final AdsVisibility _adsVisibility;
+  final FeedAdInserter _feedAdInserter;
 
   List<PlanScoreView> _allTopPicks = const <PlanScoreView>[];
   int _offset = 0;
@@ -170,20 +178,16 @@ class ResultsController extends StateNotifier<ResultsState> {
   }
 
   List<ResultFeedItem> _composeFeed(List<PlanScoreView> picks, {String? lockedPlanId}) {
-    final items = <ResultFeedItem>[];
-    for (var i = 0; i < picks.length; i++) {
-      if (i >= AdMobConfig.firstAdAfterItem &&
-          (i - AdMobConfig.firstAdAfterItem) % AdMobConfig.adInterval == 0) {
-        items.add(AdResultFeedItem(slotId: 'results-slot-$i'));
-      }
-      items.add(
-        PlaceResultFeedItem(
-          card: mapPlanToCardViewModel(picks[i]),
-          isLocked: lockedPlanId == picks[i].plan.id,
-        ),
-      );
-    }
-    return items;
+    return _feedAdInserter.inject<PlanScoreView, ResultFeedItem>(
+      items: picks,
+      placement: AdPlacement.resultsInlineBanner,
+      adsEnabled: _adsVisibility.canShow(AdPlacement.resultsInlineBanner.name),
+      adBuilder: (contentIndex, mixedIndex) => AdResultFeedItem(slotId: 'results-slot-$contentIndex-$mixedIndex'),
+      contentBuilder: (pick) => PlaceResultFeedItem(
+        card: mapPlanToCardViewModel(pick),
+        isLocked: lockedPlanId == pick.plan.id,
+      ),
+    );
   }
 
   String _buildShareCard(Plan plan) {

@@ -1,45 +1,70 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-import 'ads_service.dart';
+import 'ad_placement.dart';
+import 'ads_manager.dart';
 
-enum NativeAdLoadState { idle, loading, ready, failed }
+enum NativeAdLoadState { idle, loading, ready, failed, hidden }
 
 class NativeAdController {
   NativeAdController({
-    required AdsService adsService,
+    required AdsManager adsManager,
     required this.slotId,
-  }) : _adsService = adsService;
+    required this.placement,
+  }) : _adsManager = adsManager;
 
-  final AdsService _adsService;
+  final AdsManager _adsManager;
   final String slotId;
+  final AdPlacement placement;
 
   final ValueNotifier<NativeAdLoadState> state =
       ValueNotifier<NativeAdLoadState>(NativeAdLoadState.idle);
 
   NativeAd? _ad;
+  bool _disposed = false;
 
   NativeAd? get ad => _ad;
 
   Future<void> load() async {
-    if (!_adsService.enabled || state.value == NativeAdLoadState.loading) {
+    if (_disposed || state.value == NativeAdLoadState.loading) {
       return;
     }
+
+    if (!_adsManager.canShowPlacement(placement)) {
+      state.value = NativeAdLoadState.hidden;
+      return;
+    }
+
     disposeAdOnly();
     state.value = NativeAdLoadState.loading;
-    final ad = _adsService.buildNativeAd(
+
+    final loadedAd = await _adsManager.loadNativeAd(
+      placement: placement,
       slotId: slotId,
       onLoaded: () {
-        state.value = NativeAdLoadState.ready;
+        if (!_disposed) {
+          state.value = NativeAdLoadState.ready;
+        }
       },
-      onFailed: (error) {
-        state.value = NativeAdLoadState.failed;
-        disposeAdOnly();
+      onFailed: (_) {
+        if (!_disposed) {
+          state.value = NativeAdLoadState.failed;
+        }
       },
     );
-    _ad = ad;
-    await ad.load();
+
+    if (_disposed) {
+      loadedAd?.dispose();
+      return;
+    }
+
+    _ad = loadedAd;
+    if (loadedAd == null && state.value == NativeAdLoadState.loading) {
+      state.value = NativeAdLoadState.hidden;
+    }
   }
+
+  Future<void> retry() => load();
 
   void disposeAdOnly() {
     _ad?.dispose();
@@ -47,6 +72,8 @@ class NativeAdController {
   }
 
   void dispose() {
+    _disposed = true;
+    _adsManager.onDisposed(placement, slotId);
     disposeAdOnly();
     state.dispose();
   }
