@@ -32,5 +32,13 @@ export const ENTITLEMENT_DEFINITIONS: EntitlementDefinition[] = [
   { key: "can_access_beta_features", valueType: EntitlementValueType.BOOLEAN, description: "Beta features", defaultValue: false },
   { key: "can_purchase_promotions", valueType: EntitlementValueType.BOOLEAN, description: "Purchase promotions", defaultValue: false },
   { key: "can_be_featured", valueType: EntitlementValueType.BOOLEAN, description: "Can be featured", defaultValue: false },
-  { key: "can_receive_priority_ranking", valueType: EntitlementValueType.BOOLEAN, description: "Priority ranking", defaultValue: false }
+  { key: "can_receive_priority_ranking", valueType: EntitlementValueType.BOOLEAN, description: "Priority ranking", defaultValue: false },
+  { key: "creator_tips_enabled", valueType: EntitlementValueType.BOOLEAN, description: "Creator tips enabled", defaultValue: false },
+  { key: "creator_premium_content_enabled", valueType: EntitlementValueType.BOOLEAN, description: "Creator premium content", defaultValue: false },
+  { key: "creator_featured_eligibility", valueType: EntitlementValueType.BOOLEAN, description: "Creator featured eligibility", defaultValue: false },
+  { key: "creator_extended_upload_limits", valueType: EntitlementValueType.BOOLEAN, description: "Creator extended upload limits", defaultValue: false },
+  { key: "creator_premium_analytics", valueType: EntitlementValueType.BOOLEAN, description: "Creator premium analytics", defaultValue: false },
+  { key: "creator_membership_hooks_enabled", valueType: EntitlementValueType.BOOLEAN, description: "Creator membership foundations", defaultValue: false },
+  { key: "creator_video_extended_limits", valueType: EntitlementValueType.BOOLEAN, description: "Creator video extended limits", defaultValue: false },
+  { key: "creator_priority_review_support", valueType: EntitlementValueType.BOOLEAN, description: "Creator priority review support", defaultValue: false },
 ];

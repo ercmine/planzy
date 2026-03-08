@@ -37,6 +37,17 @@ export interface GuidePlaceItem {
   updatedAt: string;
 }
 
+
+export type ContentAccessVisibility = "public" | "followers" | "premium" | "membership";
+
+export interface ContentMonetizationMetadata {
+  mode: "free" | "premium" | "membership";
+  access: ContentAccessVisibility;
+  previewSummary?: string;
+  lockedReasonCode?: string;
+  gatingSource?: "creator_plan" | "creator_membership" | "future_bundle";
+}
+
 export interface CreatorGuide {
   id: string;
   creatorProfileId: string;
@@ -61,6 +72,7 @@ export interface CreatorGuide {
   publishedAt?: string;
   createdAt: string;
   updatedAt: string;
+  monetization?: ContentMonetizationMetadata;
 }
 
 export interface CreatorFollow {
