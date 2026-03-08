@@ -161,7 +161,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
             Expanded(
               child: CardSwiper(
                 key: ValueKey<String>(
-                  'deck-swiper-${state.items.isNotEmpty && state.items.first is DeckPlanItem ? (state.items.first as DeckPlanItem).plan.id : 'empty'}',
+                  'deck-swiper-${state.currentIndex}-${state.items.isNotEmpty && state.items.first is DeckPlanItem ? (state.items.first as DeckPlanItem).plan.id : 'empty'}',
                 ),
                 controller: _swiperController,
                 cardsCount: state.items.length,
@@ -211,7 +211,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                   return DeckCard(
                     key: ValueKey('plan-card-${plan.id}'),
                     plan: plan,
-                    isTopCard: index == 0,
+                    isTopCard: index == state.currentIndex,
                     prefetchImageUrls: prefetchUrls,
                     heroTag: 'plan-photo-${plan.id}',
                     onTap: () async {

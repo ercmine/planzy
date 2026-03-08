@@ -12,6 +12,9 @@ import '../core/utils/hashing.dart';
 import '../models/deck_batch.dart';
 import '../models/deep_links.dart';
 import '../models/plan.dart';
+import '../services/foursquare/foursquare_category_mapping.dart';
+import '../services/foursquare/foursquare_client.dart';
+import '../services/foursquare/foursquare_plan_mapper.dart';
 
 class DeckQueryParams {
   static const int _defaultMaxResults = 20;
@@ -86,12 +89,14 @@ class DeckRepository {
   DeckRepository({
     required this.apiClient,
     required this.localStore,
+    required this.foursquareClient,
     MemoryCache<String, DeckBatchResponse>? deckBatchCache,
   }) : _deckBatchCache = deckBatchCache ??
             MemoryCache<String, DeckBatchResponse>(ttl: const Duration(seconds: 30));
 
   final ApiClient apiClient;
   final LocalStore localStore;
+  final FoursquareClient foursquareClient;
   final MemoryCache<String, DeckBatchResponse> _deckBatchCache;
 
   DeckBatchResponse? getCachedDeckBatch(
@@ -123,6 +128,40 @@ class DeckRepository {
 
     List<dynamic>? responseList;
     try {
+    if (!foursquareClient.isConfigured) {
+      throw const FormatException(
+        'Missing Foursquare API key. Set FSQ_API_KEY in .env.* or --dart-define=FSQ_API_KEY=... before running the app.',
+      );
+    }
+
+      if (foursquareClient.isConfigured) {
+        final query = FoursquareCategoryMapping.queryFor(params.categories ?? const <String>[]);
+        final searchResults = await foursquareClient.searchPlaces(
+          query: query,
+          lat: params.lat,
+          lng: params.lng,
+          radius: params.radiusMeters,
+          limit: params._clampedMaxResults,
+        );
+        final plans = searchResults.map(FoursquarePlanMapper.toPlan).toList(growable: false);
+        final deck = DeckBatchResponse(
+          sessionId: sessionId,
+          plans: plans,
+          nextCursor: null,
+          mix: DeckSourceMix(
+            providersUsed: const ['foursquare'],
+            planSourceCounts: {'foursquare': plans.length},
+            categoryCounts: _categoryCounts(plans),
+            sponsoredCount: 0,
+          ),
+        );
+        _deckBatchCache.set(cacheKey, deck);
+        await localStore.saveLastSessionId(sessionId);
+        await localStore.saveLastCursor(sessionId, deck.nextCursor);
+        await localStore.saveLastSeenDeckKey(sessionId, cacheKey);
+        return deck;
+      }
+
       final response = await apiClient.getDecoded(
         ApiEndpoints.plans,
         queryParameters: params.toQueryMap(defaultLocale: 'en-US'),

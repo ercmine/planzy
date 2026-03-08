@@ -92,6 +92,7 @@ void main() {
             apiBaseUrl: 'https://example.test',
             enableDebugLogs: false,
             associatedDomain: 'example.test',
+            fsqApiKey: null,
             adsConfig: AdsConfig(
               enabled: false,
               admobAppIdIos: '',

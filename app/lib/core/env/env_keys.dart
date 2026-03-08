@@ -12,4 +12,5 @@ class EnvKeys {
   static const String adsNativeUnitIdAndroid = 'ADS_NATIVE_UNIT_ID_ANDROID';
   static const String adsFrequencyN = 'ADS_FREQUENCY_N';
   static const String adsPlaceFirstAfter = 'ADS_PLACE_FIRST_AFTER';
+  static const String fsqApiKey = 'FSQ_API_KEY';
 }

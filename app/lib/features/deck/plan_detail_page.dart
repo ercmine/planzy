@@ -15,6 +15,7 @@ import '../../models/deep_links.dart';
 import '../../models/place_review.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
+import '../../services/foursquare/foursquare_plan_mapper.dart';
 import 'widgets/category_pill.dart';
 
 class PlanDetailPage extends ConsumerStatefulWidget {
@@ -76,7 +77,8 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     }
 
     final apiClient = ref.read(apiClientProvider).valueOrNull;
-    if (apiClient == null) {
+    final fsqClient = ref.read(foursquareClientProvider);
+    if (apiClient == null && _plan.source != 'foursquare') {
       return;
     }
 
@@ -90,24 +92,57 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     });
 
     try {
-      final detailJson = await apiClient.fetchPlanDetail(_plan.id) ?? await apiClient.fetchPlaceDetail(_plan.sourceId);
-      if (!mounted || detailJson == null) {
-        return;
-      }
+      if (_plan.source == 'foursquare') {
+        final details = await fsqClient.getPlaceDetails(_plan.sourceId);
+        if (!mounted || details == null) {
+          return;
+        }
+        final photos = await fsqClient.getPlacePhotos(_plan.sourceId, limit: 10);
+        final mapped = FoursquarePlanMapper.toPlan(details).copyWith(
+          photos: photos.isEmpty
+              ? FoursquarePlanMapper.toPlan(details).photos
+              : photos
+                  .map((photo) => PlanPhoto(
+                        url: photo.originalUrl,
+                        token: photo.id,
+                        width: photo.width,
+                        height: photo.height,
+                      ))
+                  .toList(growable: false),
+        );
+        setState(() {
+          _plan = _plan.copyWith(
+            description: mapped.description,
+            location: mapped.location,
+            rating: mapped.rating,
+            priceLevel: mapped.priceLevel,
+            phone: mapped.phone,
+            photos: mapped.photos,
+            deepLinks: mapped.deepLinks,
+            metadata: {...?_plan.metadata, ...?mapped.metadata},
+          );
+          _selectedPhotoIndex = 0;
+        });
+      } else {
+        final detailJson = await apiClient!.fetchPlanDetail(_plan.id) ?? await apiClient.fetchPlaceDetail(_plan.sourceId);
+        if (!mounted || detailJson == null) {
+          return;
+        }
 
-      if (kDebugMode) {
-        debugPrint('Plan detail response keys: ${detailJson.keys.toList()}');
-      }
+        if (kDebugMode) {
+          debugPrint('Plan detail response keys: ${detailJson.keys.toList()}');
+        }
 
-      final merged = mergePlanWithDetails(basePlan: _plan, details: detailJson, apiClient: apiClient);
-      if (kDebugMode) {
-        debugPrint('Parsed detail descriptionLength=${merged.description?.length ?? 0} photoCount=${merged.photos?.length ?? 0}');
-      }
+        final merged = mergePlanWithDetails(basePlan: _plan, details: detailJson, apiClient: apiClient);
+        if (kDebugMode) {
+          debugPrint('Parsed detail descriptionLength=${merged.description?.length ?? 0} photoCount=${merged.photos?.length ?? 0}');
+        }
 
-      setState(() {
-        _plan = merged;
-        _selectedPhotoIndex = 0;
-      });
+        setState(() {
+          _plan = merged;
+          _selectedPhotoIndex = 0;
+        });
+      }
     } catch (error) {
       if (kDebugMode) {
         debugPrint('Plan detail load failed: $error');
@@ -214,6 +249,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
             children: [
               CategoryPill(category: plan.category),
               if (plan.source.trim().isNotEmpty) Chip(label: Text(plan.source)),
+              if (plan.source == 'foursquare') const Chip(label: Text('Powered by Foursquare')),
             ],
           ),
           const SizedBox(height: AppSpacing.m),
@@ -254,7 +290,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                   )
                 : Text((description != null && description.isNotEmpty)
                     ? description
-                    : 'Description is not provided by this place source.'),
+                    : 'No description available'),
           ),
           if (plan.phone?.trim().isNotEmpty == true) ...[
             const SizedBox(height: AppSpacing.m),

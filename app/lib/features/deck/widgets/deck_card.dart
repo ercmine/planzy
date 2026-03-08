@@ -143,6 +143,10 @@ class _DeckCardState extends State<DeckCard> {
 }
 
 String? resolvePlanImageUrl(Plan plan) {
+  final firstPhoto = plan.photos?.isNotEmpty == true ? plan.photos!.first.url : null;
+  if (firstPhoto != null && firstPhoto.startsWith('http')) {
+    return firstPhoto;
+  }
   final photoUrl = plan.metadata?['photoUrl']?.toString();
   if (photoUrl != null && photoUrl.startsWith('http')) {
     return photoUrl;

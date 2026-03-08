@@ -15,6 +15,7 @@ class EnvConfig {
     required this.enableDebugLogs,
     required this.associatedDomain,
     required this.adsConfig,
+    required this.fsqApiKey,
   });
 
   final EnvFlavor flavor;
@@ -22,6 +23,7 @@ class EnvConfig {
   final bool enableDebugLogs;
   final String associatedDomain;
   final AdsConfig adsConfig;
+  final String? fsqApiKey;
 }
 
 final envConfigProvider = Provider<EnvConfig>((ref) {
@@ -71,6 +73,7 @@ class Env {
       ),
       associatedDomain: dotenv.maybeGet(EnvKeys.associatedDomain) ?? 'perbug.com',
       adsConfig: AdsConfig.fromEnv(flavor: flavor),
+      fsqApiKey: _resolveFoursquareApiKey(),
     );
   }
 
@@ -82,11 +85,26 @@ class Env {
       enableDebugLogs: defaultDebug,
       associatedDomain: 'perbug.com',
       adsConfig: AdsConfig.disabled(),
+      fsqApiKey: _resolveFoursquareApiKey(),
     );
   }
 
   static String _resolveApiBaseUrl() {
     return _defaultApiBaseUrl;
+  }
+
+
+
+  static String? _resolveFoursquareApiKey() {
+    const fromDartDefine = String.fromEnvironment(EnvKeys.fsqApiKey);
+    if (fromDartDefine.trim().isNotEmpty) {
+      return fromDartDefine.trim();
+    }
+    final fromDotEnv = dotenv.maybeGet(EnvKeys.fsqApiKey)?.trim();
+    if (fromDotEnv != null && fromDotEnv.isNotEmpty) {
+      return fromDotEnv;
+    }
+    return null;
   }
 
   static bool _parseBool(String? value, {required bool fallback}) {
