@@ -36,8 +36,6 @@ import '../features/sessions/create_session/create_session_controller.dart';
 import '../features/sessions/join_session/join_session_controller.dart';
 import '../features/sessions/session_settings/session_settings_controller.dart';
 import '../features/sessions/sessions_controller.dart';
-import '../features/venue_claim/claim_venue_controller.dart';
-import '../features/venue_claim/claim_venue_state.dart';
 import '../models/session.dart';
 import '../repositories/deck_repository.dart';
 import '../repositories/ideas_repository.dart';
@@ -45,7 +43,6 @@ import '../repositories/live_results_repository.dart';
 import '../repositories/sessions_repository.dart';
 import '../repositories/swipes_repository.dart';
 import '../repositories/telemetry_repository.dart';
-import '../repositories/venue_claim_repository.dart';
 
 
 final adsConfigProvider = Provider<AdsConfig>((ref) {
@@ -133,21 +130,6 @@ final telemetryDispatcherProvider = Provider<TelemetryDispatcher?>((ref) {
   return dispatcher;
 });
 
-final venueClaimRepositoryProvider = Provider<VenueClaimRepository?>((ref) {
-  final apiClient = ref.watch(apiClientProvider).valueOrNull;
-  if (apiClient == null) {
-    return null;
-  }
-  return VenueClaimRepository(apiClient: apiClient);
-});
-
-final claimVenueControllerProvider = StateNotifierProvider.autoDispose<
-    ClaimVenueController,
-    ClaimVenueState>((ref) {
-  return ClaimVenueController(
-    repository: ref.watch(venueClaimRepositoryProvider),
-  );
-});
 
 final permissionServiceProvider = Provider<PermissionService>((ref) {
   return PermissionService();

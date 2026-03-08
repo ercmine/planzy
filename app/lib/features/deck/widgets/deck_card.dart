@@ -214,26 +214,9 @@ class _CardMeta extends StatelessWidget {
             if (isFriendIdea(plan)) const FriendIdeaBadge(),
             if (isSponsored) const SponsoredBadge(),
             if (plan.hasSpecials) const SpecialsBadge(),
-            if (plan.isVenueLike) const _ClaimBadge(),
           ],
         ),
       ],
-    );
-  }
-}
-
-class _ClaimBadge extends StatelessWidget {
-  const _ClaimBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: const Text('Claim'),
     );
   }
 }
