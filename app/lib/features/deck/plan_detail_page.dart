@@ -16,12 +16,14 @@ import '../../models/place_review.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
 import '../../services/foursquare/foursquare_plan_mapper.dart';
+import 'place_detail_models.dart';
 import 'widgets/category_pill.dart';
 
 class PlanDetailPage extends ConsumerStatefulWidget {
   const PlanDetailPage({
     required this.plan,
     required this.sessionId,
+    this.relatedSeed = const <Plan>[],
     this.sessionLat,
     this.sessionLng,
     this.heroTag,
@@ -30,6 +32,7 @@ class PlanDetailPage extends ConsumerStatefulWidget {
 
   final Plan plan;
   final String sessionId;
+  final List<Plan> relatedSeed;
   final double? sessionLat;
   final double? sessionLng;
   final Object? heroTag;
@@ -40,6 +43,7 @@ class PlanDetailPage extends ConsumerStatefulWidget {
 
 class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   late Plan _plan;
+  Map<String, dynamic>? _rawDetails;
   bool _isLoadingDetails = false;
   String? _detailsError;
   int _selectedPhotoIndex = 0;
@@ -121,6 +125,17 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
             deepLinks: mapped.deepLinks,
             metadata: {...?_plan.metadata, ...?mapped.metadata},
           );
+          _rawDetails = {
+            'description': mapped.description,
+            'address': mapped.location.address,
+            'rating': mapped.rating,
+            'priceLevel': mapped.priceLevel,
+            'phone': mapped.phone,
+            'websiteUri': mapped.deepLinks?.websiteLink,
+            'googleMapsUri': mapped.deepLinks?.mapsLink,
+            'openingHoursText': mapped.openingHoursText,
+            'providers': const ['foursquare'],
+          };
           _selectedPhotoIndex = 0;
         });
       } else {
@@ -140,6 +155,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
 
         setState(() {
           _plan = merged;
+          _rawDetails = detailJson;
           _selectedPhotoIndex = 0;
         });
       }
@@ -231,88 +247,204 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   @override
   Widget build(BuildContext context) {
     final plan = _plan;
-    final photos = plan.photos ?? const <PlanPhoto>[];
-    final address = plan.location.address;
+    final apiClient = ref.read(apiClientProvider).valueOrNull;
+    final viewData = normalizePlaceDetail(
+      basePlan: plan,
+      details: _rawDetails,
+      buildPhotoUrl: (token) => apiClient?.buildPhotoUrl(token) ?? token,
+      seedRelated: widget.relatedSeed
+          .map(
+            (candidate) => PlaceDetailRelatedItem(
+              id: candidate.id,
+              sourceId: candidate.sourceId,
+              title: candidate.title,
+              category: candidate.category,
+              source: candidate.source,
+              address: candidate.location.address,
+              rating: candidate.rating,
+              distanceMeters: candidate.distanceMeters,
+              photoUrl: candidate.photos?.isNotEmpty == true ? candidate.photos!.first.url : null,
+              lat: candidate.location.lat,
+              lng: candidate.location.lng,
+            ),
+          )
+          .toList(growable: false),
+    );
+
     final distance = _distanceLabel(plan);
-    final description = plan.description?.trim();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Plan details')),
+      appBar: AppBar(title: const Text('Place details')),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.m),
         children: [
-          Text(plan.title, style: Theme.of(context).textTheme.headlineSmall),
+          Text(viewData.name, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: AppSpacing.s),
           Wrap(
             spacing: AppSpacing.s,
             runSpacing: AppSpacing.s,
             children: [
-              CategoryPill(category: plan.category),
-              if (plan.source.trim().isNotEmpty) Chip(label: Text(plan.source)),
-              if (plan.source == 'foursquare') const Chip(label: Text('Powered by Foursquare')),
+              CategoryPill(category: viewData.category),
+              if (viewData.subcategory?.isNotEmpty == true) Chip(label: Text(viewData.subcategory!)),
+              if (viewData.source.trim().isNotEmpty) Chip(label: Text(viewData.source)),
+              if (viewData.openNow != null)
+                Chip(label: Text(viewData.openNow! ? 'Open now' : 'Closed now')),
             ],
           ),
           const SizedBox(height: AppSpacing.m),
-          _buildPhotoGallery(context, photos),
+          _buildPhotoGallery(context, viewData.photos),
           const SizedBox(height: AppSpacing.m),
           _Section(
-            title: 'Details',
+            title: 'Overview',
             child: Wrap(
               spacing: AppSpacing.m,
               runSpacing: AppSpacing.s,
               children: [
-                if (plan.rating != null)
+                if (viewData.rating != null)
                   Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text(plan.rating!.toStringAsFixed(1)),
+                    Text(viewData.rating!.toStringAsFixed(1)),
                     const SizedBox(width: 4),
                     const Icon(Icons.star, size: 16, color: Colors.amber),
-                    if (plan.reviewCount != null) Text(' (${plan.reviewCount})'),
+                    if (viewData.reviewCount != null) Text(' (${viewData.reviewCount})'),
                   ]),
-                if (plan.priceLevel != null) Text('Price ${formatPriceLevel(plan.priceLevel)}'),
+                if (viewData.priceLevel != null) Text('Price ${formatPriceLevel(viewData.priceLevel)}'),
                 if (distance != null) Text(distance),
               ],
             ),
           ),
-          if (address != null && address.trim().isNotEmpty) ...[
+          if (viewData.address?.trim().isNotEmpty == true) ...[
             const SizedBox(height: AppSpacing.m),
             _Section(
-              title: 'Location',
-              child: SelectableText(address),
+              title: 'Address',
+              child: SelectableText(viewData.address!),
             ),
           ],
           const SizedBox(height: AppSpacing.m),
           _Section(
             title: 'About',
-            child: _isLoadingDetails && (description == null || description.isEmpty)
+            child: _isLoadingDetails && (viewData.effectiveDescription == null)
                 ? const Padding(
                     padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
                     child: LinearProgressIndicator(),
                   )
-                : Text((description != null && description.isNotEmpty)
-                    ? description
-                    : 'No description available'),
+                : Text(viewData.effectiveDescription ?? 'Explore this place for details and updates.'),
           ),
-          if (plan.phone?.trim().isNotEmpty == true) ...[
-            const SizedBox(height: AppSpacing.m),
-            _Section(title: 'Phone', child: Text(plan.phone!)),
-          ],
-          if (plan.openingHoursText?.isNotEmpty == true) ...[
+          if (viewData.phone?.trim().isNotEmpty == true || viewData.website?.trim().isNotEmpty == true) ...[
             const SizedBox(height: AppSpacing.m),
             _Section(
-              title: 'Hours',
+              title: 'Contact',
+              child: Wrap(
+                spacing: AppSpacing.s,
+                runSpacing: AppSpacing.s,
+                children: [
+                  if (viewData.phone?.trim().isNotEmpty == true)
+                    FilledButton.tonalIcon(
+                      onPressed: () => _launchUri(context, Uri.tryParse('tel:${viewData.phone}')),
+                      icon: const Icon(Icons.phone_outlined),
+                      label: Text(viewData.phone!),
+                    ),
+                  if (viewData.website?.trim().isNotEmpty == true)
+                    FilledButton.tonalIcon(
+                      onPressed: () => _launchUri(context, Uri.tryParse(viewData.website!)),
+                      icon: const Icon(Icons.public),
+                      label: const Text('Website'),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.m),
+          _Section(
+            title: 'Hours',
+            child: viewData.hours.isEmpty
+                ? const Text('Hours unavailable')
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: viewData.hours
+                        .map(
+                          (row) => Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Text(
+                              row.label,
+                              style: row.isToday ? const TextStyle(fontWeight: FontWeight.w700) : null,
+                            ),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+          ),
+          if (viewData.lat != null && viewData.lng != null) ...[
+            const SizedBox(height: AppSpacing.m),
+            _Section(
+              title: 'Map',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.location_on_outlined),
+                title: const Text('View map location'),
+                subtitle: Text('${viewData.lat!.toStringAsFixed(5)}, ${viewData.lng!.toStringAsFixed(5)}'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _openMaps(context, plan),
+              ),
+            ),
+          ],
+          if (viewData.attribution.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.m),
+            _Section(
+              title: 'Source attribution',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: plan.openingHoursText!
-                    .map((line) => Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Text(line),
-                        ))
-                    .toList(),
+                children: viewData.attribution
+                    .map((item) => Text(item.label ?? 'Data from ${item.provider}'))
+                    .toList(growable: false),
+              ),
+            ),
+          ],
+          if (viewData.related.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.m),
+            _Section(
+              title: 'Related places',
+              child: Column(
+                children: viewData.related
+                    .map(
+                      (item) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(item.title),
+                        subtitle: Text([item.category, if (item.address != null) item.address!].join(' · ')),
+                        leading: item.photoUrl == null
+                            ? const CircleAvatar(child: Icon(Icons.place_outlined))
+                            : CircleAvatar(backgroundImage: NetworkImage(item.photoUrl!)),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => PlanDetailPage(
+                              plan: Plan(
+                                id: item.id,
+                                source: item.source,
+                                sourceId: item.sourceId,
+                                title: item.title,
+                                category: item.category,
+                                location: PlanLocation(lat: item.lat ?? plan.location.lat, lng: item.lng ?? plan.location.lng, address: item.address),
+                                rating: item.rating,
+                                distanceMeters: item.distanceMeters,
+                              ),
+                              sessionId: widget.sessionId,
+                              sessionLat: widget.sessionLat,
+                              sessionLng: widget.sessionLng,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
               ),
             ),
           ],
           const SizedBox(height: AppSpacing.m),
           _buildReviewsSection(context),
+          const SizedBox(height: AppSpacing.m),
+          _Section(
+            title: 'Perbug creator and business tools',
+            child: const Text('Creator videos, venue claims, and premium insights will appear here as features roll out.'),
+          ),
           const SizedBox(height: AppSpacing.m),
           Wrap(
             spacing: AppSpacing.s,
@@ -321,13 +453,8 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
               FilledButton.icon(
                 onPressed: () => _openMaps(context, plan),
                 icon: const Icon(Icons.map_outlined),
-                label: const Text('Open in Maps'),
+                label: const Text('Directions'),
               ),
-              if (plan.deepLinks?.websiteLink?.isNotEmpty == true)
-                FilledButton.tonal(
-                  onPressed: () => _launchUri(context, Uri.tryParse(plan.deepLinks!.websiteLink!)),
-                  child: const Text('Website'),
-                ),
               FilledButton.tonal(
                 onPressed: () => _share(plan),
                 child: const Text('Share'),
@@ -343,7 +470,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     );
   }
 
-  Widget _buildPhotoGallery(BuildContext context, List<PlanPhoto> photos) {
+  Widget _buildPhotoGallery(BuildContext context, List<PlaceDetailPhoto> photos) {
     if (photos.isEmpty) {
       return Container(
         height: 220,
@@ -351,7 +478,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Center(child: Icon(Icons.photo, size: 56)),
+        child: const Center(child: Icon(Icons.photo_library_outlined, size: 56)),
       );
     }
 
@@ -388,10 +515,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: _buildNetworkImage(photo.url),
-                      ),
+                      child: AspectRatio(aspectRatio: 1, child: _buildNetworkImage(photo.url)),
                     ),
                   ),
                 );
@@ -558,7 +682,8 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   }
 
   Future<void> _launchUri(BuildContext context, Uri? uri) async {
-    if (uri == null || !(uri.hasScheme && uri.host.isNotEmpty)) {
+    final canUseSchemeOnly = uri?.scheme == 'tel' || uri?.scheme == 'mailto';
+    if (uri == null || !uri.hasScheme || (!canUseSchemeOnly && uri.host.isEmpty)) {
       if (!context.mounted) {
         return;
       }

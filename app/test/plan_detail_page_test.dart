@@ -146,7 +146,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Loaded description'), findsOneWidget);
-    expect(find.byType(GestureDetector), findsNWidgets(2));
+    expect(find.byType(GestureDetector), findsAtLeastNWidgets(2));
     expect(fakeApi.fetchPlaceDetailCalls, 1);
   });
 
