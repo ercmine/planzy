@@ -1,5 +1,6 @@
 export type DiscoverySortMode = "relevance" | "nearby" | "trending" | "top_rated" | "recommended" | "popular" | "newest";
 export type DiscoveryFeedMode = "for_you" | "nearby" | "category" | "city" | "trending";
+export type RecommendationSurface = "home" | "for_you" | "city" | "category" | "place_detail" | "creator" | "guide";
 
 export interface DiscoveryFilterSet {
   openNow?: boolean;
@@ -22,6 +23,9 @@ export interface DiscoveryQueryContext {
   cursor?: string;
   filters?: DiscoveryFilterSet;
   explain?: boolean;
+  surface?: RecommendationSurface;
+  placeId?: string;
+  creatorId?: string;
 }
 
 export interface PlaceDocument {
@@ -57,6 +61,56 @@ export interface PlaceDocument {
   trendingScore: number;
   keywords: string[];
   updatedAt: string;
+  creatorId?: string;
+  creatorTrustScore?: number;
+  chainId?: string;
+  moderationState?: "active" | "suppressed";
+  isClosed?: boolean;
+}
+
+export interface CreatorDocument {
+  creatorId: string;
+  displayName: string;
+  city?: string;
+  qualityScore: number;
+  trustScore: number;
+  categoryFocus: string[];
+}
+
+export interface GuideDocument {
+  guideId: string;
+  creatorId: string;
+  title: string;
+  city?: string;
+  category: string;
+  placeIds: string[];
+  qualityScore: number;
+}
+
+export type RecommendationSignalName =
+  | "category_interest"
+  | "saved_place_similarity"
+  | "location_relevance"
+  | "engagement_history"
+  | "creator_affinity"
+  | "quality_trust"
+  | "trending_backstop"
+  | "freshness"
+  | "novelty"
+  | "repetition_penalty"
+  | "negative_feedback";
+
+export interface RecommendationSignal {
+  signal: RecommendationSignalName;
+  value: number;
+  weight: number;
+  contribution: number;
+  reasonCode: string;
+}
+
+export interface SignalBreakdown {
+  finalScore: number;
+  signals: RecommendationSignal[];
 }
 
 export interface RankingExplain {
@@ -84,6 +138,8 @@ export interface PlaceResultItem {
     trendingScore?: number;
     recommendationReasons?: string[];
     description?: PlaceDocument["descriptionMetadata"];
+    diversityBucket?: string;
+    explanation?: SignalBreakdown;
   };
   longDescription?: string;
   userContext?: {
@@ -137,6 +193,35 @@ export interface RecommendationsResponse {
   nextCursor?: string;
 }
 
+export interface RelatedPlacesResponse {
+  placeId: string;
+  items: PlaceResultItem[];
+  nextCursor?: string;
+}
+
+export interface SuggestedCreator {
+  creatorId: string;
+  displayName: string;
+  score: number;
+  reasons: string[];
+}
+
+export interface SuggestedGuide {
+  guideId: string;
+  creatorId: string;
+  title: string;
+  score: number;
+  reasons: string[];
+}
+
+export interface SuggestedCreatorsResponse {
+  items: SuggestedCreator[];
+}
+
+export interface SuggestedGuidesResponse {
+  items: SuggestedGuide[];
+}
+
 export interface DiscoveryFeedCardPlace {
   type: "place";
   id: string;
@@ -169,16 +254,75 @@ export interface CityPageResponse {
   sections: CityPageSection[];
 }
 
-export interface RecommendationProfile {
+export interface UserRecommendationProfile {
   userId: string;
-  preferredCategories: string[];
+  categoryWeights: Record<string, number>;
+  cityWeights: Record<string, number>;
+  savedPlaceIds: string[];
+  savedPlaceCategories: Record<string, number>;
+  creatorAffinity: Record<string, number>;
+  engagementCategoryWeights: Record<string, number>;
+  hiddenPlaceIds: string[];
   excludedPlaceIds: string[];
   seenPlaceIds: string[];
   homeCity?: string;
+  preferredCity?: string;
   coldStart: boolean;
+  noveltyTolerance: number;
+}
+
+export type RecommendationProfile = UserRecommendationProfile;
+
+export interface RecommendationContext {
+  userId?: string;
+  anonymous: boolean;
+  city?: string;
+  lat?: number;
+  lng?: number;
+  radiusMeters: number;
+  surface: RecommendationSurface;
+  categoryFilter?: string;
+  placeId?: string;
+  creatorId?: string;
+  cursor?: string;
+  pageSize: number;
+  explain: boolean;
+}
+
+export interface RecommendationConfig {
+  weights: {
+    categoryInterest: number;
+    cityRelevance: number;
+    savedPlaceSimilarity: number;
+    engagementSimilarity: number;
+    creatorAffinity: number;
+    qualityTrust: number;
+    trendingBackstop: number;
+    freshness: number;
+    novelty: number;
+    repetitionPenalty: number;
+    negativeFeedbackPenalty: number;
+  };
+  limits: {
+    maxCandidates: number;
+    maxPerCategory: number;
+    maxPerCreator: number;
+    maxPerChain: number;
+    qualityFloor: number;
+  };
+  geo: {
+    nearbyRadiusMeters: number;
+    locationBoost: number;
+  };
+  coldStartMix: {
+    trendingWeight: number;
+    qualityWeight: number;
+  };
 }
 
 export interface PlaceDiscoveryRepository {
   listPlaces(): Promise<PlaceDocument[]>;
-  getRecommendationProfile(userId: string): Promise<RecommendationProfile | undefined>;
+  listCreators(): Promise<CreatorDocument[]>;
+  listGuides(): Promise<GuideDocument[]>;
+  getRecommendationProfile(userId: string): Promise<UserRecommendationProfile | undefined>;
 }

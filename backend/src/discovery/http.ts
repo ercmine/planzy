@@ -19,6 +19,9 @@ export interface DiscoveryHandlers {
   nearby(req: IncomingMessage, res: ServerResponse): Promise<void>;
   trending(req: IncomingMessage, res: ServerResponse): Promise<void>;
   recommendations(req: IncomingMessage, res: ServerResponse): Promise<void>;
+  relatedPlaces(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void>;
+  suggestedCreators(req: IncomingMessage, res: ServerResponse): Promise<void>;
+  suggestedGuides(req: IncomingMessage, res: ServerResponse): Promise<void>;
   feed(req: IncomingMessage, res: ServerResponse): Promise<void>;
 }
 
@@ -65,7 +68,22 @@ export function createDiscoveryHttpHandlers(deps: DiscoveryHttpHandlerDeps): Dis
     async recommendations(req, res) {
       const { context } = requestContext(req);
       const userId = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
-      sendJson(res, 200, await deps.recommendationService.recommend(userId, context));
+      sendJson(res, 200, await deps.recommendationService.getPersonalizedRecommendations(userId, context));
+    },
+    async relatedPlaces(req, res, placeId) {
+      const { context } = requestContext(req);
+      const userId = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
+      sendJson(res, 200, await deps.recommendationService.getRelatedPlacesForPlace(userId, placeId, context));
+    },
+    async suggestedCreators(req, res) {
+      const { context } = requestContext(req);
+      const userId = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
+      sendJson(res, 200, await deps.recommendationService.getSuggestedCreators(userId, context));
+    },
+    async suggestedGuides(req, res) {
+      const { context } = requestContext(req);
+      const userId = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
+      sendJson(res, 200, await deps.recommendationService.getSuggestedGuides(userId, context));
     },
     async feed(req, res) {
       const { context, url } = requestContext(req);

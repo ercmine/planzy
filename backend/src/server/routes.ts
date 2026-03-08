@@ -212,6 +212,23 @@ export function createRoutes(
         return;
       }
 
+
+      const relatedPlacesMatch = /^\/v1\/discovery\/places\/([^/]+)\/related$/.exec(normalizedPath);
+      if (discoveryHandlers && req.method === "GET" && relatedPlacesMatch) {
+        await discoveryHandlers.relatedPlaces(req, res, decodeURIComponent(relatedPlacesMatch[1] ?? ""));
+        return;
+      }
+
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/suggested-creators") {
+        await discoveryHandlers.suggestedCreators(req, res);
+        return;
+      }
+
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/suggested-guides") {
+        await discoveryHandlers.suggestedGuides(req, res);
+        return;
+      }
+
       const cityPageMatch = /^\/v1\/discovery\/cities\/([^/]+)$/.exec(normalizedPath);
       if (discoveryHandlers && req.method === "GET" && cityPageMatch) {
         await discoveryHandlers.cityPage(req, res, decodeURIComponent(cityPageMatch[1] ?? ""));
