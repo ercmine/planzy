@@ -6,6 +6,7 @@ import { MemoryCreatorStore } from "../creator/memoryStore.js";
 import { CreatorService } from "../creator/service.js";
 import { CreatorMonetizationService, MemoryCreatorMonetizationStore } from "../creatorMonetization/index.js";
 import { ClickTracker, MemoryClickStore } from "../analytics/clicks/index.js";
+import { BusinessAnalyticsService, MemoryBusinessAnalyticsStore } from "../businessAnalytics/index.js";
 import { createDeckHandler } from "../api/sessions/deckHandler.js";
 import { createIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { AppConfig } from "../config/schema.js";
@@ -64,7 +65,8 @@ function createDefaultDeckRouter(sharedIdeasStore: IdeasStore): ProviderRouter {
 }
 
 export function createServer(options?: CreateServerOptions) {
-  const service = new VenueClaimsService(new MemoryVenueClaimStore());
+  const claimsStore = new MemoryVenueClaimStore();
+  const service = new VenueClaimsService(claimsStore);
   const merchantService = new MerchantService(new MemoryMerchantStore());
   const ideasStore = options?.ideasStore ?? new MemoryIdeasStore();
   const deckRouter = options?.deckRouter ?? createDefaultDeckRouter(ideasStore);
@@ -83,6 +85,7 @@ export function createServer(options?: CreateServerOptions) {
   const monetizationService = new CreatorMonetizationService(new MemoryCreatorMonetizationStore(), accountsService, subscriptionService, creatorStore, accessEngine);
   const creatorService = new CreatorService(creatorStore, accountsService, reviewsStore, subscriptionService, accessEngine, monetizationService);
   const savedService = new SavedService(new MemorySavedStore(), subscriptionService, accessEngine);
+  const businessAnalyticsService = new BusinessAnalyticsService(new MemoryBusinessAnalyticsStore(), claimsStore, accessEngine);
 
   const discoveryRepository = new InMemoryDiscoveryRepository();
   const placeSearchService = new PlaceSearchService(discoveryRepository);
@@ -121,6 +124,7 @@ export function createServer(options?: CreateServerOptions) {
     accountsService,
     creatorService,
     creatorMonetizationService: monetizationService,
+    businessAnalyticsService,
     savedHandlers: createSavedHttpHandlers(savedService),
     discovery: {
       searchService: placeSearchService,

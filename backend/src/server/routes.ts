@@ -5,9 +5,11 @@ import { createAccountsHttpHandlers } from "../accounts/http.js";
 import { createDiscoveryHttpHandlers } from "../discovery/http.js";
 import { createCreatorHttpHandlers } from "../creator/http.js";
 import { createCreatorMonetizationHttpHandlers } from "../creatorMonetization/http.js";
+import { createBusinessAnalyticsHttpHandlers } from "../businessAnalytics/http.js";
 import type { AccountsService } from "../accounts/service.js";
 import type { CreatorService } from "../creator/service.js";
 import type { CreatorMonetizationService } from "../creatorMonetization/service.js";
+import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
 import { PermissionAction, ProfileType } from "../accounts/types.js";
 import type { ActorContextResolved } from "../accounts/types.js";
@@ -71,6 +73,7 @@ export function createRoutes(
     accountsService?: AccountsService;
     creatorService?: CreatorService;
     creatorMonetizationService?: CreatorMonetizationService;
+    businessAnalyticsService?: BusinessAnalyticsService;
     discovery?: DiscoveryHttpHandlerDeps;
     savedHandlers?: SavedHttpHandlers;
   }
@@ -85,6 +88,7 @@ export function createRoutes(
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
   const creatorMonetizationHandlers = deps?.creatorMonetizationService ? createCreatorMonetizationHttpHandlers(deps.creatorMonetizationService) : null;
+  const businessAnalyticsHandlers = deps?.businessAnalyticsService ? createBusinessAnalyticsHttpHandlers(deps.businessAnalyticsService) : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -105,6 +109,17 @@ export function createRoutes(
           service: "perbug-api",
           version: "1.0.0"
         });
+        return;
+      }
+
+      if (businessAnalyticsHandlers && req.method === "POST" && normalizedPath === "/v1/business/analytics/events") {
+        await businessAnalyticsHandlers.trackEvent(req, res);
+        return;
+      }
+
+      const businessAnalyticsMatch = /^\/v1\/business\/profiles\/([^/]+)\/analytics\/dashboard$/.exec(normalizedPath);
+      if (businessAnalyticsHandlers && req.method === "GET" && businessAnalyticsMatch) {
+        await businessAnalyticsHandlers.dashboard(req, res, decodeURIComponent(businessAnalyticsMatch[1] ?? ""));
         return;
       }
 
