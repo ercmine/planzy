@@ -54,8 +54,8 @@ class DeckQueryParams {
     return <String, String?>{
       'cursor': cursor,
       'limit': limit?.toString(),
-      'lat': lat?.toString(),
-      'lng': lng?.toString(),
+      'lat': lat == null ? null : lat!.toStringAsFixed(6),
+      'lng': lng == null ? null : lng!.toStringAsFixed(6),
       'radiusMeters': radiusMeters?.toString(),
       'categories': categories?.join(','),
       'openNow': openNow?.toString(),

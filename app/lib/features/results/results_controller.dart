@@ -36,7 +36,7 @@ class ResultsController extends StateNotifier<ResultsState> {
   static const double _debugDefaultLng = -93.5590;
 
   Future<void> refresh() async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    state = state.copyWith(isLoading: true, clearError: true, locationRequired: false);
     try {
       final swipeCount = await _swipesRepository.getSwipeCount(_sessionId);
       final topPicks = await _swipesRepository.computeTopPicks(_sessionId);
@@ -68,6 +68,11 @@ class ResultsController extends StateNotifier<ResultsState> {
     }
   }
 
+  Future<void> requestLocationAndReload() async {
+    await _locationController.requestPermissionAndLoad();
+    await refresh();
+  }
+
   Future<LiveResultsResponse?> _loadLiveResults() async {
     if (_liveResultsRepository == null) {
       return null;
@@ -80,7 +85,8 @@ class ResultsController extends StateNotifier<ResultsState> {
     }
 
     if (location == null) {
-      throw const FormatException('Enable location to load live results.');
+      state = state.copyWith(locationRequired: true, isLoading: false);
+      return null;
     }
 
     return _liveResultsRepository!.fetchLiveResults(

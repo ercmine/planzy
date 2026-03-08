@@ -23,12 +23,14 @@ class ResultsState {
     required this.swipeCount,
     this.activeSessions,
     this.generatedAt,
+    required this.locationRequired,
   });
 
   factory ResultsState.initial() => const ResultsState(
         isLoading: true,
         topPicks: <PlanScoreView>[],
         swipeCount: 0,
+        locationRequired: false,
       );
 
   final bool isLoading;
@@ -38,6 +40,7 @@ class ResultsState {
   final int swipeCount;
   final int? activeSessions;
   final String? generatedAt;
+  final bool locationRequired;
 
   ResultsState copyWith({
     bool? isLoading,
@@ -47,6 +50,7 @@ class ResultsState {
     int? swipeCount,
     int? activeSessions,
     String? generatedAt,
+    bool? locationRequired,
     bool clearError = false,
   }) {
     return ResultsState(
@@ -57,6 +61,7 @@ class ResultsState {
       swipeCount: swipeCount ?? this.swipeCount,
       activeSessions: activeSessions ?? this.activeSessions,
       generatedAt: generatedAt ?? this.generatedAt,
+      locationRequired: locationRequired ?? this.locationRequired,
     );
   }
 }
