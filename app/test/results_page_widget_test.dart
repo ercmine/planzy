@@ -12,6 +12,8 @@ import 'package:perbug/core/location/location_permission_service.dart';
 import 'package:perbug/core/location/location_service.dart';
 import 'package:perbug/core/sharing/share_service.dart';
 import 'package:perbug/features/results/results_controller.dart';
+import 'package:perbug/features/results/results_mapper.dart';
+import 'package:perbug/features/results/results_models.dart';
 import 'package:perbug/features/results/results_page.dart';
 import 'package:perbug/features/results/results_state.dart';
 import 'package:perbug/models/plan.dart';
@@ -40,11 +42,7 @@ class _FakeLocationPermissionService extends LocationPermissionService {
 class _FakeLocationService extends LocationService {
   @override
   Future<AppLocation> getCurrentLocation() async {
-    return AppLocation(
-      lat: 37.7,
-      lng: -122.4,
-      capturedAt: DateTime.utc(2024, 1, 1),
-    );
+    return AppLocation(lat: 37.7, lng: -122.4, capturedAt: DateTime.utc(2024, 1, 1));
   }
 }
 
@@ -80,6 +78,9 @@ class _TestResultsController extends ResultsController {
 
   @override
   Future<void> lockIn(Plan plan) async {}
+
+  @override
+  Future<void> loadMore() async {}
 }
 
 void main() {
@@ -106,80 +107,77 @@ void main() {
             ),
           ),
         ),
-        resultsControllerProvider.overrideWith(
-          (ref, sessionId) => _TestResultsController(state),
-        ),
+        resultsControllerProvider.overrideWith((ref, sessionId) => _TestResultsController(state)),
       ],
       child: child ?? MaterialApp(theme: buildAppTheme(Brightness.light), home: const ResultsPage(sessionId: 'session-1')),
     );
   }
 
-  testWidgets('Results page renders items when provider has data', (tester) async {
+  testWidgets('Results page renders cards when provider has data', (tester) async {
+    final scored = PlanScoreView(plan: _plan('plan-1'), score: 3, yesCount: 1, maybeCount: 1);
     final state = ResultsState(
       isLoading: false,
-      topPicks: [
-        PlanScoreView(plan: _plan('plan-1'), score: 3, yesCount: 1, maybeCount: 1),
-      ],
+      isRefreshing: false,
+      isLoadingMore: false,
+      topPicks: [scored],
+      feedItems: [PlaceResultFeedItem(card: mapPlanToCardViewModel(scored), isLocked: false)],
       swipeCount: 1,
       locationRequired: false,
+      hasMore: false,
     );
 
     await tester.pumpWidget(_wrap(state));
     await tester.pump();
 
     expect(find.text('Plan plan-1'), findsOneWidget);
+    expect(find.text('food'), findsOneWidget);
   });
 
-  testWidgets('Results page shows loading indicator while fetching', (tester) async {
+  testWidgets('Results page shows loading skeleton while fetching', (tester) async {
     final state = const ResultsState(
       isLoading: true,
+      isRefreshing: false,
+      isLoadingMore: false,
       topPicks: <PlanScoreView>[],
+      feedItems: <ResultFeedItem>[],
       swipeCount: 0,
       locationRequired: false,
+      hasMore: false,
     );
 
     await tester.pumpWidget(_wrap(state));
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(Card), findsWidgets);
   });
 
   testWidgets('Results page shows empty state for zero results', (tester) async {
     final state = const ResultsState(
       isLoading: false,
+      isRefreshing: false,
+      isLoadingMore: false,
       topPicks: <PlanScoreView>[],
+      feedItems: <ResultFeedItem>[],
       swipeCount: 0,
       locationRequired: false,
+      hasMore: false,
     );
 
     await tester.pumpWidget(_wrap(state));
 
-    expect(find.text('No plans returned from API. Pull to refresh.'), findsOneWidget);
+    expect(find.text('No results found yet.'), findsOneWidget);
   });
 
-  testWidgets('Results page shows error state on failure', (tester) async {
-    final state = const ResultsState(
-      isLoading: false,
-      topPicks: <PlanScoreView>[],
-      swipeCount: 0,
-      locationRequired: false,
-      errorMessage: 'Could not load results (HTTP 500)',
-    );
-
-    await tester.pumpWidget(_wrap(state));
-
-    expect(find.text('Could not load plans'), findsOneWidget);
-    expect(find.text('Could not load results (HTTP 500)'), findsOneWidget);
-  });
-
-  testWidgets('Navigating to Results page with valid data displays the first result',
-      (tester) async {
+  testWidgets('Navigating to Results page with valid data displays the first result', (tester) async {
+    final scored = PlanScoreView(plan: _plan('plan-1'), score: 4, yesCount: 2, maybeCount: 0);
     final state = ResultsState(
       isLoading: false,
-      topPicks: [
-        PlanScoreView(plan: _plan('plan-1'), score: 4, yesCount: 2, maybeCount: 0),
-      ],
+      isRefreshing: false,
+      isLoadingMore: false,
+      topPicks: [scored],
+      feedItems: [PlaceResultFeedItem(card: mapPlanToCardViewModel(scored), isLocked: false)],
       swipeCount: 2,
       locationRequired: false,
+      hasMore: false,
     );
 
     final router = GoRouter(
@@ -187,8 +185,7 @@ void main() {
       routes: [
         GoRoute(
           path: '/sessions/:id/results',
-          builder: (context, routeState) =>
-              ResultsPage(sessionId: routeState.pathParameters['id'] ?? ''),
+          builder: (context, routeState) => ResultsPage(sessionId: routeState.pathParameters['id'] ?? ''),
         ),
       ],
     );

@@ -1,18 +1,13 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ads/native_ad_card.dart';
-import '../../api/api_client.dart';
 import '../../app/theme/spacing.dart';
-import '../../config/admob_config.dart';
 import '../../core/ads/native_ad_controller.dart';
-import '../../core/env/env.dart';
-import '../../core/location/location_models.dart';
-import '../../core/debug_flags.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
 import 'results_controller.dart';
+import 'results_models.dart';
 import 'results_state.dart';
 import 'widgets/results_plan_tile.dart';
 
@@ -26,199 +21,94 @@ class ResultsPage extends ConsumerStatefulWidget {
 }
 
 class _ResultsPageState extends ConsumerState<ResultsPage> {
+  final _scrollController = ScrollController();
   final Map<String, NativeAdController> _adControllers = <String, NativeAdController>{};
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
   void dispose() {
+    _scrollController.dispose();
     for (final c in _adControllers.values) {
       c.dispose();
     }
     super.dispose();
   }
 
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 240) {
+      ref.read(resultsControllerProvider(widget.sessionId).notifier).loadMore();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(resultsControllerProvider(widget.sessionId));
     final controller = ref.read(resultsControllerProvider(widget.sessionId).notifier);
-    final envConfig = ref.watch(envConfigProvider);
-    final location = ref.watch(locationControllerProvider).effectiveLocation;
-    final apiClient = ref.watch(apiClientProvider).valueOrNull;
-
-    if (kDebugMode) {
-      debugPrint(
-        '[ResultsPage] build session=${widget.sessionId} '
-        'isLoading=${state.isLoading} topPicks=${state.topPicks.length} '
-        'error=${state.errorMessage ?? '-'} locationRequired=${state.locationRequired}',
-      );
-    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Results')),
       body: RefreshIndicator(
         onRefresh: controller.refresh,
-        child: Builder(
-          builder: (context) {
-            if (state.isLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        child: state.isLoading
+            ? _LoadingList()
+            : state.feedItems.isEmpty
+                ? _EmptyResults(state: state, onRetry: controller.refresh, onEnableLocation: controller.requestLocationAndReload)
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(AppSpacing.m),
+                    itemCount: state.feedItems.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == state.feedItems.length) {
+                        if (state.isLoadingMore) {
+                          return const Padding(
+                            padding: EdgeInsets.all(AppSpacing.m),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        if (!state.hasMore) {
+                          return const Padding(
+                            padding: EdgeInsets.all(AppSpacing.m),
+                            child: Center(child: Text('No more results')),
+                          );
+                        }
+                        return const SizedBox(height: AppSpacing.xl);
+                      }
 
-            if (state.topPicks.isEmpty) {
-              return ListView(
-                padding: const EdgeInsets.all(AppSpacing.m),
-                children: [
-                  if (kShowDebugUi && envConfig.enableDebugLogs)
-                    _DebugBanner(location: location, apiClient: apiClient),
-                  if (state.liveResultsErrorMessage != null)
-                    Card(
-                      color: Theme.of(context).colorScheme.errorContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.s),
-                        child: Text('Live results unavailable: ${state.liveResultsErrorMessage!}'),
-                      ),
-                    ),
-                  if (state.locationRequired)
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.m),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Enable location'),
-                            const SizedBox(height: AppSpacing.xs),
-                            const Text('Allow location to load live results near you.'),
-                            const SizedBox(height: AppSpacing.s),
-                            FilledButton(
-                              onPressed: controller.requestLocationAndReload,
-                              child: const Text('Enable location'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else if (state.errorMessage != null)
-                    Card(
-                      color: Theme.of(context).colorScheme.errorContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.m),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Could not load plans'),
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(state.errorMessage!),
-                            const SizedBox(height: AppSpacing.s),
-                            FilledButton(
-                              onPressed: controller.refresh,
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    const Center(child: Text('No plans returned from API. Pull to refresh.')),
-                ],
-              );
-            }
-
-            return ListView(
-              padding: const EdgeInsets.all(AppSpacing.m),
-              children: [
-                if (kShowDebugUi && envConfig.enableDebugLogs)
-                  _DebugBanner(location: location, apiClient: apiClient),
-                if (state.lockedPlanId != null) ...[
-                  MaterialBanner(
-                    content: Text(
-                      'Locked in: ${state.topPicks.firstWhere((p) => p.plan.id == state.lockedPlanId, orElse: () => state.topPicks.first).plan.title}',
-                    ),
-                    actions: const [SizedBox.shrink()],
-                  ),
-                  const SizedBox(height: AppSpacing.s),
-                ],
-                ..._buildFeedTiles(state, controller),
-                if (state.activeSessions != null || state.generatedAt != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.s),
-                    child: Text(
-                      'Live summary: activeSessions=${state.activeSessions ?? '-'} generatedAt=${state.generatedAt ?? '-'}',
-                    ),
-                  ),
-                if (state.liveResultsErrorMessage != null)
-                  Card(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.s),
-                      child: Text('Live results unavailable: ${state.liveResultsErrorMessage!}'),
-                    ),
-                  ),
-                if (state.locationRequired)
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.s),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Enable location'),
-                          const SizedBox(height: AppSpacing.xs),
-                          FilledButton(
-                            onPressed: controller.requestLocationAndReload,
-                            child: const Text('Enable location'),
+                      final feedItem = state.feedItems[index];
+                      if (feedItem is AdResultFeedItem) {
+                        final adController = _adControllers.putIfAbsent(
+                          feedItem.slotId,
+                          () => NativeAdController(
+                            adsService: ref.read(adsServiceProvider),
+                            slotId: feedItem.slotId,
                           ),
-                        ],
-                      ),
-                    ),
+                        );
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                          child: NativeAdCard(controller: adController),
+                        );
+                      }
+
+                      final place = feedItem as PlaceResultFeedItem;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                        child: ResultsPlanTile(
+                          item: place,
+                          onTap: () => _showCardDetailsSheet(context, place.card.plan),
+                          onLockIn: () => controller.lockIn(place.card.plan),
+                        ),
+                      );
+                    },
                   ),
-                if (state.errorMessage != null)
-                  Card(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.s),
-                      child: Text(state.errorMessage!),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
       ),
     );
-  }
-
-  List<Widget> _buildFeedTiles(ResultsState state, ResultsController controller) {
-    final widgets = <Widget>[];
-    for (var i = 0; i < state.topPicks.length; i++) {
-      final item = state.topPicks[i];
-
-      final shouldInsertAd = i >= AdMobConfig.firstAdAfterItem &&
-          (i - AdMobConfig.firstAdAfterItem) % AdMobConfig.adInterval == 0;
-      if (shouldInsertAd) {
-        final slotId = 'results-slot-$i';
-        final adController = _adControllers.putIfAbsent(
-          slotId,
-          () => NativeAdController(
-            adsService: ref.read(adsServiceProvider),
-            slotId: slotId,
-          ),
-        );
-        widgets.add(
-          NativeAdCard(
-            key: ValueKey(slotId),
-            controller: adController,
-          ),
-        );
-      }
-
-      widgets.add(
-        ResultsPlanTile(
-          item: item,
-          isLocked: state.lockedPlanId == item.plan.id,
-          onTap: () => _showCardDetailsSheet(context, item.plan),
-          onLockIn: () => controller.lockIn(item.plan),
-        ),
-      );
-    }
-
-    return widgets;
   }
 
   void _showCardDetailsSheet(BuildContext context, Plan plan) {
@@ -230,26 +120,49 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
   }
 }
 
-class _DebugBanner extends StatelessWidget {
-  const _DebugBanner({required this.location, required this.apiClient});
+class _LoadingList extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(AppSpacing.m),
+      itemCount: 4,
+      itemBuilder: (_, __) => const Card(
+        child: SizedBox(height: 240),
+      ),
+    );
+  }
+}
 
-  final AppLocation? location;
-  final ApiClient? apiClient;
+class _EmptyResults extends StatelessWidget {
+  const _EmptyResults({
+    required this.state,
+    required this.onRetry,
+    required this.onEnableLocation,
+  });
+
+  final ResultsState state;
+  final Future<void> Function() onRetry;
+  final Future<void> Function() onEnableLocation;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.s),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppSpacing.s),
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Text(
-          'debug lat/lng=${location?.lat.toStringAsFixed(4) ?? '-'},${location?.lng.toStringAsFixed(4) ?? '-'} '
-          'plansStatus=${apiClient?.lastPlansStatus?.toString() ?? '-'} '
-          'liveStatus=${apiClient?.lastLiveResultsStatus?.toString() ?? '-'}',
-        ),
-      ),
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.m),
+      children: [
+        const Text('No results found yet.'),
+        const SizedBox(height: AppSpacing.s),
+        const Text('Try widening your radius, changing categories, or refreshing for nearby/trending options.'),
+        const SizedBox(height: AppSpacing.s),
+        FilledButton(onPressed: onRetry, child: const Text('Retry')),
+        if (state.locationRequired) ...[
+          const SizedBox(height: AppSpacing.s),
+          FilledButton(onPressed: onEnableLocation, child: const Text('Enable location')),
+        ],
+        if (state.errorMessage != null) ...[
+          const SizedBox(height: AppSpacing.s),
+          Text(state.errorMessage!),
+        ],
+      ],
     );
   }
 }
