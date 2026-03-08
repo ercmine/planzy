@@ -315,6 +315,8 @@ class _DeckPageState extends ConsumerState<DeckPage> {
   }
 
   Widget _scaffoldWithBody(Widget body) {
+    final controller = ref.read(deckControllerProvider(widget.sessionId).notifier);
+
     return AppScaffold(
       appBar: AppBar(
         title: const Text('Deck'),
