@@ -140,6 +140,30 @@ describe("server diagnostic and alias routes", () => {
     });
   });
 
+
+  it("serves discovery API contracts", async () => {
+    const searchRes = await fetch(`${baseUrl}/v1/discovery/search?q=coffee&city=austin&pageSize=2`);
+    expect(searchRes.status).toBe(200);
+    await expect(searchRes.json()).resolves.toMatchObject({
+      query: expect.any(Object),
+      items: expect.any(Array)
+    });
+
+    const cityRes = await fetch(`${baseUrl}/v1/discovery/cities/austin`);
+    expect(cityRes.status).toBe(200);
+    await expect(cityRes.json()).resolves.toMatchObject({
+      city: expect.objectContaining({ slug: "austin" }),
+      sections: expect.any(Array)
+    });
+
+    const feedRes = await fetch(`${baseUrl}/v1/discovery/feed?mode=trending&city=austin`);
+    expect(feedRes.status).toBe(200);
+    await expect(feedRes.json()).resolves.toMatchObject({
+      mode: "trending",
+      items: expect.any(Array)
+    });
+  });
+
   it("serves plans and live-results under bare and /api aliases", async () => {
     const planResponse = await fetch(`${baseUrl}/plans?lat=44.85&lng=-93.54&category=coffee`);
     expect(planResponse.status).toBe(200);

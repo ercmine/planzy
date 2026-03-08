@@ -2,7 +2,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import { createAccountsHttpHandlers } from "../accounts/http.js";
+import { createDiscoveryHttpHandlers } from "../discovery/http.js";
 import type { AccountsService } from "../accounts/service.js";
+import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
 import { PermissionAction, ProfileType } from "../accounts/types.js";
 import type { ActorContextResolved } from "../accounts/types.js";
 import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
@@ -61,6 +63,7 @@ export function createRoutes(
     entitlementPolicy?: EntitlementPolicyService;
     accessEngine?: FeatureQuotaEngine;
     accountsService?: AccountsService;
+    discovery?: DiscoveryHttpHandlerDeps;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -70,6 +73,7 @@ export function createRoutes(
     ? createSubscriptionHttpHandlers(deps.subscriptionService, deps.entitlementPolicy)
     : null;
   const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
+  const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -100,6 +104,42 @@ export function createRoutes(
           version: "1.0.0",
           time: new Date().toISOString()
         });
+        return;
+      }
+
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/search") {
+        await discoveryHandlers.search(req, res);
+        return;
+      }
+
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/browse") {
+        await discoveryHandlers.browse(req, res);
+        return;
+      }
+
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/nearby") {
+        await discoveryHandlers.nearby(req, res);
+        return;
+      }
+
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/trending") {
+        await discoveryHandlers.trending(req, res);
+        return;
+      }
+
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/recommendations") {
+        await discoveryHandlers.recommendations(req, res);
+        return;
+      }
+
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/feed") {
+        await discoveryHandlers.feed(req, res);
+        return;
+      }
+
+      const cityPageMatch = /^\/v1\/discovery\/cities\/([^/]+)$/.exec(normalizedPath);
+      if (discoveryHandlers && req.method === "GET" && cityPageMatch) {
+        await discoveryHandlers.cityPage(req, res, decodeURIComponent(cityPageMatch[1] ?? ""));
         return;
       }
 

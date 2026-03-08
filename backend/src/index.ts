@@ -94,3 +94,4 @@ export * from "./accounts/service.js";
 export * from "./accounts/http.js";
 
 export * from "./places/index.js";
+export * from "./discovery/index.js";

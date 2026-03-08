@@ -6,6 +6,16 @@ import { ClickTracker, MemoryClickStore } from "../analytics/clicks/index.js";
 import { createDeckHandler } from "../api/sessions/deckHandler.js";
 import { createIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { AppConfig } from "../config/schema.js";
+import { InMemoryDiscoveryRepository } from "../discovery/memoryRepository.js";
+import {
+  CategoryBrowseService,
+  CityPageService,
+  DiscoveryFeedService,
+  NearbyDiscoveryService,
+  PlaceSearchService,
+  RecommendationService,
+  TrendingService
+} from "../discovery/services.js";
 import type { Logger } from "../logging/loggerTypes.js";
 import { MemoryMerchantStore } from "../merchant/memoryStore.js";
 import { MerchantService } from "../merchant/service.js";
@@ -64,6 +74,21 @@ export function createServer(options?: CreateServerOptions) {
   const accessEngine = new FeatureQuotaEngine(subscriptionService, new MemoryAccessUsageStore());
   const accountsService = new AccountsService(new MemoryAccountsStore());
 
+  const discoveryRepository = new InMemoryDiscoveryRepository();
+  const placeSearchService = new PlaceSearchService(discoveryRepository);
+  const categoryBrowseService = new CategoryBrowseService(discoveryRepository);
+  const nearbyService = new NearbyDiscoveryService(discoveryRepository);
+  const trendingService = new TrendingService(discoveryRepository);
+  const recommendationService = new RecommendationService(discoveryRepository);
+  const cityPageService = new CityPageService(trendingService, recommendationService, categoryBrowseService);
+  const discoveryFeedService = new DiscoveryFeedService(
+    recommendationService,
+    nearbyService,
+    trendingService,
+    categoryBrowseService,
+    placeSearchService
+  );
+
   const deckHandler = createDeckHandler({
     router: deckRouter,
     logger: options?.logger,
@@ -83,7 +108,16 @@ export function createServer(options?: CreateServerOptions) {
     subscriptionService,
     entitlementPolicy,
     accessEngine,
-    accountsService
+    accountsService,
+    discovery: {
+      searchService: placeSearchService,
+      browseService: categoryBrowseService,
+      nearbyService,
+      trendingService,
+      recommendationService,
+      cityPageService,
+      feedService: discoveryFeedService
+    }
   });
 }
 
