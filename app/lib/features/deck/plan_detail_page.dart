@@ -16,6 +16,7 @@ import '../../core/json_parsers.dart';
 import '../../core/validation/url.dart';
 import '../../models/deep_links.dart';
 import '../../models/place_review.dart';
+import '../../models/place_review_video.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
 import '../../services/foursquare/foursquare_plan_mapper.dart';
@@ -56,6 +57,14 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   String? _reviewsError;
   List<PlaceReview> _reviews = const <PlaceReview>[];
 
+  bool _isLoadingVideos = false;
+  bool _isLoadingMoreVideos = false;
+  String? _videosError;
+  List<PlaceReviewVideo> _videos = const <PlaceReviewVideo>[];
+  PlaceReviewVideo? _featuredVideo;
+  String? _videoCursor;
+  String _videoFilter = 'all';
+
   final _reviewFormKey = GlobalKey<FormState>();
   final _reviewTextController = TextEditingController();
   final _displayNameController = TextEditingController();
@@ -69,6 +78,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     _plan = widget.plan;
     _loadDetailsIfNeeded();
     _loadReviews();
+    _loadReviewVideos();
   }
 
   @override
@@ -201,6 +211,111 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
         setState(() => _isLoadingReviews = false);
       }
     }
+  }
+
+
+  Future<void> _loadReviewVideos({bool append = false}) async {
+    final repo = ref.read(reviewsRepositoryProvider).valueOrNull;
+    if (repo == null) {
+      return;
+    }
+    if (append) {
+      if (_isLoadingMoreVideos || _videoCursor == null) return;
+      setState(() => _isLoadingMoreVideos = true);
+    } else {
+      setState(() {
+        _isLoadingVideos = true;
+        _videosError = null;
+        _videoCursor = null;
+      });
+    }
+
+    try {
+      final section = await repo.fetchVideoSection(
+        _plan.sourceId,
+        filter: _videoFilter,
+        cursor: append ? _videoCursor : null,
+      );
+      if (!mounted) return;
+      setState(() {
+        _featuredVideo = section.featuredVideo;
+        _videos = append ? [..._videos, ...section.videos] : section.videos;
+        _videoCursor = section.nextCursor;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _videosError = 'Could not load videos.');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingVideos = false;
+        _isLoadingMoreVideos = false;
+      });
+    }
+  }
+
+  Future<void> _openVideoViewer(int initialIndex) async {
+    if (_videos.isEmpty) return;
+    var index = initialIndex.clamp(0, _videos.length - 1);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final current = _videos[index];
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.m),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: _buildNetworkImage(current.previewUrl),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s),
+                    Text(current.author.displayName, style: Theme.of(context).textTheme.titleMedium),
+                    if (current.caption?.trim().isNotEmpty == true) Text(current.caption!),
+                    const SizedBox(height: AppSpacing.s),
+                    Wrap(
+                      spacing: AppSpacing.s,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => _launchUri(context, Uri.tryParse(current.playbackUrl)),
+                          icon: const Icon(Icons.play_circle_outline),
+                          label: const Text('Play video'),
+                        ),
+                        if (_videos.length > 1)
+                          OutlinedButton.icon(
+                            onPressed: index > 0
+                                ? () => setModalState(() => index -= 1)
+                                : null,
+                            icon: const Icon(Icons.chevron_left),
+                            label: const Text('Previous'),
+                          ),
+                        if (_videos.length > 1)
+                          OutlinedButton.icon(
+                            onPressed: index < _videos.length - 1
+                                ? () => setModalState(() => index += 1)
+                                : null,
+                            icon: const Icon(Icons.chevron_right),
+                            label: const Text('Next'),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _submitReview() async {
@@ -451,6 +566,8 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
             ),
           ],
           const SizedBox(height: AppSpacing.m),
+          _buildReviewVideosSection(context),
+          const SizedBox(height: AppSpacing.m),
           _buildReviewsSection(context),
           const SizedBox(height: AppSpacing.m),
           NativeAdCard(
@@ -562,6 +679,101 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
           ),
         ],
       ],
+    );
+  }
+
+
+  Widget _buildReviewVideosSection(BuildContext context) {
+    return _Section(
+      title: 'Review Videos',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: AppSpacing.s,
+            children: [
+              for (final option in const ['all', 'creator', 'user', 'trusted', 'verified'])
+                ChoiceChip(
+                  label: Text(option[0].toUpperCase() + option.substring(1)),
+                  selected: _videoFilter == option,
+                  onSelected: (selected) {
+                    if (!selected || _videoFilter == option) return;
+                    setState(() => _videoFilter = option);
+                    _loadReviewVideos();
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s),
+          if (_isLoadingVideos)
+            const LinearProgressIndicator(),
+          if (_videosError != null)
+            Text(_videosError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          if (!_isLoadingVideos && _videos.isEmpty && _videosError == null)
+            const Text('No videos yet.'),
+          if (_featuredVideo != null) ...[
+            Text('Featured', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: AppSpacing.xs),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              onTap: () {
+                final index = _videos.indexWhere((item) => item.id == _featuredVideo!.id);
+                _openVideoViewer(index < 0 ? 0 : index);
+              },
+              leading: CircleAvatar(backgroundImage: _featuredVideo!.author.avatarUrl != null ? NetworkImage(_featuredVideo!.author.avatarUrl!) : null),
+              title: Text(_featuredVideo!.title?.isNotEmpty == true ? _featuredVideo!.title! : _featuredVideo!.author.displayName),
+              subtitle: Text(_featuredVideo!.labels.join(' • ')),
+              trailing: const Icon(Icons.play_circle_fill),
+            ),
+            const SizedBox(height: AppSpacing.s),
+          ],
+          if (_videos.isNotEmpty)
+            SizedBox(
+              height: 210,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _videos.length,
+                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.s),
+                itemBuilder: (context, index) {
+                  final video = _videos[index];
+                  return SizedBox(
+                    width: 220,
+                    child: InkWell(
+                      onTap: () => _openVideoViewer(index),
+                      child: Card(
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(height: 120, width: double.infinity, child: Stack(children: [
+                              Positioned.fill(child: _buildNetworkImage(video.previewUrl)),
+                              const Positioned.fill(child: Center(child: Icon(Icons.play_circle_outline, size: 36))),
+                            ])),
+                            Padding(
+                              padding: const EdgeInsets.all(AppSpacing.xs),
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(video.author.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                Text(video.caption?.isNotEmpty == true ? video.caption! : 'Video review', maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          if (_videoCursor != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _isLoadingMoreVideos ? null : () => _loadReviewVideos(append: true),
+                child: Text(_isLoadingMoreVideos ? 'Loading…' : 'View more videos'),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

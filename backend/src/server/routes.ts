@@ -41,6 +41,7 @@ import type { TelemetryService } from "../telemetry/telemetryService.js";
 import { createVenueClaimsHttpHandlers, parseJsonBody, readHeader, sendJson } from "../venues/claims/http.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 import type { ReviewsStore } from "../reviews/store.js";
+import { getPlaceReviewVideoSection } from "../reviews/placeVideoSection.js";
 import type { SavedHttpHandlers } from "../saved/http.js";
 import type { OutingPlannerService } from "../outingPlanner/service.js";
 import { createOutingPlannerHandlers } from "../outingPlanner/http.js";
@@ -708,6 +709,25 @@ export function createRoutes(
           sendJson(res, 201, { review: created, created: true });
           return;
         }
+      }
+
+      const reviewVideosMatch = /^\/places\/([^/]+)\/review-videos$/.exec(normalizedPath);
+      if (reviewVideosMatch && req.method === "GET" && deps?.reviewsStore) {
+        const placeId = decodeURIComponent(reviewVideosMatch[1] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        const cursor = String(url.searchParams.get("cursor") ?? "").trim() || undefined;
+        const filterRaw = String(url.searchParams.get("filter") ?? "all").trim();
+        const filter = (["all", "creator", "user", "trusted", "verified"].includes(filterRaw) ? filterRaw : "all") as "all" | "creator" | "user" | "trusted" | "verified";
+        const limit = Number(url.searchParams.get("limit") ?? "12");
+        const section = await getPlaceReviewVideoSection(deps.reviewsStore, {
+          placeId,
+          viewerUserId: userIdHeader || undefined,
+          cursor,
+          limit,
+          filter
+        });
+        sendJson(res, 200, section);
+        return;
       }
 
       const myReviewMatch = /^\/places\/([^/]+)\/reviews\/me$/.exec(normalizedPath);

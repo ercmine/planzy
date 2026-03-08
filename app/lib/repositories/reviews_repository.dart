@@ -1,5 +1,6 @@
 import '../api/api_client.dart';
 import '../models/place_review.dart';
+import '../models/place_review_video.dart';
 
 class ReviewsRepository {
   ReviewsRepository({required this.apiClient});
@@ -15,6 +16,24 @@ class ReviewsRepository {
     return items.whereType<Map<String, dynamic>>().map(PlaceReview.fromJson).toList(growable: false);
   }
 
+
+
+  Future<PlaceReviewVideoSection> fetchVideoSection(
+    String placeId, {
+    String filter = 'all',
+    String? cursor,
+    int limit = 12,
+  }) async {
+    final response = await apiClient.getJson(
+      '/places/$placeId/review-videos',
+      queryParameters: <String, String?>{
+        'filter': filter,
+        'cursor': cursor,
+        'limit': '$limit',
+      },
+    );
+    return PlaceReviewVideoSection.fromJson(response);
+  }
   Future<PlaceReview> createReview({
     required String placeId,
     int? rating,
