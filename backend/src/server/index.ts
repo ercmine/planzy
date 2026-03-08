@@ -7,6 +7,7 @@ import { CreatorService } from "../creator/service.js";
 import { CreatorMonetizationService, MemoryCreatorMonetizationStore } from "../creatorMonetization/index.js";
 import { ClickTracker, MemoryClickStore } from "../analytics/clicks/index.js";
 import { BusinessAnalyticsService, MemoryBusinessAnalyticsStore } from "../businessAnalytics/index.js";
+import { CollaborationService, MemoryCollaborationStore } from "../collaboration/index.js";
 import { createDeckHandler } from "../api/sessions/deckHandler.js";
 import { createIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { AppConfig } from "../config/schema.js";
@@ -86,6 +87,7 @@ export function createServer(options?: CreateServerOptions) {
   const creatorService = new CreatorService(creatorStore, accountsService, reviewsStore, subscriptionService, accessEngine, monetizationService);
   const savedService = new SavedService(new MemorySavedStore(), subscriptionService, accessEngine);
   const businessAnalyticsService = new BusinessAnalyticsService(new MemoryBusinessAnalyticsStore(), claimsStore, accessEngine);
+  const collaborationService = new CollaborationService(new MemoryCollaborationStore(), accountsService, service, subscriptionService, accessEngine, businessAnalyticsService);
 
   const discoveryRepository = new InMemoryDiscoveryRepository();
   const placeSearchService = new PlaceSearchService(discoveryRepository);
@@ -125,6 +127,7 @@ export function createServer(options?: CreateServerOptions) {
     creatorService,
     creatorMonetizationService: monetizationService,
     businessAnalyticsService,
+    collaborationService,
     savedHandlers: createSavedHttpHandlers(savedService),
     discovery: {
       searchService: placeSearchService,
