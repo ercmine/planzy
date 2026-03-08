@@ -64,14 +64,14 @@ class FoursquarePlanMapper {
     ].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ');
 
     if (area.isNotEmpty) {
-      return '$categoryText around $area.';
+      return '$categoryText in $area with map location and contact details on Perbug.';
     }
 
     final address = place.location.formattedAddress;
     if (address != null && address.trim().isNotEmpty) {
-      return '$categoryText near $address.';
+      return '$categoryText near $address with map location and contact details on Perbug.';
     }
 
-    return 'No description available';
+    return '$categoryText with map location and business details on Perbug.';
   }
 }

@@ -27,7 +27,19 @@ export interface DiscoveryQueryContext {
 export interface PlaceDocument {
   canonicalPlaceId: string;
   name: string;
+  shortDescription?: string;
+  longDescription?: string;
   description?: string;
+  descriptionMetadata?: {
+    sourceType?: string;
+    sourceProvider?: string;
+    attribution?: string;
+    confidence?: number;
+    generatedAt?: string;
+    version?: number;
+    language?: string;
+    generationMethod?: string;
+  };
   primaryCategory: string;
   secondaryCategories: string[];
   city?: string;
@@ -71,7 +83,9 @@ export interface PlaceResultItem {
     rankingScore: number;
     trendingScore?: number;
     recommendationReasons?: string[];
+    description?: PlaceDocument["descriptionMetadata"];
   };
+  longDescription?: string;
   userContext?: {
     saved: boolean;
     reviewed: boolean;

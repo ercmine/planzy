@@ -79,9 +79,7 @@ class CardDetailsSheet extends ConsumerWidget {
                 ),
               ),
             const SizedBox(height: AppSpacing.m),
-            Text((plan.description?.trim().isNotEmpty ?? false)
-                ? plan.description!.trim()
-                : 'No description available'),
+            if (plan.description?.trim().isNotEmpty ?? false) Text(plan.description!.trim()),
             if (plan.location.address?.isNotEmpty == true) ...[
               const SizedBox(height: AppSpacing.m),
               Text(plan.location.address!),
