@@ -110,8 +110,8 @@ class _DeckPageState extends ConsumerState<DeckPage> {
     if (state.items.isEmpty) {
       return _scaffoldWithBody(
         RetryView(
-          title: 'No more ideas right now',
-          message: 'Try retrying or adjusting your session filters.',
+          title: 'No results nearby',
+          message: 'Try widening your radius or adjusting your session filters.',
           onRetry: controller.refresh,
         ),
       );
@@ -226,7 +226,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                   'debug lat/lng=${location?.lat.toStringAsFixed(4) ?? '-'},${location?.lng.toStringAsFixed(4) ?? '-'} '
                   'plansStatus=${apiClient?.lastPlansStatus?.toString() ?? '-'} '
                   'liveStatus=${apiClient?.lastLiveResultsStatus?.toString() ?? '-'} '
-                  '${state.lastBatchMix != null ? 'sources=${state.lastBatchMix!.planSourceCounts}' : ''}',
+                  '${state.lastBatchMix != null ? 'source: ${state.lastBatchMix!.planSourceCounts.keys.join(',')}' : ''}',
                 ),
               ),
             ],

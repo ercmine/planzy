@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
-
 import '../api/api_client.dart';
+import '../api/api_error.dart';
 import '../api/endpoints.dart';
 import '../api/models.dart';
+import '../core/logging/log.dart';
 
 class LiveResultsRepository {
   LiveResultsRepository({required this.apiClient});
@@ -22,37 +22,25 @@ class LiveResultsRepository {
         },
       );
       if (decoded is! Map<String, dynamic>) {
-        throw FormatException(
+        throw ApiError.decoding(
           'Parse error: expected object but got ${decoded.runtimeType}',
+          details: decoded,
         );
       }
       final response = LiveResultsResponse.fromJson(decoded);
-      if (response.results.isEmpty && kDebugMode) {
-        return _debugFallback();
-      }
+      Log.info(
+        '/live-results status=${apiClient.lastLiveResultsStatus ?? '-'} '
+        'bodySnippet="${apiClient.lastLiveResultsBodySnippet ?? '-'}" '
+        'parsedCount=${response.results.length} fallbackUsed=false reason=none',
+      );
       return response;
-    } catch (_) {
-      if (kDebugMode) {
-        return _debugFallback();
-      }
+    } on ApiError catch (error) {
+      Log.warn(
+        '/live-results status=${apiClient.lastLiveResultsStatus ?? '-'} '
+        'bodySnippet="${apiClient.lastLiveResultsBodySnippet ?? '-'}" '
+        'fallbackUsed=false errorKind=${error.kind}',
+      );
       rethrow;
     }
-  }
-
-  LiveResultsResponse _debugFallback() {
-    return LiveResultsResponse(
-      results: [
-        LiveResultItem(
-          sessionId: 'debug-fallback',
-          topPlanId: 'debug-fallback-1',
-          topPlanTitle: 'Fallback result',
-          score: 0.6,
-        ),
-      ],
-      summary: LiveResultsSummary(
-        activeSessions: 1,
-        generatedAt: DateTime.now().toUtc().toIso8601String(),
-      ),
-    );
   }
 }

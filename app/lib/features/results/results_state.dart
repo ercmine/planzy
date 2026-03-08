@@ -24,6 +24,7 @@ class ResultsState {
     this.activeSessions,
     this.generatedAt,
     required this.locationRequired,
+    this.liveResultsErrorMessage,
   });
 
   factory ResultsState.initial() => const ResultsState(
@@ -41,6 +42,7 @@ class ResultsState {
   final int? activeSessions;
   final String? generatedAt;
   final bool locationRequired;
+  final String? liveResultsErrorMessage;
 
   ResultsState copyWith({
     bool? isLoading,
@@ -51,7 +53,9 @@ class ResultsState {
     int? activeSessions,
     String? generatedAt,
     bool? locationRequired,
+    String? liveResultsErrorMessage,
     bool clearError = false,
+    bool clearLiveResultsError = false,
   }) {
     return ResultsState(
       isLoading: isLoading ?? this.isLoading,
@@ -62,6 +66,9 @@ class ResultsState {
       activeSessions: activeSessions ?? this.activeSessions,
       generatedAt: generatedAt ?? this.generatedAt,
       locationRequired: locationRequired ?? this.locationRequired,
+      liveResultsErrorMessage: clearLiveResultsError
+          ? null
+          : (liveResultsErrorMessage ?? this.liveResultsErrorMessage),
     );
   }
 }

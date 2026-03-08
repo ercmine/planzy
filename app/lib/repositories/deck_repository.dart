@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
-
 import '../api/api_client.dart';
+import '../api/api_error.dart';
 import '../api/endpoints.dart';
+import '../core/logging/log.dart';
 import '../core/cache/local_store.dart';
 import '../core/cache/memory_cache.dart';
 import '../core/utils/hashing.dart';
@@ -118,18 +118,22 @@ class DeckRepository {
         ApiEndpoints.plans,
         queryParameters: params.toQueryMap(defaultLocale: 'en-US'),
       );
-      if (response is! List) {
-        throw FormatException('Parse error: expected list but got ${response.runtimeType}');
-      }
-
-      final plans = response
-          .whereType<Map<String, dynamic>>()
-          .map(_planFromApi)
+      final responseList = _extractPlansList(response);
+      final plans = responseList
+          .map((item) {
+            if (item is! Map<String, dynamic>) {
+              throw ApiError.decoding(
+                'Parse error: expected plan object but got ${item.runtimeType}',
+                details: item,
+              );
+            }
+            return _planFromApi(item);
+          })
           .toList(growable: false);
 
-      if (plans.isEmpty && kDebugMode) {
-        return _fallbackDeck(sessionId, cacheKey, params);
-      }
+      Log.info(
+        '/plans status=${apiClient.lastPlansStatus ?? '-'} bodySnippet="${apiClient.lastPlansBodySnippet ?? '-'}" parsedCount=${plans.length} fallbackUsed=false reason=none',
+      );
 
       final deck = DeckBatchResponse(
         sessionId: sessionId,
@@ -149,19 +153,22 @@ class DeckRepository {
       await localStore.saveLastSeenDeckKey(sessionId, cacheKey);
 
       return deck;
-    } catch (_) {
-      if (kDebugMode) {
-        return _fallbackDeck(sessionId, cacheKey, params);
-      }
-      rethrow;
+    } on ApiError catch (error) {
+      Log.warn('/plans status=${apiClient.lastPlansStatus ?? '-'} bodySnippet="${apiClient.lastPlansBodySnippet ?? '-'}" fallbackUsed=true reason=api-error kind=${error.kind}');
+      return _fallbackDeck(sessionId, cacheKey, params, reason: 'api-error:${error.kind}');
+    } on FormatException catch (error) {
+      Log.warn('/plans status=${apiClient.lastPlansStatus ?? '-'} bodySnippet="${apiClient.lastPlansBodySnippet ?? '-'}" fallbackUsed=true reason=format-exception message=${error.message}');
+      return _fallbackDeck(sessionId, cacheKey, params, reason: 'format-exception');
     }
   }
 
   Future<DeckBatchResponse> _fallbackDeck(
     String sessionId,
     String cacheKey,
-    DeckQueryParams params,
-  ) async {
+    DeckQueryParams params, {
+    required String reason,
+  }) async {
+    Log.warn('/plans fallbackUsed=true reason=$reason');
     final lat = params.lat ?? 44.8620;
     final lng = params.lng ?? -93.5590;
     final plans = <Plan>[
@@ -199,6 +206,30 @@ class DeckRepository {
   String _cacheKey(String sessionId, DeckQueryParams params, String filtersHash) {
     return '$sessionId::${params.cursor ?? ''}::$filtersHash';
   }
+}
+
+
+List<dynamic> _extractPlansList(Object decoded) {
+  if (decoded is List) {
+    return decoded;
+  }
+
+  if (decoded is Map<String, dynamic>) {
+    final plans = decoded['plans'];
+    if (plans is List) {
+      return plans;
+    }
+
+    final results = decoded['results'];
+    if (results is List) {
+      return results;
+    }
+  }
+
+  throw ApiError.decoding(
+    'Parse error: expected plans array, {plans:[...]}, or {results:[...]}',
+    details: decoded,
+  );
 }
 
 Map<String, int> _sourceCounts(List<Plan> plans) {
