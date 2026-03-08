@@ -1,3 +1,4 @@
+import { buildCategorySearchPlan } from "./categoryIntelligence.js";
 const GOOGLE_PLACES_NEARBY_ENDPOINT = "https://places.googleapis.com/v1/places:searchNearby";
 const GOOGLE_PLACES_TIMEOUT_MS = 8_000;
 const GOOGLE_PLACES_DETAILS_BASE = "https://places.googleapis.com/v1/places";
@@ -229,22 +230,5 @@ export async function fetchPlaceDetail(placeId: string): Promise<GooglePlaceDeta
 }
 
 export function categoryToIncludedTypes(category?: string): string[] {
-  switch ((category ?? "").toLowerCase()) {
-    case "coffee":
-      return ["cafe", "coffee_shop"];
-    case "food":
-      return ["restaurant"];
-    case "bar":
-      return ["bar"];
-    case "park":
-      return ["park"];
-    case "museum":
-      return ["museum"];
-    case "shopping":
-      return ["shopping_mall", "store"];
-    case "fun":
-      return ["tourist_attraction"];
-    default:
-      return ["restaurant", "cafe", "tourist_attraction"];
-  }
+  return buildCategorySearchPlan(category).primaryTypes;
 }

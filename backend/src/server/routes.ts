@@ -5,6 +5,12 @@ import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import { handleMerchantHttpError, createMerchantHttpHandlers } from "../merchant/http.js";
 import type { MerchantService } from "../merchant/service.js";
 import { ValidationError } from "../plans/errors.js";
+import {
+  buildCategorySearchPlan,
+  getCategoryDefinition,
+  rankAndFilterCategoryResults,
+  type CategoryScore
+} from "../services/categoryIntelligence.js";
 import { categoryToIncludedTypes, fetchPlaceDetail, GooglePlacesError, searchNearby } from "../services/googlePlaces.js";
 import { createTelemetryHttpHandlers } from "../telemetry/http.js";
 import type { TelemetryService } from "../telemetry/telemetryService.js";
@@ -75,12 +81,50 @@ export function createRoutes(
         const limit = Number(url.searchParams.get("limit") ?? "20");
         const category = url.searchParams.get("category") ?? "food";
 
-        const places = await searchNearby({
+        const searchPlan = buildCategorySearchPlan(category);
+        const primaryPlaces = await searchNearby({
           lat,
           lng,
           radiusMeters: radius,
           maxResults: limit,
-          includedTypes: categoryToIncludedTypes(category)
+          includedTypes: searchPlan.primaryTypes
+        });
+
+        const combinedPlaces = [...primaryPlaces];
+        const sourcePriority = new Map<string, number>();
+        for (const place of primaryPlaces) {
+          sourcePriority.set(place.id, 8);
+        }
+
+        if (combinedPlaces.length < limit && searchPlan.fallbackTypes.length > 0) {
+          const fallbackPlaces = await searchNearby({
+            lat,
+            lng,
+            radiusMeters: radius,
+            maxResults: Math.max(4, Math.min(limit, 12)),
+            includedTypes: searchPlan.fallbackTypes
+          });
+
+          for (const place of fallbackPlaces) {
+            if (!sourcePriority.has(place.id)) {
+              combinedPlaces.push(place);
+              sourcePriority.set(place.id, 0);
+            }
+          }
+        }
+
+        const definition = getCategoryDefinition(category);
+        const filtered = rankAndFilterCategoryResults(combinedPlaces, definition, { sourcePriority });
+        const places = filtered.kept.slice(0, limit);
+
+        logCategoryDiagnostics({
+          category,
+          queryTerms: searchPlan.queryTerms,
+          includedTypes: [...searchPlan.primaryTypes, ...searchPlan.fallbackTypes],
+          returnedCount: combinedPlaces.length,
+          filteredOutCount: filtered.rejected.length,
+          scoreMap: filtered.scoreMap,
+          rejected: filtered.rejected
         });
 
         const publicApiBaseUrl = process.env.PUBLIC_API_BASE_URL ?? DEFAULT_PUBLIC_API_BASE_URL;
@@ -196,6 +240,8 @@ export function createRoutes(
         const radius = Number(url.searchParams.get("radius") ?? "2500");
         const category = url.searchParams.get("category") ?? "food";
         const sessionId = url.searchParams.get("sessionId") ?? "live-session";
+        const searchPlan = buildCategorySearchPlan(category);
+        const definition = getCategoryDefinition(category);
 
         const places = await searchNearby({
           lat,
@@ -205,7 +251,9 @@ export function createRoutes(
           includedTypes: categoryToIncludedTypes(category)
         });
 
-        const ranked = places
+        const filtered = rankAndFilterCategoryResults(places, definition);
+
+        const ranked = filtered.kept
           .map((place) => ({
             place,
             score: (place.rating ?? 0) + Math.log10((place.userRatingCount ?? 0) + 1)
@@ -227,7 +275,9 @@ export function createRoutes(
             : [],
           summary: {
             activeSessions: top ? 1 : 0,
-            generatedAt: new Date().toISOString()
+            generatedAt: new Date().toISOString(),
+            categoryIntent: searchPlan.definition.semanticIntent,
+            filteredOutCount: filtered.rejected.length
           }
         });
         return;
@@ -421,6 +471,41 @@ export function createRoutes(
       sendJson(res, 500, { error: "Internal Server Error" });
     }
   };
+}
+
+function logCategoryDiagnostics(input: {
+  category: string;
+  queryTerms: string[];
+  includedTypes: string[];
+  returnedCount: number;
+  filteredOutCount: number;
+  scoreMap: Map<string, CategoryScore>;
+  rejected: Array<{ place: { id: string; displayName?: { text?: string } }; reason: string }>;
+}): void {
+  const topScoringReasons = [...input.scoreMap.values()]
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 5)
+    .map((score) => score.reasons.slice(0, 2).join(","))
+    .filter(Boolean);
+
+  const rejectedPreview = input.rejected.slice(0, 10).map((entry) => ({
+    id: entry.place.id,
+    title: entry.place.displayName?.text ?? "Untitled",
+    reason: entry.reason
+  }));
+
+  console.info(
+    JSON.stringify({
+      event: "category_intelligence",
+      category: input.category,
+      queryTerms: input.queryTerms,
+      includedTypes: input.includedTypes,
+      returnedCount: input.returnedCount,
+      filteredOutCount: input.filteredOutCount,
+      topScoringReasons,
+      rejectedPreview
+    })
+  );
 }
 
 function normalizeAliasPath(pathname: string): string {
