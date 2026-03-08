@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -42,6 +43,14 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
     final envConfig = ref.watch(envConfigProvider);
     final location = ref.watch(locationControllerProvider).effectiveLocation;
     final apiClient = ref.watch(apiClientProvider).valueOrNull;
+
+    if (kDebugMode) {
+      debugPrint(
+        '[ResultsPage] build session=${widget.sessionId} '
+        'isLoading=${state.isLoading} topPicks=${state.topPicks.length} '
+        'error=${state.errorMessage ?? '-'} locationRequired=${state.locationRequired}',
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Results')),
