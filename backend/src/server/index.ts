@@ -40,6 +40,7 @@ import { TelemetryService } from "../telemetry/telemetryService.js";
 import { createSavedHttpHandlers } from "../saved/http.js";
 import { SavedService } from "../saved/service.js";
 import { MemorySavedStore } from "../saved/store.js";
+import { MemoryOutingPlannerStore, OutingPlannerService } from "../outingPlanner/index.js";
 import { VenueClaimsService } from "../venues/claims/claimsService.js";
 import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
 import { createHttpServer } from "./httpServer.js";
@@ -90,6 +91,13 @@ export function createServer(options?: CreateServerOptions) {
   const collaborationService = new CollaborationService(new MemoryCollaborationStore(), accountsService, service, subscriptionService, accessEngine, businessAnalyticsService);
 
   const discoveryRepository = new InMemoryDiscoveryRepository();
+  const outingPlannerService = new OutingPlannerService({
+    listPlaces: () => discoveryRepository.listPlaces(),
+    creatorStore,
+    store: new MemoryOutingPlannerStore(),
+    subscriptions: subscriptionService,
+    access: accessEngine
+  });
   const placeSearchService = new PlaceSearchService(discoveryRepository);
   const categoryBrowseService = new CategoryBrowseService(discoveryRepository);
   const nearbyService = new NearbyDiscoveryService(discoveryRepository);
@@ -129,6 +137,7 @@ export function createServer(options?: CreateServerOptions) {
     businessAnalyticsService,
     collaborationService,
     savedHandlers: createSavedHttpHandlers(savedService),
+    outingPlannerService,
     discovery: {
       searchService: placeSearchService,
       browseService: categoryBrowseService,

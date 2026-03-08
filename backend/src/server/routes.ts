@@ -38,6 +38,8 @@ import { createVenueClaimsHttpHandlers, parseJsonBody, readHeader, sendJson } fr
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 import type { ReviewsStore } from "../reviews/store.js";
 import type { SavedHttpHandlers } from "../saved/http.js";
+import type { OutingPlannerService } from "../outingPlanner/service.js";
+import { createOutingPlannerHandlers } from "../outingPlanner/http.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -79,6 +81,7 @@ export function createRoutes(
     collaborationService?: CollaborationService;
     discovery?: DiscoveryHttpHandlerDeps;
     savedHandlers?: SavedHttpHandlers;
+    outingPlannerService?: OutingPlannerService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -93,6 +96,7 @@ export function createRoutes(
   const creatorMonetizationHandlers = deps?.creatorMonetizationService ? createCreatorMonetizationHttpHandlers(deps.creatorMonetizationService) : null;
   const businessAnalyticsHandlers = deps?.businessAnalyticsService ? createBusinessAnalyticsHttpHandlers(deps.businessAnalyticsService) : null;
   const collaborationHandlers = deps?.collaborationService && deps?.accountsService ? createCollaborationHttpHandlers(deps.collaborationService, deps.accountsService) : null;
+  const outingPlannerHandlers = deps?.outingPlannerService ? createOutingPlannerHandlers(deps.outingPlannerService) : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -232,6 +236,48 @@ export function createRoutes(
       const cityPageMatch = /^\/v1\/discovery\/cities\/([^/]+)$/.exec(normalizedPath);
       if (discoveryHandlers && req.method === "GET" && cityPageMatch) {
         await discoveryHandlers.cityPage(req, res, decodeURIComponent(cityPageMatch[1] ?? ""));
+        return;
+      }
+
+
+      if (outingPlannerHandlers && req.method === "POST" && normalizedPath === "/v1/outing-planner/create") {
+        await outingPlannerHandlers.createPlan(req, res);
+        return;
+      }
+
+      if (outingPlannerHandlers && req.method === "POST" && normalizedPath === "/v1/outing-planner/save") {
+        await outingPlannerHandlers.savePlan(req, res);
+        return;
+      }
+
+      if (outingPlannerHandlers && req.method === "GET" && normalizedPath === "/v1/outing-planner/saved") {
+        await outingPlannerHandlers.listSaved(req, res);
+        return;
+      }
+
+      const outingSavedMatch = /^\/v1\/outing-planner\/saved\/([^/]+)$/.exec(normalizedPath);
+      if (outingPlannerHandlers && req.method === "GET" && outingSavedMatch) {
+        await outingPlannerHandlers.getSaved(req, res, decodeURIComponent(outingSavedMatch[1] ?? ""));
+        return;
+      }
+
+      if (outingPlannerHandlers && req.method === "PATCH" && outingSavedMatch) {
+        await outingPlannerHandlers.patchSaved(req, res, decodeURIComponent(outingSavedMatch[1] ?? ""));
+        return;
+      }
+
+      if (outingPlannerHandlers && req.method === "DELETE" && outingSavedMatch) {
+        await outingPlannerHandlers.deleteSaved(req, res, decodeURIComponent(outingSavedMatch[1] ?? ""));
+        return;
+      }
+
+      if (outingPlannerHandlers && req.method === "POST" && normalizedPath === "/v1/outing-planner/regenerate") {
+        await outingPlannerHandlers.regenerate(req, res);
+        return;
+      }
+
+      if (outingPlannerHandlers && req.method === "GET" && normalizedPath === "/v1/outing-planner/usage") {
+        await outingPlannerHandlers.usage(req, res);
         return;
       }
 

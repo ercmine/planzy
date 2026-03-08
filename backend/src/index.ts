@@ -100,3 +100,5 @@ export * from "./discovery/index.js";
 export * from "./creatorMonetization/index.js";
 
 export * from "./collaboration/index.js";
+
+export * from "./outingPlanner/index.js";
