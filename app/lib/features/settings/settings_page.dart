@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +14,7 @@ import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
 import '../../core/permissions/permission_state.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../core/debug_flags.dart';
 import '../../models/session.dart';
 import '../../providers/app_providers.dart';
 
@@ -142,17 +142,18 @@ class SettingsPage extends ConsumerWidget {
               onChanged: controller.setNotificationsEnabled,
             ),
           ),
-          _Section(
-            title: 'Diagnostics',
-            icon: Icons.monitor_heart_outlined,
-            child: SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Diagnostics logging'),
-              subtitle: const Text('Enable extra local logs to help troubleshoot app issues.'),
-              value: state.diagnosticsLoggingEnabled,
-              onChanged: controller.setDiagnosticsLoggingEnabled,
+          if (kShowDebugUi)
+            _Section(
+              title: 'Diagnostics',
+              icon: Icons.monitor_heart_outlined,
+              child: SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Diagnostics logging'),
+                subtitle: const Text('Enable extra local logs to help troubleshoot app issues.'),
+                value: state.diagnosticsLoggingEnabled,
+                onChanged: controller.setDiagnosticsLoggingEnabled,
+              ),
             ),
-          ),
           _Section(
             title: 'Support',
             icon: Icons.support_agent,
@@ -161,7 +162,8 @@ class SettingsPage extends ConsumerWidget {
               runSpacing: AppSpacing.s,
               children: [
                 FilledButton.tonal(onPressed: () => _emailSupport(context, state.appVersion), child: const Text('Email support')),
-                FilledButton.tonal(onPressed: () => _copyDiagnostics(context, ref), child: const Text('Copy diagnostics')),
+                if (kShowDebugUi)
+                  FilledButton.tonal(onPressed: () => _copyDiagnostics(context, ref), child: const Text('Copy diagnostics')),
               ],
             ),
           ),
@@ -203,9 +205,6 @@ class SettingsPage extends ConsumerWidget {
 
   Future<void> _handleBackPressed(BuildContext context, WidgetRef ref) async {
     if (context.canPop()) {
-      if (kDebugMode) {
-        debugPrint('Settings back press: pop()');
-      }
       context.pop();
       return;
     }
@@ -217,15 +216,8 @@ class SettingsPage extends ConsumerWidget {
     }
 
     if (activeSessionId != null && activeSessionId.isNotEmpty) {
-      if (kDebugMode) {
-        debugPrint('Settings back press: fallback go(/sessions/$activeSessionId)');
-      }
       context.go('/sessions/$activeSessionId');
       return;
-    }
-
-    if (kDebugMode) {
-      debugPrint('Settings back press: fallback go(/sessions)');
     }
     context.go('/sessions');
   }

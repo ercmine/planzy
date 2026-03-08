@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +10,7 @@ import '../../core/env/env.dart';
 import '../../core/location/location_permission_service.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/widgets/retry_view.dart';
+import '../../core/debug_flags.dart';
 import '../../core/validation/url.dart';
 import '../../providers/app_providers.dart';
 import 'deck_controller.dart';
@@ -30,6 +30,7 @@ class DeckPage extends ConsumerStatefulWidget {
 }
 
 class _DeckPageState extends ConsumerState<DeckPage> {
+  bool _voteInFlight = false;
   final CardSwiperController _swiperController = CardSwiperController();
   final Map<String, NativeAdController> _adControllers = <String, NativeAdController>{};
 
@@ -145,6 +146,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                   up: true,
                 ),
                 onSwipe: (previousIndex, currentIndex, direction) {
+                  setState(() => _voteInFlight = false);
                   controller.handleSwipeDirection(direction);
                   controller.loadMoreIfNeeded();
                   return true;
@@ -183,6 +185,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                     plan: plan,
                     isTopCard: index == 0,
                     prefetchImageUrls: prefetchUrls,
+                    heroTag: 'plan-photo-${plan.id}',
                     onTap: () async {
                       await controller.onCardOpened(plan);
                       if (!context.mounted) {
@@ -195,6 +198,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                             sessionId: widget.sessionId,
                             sessionLat: location?.lat,
                             sessionLng: location?.lng,
+                            heroTag: 'plan-photo-${plan.id}',
                           ),
                         ),
                       );
@@ -205,11 +209,11 @@ class _DeckPageState extends ConsumerState<DeckPage> {
             ),
             const SizedBox(height: AppSpacing.m),
             DeckActionsBar(
-              disabled: state.items.isEmpty,
+              disabled: state.items.isEmpty || _voteInFlight,
               canUndo: state.undoStack.isNotEmpty,
-              onNo: () => _swiperController.swipe(CardSwiperDirection.left),
-              onMaybe: () => _swiperController.swipe(CardSwiperDirection.top),
-              onYes: () => _swiperController.swipe(CardSwiperDirection.right),
+              onNo: () => _triggerSwipe(CardSwiperDirection.left),
+              onMaybe: () => _triggerSwipe(CardSwiperDirection.top),
+              onYes: () => _triggerSwipe(CardSwiperDirection.right),
               onUndo: controller.undo,
             ),
             if (state.usingOfflineCachedData) ...[
@@ -257,7 +261,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                 ),
               ),
             ],
-            if (kDebugMode && envConfig.enableDebugLogs) ...[
+            if (kShowDebugUi && envConfig.enableDebugLogs) ...[
               const SizedBox(height: AppSpacing.s),
               Container(
                 width: double.infinity,
@@ -281,6 +285,15 @@ class _DeckPageState extends ConsumerState<DeckPage> {
     );
   }
 
+
+
+  void _triggerSwipe(CardSwiperDirection direction) {
+    if (_voteInFlight) {
+      return;
+    }
+    setState(() => _voteInFlight = true);
+    _swiperController.swipe(direction);
+  }
 
   Future<void> _onEnableLocationPressed(DeckController controller) async {
     await controller.requestLocationAndReload();

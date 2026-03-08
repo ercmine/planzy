@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +8,7 @@ import '../../config/admob_config.dart';
 import '../../core/ads/native_ad_controller.dart';
 import '../../core/env/env.dart';
 import '../../core/location/location_models.dart';
+import '../../core/debug_flags.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
 import 'results_controller.dart';
@@ -57,7 +57,7 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
               return ListView(
                 padding: const EdgeInsets.all(AppSpacing.m),
                 children: [
-                  if (kDebugMode && envConfig.enableDebugLogs)
+                  if (kShowDebugUi && envConfig.enableDebugLogs)
                     _DebugBanner(location: location, apiClient: apiClient),
                   if (state.liveResultsErrorMessage != null)
                     Card(
@@ -115,7 +115,7 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
             return ListView(
               padding: const EdgeInsets.all(AppSpacing.m),
               children: [
-                if (kDebugMode && envConfig.enableDebugLogs)
+                if (kShowDebugUi && envConfig.enableDebugLogs)
                   _DebugBanner(location: location, apiClient: apiClient),
                 if (state.lockedPlanId != null) ...[
                   MaterialBanner(

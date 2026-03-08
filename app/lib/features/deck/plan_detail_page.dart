@@ -21,6 +21,7 @@ class PlanDetailPage extends ConsumerStatefulWidget {
     required this.sessionId,
     this.sessionLat,
     this.sessionLng,
+    this.heroTag,
     super.key,
   });
 
@@ -28,6 +29,7 @@ class PlanDetailPage extends ConsumerStatefulWidget {
   final String sessionId;
   final double? sessionLat;
   final double? sessionLng;
+  final Object? heroTag;
 
   @override
   ConsumerState<PlanDetailPage> createState() => _PlanDetailPageState();
@@ -218,9 +220,12 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(height: 220, child: _buildNetworkImage(photos.first.url)),
+    return Hero(
+      tag: widget.heroTag ?? 'plan-photo-${_plan.id}',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(height: 220, child: _buildNetworkImage(photos.first.url)),
+      ),
     );
   }
 
