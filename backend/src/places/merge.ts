@@ -1,6 +1,7 @@
 import { resolveCanonicalCategory } from "./categoryNormalization.js";
 import { enrichPlaceDescriptions } from "./descriptionEnrichment.js";
 import { buildSlug, geohashLite, stableHash } from "./normalization.js";
+import { dedupeAndRankPhotos, normalizeProviderPhoto } from "./photoGallery.js";
 import type {
   CanonicalPhoto,
   CanonicalPlace,
@@ -23,32 +24,6 @@ function chooseString(existing: string | undefined, incoming: string | undefined
     return incoming;
   }
   return incoming.length > existing.length ? incoming : existing;
-}
-
-function buildPhoto(sourceRecordId: string, provider: string, photo: NormalizedProviderPlace["photos"][number]): CanonicalPhoto {
-  return {
-    canonicalPhotoId: stableHash([provider, photo.providerPhotoRef, photo.url]).slice(0, 16),
-    provider,
-    providerPhotoRef: photo.providerPhotoRef,
-    url: photo.url,
-    width: photo.width,
-    height: photo.height,
-    attributionText: photo.attributionText,
-    sourceRecordId,
-    qualityScore: (photo.width ?? 0) * (photo.height ?? 0)
-  };
-}
-
-function dedupePhotos(photos: CanonicalPhoto[]): CanonicalPhoto[] {
-  const seen = new Map<string, CanonicalPhoto>();
-  for (const photo of photos) {
-    const key = `${photo.providerPhotoRef ?? ""}|${photo.url ?? ""}`;
-    const existing = seen.get(key);
-    if (!existing || existing.qualityScore < photo.qualityScore) {
-      seen.set(key, photo);
-    }
-  }
-  return [...seen.values()].sort((a, b) => b.qualityScore - a.qualityScore);
 }
 
 function addFieldAttribution(
@@ -98,7 +73,15 @@ export function mergeIntoCanonicalPlace(params: {
   const timestamp = nowIso();
   const category = resolveCanonicalCategory(normalized.providerCategories, normalized.name);
 
-  const incomingPhotos = normalized.photos.map((photo) => buildPhoto(sourceRecord.sourceRecordId, normalized.provider, photo));
+  const incomingPhotos = normalized.photos.map((photo, index) =>
+    normalizeProviderPhoto({
+      sourceRecordId: sourceRecord.sourceRecordId,
+      provider: normalized.provider,
+      photo,
+      index,
+      fetchedAt: sourceRecord.fetchTimestamp
+    })
+  );
   const enrichedDescription = enrichPlaceDescriptions({
     existingPlace,
     normalized,
@@ -111,7 +94,7 @@ export function mergeIntoCanonicalPlace(params: {
 
   if (!existingPlace) {
     const canonicalPlaceId = `plc_${stableHash([normalized.provider, normalized.providerPlaceId]).slice(0, 16)}`;
-    const gallery = dedupePhotos(incomingPhotos);
+    const gallery = dedupeAndRankPhotos(incomingPhotos);
     place = {
       canonicalPlaceId,
       slug: buildSlug(normalized.name, canonicalPlaceId),
@@ -163,8 +146,8 @@ export function mergeIntoCanonicalPlace(params: {
       aiGeneratedDescription: false,
       editorialDescription: enrichedDescription.descriptionSourceType === "provider_editorial",
       descriptionCandidates: enrichedDescription.candidates,
-      primaryPhoto: gallery[0],
-      photoGallery: gallery,
+      primaryPhoto: gallery[0] ? { ...gallery[0], placeId: canonicalPlaceId, isPrimary: true, sortOrder: 0 } : undefined,
+      photoGallery: gallery.map((photo, index) => ({ ...photo, placeId: canonicalPlaceId, isPrimary: index === 0, sortOrder: index })),
       providerPhotoRefs: incomingPhotos
         .filter((photo) => photo.providerPhotoRef)
         .map((photo) => ({ provider: photo.provider, providerPhotoRef: photo.providerPhotoRef ?? "", sourceRecordId: photo.sourceRecordId })),
@@ -253,15 +236,30 @@ export function mergeIntoCanonicalPlace(params: {
       }
     }
 
-    place.photoGallery = dedupePhotos([...place.photoGallery, ...incomingPhotos]);
+    const previousPrimaryId = place.primaryPhoto?.canonicalPhotoId;
+    place.photoGallery = dedupeAndRankPhotos([...place.photoGallery, ...incomingPhotos]).map((photo) => ({ ...photo, placeId: place.canonicalPlaceId }));
     if (!place.manualOverrides.primaryPhotoId) {
-      place.primaryPhoto = place.photoGallery[0];
+      const preferredPrimary = previousPrimaryId
+        ? place.photoGallery.find((photo) => photo.canonicalPhotoId === previousPrimaryId)
+        : undefined;
+      place.primaryPhoto = preferredPrimary ?? place.photoGallery[0];
+      if (place.primaryPhoto) {
+        place.photoGallery = [
+          { ...place.primaryPhoto, isPrimary: true, sortOrder: 0 },
+          ...place.photoGallery
+            .filter((photo) => photo.canonicalPhotoId !== place.primaryPhoto?.canonicalPhotoId)
+            .map((photo, index) => ({ ...photo, isPrimary: false, sortOrder: index + 1 }))
+        ];
+      }
     }
-    place.providerPhotoRefs = dedupePhotos([
+    place.providerPhotoRefs = dedupeAndRankPhotos([
       ...place.providerPhotoRefs.map((entry) => ({
         canonicalPhotoId: `${entry.provider}:${entry.providerPhotoRef}`,
         provider: entry.provider,
+        sourceProvider: entry.provider,
+        sourceType: "provider" as const,
         providerPhotoRef: entry.providerPhotoRef,
+        sourcePhotoId: entry.providerPhotoRef,
         sourceRecordId: entry.sourceRecordId,
         qualityScore: 0
       })),

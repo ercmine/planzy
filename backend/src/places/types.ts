@@ -30,13 +30,32 @@ export interface PlaceDescriptionCandidate {
 
 export interface CanonicalPhoto {
   canonicalPhotoId: string;
+  placeId?: string;
   provider: string;
+  sourceProvider: string;
+  sourceType: "provider" | "internal" | "user" | "business" | "creator";
   providerPhotoRef?: string;
+  sourcePhotoId?: string;
   url?: string;
+  thumbnailUrl?: string;
+  mediumUrl?: string;
+  largeUrl?: string;
+  fullUrl?: string;
   width?: number;
   height?: number;
+  aspectRatio?: number;
   attributionText?: string;
+  attributionRequired?: boolean;
   sourceRecordId: string;
+  sortOrder?: number;
+  rankScore?: number;
+  isPrimary?: boolean;
+  isFallback?: boolean;
+  photoType?: "venue" | "interior" | "exterior" | "food" | "drink" | "menu" | "logo" | "map" | "other";
+  status?: "active" | "filtered" | "broken" | "placeholder";
+  fetchedAt?: string;
+  updatedAt?: string;
+  fingerprint?: string;
   qualityScore: number;
 }
 
@@ -126,10 +145,18 @@ export interface CanonicalPlace {
 
 export interface NormalizedProviderPhoto {
   providerPhotoRef?: string;
+  sourcePhotoId?: string;
   url?: string;
+  thumbnailUrl?: string;
+  mediumUrl?: string;
+  largeUrl?: string;
+  fullUrl?: string;
   width?: number;
   height?: number;
   attributionText?: string;
+  isPrimary?: boolean;
+  photoType?: CanonicalPhoto["photoType"];
+  fetchedAt?: string;
 }
 
 export interface NormalizedProviderPlace {

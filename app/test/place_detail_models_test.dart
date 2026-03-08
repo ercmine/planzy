@@ -65,4 +65,34 @@ void main() {
     expect(detail.effectiveDescription, 'Short text');
     expect(detail.attribution.any((item) => item.provider == 'foursquare'), isTrue);
   });
+
+  test('normalizeDetailPhotos respects primary/sort order and metadata urls', () {
+    final photos = normalizeDetailPhotos(
+      basePlan: basePlan(),
+      details: {
+        'photos': [
+          {
+            'token': 'b',
+            'mediumUrl': 'https://img/medium-b.jpg',
+            'thumbnailUrl': 'https://img/thumb-b.jpg',
+            'sortOrder': 2,
+          },
+          {
+            'token': 'a',
+            'fullUrl': 'https://img/full-a.jpg',
+            'isPrimary': true,
+            'sortOrder': 1,
+            'attributionText': 'Provider A'
+          }
+        ]
+      },
+      buildPhotoUrl: (token) => token == null ? null : 'https://img/$token.jpg',
+    );
+
+    expect(photos.first.isPrimary, isTrue);
+    expect(photos.first.heroUrl, 'https://img/full-a.jpg');
+    expect(photos.first.attributionText, 'Provider A');
+    expect(photos[1].thumbUrl, 'https://img/thumb-b.jpg');
+  });
+
 }

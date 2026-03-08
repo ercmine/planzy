@@ -20,16 +20,41 @@ class PlaceDetailPhoto {
   const PlaceDetailPhoto({
     required this.url,
     this.token,
+    this.thumbnailUrl,
+    this.mediumUrl,
+    this.largeUrl,
+    this.fullUrl,
     this.width,
     this.height,
     this.provider,
+    this.sourceType,
+    this.attributionText,
+    this.sortOrder,
+    this.rankScore,
+    this.isPrimary = false,
+    this.isFallback = false,
+    this.status = 'active',
   });
 
   final String url;
   final String? token;
+  final String? thumbnailUrl;
+  final String? mediumUrl;
+  final String? largeUrl;
+  final String? fullUrl;
   final int? width;
   final int? height;
   final String? provider;
+  final String? sourceType;
+  final String? attributionText;
+  final int? sortOrder;
+  final double? rankScore;
+  final bool isPrimary;
+  final bool isFallback;
+  final String status;
+
+  String get heroUrl => fullUrl ?? largeUrl ?? mediumUrl ?? url;
+  String get thumbUrl => thumbnailUrl ?? mediumUrl ?? url;
 }
 
 class PlaceDetailHoursRow {
@@ -188,13 +213,58 @@ List<PlaceDetailPhoto> normalizeDetailPhotos({
   final out = <PlaceDetailPhoto>[];
   final dedupe = <String>{};
 
-  void addPhoto(String? token, {String? url, int? width, int? height, String? provider}) {
-    final resolved = url ?? buildPhotoUrl(token);
-    if (resolved == null || !isHttpUrl(resolved) || dedupe.contains(resolved)) {
+  String? resolveUrl({String? url, String? mediumUrl, String? largeUrl, String? fullUrl, String? token}) {
+    for (final candidate in <String?>[url, mediumUrl, largeUrl, fullUrl, buildPhotoUrl(token)]) {
+      if (candidate != null && isHttpUrl(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  void addPhoto(
+    String? token, {
+    String? url,
+    String? thumbnailUrl,
+    String? mediumUrl,
+    String? largeUrl,
+    String? fullUrl,
+    int? width,
+    int? height,
+    String? provider,
+    String? sourceType,
+    String? attributionText,
+    int? sortOrder,
+    double? rankScore,
+    bool isPrimary = false,
+    bool isFallback = false,
+    String status = 'active',
+  }) {
+    final resolved = resolveUrl(url: url, mediumUrl: mediumUrl, largeUrl: largeUrl, fullUrl: fullUrl, token: token);
+    if (resolved == null || dedupe.contains(resolved)) {
       return;
     }
     dedupe.add(resolved);
-    out.add(PlaceDetailPhoto(url: resolved, token: token, width: width, height: height, provider: provider));
+    out.add(
+      PlaceDetailPhoto(
+        url: resolved,
+        token: token,
+        thumbnailUrl: isHttpUrl(thumbnailUrl ?? '') ? thumbnailUrl : null,
+        mediumUrl: isHttpUrl(mediumUrl ?? '') ? mediumUrl : null,
+        largeUrl: isHttpUrl(largeUrl ?? '') ? largeUrl : null,
+        fullUrl: isHttpUrl(fullUrl ?? '') ? fullUrl : null,
+        width: width,
+        height: height,
+        provider: provider,
+        sourceType: sourceType,
+        attributionText: attributionText,
+        sortOrder: sortOrder,
+        rankScore: rankScore,
+        isPrimary: isPrimary,
+        isFallback: isFallback,
+        status: status,
+      ),
+    );
   }
 
   final photos = details['photos'];
@@ -204,9 +274,19 @@ List<PlaceDetailPhoto> normalizeDetailPhotos({
         addPhoto(
           item['name']?.toString() ?? item['photoReference']?.toString() ?? item['token']?.toString(),
           url: item['url']?.toString(),
+          thumbnailUrl: item['thumbnailUrl']?.toString(),
+          mediumUrl: item['mediumUrl']?.toString(),
+          largeUrl: item['largeUrl']?.toString(),
+          fullUrl: item['fullUrl']?.toString(),
           width: parseInt(item['width']),
           height: parseInt(item['height']),
-          provider: item['provider']?.toString(),
+          provider: item['provider']?.toString() ?? item['sourceProvider']?.toString(),
+          sourceType: item['sourceType']?.toString(),
+          attributionText: item['attributionText']?.toString(),
+          sortOrder: parseInt(item['sortOrder']),
+          rankScore: parseDouble(item['rankScore']),
+          isPrimary: item['isPrimary'] == true,
+          status: item['status']?.toString() ?? 'active',
         );
       } else {
         addPhoto(item?.toString());
@@ -214,10 +294,56 @@ List<PlaceDetailPhoto> normalizeDetailPhotos({
     }
   }
 
-  addPhoto(details['photo']?.toString(), url: details['photoUrl']?.toString(), provider: details['source']?.toString());
+  addPhoto(
+    details['photo']?.toString(),
+    url: details['photoUrl']?.toString(),
+    provider: details['source']?.toString(),
+    sourceType: 'provider',
+    isFallback: true,
+  );
 
   for (final photo in basePlan.photos ?? const <PlanPhoto>[]) {
-    addPhoto(photo.token, url: photo.url, width: photo.width, height: photo.height, provider: basePlan.source);
+    addPhoto(
+      photo.token,
+      url: photo.url,
+      width: photo.width,
+      height: photo.height,
+      provider: basePlan.source,
+      sourceType: 'provider',
+      isFallback: true,
+    );
+  }
+
+  out.sort((a, b) {
+    final aPrimary = a.isPrimary ? 1 : 0;
+    final bPrimary = b.isPrimary ? 1 : 0;
+    if (aPrimary != bPrimary) return bPrimary - aPrimary;
+    final aSort = a.sortOrder ?? 1 << 20;
+    final bSort = b.sortOrder ?? 1 << 20;
+    if (aSort != bSort) return aSort - bSort;
+    return (b.rankScore ?? 0).compareTo(a.rankScore ?? 0);
+  });
+
+  if (out.isNotEmpty && !out.any((p) => p.isPrimary)) {
+    final first = out.first;
+    out[0] = PlaceDetailPhoto(
+      url: first.url,
+      token: first.token,
+      thumbnailUrl: first.thumbnailUrl,
+      mediumUrl: first.mediumUrl,
+      largeUrl: first.largeUrl,
+      fullUrl: first.fullUrl,
+      width: first.width,
+      height: first.height,
+      provider: first.provider,
+      sourceType: first.sourceType,
+      attributionText: first.attributionText,
+      sortOrder: first.sortOrder,
+      rankScore: first.rankScore,
+      isPrimary: true,
+      isFallback: first.isFallback,
+      status: first.status,
+    );
   }
 
   return out;
