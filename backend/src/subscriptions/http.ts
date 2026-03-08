@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { ValidationError } from "../plans/errors.js";
 import { parseJsonBody, readHeader, sendJson } from "../venues/claims/http.js";
-import { AccountType, EntitlementValueType, UsageWindow, type EntitlementKey } from "./types.js";
+import { AccountType, CancellationMode, EntitlementValueType, UsageWindow, type EntitlementKey } from "./types.js";
 import type { EntitlementPolicyService } from "./policy.js";
 import type { SubscriptionService } from "./service.js";
 
@@ -30,7 +30,12 @@ export function createSubscriptionHttpHandlers(service: SubscriptionService, pol
   return {
     async getCurrentSubscription(req: IncomingMessage, res: ServerResponse): Promise<void> {
       const accountId = await ensureAccount(req);
-      sendJson(res, 200, { subscription: service.getSubscription(accountId) });
+      sendJson(res, 200, { subscription: service.getSubscription(accountId), summary: service.getCurrentSubscriptionSummary(accountId) });
+    },
+
+    async getBillingState(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const accountId = await ensureAccount(req);
+      sendJson(res, 200, { billingState: service.getBillingState(accountId) });
     },
 
     async getCurrentEntitlements(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -41,6 +46,16 @@ export function createSubscriptionHttpHandlers(service: SubscriptionService, pol
     async getAvailablePlans(req: IncomingMessage, res: ServerResponse): Promise<void> {
       const accountId = await ensureAccount(req);
       sendJson(res, 200, { plans: service.getAvailablePlansForAccount(accountId) });
+    },
+
+    async checkTrialEligibility(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const accountId = await ensureAccount(req);
+      const base = `http://${req.headers.host ?? "localhost"}`;
+      const url = new URL(req.url ?? "/", base);
+      const planId = String(url.searchParams.get("planId") ?? "").trim();
+      if (!planId) throw new ValidationError(["planId query parameter is required"]);
+      const account = service.ensureAccount(accountId, parseAccountType(readHeader(req, "x-account-type")));
+      sendJson(res, 200, { eligibility: service.canStartTrial({ type: account.accountType, id: account.id }, planId) });
     },
 
     async previewUpgrade(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -70,16 +85,44 @@ export function createSubscriptionHttpHandlers(service: SubscriptionService, pol
       sendJson(res, 200, await service.startSubscriptionChange(accountId, targetPlanId));
     },
 
+    async startTrial(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const accountId = await ensureAccount(req);
+      const body = await parseJsonBody(req);
+      const planId = String((body as Record<string, unknown>)?.planId ?? "").trim();
+      if (!planId) throw new ValidationError(["planId is required"]);
+      sendJson(res, 200, { subscription: service.startTrial(accountId, planId), summary: service.getCurrentSubscriptionSummary(accountId) });
+    },
+
+    async markPastDue(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const accountId = await ensureAccount(req);
+      service.markPastDue(accountId);
+      sendJson(res, 200, { ok: true, summary: service.getCurrentSubscriptionSummary(accountId) });
+    },
+
+    async enterGracePeriod(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const accountId = await ensureAccount(req);
+      const body = await parseJsonBody(req);
+      const graceDays = Number((body as Record<string, unknown>)?.graceDays ?? 3);
+      service.enterGracePeriod(accountId, graceDays);
+      sendJson(res, 200, { ok: true, summary: service.getCurrentSubscriptionSummary(accountId) });
+    },
+
     async cancelSubscription(req: IncomingMessage, res: ServerResponse): Promise<void> {
       const accountId = await ensureAccount(req);
-      await service.cancelSubscription(accountId);
-      sendJson(res, 200, { ok: true });
+      const body = await parseJsonBody(req).catch(() => undefined);
+      const mode = String((body as Record<string, unknown> | undefined)?.mode ?? "period_end");
+      if (mode === "immediate") {
+        await service.cancelImmediately(accountId);
+      } else {
+        await service.cancelSubscription(accountId);
+      }
+      sendJson(res, 200, { ok: true, mode: mode === "immediate" ? CancellationMode.IMMEDIATE : CancellationMode.CANCEL_AT_PERIOD_END, summary: service.getCurrentSubscriptionSummary(accountId) });
     },
 
     async resumeSubscription(req: IncomingMessage, res: ServerResponse): Promise<void> {
       const accountId = await ensureAccount(req);
       await service.resumeSubscription(accountId);
-      sendJson(res, 200, { ok: true });
+      sendJson(res, 200, { ok: true, summary: service.getCurrentSubscriptionSummary(accountId) });
     },
 
     async getUsageSummary(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -136,6 +179,7 @@ export function createSubscriptionHttpHandlers(service: SubscriptionService, pol
       if (!accountId) throw new ValidationError(["x-account-id header is required"]);
       sendJson(res, 200, {
         subscription: service.getSubscription(accountId),
+        summary: service.getCurrentSubscriptionSummary(accountId),
         entitlements: service.getCurrentEntitlements(accountId),
         usage: await service.getUsageSummary(accountId),
         events: service.getEventHistory(accountId)

@@ -364,8 +364,16 @@ export function createRoutes(
           await subscriptionHandlers.getCurrentEntitlements(req, res);
           return;
         }
+        if (req.method === "GET" && normalizedPath === "/v1/subscription/billing-state") {
+          await subscriptionHandlers.getBillingState(req, res);
+          return;
+        }
         if (req.method === "GET" && normalizedPath === "/v1/subscription/plans") {
           await subscriptionHandlers.getAvailablePlans(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/subscription/trial-eligibility") {
+          await subscriptionHandlers.checkTrialEligibility(req, res);
           return;
         }
         if (req.method === "GET" && normalizedPath === "/v1/subscription/preview-upgrade") {
@@ -378,6 +386,18 @@ export function createRoutes(
         }
         if (req.method === "POST" && normalizedPath === "/v1/subscription/change") {
           await subscriptionHandlers.startSubscriptionChange(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/subscription/start-trial") {
+          await subscriptionHandlers.startTrial(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/subscription/mark-past-due") {
+          await subscriptionHandlers.markPastDue(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/subscription/enter-grace") {
+          await subscriptionHandlers.enterGracePeriod(req, res);
           return;
         }
         if (req.method === "POST" && normalizedPath === "/v1/subscription/cancel") {

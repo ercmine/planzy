@@ -66,7 +66,7 @@ describe("subscription routes", () => {
     await expect(response.json()).resolves.toMatchObject({
       decision: {
         allowed: false,
-        reasonCode: "PLAN_REQUIRED"
+        reasonCode: "FEATURE_NOT_IN_PLAN"
       }
     });
   });
@@ -95,7 +95,7 @@ describe("subscription routes", () => {
 
     expect(blocked.status).toBe(403);
     await expect(blocked.json()).resolves.toMatchObject({
-      error: "PLAN_LIMIT_EXCEEDED"
+      error: "USAGE_LIMIT_REACHED"
     });
   });
 });

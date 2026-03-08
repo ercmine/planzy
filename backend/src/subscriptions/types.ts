@@ -1,8 +1,13 @@
-export enum AccountType {
+export enum SubscriptionTargetType {
   USER = "USER",
   CREATOR = "CREATOR",
-  BUSINESS = "BUSINESS"
+  BUSINESS = "BUSINESS",
+  MULTI = "MULTI"
 }
+
+// Backward-compatible alias used by account-service integration.
+export const AccountType = SubscriptionTargetType;
+export type AccountType = SubscriptionTargetType;
 
 export enum PlanTier {
   FREE = "FREE",
@@ -11,16 +16,48 @@ export enum PlanTier {
   ELITE = "ELITE"
 }
 
-export enum BillingInterval {
-  MONTHLY = "MONTHLY"
+export enum PlanInterval {
+  NONE = "NONE",
+  MONTHLY = "MONTHLY",
+  YEARLY = "YEARLY",
+  LIFETIME = "LIFETIME"
+}
+
+// Backward-compatible alias used by existing tests/scaffolding.
+export const BillingInterval = PlanInterval;
+export type BillingInterval = PlanInterval;
+
+export enum BillingProviderName {
+  INTERNAL = "INTERNAL",
+  STRIPE = "STRIPE",
+  APP_STORE = "APP_STORE",
+  PLAY_STORE = "PLAY_STORE",
+  UNKNOWN = "UNKNOWN"
 }
 
 export enum SubscriptionStatus {
-  ACTIVE = "ACTIVE",
+  FREE = "FREE",
   TRIALING = "TRIALING",
+  ACTIVE = "ACTIVE",
   PAST_DUE = "PAST_DUE",
+  GRACE_PERIOD = "GRACE_PERIOD",
   CANCELED = "CANCELED",
-  EXPIRED = "EXPIRED"
+  EXPIRED = "EXPIRED",
+  INCOMPLETE = "INCOMPLETE"
+}
+
+export enum RenewalStatus {
+  AUTO_RENEW_ON = "AUTO_RENEW_ON",
+  AUTO_RENEW_OFF = "AUTO_RENEW_OFF",
+  NON_RENEWING = "NON_RENEWING",
+  UNKNOWN = "UNKNOWN"
+}
+
+export enum CancellationMode {
+  NONE = "NONE",
+  CANCEL_AT_PERIOD_END = "CANCEL_AT_PERIOD_END",
+  IMMEDIATE = "IMMEDIATE",
+  PROVIDER_FORCED = "PROVIDER_FORCED"
 }
 
 export enum EntitlementValueType {
@@ -71,37 +108,69 @@ export interface EntitlementDefinition {
   defaultValue: EntitlementValue;
 }
 
-export interface SubscriptionPlan {
+export interface PlanDefinition {
   id: string;
-  accountType: AccountType;
+  code: string;
+  targetType: SubscriptionTargetType;
   tier: PlanTier;
   displayName: string;
-  monthlyPriceCents: number;
+  interval: PlanInterval;
+  priceAmount: number;
+  priceCurrency: string;
+  isActive: boolean;
   billable: boolean;
   visible: boolean;
   saleable: boolean;
+  trialDays?: number;
+  metadata?: Record<string, unknown>;
   entitlements: Record<EntitlementKey, EntitlementValue>;
   upgradePlanIds: string[];
   downgradePlanIds: string[];
 }
 
+// Backward-compatible alias.
+export type SubscriptionPlan = PlanDefinition;
+
+export interface SubscriptionTargetRef {
+  type: SubscriptionTargetType;
+  id: string;
+}
+
 export interface Subscription {
-  accountId: string;
+  id: string;
+  targetType: SubscriptionTargetType;
+  targetId: string;
   planId: string;
+  provider: BillingProviderName;
+  providerCustomerId?: string;
+  providerSubscriptionId?: string;
   status: SubscriptionStatus;
-  billingInterval: BillingInterval;
-  trialEndsAt?: string;
-  graceEndsAt?: string;
-  cancelAtPeriodEnd?: boolean;
+  renewalStatus: RenewalStatus;
+  cancellationMode: CancellationMode;
+  startedAt: string;
   currentPeriodStartAt?: string;
   currentPeriodEndAt?: string;
-  providerSubscriptionId?: string;
+  renewsAt?: string;
+  canceledAt?: string;
+  cancelEffectiveAt?: string;
+  expiresAt?: string;
+  trialStartAt?: string;
+  trialEndAt?: string;
+  graceStartAt?: string;
+  graceEndAt?: string;
+  pastDueAt?: string;
+  lastPaymentAt?: string;
+  billingAnchorAt?: string;
+  autoRenews: boolean;
   comped?: boolean;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Account {
   id: string;
-  accountType: AccountType;
+  accountType: SubscriptionTargetType;
   featureFlags: string[];
   billingStatus: SubscriptionStatus;
 }
@@ -114,11 +183,15 @@ export interface EntitlementOverride {
 }
 
 export interface ResolvedEntitlements {
+  targetType: SubscriptionTargetType;
+  targetId: string;
   accountId: string;
-  accountType: AccountType;
+  accountType: SubscriptionTargetType;
   planId: string;
+  status: SubscriptionStatus;
+  hasAccessNow: boolean;
   values: Record<EntitlementKey, EntitlementValue>;
-  sources: Record<EntitlementKey, "default" | "plan" | "flag" | "override" | "grace">;
+  sources: Record<EntitlementKey, "default" | "plan" | "flag" | "override" | "grace" | "fallback_free">;
   evaluatedAt: string;
 }
 
@@ -154,7 +227,15 @@ export enum ReasonCode {
   PLAN_LIMIT_EXCEEDED = "PLAN_LIMIT_EXCEEDED",
   ACCOUNT_TYPE_MISMATCH = "ACCOUNT_TYPE_MISMATCH",
   SUBSCRIPTION_INACTIVE = "SUBSCRIPTION_INACTIVE",
-  NOT_AVAILABLE = "NOT_AVAILABLE"
+  NOT_AVAILABLE = "NOT_AVAILABLE",
+  NO_SUBSCRIPTION = "NO_SUBSCRIPTION",
+  WRONG_TARGET_TYPE = "WRONG_TARGET_TYPE",
+  TRIAL_EXPIRED = "TRIAL_EXPIRED",
+  SUBSCRIPTION_PAST_DUE = "SUBSCRIPTION_PAST_DUE",
+  GRACE_PERIOD_EXPIRED = "GRACE_PERIOD_EXPIRED",
+  CANCELED_EFFECTIVE = "CANCELED_EFFECTIVE",
+  FEATURE_NOT_IN_PLAN = "FEATURE_NOT_IN_PLAN",
+  USAGE_LIMIT_REACHED = "USAGE_LIMIT_REACHED"
 }
 
 export interface PermissionDecision {
@@ -164,6 +245,7 @@ export interface PermissionDecision {
   requiredPlan?: PlanTier;
   limit?: number;
   usage?: number;
+  denialDetails?: string;
 }
 
 export interface PlanChangePreview {
@@ -178,18 +260,80 @@ export interface PlanChangePreview {
 
 export interface SubscriptionEvent {
   id: string;
-  accountId: string;
-  type: string;
+  subscriptionId: string;
+  targetId: string;
+  targetType: SubscriptionTargetType;
+  type:
+    | "created"
+    | "trial_started"
+    | "activated"
+    | "renewed"
+    | "payment_failed"
+    | "grace_started"
+    | "canceled"
+    | "expired"
+    | "reactivated"
+    | "plan_changed"
+    | "entitlement_override";
+  previousState?: SubscriptionStatus;
+  nextState?: SubscriptionStatus;
   occurredAt: string;
+  actor: "system" | "admin" | "provider" | "user";
   payload: Record<string, unknown>;
 }
 
 export interface SubscriptionPlanDto {
   id: string;
-  accountType: AccountType;
+  code: string;
+  targetType: SubscriptionTargetType;
   tier: PlanTier;
   displayName: string;
-  monthlyPriceCents: number;
+  priceAmount: number;
+  priceCurrency: string;
+  interval: PlanInterval;
   billable: boolean;
+  trialAvailable: boolean;
   includedEntitlements: Record<EntitlementKey, EntitlementValue>;
+}
+
+export interface SubscriptionSummary {
+  targetType: SubscriptionTargetType;
+  targetId: string;
+  planCode: string;
+  status: SubscriptionStatus;
+  renewalStatus: RenewalStatus;
+  isTrial: boolean;
+  willCancelAtPeriodEnd: boolean;
+  hasAccessNow: boolean;
+  accessEndsAt?: string;
+  currentPeriodEndAt?: string;
+  graceEndAt?: string;
+  trialEndAt?: string;
+  nextRenewalAt?: string;
+  priceAmount: number;
+  priceCurrency: string;
+  interval: PlanInterval;
+  upgradeEligible: boolean;
+  downgradeEligible: boolean;
+}
+
+export interface EntitlementSummary {
+  targetType: SubscriptionTargetType;
+  targetId: string;
+  features: Record<string, boolean>;
+  limits: Record<string, number>;
+}
+
+export interface TrialEligibilityResult {
+  eligible: boolean;
+  reasonCodes: Array<"already_used_trial" | "target_ineligible" | "wrong_plan_type" | "active_subscription_exists" | "role_missing">;
+}
+
+export interface AccessWindowResolution {
+  hasAccessNow: boolean;
+  softActive: boolean;
+  inGrace: boolean;
+  expiresAt?: string;
+  shouldDowngradeNow: boolean;
+  reason?: ReasonCode;
 }

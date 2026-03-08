@@ -1,5 +1,6 @@
 import { ENTITLEMENT_DEFINITIONS } from "./entitlementDefinitions.js";
-import { getPlan } from "./catalog.js";
+import { getFreePlan, getPlan } from "./catalog.js";
+import { resolveAccessWindow } from "./state.js";
 import { SubscriptionStatus, type EntitlementKey, type EntitlementOverride, type EntitlementValue, type ResolvedEntitlements, type Subscription, type Account } from "./types.js";
 
 const FLAG_OVERRIDES: Record<string, Partial<Record<EntitlementKey, EntitlementValue>>> = {
@@ -11,19 +12,31 @@ export function resolveEntitlements(input: {
   account: Account;
   subscription: Subscription;
   overrides?: EntitlementOverride[];
+  now?: Date;
 }): ResolvedEntitlements {
-  const plan = getPlan(input.subscription.planId);
-  if (!plan) {
+  const now = input.now ?? new Date();
+  const window = resolveAccessWindow(input.subscription, now);
+  const status = window.shouldDowngradeNow ? SubscriptionStatus.EXPIRED : input.subscription.status;
+
+  const paidPlan = getPlan(input.subscription.planId);
+  if (!paidPlan) {
     throw new Error(`Unknown plan: ${input.subscription.planId}`);
   }
 
-  const now = Date.now();
-  const values = Object.fromEntries(ENTITLEMENT_DEFINITIONS.map((d) => [d.key, d.defaultValue])) as Record<EntitlementKey, EntitlementValue>;
-  const sources = Object.fromEntries(ENTITLEMENT_DEFINITIONS.map((d) => [d.key, "default"])) as ResolvedEntitlements["sources"];
+  const effectivePlan = status === SubscriptionStatus.EXPIRED || status === SubscriptionStatus.FREE
+    ? getFreePlan(input.subscription.targetType)
+    : paidPlan;
 
-  for (const [key, value] of Object.entries(plan.entitlements) as Array<[EntitlementKey, EntitlementValue]>) {
+  const values = Object.fromEntries(ENTITLEMENT_DEFINITIONS.map((d) => [d.key, d.defaultValue])) as Record<EntitlementKey, EntitlementValue>;
+  const sources = Object.fromEntries(ENTITLEMENT_DEFINITIONS.map((d) => [d.key, d.defaultValue])) as unknown as ResolvedEntitlements["sources"];
+
+  for (const key of Object.keys(sources) as EntitlementKey[]) {
+    sources[key] = "default";
+  }
+
+  for (const [key, value] of Object.entries(effectivePlan.entitlements) as Array<[EntitlementKey, EntitlementValue]>) {
     values[key] = value;
-    sources[key] = "plan";
+    sources[key] = effectivePlan.id === paidPlan.id ? "plan" : "fallback_free";
   }
 
   for (const flag of input.account.featureFlags) {
@@ -36,22 +49,26 @@ export function resolveEntitlements(input: {
   }
 
   for (const override of input.overrides ?? []) {
-    if (override.expiresAt && new Date(override.expiresAt).getTime() < now) continue;
+    if (override.expiresAt && new Date(override.expiresAt).getTime() < now.getTime()) continue;
     values[override.key] = override.value;
     sources[override.key] = "override";
   }
 
-  if (input.subscription.status === SubscriptionStatus.EXPIRED && input.subscription.graceEndsAt && new Date(input.subscription.graceEndsAt).getTime() > now) {
+  if (input.subscription.status === SubscriptionStatus.GRACE_PERIOD && window.inGrace) {
     values.priority_support = false;
     sources.priority_support = "grace";
   }
 
   return {
+    targetType: input.subscription.targetType,
+    targetId: input.subscription.targetId,
     accountId: input.account.id,
     accountType: input.account.accountType,
-    planId: input.subscription.planId,
+    planId: effectivePlan.id,
+    status,
+    hasAccessNow: window.hasAccessNow,
     values,
     sources,
-    evaluatedAt: new Date().toISOString()
+    evaluatedAt: now.toISOString()
   };
 }
