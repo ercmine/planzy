@@ -2,180 +2,214 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCategorySearchPlan,
+  classifyPlaceCategories,
   getCategoryDefinition,
   rankAndFilterCategoryResults,
-  scorePlaceForCategory
+  resolveCategoryAlias,
+  scorePlaceForCategory,
+  type ProviderPlaceEvidence
 } from "../categoryIntelligence.js";
 
+function googleEvidence(overrides: Partial<ProviderPlaceEvidence>): ProviderPlaceEvidence {
+  return {
+    provider: "google",
+    placeId: "g-1",
+    ...overrides
+  };
+}
+
 describe("category intelligence", () => {
-  it("builds category definitions with expected query/type constraints", () => {
+  it("resolves aliases to canonical category IDs", () => {
+    expect(resolveCategoryAlias("coffee")).toBe("coffee-shops");
+    expect(resolveCategoryAlias("bars near me")).toBe("bars");
+    expect(resolveCategoryAlias("unknown")).toBe("food-drink");
+  });
+
+  it("builds search plans from provider hints", () => {
     const coffee = buildCategorySearchPlan("coffee");
-    expect(coffee.primaryTypes).toContain("coffee_shop");
+    expect(coffee.definition.id).toBe("coffee-shops");
+    expect(coffee.primaryTypes).toContain("cafe");
     expect(coffee.queryTerms).toContain("espresso");
 
-    const hiking = buildCategorySearchPlan("hiking");
-    expect(hiking.definition.id).toBe("outdoors");
-    expect(hiking.primaryTypes).toContain("hiking_area");
+    const museum = buildCategorySearchPlan("museum");
+    expect(museum.definition.id).toBe("museums");
+    expect(museum.primaryTypes).toContain("museum");
   });
 
-  it("filters irrelevant provider types for category pages", () => {
-    const definition = getCategoryDefinition("outdoors");
-    const filtered = rankAndFilterCategoryResults(
-      [
-        {
-          id: "trail",
-          displayName: { text: "Sunset Hiking Trail" },
-          primaryType: "hiking_area",
-          types: ["hiking_area", "park"],
-          rating: 4.6,
-          userRatingCount: 230
-        },
-        {
-          id: "apt",
-          displayName: { text: "River Apartments" },
-          primaryType: "apartment_building",
-          types: ["apartment_building"],
-          rating: 4.7,
-          userRatingCount: 400
-        }
-      ],
-      definition
-    );
+  it("maps Google and Foursquare coffee types strongly to coffee-shops with agreement bonus", () => {
+    const profile = classifyPlaceCategories([
+      googleEvidence({
+        primaryType: "cafe",
+        types: ["cafe", "coffee_shop"],
+        name: "North Loop Roastery",
+        description: "Espresso and latte bar"
+      }),
+      {
+        provider: "foursquare",
+        placeId: "fsq-1",
+        subcategories: ["Coffee Shop"],
+        name: "North Loop Coffee Shop"
+      }
+    ]);
 
-    expect(filtered.kept.map((place) => place.id)).toEqual(["trail"]);
-    expect(filtered.rejected[0]?.reason).toContain("banned_type");
+    expect(profile.primaryCategoryId).toBe("coffee-shops");
+    expect(profile.categoryScores["coffee-shops"]).toBeGreaterThan(0.9);
+    expect(profile.evidenceByCategory["coffee-shops"].bonuses.some((entry) => entry.source === "agreement:multi_provider")).toBe(
+      true
+    );
   });
 
-  it("coffee prefers cafes over generic restaurants", () => {
-    const definition = getCategoryDefinition("coffee");
-    const cafeScore = scorePlaceForCategory(
-      {
-        id: "cafe",
-        displayName: { text: "North Loop Coffee" },
-        primaryType: "coffee_shop",
-        types: ["coffee_shop", "cafe"],
-        rating: 4.5,
-        userRatingCount: 120
-      },
-      definition
-    );
+  it("does not strongly map generic restaurant or tourist_attraction to specific categories", () => {
+    const brunchProfile = classifyPlaceCategories([
+      googleEvidence({ primaryType: "restaurant", types: ["restaurant"], name: "Generic Restaurant" })
+    ]);
+    expect(brunchProfile.fitByCategory.brunch).not.toBe("strong_match");
 
-    const restaurantScore = scorePlaceForCategory(
-      {
-        id: "restaurant",
-        displayName: { text: "All Day Grill" },
+    const museumProfile = classifyPlaceCategories([
+      googleEvidence({ primaryType: "tourist_attraction", types: ["tourist_attraction"], name: "Downtown Landmark" })
+    ]);
+    expect(museumProfile.fitByCategory.museums).toBe("mismatch");
+  });
+
+  it("keyword signals and negative keywords adjust confidence deterministically", () => {
+    const positive = classifyPlaceCategories([
+      googleEvidence({
+        primaryType: "restaurant",
+        types: ["restaurant", "breakfast_restaurant"],
+        name: "Sunny Brunch Spot",
+        description: "Mimosa flights and eggs benedict"
+      })
+    ]);
+
+    const negative = classifyPlaceCategories([
+      googleEvidence({
         primaryType: "restaurant",
         types: ["restaurant"],
-        rating: 4.5,
-        userRatingCount: 120
-      },
-      definition
-    );
+        name: "Late Night Office Kitchen",
+        description: "Quick bite"
+      })
+    ]);
 
-    expect(cafeScore.score).toBeGreaterThan(restaurantScore.score);
+    expect(positive.categoryScores.brunch).toBeGreaterThan(negative.categoryScores.brunch);
   });
 
-  it("hiking prefers trails/parks over unrelated places", () => {
-    const definition = getCategoryDefinition("hiking");
-    const ranked = rankAndFilterCategoryResults(
-      [
-        {
-          id: "park",
-          displayName: { text: "Eagle Ridge Trailhead" },
-          primaryType: "hiking_area",
-          types: ["hiking_area", "park"],
-          rating: 4.8,
-          userRatingCount: 320
-        },
-        {
-          id: "shop",
-          displayName: { text: "Random Convenience" },
-          primaryType: "convenience_store",
-          types: ["convenience_store", "store"],
-          rating: 4.9,
-          userRatingCount: 500
-        }
-      ],
-      definition
-    );
+  it("prefers specific categories over generic parent when evidence is strong", () => {
+    const profile = classifyPlaceCategories([
+      googleEvidence({ primaryType: "dog_park", types: ["park", "dog_park"], name: "Riverside Off Leash Dog Park" })
+    ]);
 
-    expect(ranked.kept.map((place) => place.id)).toEqual(["park"]);
+    expect(profile.primaryCategoryId).toBe("dog-parks");
+    expect(profile.categoryScores["dog-parks"]).toBeGreaterThanOrEqual(profile.categoryScores.outdoors);
   });
 
-  it("nightlife does not rank coffee shops above bars", () => {
-    const definition = getCategoryDefinition("nightlife");
-    const bar = scorePlaceForCategory(
-      {
-        id: "bar",
-        displayName: { text: "Velvet Lounge" },
-        primaryType: "bar",
-        types: ["bar", "event_venue"],
-        rating: 4.4,
-        userRatingCount: 220
-      },
-      definition
-    );
+  it("classifies nightlife bars vs clubs distinctly", () => {
+    const clubs = classifyPlaceCategories([
+      googleEvidence({ primaryType: "night_club", types: ["night_club"], name: "Pulse DJ Night Club" })
+    ]);
+    const bars = classifyPlaceCategories([
+      googleEvidence({ primaryType: "bar", types: ["bar"], name: "Velvet Cocktail Bar" })
+    ]);
 
-    const coffee = scorePlaceForCategory(
-      {
-        id: "coffee",
-        displayName: { text: "Morning Roast Coffee" },
-        primaryType: "coffee_shop",
-        types: ["coffee_shop", "cafe"],
-        rating: 4.8,
-        userRatingCount: 300
-      },
-      definition
-    );
-
-    expect(bar.score).toBeGreaterThan(coffee.score);
+    expect(clubs.primaryCategoryId).toBe("clubs");
+    expect(bars.primaryCategoryId).toBe("bars");
   });
 
-  it("weak result sets are filtered to empty", () => {
-    const definition = getCategoryDefinition("family");
-    const ranked = rankAndFilterCategoryResults(
-      [
-        {
-          id: "weak",
-          displayName: { text: "Downtown Office Plaza" },
-          primaryType: "office_building",
-          types: ["office_building"],
-          rating: 4.0,
-          userRatingCount: 5
-        }
-      ],
-      definition
-    );
+  it("supports manual include, exclude, and primary overrides with precedence", () => {
+    const place = {
+      id: "weak",
+      displayName: { text: "Grand Hotel Lounge" },
+      primaryType: "lodging",
+      types: ["lodging", "bar"],
+      rating: 4.2,
+      userRatingCount: 150
+    };
 
-    expect(ranked.kept).toHaveLength(0);
-    expect(ranked.rejected).toHaveLength(1);
+    const definition = getCategoryDefinition("clubs");
+    const without = rankAndFilterCategoryResults([place], definition);
+    expect(without.kept).toHaveLength(0);
+
+    const withOverride = rankAndFilterCategoryResults([place], definition, {
+      placeOverrides: new Map([
+        [
+          "weak",
+          {
+            hardPrimaryCategoryId: "clubs",
+            hardExcludeCategoryIds: ["bars"]
+          }
+        ]
+      ])
+    });
+
+    expect(withOverride.kept).toHaveLength(1);
+    expect(withOverride.scoreMap.get("weak")?.fitLabel).toBe("exact_match");
   });
 
-  it("sorts strong matches above weak matches", () => {
-    const definition = getCategoryDefinition("date");
+  it("ranks strong matches above weak matches and filters mismatches on strict pages", () => {
+    const definition = getCategoryDefinition("coffee");
     const ranked = rankAndFilterCategoryResults(
       [
         {
           id: "strong",
-          displayName: { text: "Romantic Wine Bar" },
-          primaryType: "wine_bar",
-          types: ["wine_bar", "bar"],
-          rating: 4.7,
-          userRatingCount: 400,
+          displayName: { text: "Neighborhood Coffee Roastery" },
+          primaryType: "coffee_shop",
+          types: ["coffee_shop", "cafe"],
+          rating: 4.4,
+          userRatingCount: 90,
           photos: [{ name: "p" }]
         },
         {
-          id: "weaker",
-          displayName: { text: "Generic Eatery" },
+          id: "weak",
+          displayName: { text: "Generic Restaurant" },
           primaryType: "restaurant",
           types: ["restaurant"],
-          rating: 4.1,
-          userRatingCount: 30
+          rating: 4.9,
+          userRatingCount: 1000
         }
       ],
-      definition
+      definition,
+      { strictness: "strict" }
     );
 
     expect(ranked.kept[0]?.id).toBe("strong");
+    expect(ranked.rejected.some((entry) => entry.place.id === "weak")).toBe(true);
+  });
+
+  it("broad parent pages keep acceptable child matches", () => {
+    const definition = getCategoryDefinition("nightlife");
+    const ranked = rankAndFilterCategoryResults(
+      [
+        {
+          id: "bar",
+          displayName: { text: "Velvet Cocktail Bar" },
+          primaryType: "bar",
+          types: ["bar"],
+          rating: 4.3,
+          userRatingCount: 200
+        }
+      ],
+      definition,
+      { strictness: "broad" }
+    );
+
+    expect(ranked.kept).toHaveLength(1);
+  });
+
+  it("scorePlaceForCategory exposes explainable reasons", () => {
+    const definition = getCategoryDefinition("museums");
+    const score = scorePlaceForCategory(
+      {
+        id: "museum",
+        displayName: { text: "City Science Museum" },
+        primaryType: "museum",
+        types: ["museum", "tourist_attraction"],
+        rating: 4.8,
+        userRatingCount: 1200
+      },
+      definition
+    );
+
+    expect(score.keep).toBe(true);
+    expect(score.reasons.length).toBeGreaterThan(0);
+    expect(score.evidence?.contributions.length).toBeGreaterThan(0);
   });
 });
