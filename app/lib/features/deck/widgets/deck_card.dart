@@ -1,5 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -65,6 +63,7 @@ class _DeckCardState extends State<DeckCard> {
   @override
   Widget build(BuildContext context) {
     final plan = widget.plan;
+    final imageUrl = resolvePlanImageUrl(plan);
     final distance = formatDistanceMeters(plan.distanceMeters);
     final rating = formatRating(plan.rating, plan.reviewCount);
     final price = formatPriceLevel(plan.priceLevel);
@@ -87,30 +86,25 @@ class _DeckCardState extends State<DeckCard> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        if (isHttpUrl(plan.photos?.firstOrNull?.url))
-                          CachedNetworkImage(
-                            imageUrl: plan.photos!.first.url,
+                        if (imageUrl != null)
+                          Image.network(
+                            imageUrl,
                             fit: BoxFit.cover,
-                            memCacheWidth: 800,
-                            placeholder: (_, __) => ColoredBox(
-                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                              child: const Icon(Icons.photo, size: 56),
-                            ),
-                            errorWidget: (_, __, error) {
+                            errorBuilder: (_, __, error) {
                               if (kDebugMode) {
-                                debugPrint('[PlanCard] image failed: ${plan.photos!.first.url} $error');
+                                debugPrint('[PlanCard] image failed: $imageUrl $error');
                               }
-                              return ColoredBox(
-                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                child: const Icon(Icons.photo, size: 56),
-                              );
+                              return _imagePlaceholder(context);
+                            },
+                            loadingBuilder: (_, child, progress) {
+                              if (progress == null) {
+                                return child;
+                              }
+                              return _imagePlaceholder(context, loading: true);
                             },
                           )
                         else
-                          ColoredBox(
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                            child: const Icon(Icons.photo, size: 56),
-                          ),
+                          _imagePlaceholder(context),
                         const DecoratedBox(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
@@ -141,6 +135,35 @@ class _DeckCardState extends State<DeckCard> {
       ),
     );
   }
+}
+
+String? resolvePlanImageUrl(Plan plan) {
+  final photoUrl = plan.metadata?['photoUrl']?.toString();
+  if (photoUrl != null && photoUrl.startsWith('http')) {
+    return photoUrl;
+  }
+  return null;
+}
+
+Widget _imagePlaceholder(BuildContext context, {bool loading = false}) {
+  return Container(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF20242E), Color(0xFF3A4255)],
+      ),
+    ),
+    child: Center(
+      child: loading
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.photo, size: 56),
+    ),
+  );
 }
 
 class _CardMeta extends StatelessWidget {

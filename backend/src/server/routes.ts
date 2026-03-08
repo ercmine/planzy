@@ -101,7 +101,7 @@ export function createRoutes(
             googleMapsUri: place.googleMapsUri,
             websiteUri: place.websiteUri,
             photo: photoName,
-            photoUrl: photoName ? `${publicApiBaseUrl}/photos?name=${encodeURIComponent(photoName)}&maxWidthPx=800` : undefined
+            photoUrl: photoName ? `${publicApiBaseUrl}/photo?name=${encodeURIComponent(photoName)}&maxWidthPx=800` : undefined
           };
         });
 
@@ -152,14 +152,22 @@ export function createRoutes(
         return;
       }
 
-      if (req.method === "GET" && (normalizedPath === "/photos" || normalizedPath === "/places/photo")) {
+      if (
+        req.method === "GET" &&
+        (normalizedPath === "/photo" || normalizedPath === "/photos" || normalizedPath === "/photos/media" || normalizedPath === "/places/photo")
+      ) {
         const name = url.searchParams.get("name");
         const maxWidthPx = Number(url.searchParams.get("maxWidthPx") ?? "800");
         const maxHeightPx = Number(url.searchParams.get("maxHeightPx") ?? "800");
         const apiKey = process.env.GOOGLE_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
 
-        if (!apiKey || !name || !name.startsWith("places/") || !name.includes("/photos/")) {
-          sendJson(res, 404, { error: "photo_not_available" });
+        if (!name || !name.startsWith("places/") || !name.includes("/photos/")) {
+          sendJson(res, 400, { error: "invalid_photo_name" });
+          return;
+        }
+
+        if (!apiKey) {
+          sendJson(res, 503, { error: "photo_service_unavailable" });
           return;
         }
 
@@ -343,7 +351,7 @@ function normalizeAliasPath(pathname: string): string {
     return pathname.slice("/api".length);
   }
 
-  const v1AliasPaths = ["/plans", "/live-results", "/health", "/photos", "/places/photo"];
+  const v1AliasPaths = ["/plans", "/live-results", "/health", "/photo", "/photos", "/photos/media", "/places/photo"];
   if (pathname.startsWith("/v1/")) {
     const withoutPrefix = pathname.slice("/v1".length);
     if (v1AliasPaths.some((aliasPath) => withoutPrefix === aliasPath || withoutPrefix.startsWith(`${aliasPath}/`))) {
