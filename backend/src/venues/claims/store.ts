@@ -1,5 +1,6 @@
 import type {
   BusinessClaimEvidenceRecord,
+  BusinessContactMethodRecord,
   BusinessManagedPlaceContentRecord,
   BusinessManagedPlaceImage,
   BusinessManagedPlaceProfile,
@@ -9,6 +10,8 @@ import type {
   BusinessPlaceClaimRecord,
   BusinessPlaceLink,
   BusinessPlaceMenuServiceCatalog,
+  BusinessTrustAuditEvent,
+  BusinessTrustProfile,
   ClaimAuditEvent,
   ClaimStatus,
   ListClaimsOptions,
@@ -59,6 +62,16 @@ export interface VenueClaimStore {
 
   upsertBusinessImage(input: BusinessManagedPlaceImage): Promise<void>;
   listBusinessImages(placeId: string): Promise<BusinessManagedPlaceImage[]>;
+
+  upsertBusinessContactMethod(input: BusinessContactMethodRecord): Promise<void>;
+  listBusinessContactMethods(placeId: string): Promise<BusinessContactMethodRecord[]>;
+  getBusinessContactMethodById(contactMethodId: string): Promise<BusinessContactMethodRecord | null>;
+
+  upsertBusinessTrustProfile(input: BusinessTrustProfile): Promise<void>;
+  getBusinessTrustProfile(placeId: string): Promise<BusinessTrustProfile | null>;
+
+  appendBusinessTrustAuditEvent(input: BusinessTrustAuditEvent): Promise<void>;
+  listBusinessTrustAuditEvents(placeId: string): Promise<BusinessTrustAuditEvent[]>;
 
   appendBusinessManagedAuditEvent(input: BusinessManagedChangeAuditRecord): Promise<void>;
   listBusinessManagedAuditEvents(placeId: string): Promise<BusinessManagedChangeAuditRecord[]>;

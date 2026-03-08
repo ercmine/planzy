@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { ValidationError } from "../../plans/errors.js";
 import { normalizePhone, normalizeUrl } from "../../places/normalization.js";
 import { sanitizeText } from "../../sanitize/text.js";
+import { BusinessTrustService } from "./trustService.js";
 import type {
   BusinessManagedHours,
   BusinessManagedPlaceContentRecord,
@@ -11,6 +12,9 @@ import type {
   BusinessPlaceClaimRecord,
   BusinessPlaceLink,
   BusinessPlaceLinkType,
+  BusinessTrustPublicView,
+  ContactVerificationMethod,
+  ContactVerificationStatus,
   BusinessPlaceMenuServiceCatalog,
   ClaimActor,
   ClaimStatus,
@@ -41,7 +45,11 @@ const URL_LINK_TYPES = new Set<BusinessPlaceLinkType>([
 ]);
 
 export class VenueClaimsService {
-  constructor(private readonly store: VenueClaimStore, private readonly now: () => Date = () => new Date()) {}
+  private readonly trustService: BusinessTrustService;
+
+  constructor(private readonly store: VenueClaimStore, private readonly now: () => Date = () => new Date()) {
+    this.trustService = new BusinessTrustService(store, now);
+  }
 
   private requireUser(actor?: ClaimActor): string {
     if (!actor?.userId) throw new ValidationError(["x-user-id is required"]);
@@ -193,6 +201,7 @@ export class VenueClaimsService {
       ...(claim.claimantUserId ? { primaryUserId: claim.claimantUserId } : {})
     };
     await this.store.upsertOwnership(ownership);
+    await this.trustService.recompute(claim.placeId);
     await this.track(claim.placeId, "business_claim_approved", actor?.userId, { claimId, reasonCode, ownershipId: ownership.id, partial: Boolean(existingPrimary) });
     return updated;
   }
@@ -203,6 +212,7 @@ export class VenueClaimsService {
     if (!own) throw new ValidationError(["ownership not found"]);
     const nowIso = this.now().toISOString();
     await this.store.updateOwnership(ownershipId, { isActive: false, verificationStatus: "revoked", revokedAt: nowIso, revokedReasonCode: reasonCode, updatedAt: nowIso });
+    await this.trustService.recompute(own.placeId);
     await this.track(own.placeId, "business_ownership_revoked", actor?.userId, { ownershipId, reasonCode });
   }
 
@@ -226,6 +236,7 @@ export class VenueClaimsService {
     await this.store.upsertOfficialDescription(record);
     await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "description", entityId: record.id, action: "updated", actorUserId: actor?.userId, metadata: { moderationStatus: record.moderationStatus }, createdAt: nowIso });
     await this.store.upsertBusinessManagedPlaceProfile({ id: randomUUID(), placeId, ownershipLinkId: ownership?.id ?? "admin", status: "active", createdAt: nowIso, updatedAt: nowIso, publishedAt: nowIso, ...(ownership?.businessProfileId ? { businessProfileId: ownership.businessProfileId } : {}) });
+    await this.trustService.recompute(placeId);
     return record;
   }
 
@@ -246,6 +257,7 @@ export class VenueClaimsService {
     };
     await this.store.upsertCategorySuggestion(record);
     await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "category", entityId: record.id, action: "created", actorUserId: actor?.userId, metadata: { primary: input.primaryCategoryId }, createdAt: nowIso });
+    await this.trustService.recompute(placeId);
     return record;
   }
 
@@ -268,6 +280,7 @@ export class VenueClaimsService {
     };
     await this.store.upsertManagedHours(record);
     await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "hours", entityId: record.id, action: "updated", actorUserId: actor?.userId, metadata: { timezone: record.timezone }, createdAt: nowIso });
+    await this.trustService.recompute(placeId);
     return record;
   }
 
@@ -290,6 +303,7 @@ export class VenueClaimsService {
     };
     await this.store.upsertBusinessLink(record);
     await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "link", entityId: record.id, action: "updated", actorUserId: actor?.userId, metadata: { linkType: record.linkType }, createdAt: nowIso });
+    await this.trustService.recompute(placeId);
     return record;
   }
 
@@ -312,6 +326,7 @@ export class VenueClaimsService {
     };
     await this.store.upsertMenuServiceCatalog(record);
     await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "menu_services", entityId: record.id, action: "updated", actorUserId: actor?.userId, metadata: { contentType: record.contentType }, createdAt: nowIso });
+    await this.trustService.recompute(placeId);
     return record;
   }
 
@@ -335,6 +350,7 @@ export class VenueClaimsService {
     };
     await this.store.upsertBusinessImage(record);
     await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "gallery", entityId: record.id, action: "created", actorUserId: actor?.userId, metadata: { imageType: record.imageType, isCover: record.isCover }, createdAt: nowIso });
+    await this.trustService.recompute(placeId);
     return record;
   }
 
@@ -387,6 +403,8 @@ export class VenueClaimsService {
     const categorySuggestions = await this.store.listCategorySuggestions(placeId);
     const approvedCategory = categorySuggestions.find((entry) => entry.status === "approved");
 
+    const trust = await this.trustService.buildPublicTrustView(placeId);
+
     return {
       provider: providerData,
       merged: {
@@ -425,7 +443,45 @@ export class VenueClaimsService {
         verificationLevel: ownership?.verificationLevel,
         attribution: "official_business"
       },
-      sourcePrecedence: ["official_business", "business_approved_suggestion", "moderated_override", "normalized_provider", "raw_provider"]
+      sourcePrecedence: ["official_business", "business_approved_suggestion", "moderated_override", "normalized_provider", "raw_provider"],
+      trust
+    };
+  }
+
+
+  public async upsertBusinessContactMethod(placeId: string, input: { type: "phone" | "email" | "website" | "booking_url" | "contact_url" | "social"; value: string; isPrimary?: boolean }, actor?: ClaimActor) {
+    await this.assertCanManageClaimedPlace(placeId, actor);
+    return this.trustService.upsertContactMethod(placeId, input, actor);
+  }
+
+  public async listBusinessContactMethods(placeId: string, actor?: ClaimActor) {
+    await this.assertCanManageClaimedPlace(placeId, actor);
+    return this.store.listBusinessContactMethods(placeId);
+  }
+
+  public async verifyBusinessContactMethod(placeId: string, contactMethodId: string, input: { status: ContactVerificationStatus; method?: ContactVerificationMethod; reasonCode?: string }, actor?: ClaimActor) {
+    await this.assertCanManageClaimedPlace(placeId, actor);
+    if (!actor?.isAdmin && input.status !== "pending_verification") throw new ValidationError(["admin required for this verification action"]);
+    return this.trustService.setContactVerificationStatus({ placeId, contactMethodId, status: input.status, method: input.method, reasonCode: input.reasonCode, actor });
+  }
+
+  public async getBusinessTrustStatus(placeId: string, actor?: ClaimActor): Promise<{ publicView: BusinessTrustPublicView; internal: unknown }> {
+    await this.assertCanManageClaimedPlace(placeId, actor);
+    const publicView = await this.trustService.buildPublicTrustView(placeId);
+    const profile = await this.store.getBusinessTrustProfile(placeId);
+    const contacts = await this.store.listBusinessContactMethods(placeId);
+    return { publicView, internal: { profile, contacts } };
+  }
+
+  public async getAdminBusinessTrustState(placeId: string, actor?: ClaimActor) {
+    this.assertCanReview(actor);
+    const publicView = await this.trustService.buildPublicTrustView(placeId);
+    return {
+      publicView,
+      trustProfile: await this.store.getBusinessTrustProfile(placeId),
+      contacts: await this.store.listBusinessContactMethods(placeId),
+      trustAudit: await this.store.listBusinessTrustAuditEvents(placeId),
+      claimAudit: await this.store.listAuditEvents(placeId)
     };
   }
 

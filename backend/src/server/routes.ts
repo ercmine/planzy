@@ -1964,6 +1964,45 @@ export function createRoutes(
         return;
       }
 
+
+      const manageContactsMatch = /^\/places\/([^/]+)\/business-management\/contacts$/.exec(normalizedPath);
+      if (manageContactsMatch && req.method === "POST") {
+        await handlers.handleUpsertBusinessContactMethod(req, res, decodeURIComponent(manageContactsMatch[1] ?? ""));
+        return;
+      }
+      if (manageContactsMatch && req.method === "GET") {
+        await handlers.handleListBusinessContactMethods(req, res, decodeURIComponent(manageContactsMatch[1] ?? ""));
+        return;
+      }
+
+      const verifyContactMatch = /^\/places\/([^/]+)\/business-management\/contacts\/([^/]+)\/verify$/.exec(normalizedPath);
+      if (verifyContactMatch && req.method === "POST") {
+        await handlers.handleVerifyBusinessContactMethod(req, res, decodeURIComponent(verifyContactMatch[1] ?? ""), decodeURIComponent(verifyContactMatch[2] ?? ""));
+        return;
+      }
+
+      const trustStatusMatch = /^\/places\/([^/]+)\/business-management\/trust$/.exec(normalizedPath);
+      if (trustStatusMatch && req.method === "GET") {
+        await handlers.handleBusinessTrustStatus(req, res, decodeURIComponent(trustStatusMatch[1] ?? ""));
+        return;
+      }
+
+      const publicTrustMatch = /^\/v1\/places\/([^/]+)\/trust$/.exec(normalizedPath);
+      if (publicTrustMatch && req.method === "GET") {
+        await handlers.handlePublicBusinessTrust(req, res, decodeURIComponent(publicTrustMatch[1] ?? ""));
+        return;
+      }
+
+      const adminTrustMatch = /^\/v1\/admin\/business-trust\/([^/]+)$/.exec(normalizedPath);
+      if (adminTrustMatch && req.method === "GET") {
+        if (!assertAdmin(req)) {
+          sendJson(res, 401, { error: "Unauthorized" });
+          return;
+        }
+        await handlers.handleAdminBusinessTrust(req, res, decodeURIComponent(adminTrustMatch[1] ?? ""));
+        return;
+      }
+
       const managePlaceMatch = /^\/places\/([^/]+)\/business-management$/.exec(normalizedPath);
       if (managePlaceMatch && req.method === "GET") {
         await handlers.handlePlaceManagementState(req, res, decodeURIComponent(managePlaceMatch[1] ?? ""));
