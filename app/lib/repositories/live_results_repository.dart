@@ -17,8 +17,8 @@ class LiveResultsRepository {
       final decoded = await apiClient.getDecoded(
         ApiEndpoints.liveResults,
         queryParameters: <String, String?>{
-          'lat': lat.toString(),
-          'lng': lng.toString(),
+          'lat': lat.toStringAsFixed(6),
+          'lng': lng.toStringAsFixed(6),
         },
       );
       if (decoded is! Map<String, dynamic>) {

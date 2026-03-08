@@ -35,17 +35,19 @@ class ApiClient {
 
   Uri buildUri(String path, [Map<String, String?>? queryParameters]) {
     final base = Uri.parse(envConfig.apiBaseUrl);
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
     final sanitized = queryParameters == null
-        ? null
+        ? <String, String>{}
         : Map<String, String>.fromEntries(
             queryParameters.entries
                 .where((entry) => entry.value != null && entry.value!.isNotEmpty)
                 .map((entry) => MapEntry(entry.key, entry.value!)),
           );
 
-    return base.replace(
-      path: '${base.path}${path.startsWith('/') ? path : '/$path'}',
-      queryParameters: sanitized,
+    return Uri.https(
+      base.authority,
+      '${base.path}$normalizedPath',
+      sanitized.isEmpty ? null : sanitized,
     );
   }
 
@@ -192,6 +194,7 @@ class ApiClient {
       };
 
       try {
+        _logDebugRequest(method: method, uri: uri);
         final response = await _request(method, uri, headers, body).timeout(timeout);
         _logResponse(method: method, uri: uri, response: response);
 
@@ -300,8 +303,19 @@ class ApiClient {
     if (!kDebugMode) {
       return;
     }
-    final snippet = _bodySnippet300(responseBody);
+    final snippet = _bodySnippet500(responseBody);
+    print('[DEBUG] $method $uri status=$statusCode body="$snippet"');
     Log.warn('$method $uri failed: status=$statusCode body="$snippet"');
+  }
+
+  void _logDebugRequest({
+    required String method,
+    required Uri uri,
+  }) {
+    if (!kDebugMode) {
+      return;
+    }
+    print('[DEBUG] $method $uri');
   }
 
   void _logResponse({
@@ -317,6 +331,9 @@ class ApiClient {
     if (uri.path.endsWith('/live-results')) {
       lastLiveResultsStatus = response.statusCode;
     }
+    if (kDebugMode) {
+      print('[DEBUG] $method $uri status=${response.statusCode}');
+    }
     Log.d(
       '$method ${uri.path.isEmpty ? '/' : uri.path} url=$uri status=${response.statusCode} x-request-id=${requestId ?? '-'} body="$snippet"',
     );
@@ -329,9 +346,9 @@ class ApiClient {
     return responseBody;
   }
 
-  String _bodySnippet300(String responseBody) {
-    if (responseBody.length > 300) {
-      return '${responseBody.substring(0, 300)}...';
+  String _bodySnippet500(String responseBody) {
+    if (responseBody.length > 500) {
+      return '${responseBody.substring(0, 500)}...';
     }
     return responseBody;
   }

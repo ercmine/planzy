@@ -59,7 +59,26 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
                 children: [
                   if (kDebugMode && envConfig.enableDebugLogs)
                     _DebugBanner(location: location, apiClient: apiClient),
-                  if (state.errorMessage != null)
+                  if (state.locationRequired)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.m),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Enable location'),
+                            const SizedBox(height: AppSpacing.xs),
+                            const Text('Allow location to load live results near you.'),
+                            const SizedBox(height: AppSpacing.s),
+                            FilledButton(
+                              onPressed: controller.requestLocationAndReload,
+                              child: const Text('Enable location'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (state.errorMessage != null)
                     Card(
                       color: Theme.of(context).colorScheme.errorContainer,
                       child: Padding(
@@ -105,6 +124,23 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
                     padding: const EdgeInsets.only(top: AppSpacing.s),
                     child: Text(
                       'Live summary: activeSessions=${state.activeSessions ?? '-'} generatedAt=${state.generatedAt ?? '-'}',
+                    ),
+                  ),
+                if (state.locationRequired)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.s),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Enable location'),
+                          const SizedBox(height: AppSpacing.xs),
+                          FilledButton(
+                            onPressed: controller.requestLocationAndReload,
+                            child: const Text('Enable location'),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 if (state.errorMessage != null)
