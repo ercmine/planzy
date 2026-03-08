@@ -5,6 +5,7 @@ import { FEATURE_KEYS } from "../subscriptions/accessEngine.js";
 import { SubscriptionTargetType } from "../subscriptions/types.js";
 import type { VenueClaimStore } from "../venues/claims/store.js";
 import type { BusinessAnalyticsStore } from "./store.js";
+import type { BusinessPremiumService } from "../businessPremium/service.js";
 import type {
   AnalyticsQuery,
   BusinessAnalyticsDashboard,
@@ -23,6 +24,7 @@ export class BusinessAnalyticsService {
     private readonly store: BusinessAnalyticsStore,
     private readonly claimsStore: VenueClaimStore,
     private readonly accessEngine: FeatureQuotaEngine,
+    private readonly businessPremium?: BusinessPremiumService,
     private readonly now: () => Date = () => new Date()
   ) {}
 
@@ -34,7 +36,7 @@ export class BusinessAnalyticsService {
 
   async getDashboard(userId: string, query: AnalyticsQuery, isAdmin = false): Promise<BusinessAnalyticsDashboard> {
     const allowedPlaceIds = await this.resolveAuthorizedPlaces({ userId, businessProfileId: query.businessProfileId, placeIds: query.placeIds, isAdmin });
-    const entitlements = this.resolveEntitlements(query.businessProfileId);
+    const entitlements = await this.resolveEntitlements(query.businessProfileId);
     const bounded = this.boundHistory(query, entitlements.extendedHistoryDays);
 
     const metrics = await this.store.listDailyMetrics({
@@ -88,19 +90,23 @@ export class BusinessAnalyticsService {
     };
   }
 
-  private resolveEntitlements(businessProfileId: string): EntitlementState {
+  private async resolveEntitlements(businessProfileId: string): Promise<EntitlementState> {
     const target = { targetType: SubscriptionTargetType.BUSINESS, targetId: businessProfileId };
     const features = this.accessEngine.resolveFeatureSet(target).features;
     const basic = Boolean(features[FEATURE_KEYS.BUSINESS_ANALYTICS_BASIC]);
     const advanced = Boolean(features[FEATURE_KEYS.BUSINESS_ANALYTICS_ADVANCED]);
+    const premiumAdvanced = this.businessPremium ? await this.businessPremium.canAccessAdvancedBusinessAnalytics(businessProfileId) : advanced;
+    const creatorImpact = this.businessPremium ? await this.businessPremium.hasBusinessEntitlement(businessProfileId, "business.insights.creatorImpact") : premiumAdvanced;
+    const multiLocation = this.businessPremium ? await this.businessPremium.canManageMultipleLocations(businessProfileId) : premiumAdvanced;
+    const exportAnalytics = this.businessPremium ? await this.businessPremium.hasBusinessEntitlement(businessProfileId, "business.reporting.export") : premiumAdvanced;
     return {
       basicAnalytics: basic,
-      advancedAnalytics: advanced,
-      creatorImpactAnalytics: advanced,
-      multiLocationAnalytics: advanced,
-      exportAnalytics: advanced,
-      extendedHistoryDays: advanced ? 365 : 30,
-      lockedModules: advanced
+      advancedAnalytics: premiumAdvanced,
+      creatorImpactAnalytics: creatorImpact,
+      multiLocationAnalytics: multiLocation,
+      exportAnalytics,
+      extendedHistoryDays: premiumAdvanced ? 365 : 30,
+      lockedModules: premiumAdvanced
         ? []
         : ["timeseries", "creator_impact", "multi_location", "export", "advanced_breakdowns"]
     };

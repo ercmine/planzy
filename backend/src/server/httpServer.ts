@@ -7,6 +7,7 @@ import type { CreatorMonetizationService } from "../creatorMonetization/service.
 import type { CreatorPremiumService } from "../creatorPremium/service.js";
 import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
 import type { CollaborationService } from "../collaboration/service.js";
+import type { BusinessPremiumService } from "../businessPremium/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
 import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { MerchantService } from "../merchant/service.js";
@@ -67,6 +68,7 @@ export function createHttpServer(
     creatorPremiumService?: CreatorPremiumService;
     businessAnalyticsService?: BusinessAnalyticsService;
     collaborationService?: CollaborationService;
+    businessPremiumService?: BusinessPremiumService;
     discovery?: DiscoveryHttpHandlerDeps;
     savedHandlers?: SavedHttpHandlers;
     outingPlannerService?: OutingPlannerService;

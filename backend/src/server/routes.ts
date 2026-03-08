@@ -8,12 +8,14 @@ import { createCreatorMonetizationHttpHandlers } from "../creatorMonetization/ht
 import { createCreatorPremiumHttpHandlers } from "../creatorPremium/http.js";
 import { createBusinessAnalyticsHttpHandlers } from "../businessAnalytics/http.js";
 import { createCollaborationHttpHandlers } from "../collaboration/http.js";
+import { createBusinessPremiumHttpHandlers } from "../businessPremium/http.js";
 import type { AccountsService } from "../accounts/service.js";
 import type { CreatorService } from "../creator/service.js";
 import type { CreatorMonetizationService } from "../creatorMonetization/service.js";
 import type { CreatorPremiumService } from "../creatorPremium/service.js";
 import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
 import type { CollaborationService } from "../collaboration/service.js";
+import type { BusinessPremiumService } from "../businessPremium/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
 import { PermissionAction, ProfileType } from "../accounts/types.js";
 import type { ActorContextResolved } from "../accounts/types.js";
@@ -82,6 +84,7 @@ export function createRoutes(
     creatorPremiumService?: CreatorPremiumService;
     businessAnalyticsService?: BusinessAnalyticsService;
     collaborationService?: CollaborationService;
+    businessPremiumService?: BusinessPremiumService;
     discovery?: DiscoveryHttpHandlerDeps;
     savedHandlers?: SavedHttpHandlers;
     outingPlannerService?: OutingPlannerService;
@@ -100,6 +103,7 @@ export function createRoutes(
   const creatorPremiumHandlers = deps?.creatorPremiumService ? createCreatorPremiumHttpHandlers(deps.creatorPremiumService) : null;
   const businessAnalyticsHandlers = deps?.businessAnalyticsService ? createBusinessAnalyticsHttpHandlers(deps.businessAnalyticsService) : null;
   const collaborationHandlers = deps?.collaborationService && deps?.accountsService ? createCollaborationHttpHandlers(deps.collaborationService, deps.accountsService) : null;
+  const businessPremiumHandlers = deps?.businessPremiumService ? createBusinessPremiumHttpHandlers(deps.businessPremiumService) : null;
   const outingPlannerHandlers = deps?.outingPlannerService ? createOutingPlannerHandlers(deps.outingPlannerService) : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -254,6 +258,35 @@ export function createRoutes(
         return;
       }
 
+
+
+      const businessPremiumStateMatch = /^\/v1\/businesses\/([^/]+)\/premium$/.exec(normalizedPath);
+      if (businessPremiumHandlers && req.method === "GET" && businessPremiumStateMatch) {
+        await businessPremiumHandlers.getPremiumState(req, res, decodeURIComponent(businessPremiumStateMatch[1] ?? ""));
+        return;
+      }
+      if (businessPremiumHandlers && req.method === "PATCH" && businessPremiumStateMatch) {
+        await businessPremiumHandlers.setTier(req, res, decodeURIComponent(businessPremiumStateMatch[1] ?? ""));
+        return;
+      }
+
+      const businessFeaturedMatch = /^\/v1\/businesses\/([^/]+)\/featured-placement$/.exec(normalizedPath);
+      if (businessPremiumHandlers && req.method === "PATCH" && businessFeaturedMatch) {
+        await businessPremiumHandlers.updateFeaturedPlacementSettings(req, res, decodeURIComponent(businessFeaturedMatch[1] ?? ""));
+        return;
+      }
+
+      const businessProfileEnhancedMatch = /^\/v1\/businesses\/([^/]+)\/enhanced-profile$/.exec(normalizedPath);
+      if (businessPremiumHandlers && req.method === "PATCH" && businessProfileEnhancedMatch) {
+        await businessPremiumHandlers.updateEnhancedProfile(req, res, decodeURIComponent(businessProfileEnhancedMatch[1] ?? ""));
+        return;
+      }
+
+      const businessCampaignCreateMatch = /^\/v1\/businesses\/([^/]+)\/campaigns$/.exec(normalizedPath);
+      if (businessPremiumHandlers && req.method === "POST" && businessCampaignCreateMatch) {
+        await businessPremiumHandlers.createCampaign(req, res, decodeURIComponent(businessCampaignCreateMatch[1] ?? ""));
+        return;
+      }
 
       if (outingPlannerHandlers && req.method === "POST" && normalizedPath === "/v1/outing-planner/create") {
         await outingPlannerHandlers.createPlan(req, res);

@@ -68,6 +68,13 @@ describe("collaboration routes", () => {
     });
     expect(subRes.status).toBe(200);
 
+    const premiumRes = await fetch(`${baseUrl}/v1/businesses/${encodeURIComponent(biz.profile.id)}/premium`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tier: "pro" })
+    });
+    expect(premiumRes.status).toBe(200);
+
     const inviteRes = await fetch(`${baseUrl}/v1/collaboration/invites`, {
       method: "POST",
       headers: {

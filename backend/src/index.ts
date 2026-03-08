@@ -57,6 +57,7 @@ export * from "./logging/logger.js";
 
 export * from "./analytics/clicks/index.js";
 export * from "./businessAnalytics/index.js";
+export * from "./businessPremium/index.js";
 
 export * from "./venues/claims/index.js";
 export * from "./server/index.js";

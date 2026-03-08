@@ -8,6 +8,7 @@ import { CreatorPremiumService, MemoryCreatorPremiumStore } from "../creatorPrem
 import { CreatorMonetizationService, MemoryCreatorMonetizationStore } from "../creatorMonetization/index.js";
 import { ClickTracker, MemoryClickStore } from "../analytics/clicks/index.js";
 import { BusinessAnalyticsService, MemoryBusinessAnalyticsStore } from "../businessAnalytics/index.js";
+import { BusinessPremiumService, MemoryBusinessPremiumStore } from "../businessPremium/index.js";
 import { CollaborationService, MemoryCollaborationStore } from "../collaboration/index.js";
 import { createDeckHandler } from "../api/sessions/deckHandler.js";
 import { createIdeasHandlers } from "../api/sessions/ideasHandler.js";
@@ -93,8 +94,9 @@ export function createServer(options?: CreateServerOptions) {
     getCreatorProfile: (creatorProfileId) => creatorStore.getProfileById(creatorProfileId)
   });
   const savedService = new SavedService(new MemorySavedStore(), subscriptionService, accessEngine);
-  const businessAnalyticsService = new BusinessAnalyticsService(new MemoryBusinessAnalyticsStore(), claimsStore, accessEngine);
-  const collaborationService = new CollaborationService(new MemoryCollaborationStore(), accountsService, service, subscriptionService, accessEngine, businessAnalyticsService);
+  const businessPremiumService = new BusinessPremiumService(new MemoryBusinessPremiumStore());
+  const businessAnalyticsService = new BusinessAnalyticsService(new MemoryBusinessAnalyticsStore(), claimsStore, accessEngine, businessPremiumService);
+  const collaborationService = new CollaborationService(new MemoryCollaborationStore(), accountsService, service, subscriptionService, accessEngine, businessAnalyticsService, businessPremiumService);
 
   const discoveryRepository = new InMemoryDiscoveryRepository();
   const outingPlannerService = new OutingPlannerService({
@@ -144,6 +146,7 @@ export function createServer(options?: CreateServerOptions) {
     creatorPremiumService,
     businessAnalyticsService,
     collaborationService,
+    businessPremiumService,
     savedHandlers: createSavedHttpHandlers(savedService),
     outingPlannerService,
     discovery: {

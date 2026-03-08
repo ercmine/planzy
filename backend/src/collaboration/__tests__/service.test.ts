@@ -13,28 +13,31 @@ import { MemoryVenueClaimStore } from "../../venues/claims/memoryStore.js";
 import { ValidationError } from "../../plans/errors.js";
 import { MemoryCollaborationStore } from "../memoryStore.js";
 import { CollaborationService } from "../service.js";
+import { BusinessPremiumService, MemoryBusinessPremiumStore } from "../../businessPremium/index.js";
 
-function build() {
+async function build() {
   const accounts = new AccountsService(new MemoryAccountsStore());
   const claimStore = new MemoryVenueClaimStore();
   const claims = new VenueClaimsService(claimStore);
   const subscriptions = new SubscriptionService(new MemoryUsageStore(), new DevBillingProvider());
   const access = new FeatureQuotaEngine(subscriptions, new MemoryAccessUsageStore());
-  const analytics = new BusinessAnalyticsService(new MemoryBusinessAnalyticsStore(), claimStore, access);
-  const service = new CollaborationService(new MemoryCollaborationStore(), accounts, claims, undefined, undefined, analytics, () => new Date("2026-03-08T00:00:00.000Z"));
-  return { accounts, claimStore, service };
+  const premium = new BusinessPremiumService(new MemoryBusinessPremiumStore());
+  const analytics = new BusinessAnalyticsService(new MemoryBusinessAnalyticsStore(), claimStore, access, premium);
+  const service = new CollaborationService(new MemoryCollaborationStore(), accounts, claims, undefined, undefined, analytics, premium, () => new Date("2026-03-08T00:00:00.000Z"));
+  return { accounts, claimStore, service, premium };
 }
 
 describe("collaboration service", () => {
   it("runs invite -> accept -> campaign lifecycle with permissions", async () => {
-    const { accounts, claimStore, service } = build();
+    const { accounts, claimStore, service, premium } = await build();
     const businessUser = "biz-1";
     const creatorUser = "creator-1";
     const business = accounts.createBusinessProfile(businessUser, { businessName: "Cafe", slug: "cafe" });
+    await premium.setBusinessTier(business.id, "pro");
     const creator = accounts.createCreatorProfile(creatorUser, { creatorName: "Ava" });
 
     await claimStore.upsertOwnership({
-      id: "own-1", placeId: "place-1", businessProfileId: business.id, primaryUserId: businessUser, role: "owner", verificationStatus: "verified", verificationMethod: "manual_review", isActive: true, createdAt: "2026-03-08T00:00:00.000Z", updatedAt: "2026-03-08T00:00:00.000Z"
+      id: "own-1", placeId: "place-1", businessProfileId: business.id, primaryUserId: businessUser, ownershipRole: "owner", verificationStatus: "verified", verificationLevel: "enhanced", verificationMethodSummary: ["document"], isPrimary: true, isActive: true, approvedAt: "2026-03-08T00:00:00.000Z", createdAt: "2026-03-08T00:00:00.000Z", updatedAt: "2026-03-08T00:00:00.000Z"
     });
 
     const bizActor = accounts.resolveActingContext(businessUser, { profileType: ProfileType.BUSINESS, profileId: business.id });
@@ -58,10 +61,11 @@ describe("collaboration service", () => {
   });
 
   it("blocks featuring content without creator approval link", async () => {
-    const { accounts, claimStore, service } = build();
+    const { accounts, claimStore, service, premium } = await build();
     const business = accounts.createBusinessProfile("biz-2", { businessName: "Deli", slug: "deli" });
     const creator = accounts.createCreatorProfile("creator-2", { creatorName: "Noah" });
-    await claimStore.upsertOwnership({ id: "own-2", placeId: "place-2", businessProfileId: business.id, primaryUserId: "biz-2", role: "owner", verificationStatus: "verified", verificationMethod: "manual_review", isActive: true, createdAt: "2026-03-08T00:00:00.000Z", updatedAt: "2026-03-08T00:00:00.000Z" });
+    await premium.setBusinessTier(business.id, "pro");
+    await claimStore.upsertOwnership({ id: "own-2", placeId: "place-2", businessProfileId: business.id, primaryUserId: "biz-2", ownershipRole: "owner", verificationStatus: "verified", verificationLevel: "enhanced", verificationMethodSummary: ["document"], isPrimary: true, isActive: true, approvedAt: "2026-03-08T00:00:00.000Z", createdAt: "2026-03-08T00:00:00.000Z", updatedAt: "2026-03-08T00:00:00.000Z" });
     const bizActor = accounts.resolveActingContext("biz-2", { profileType: ProfileType.BUSINESS, profileId: business.id });
     await expect(service.addFeaturedPlacement(bizActor, {
       businessProfileId: business.id,
@@ -75,4 +79,28 @@ describe("collaboration service", () => {
       sourceCampaignContentLinkId: "missing"
     })).rejects.toBeInstanceOf(ValidationError);
   });
+
+  it("blocks invite creation for non-premium businesses", async () => {
+    const { accounts, claimStore, service, premium } = await build();
+    const businessUser = "biz-3";
+    const creatorUser = "creator-3";
+    const business = accounts.createBusinessProfile(businessUser, { businessName: "Bakery", slug: "bakery" });
+    await premium.setBusinessTier(business.id, "standard");
+    const creator = accounts.createCreatorProfile(creatorUser, { creatorName: "Luca" });
+
+    await claimStore.upsertOwnership({
+      id: "own-3", placeId: "place-3", businessProfileId: business.id, primaryUserId: businessUser, ownershipRole: "owner", verificationStatus: "verified", verificationLevel: "enhanced", verificationMethodSummary: ["document"], isPrimary: true, isActive: true, approvedAt: "2026-03-08T00:00:00.000Z", createdAt: "2026-03-08T00:00:00.000Z", updatedAt: "2026-03-08T00:00:00.000Z"
+    });
+
+    const bizActor = accounts.resolveActingContext(businessUser, { profileType: ProfileType.BUSINESS, profileId: business.id });
+    await expect(service.createInvite(bizActor, {
+      businessProfileId: business.id,
+      creatorProfileId: creator.id,
+      title: "Standard cannot invite",
+      targetPlaceIds: ["place-3"],
+      disclosureExpectation: "partnered",
+      highlightedContentPermissionMode: "campaign_opt_in"
+    })).rejects.toBeInstanceOf(ValidationError);
+  });
+
 });

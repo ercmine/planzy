@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { AccountsService } from "../accounts/service.js";
 import { BusinessMembershipRole, CreatorProfileStatus, ProfileType, type ActorContextResolved } from "../accounts/types.js";
 import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
+import type { BusinessPremiumService } from "../businessPremium/service.js";
 import { ValidationError } from "../plans/errors.js";
 import { QUOTA_KEYS, type FeatureQuotaEngine } from "../subscriptions/accessEngine.js";
 import { SubscriptionTargetType } from "../subscriptions/types.js";
@@ -31,6 +32,7 @@ export class CollaborationService {
     private readonly subscriptions?: SubscriptionService,
     private readonly accessEngine?: FeatureQuotaEngine,
     private readonly businessAnalytics?: BusinessAnalyticsService,
+    private readonly businessPremium?: BusinessPremiumService,
     private readonly now: () => Date = () => new Date()
   ) {}
 
@@ -59,6 +61,9 @@ export class CollaborationService {
 
   async createInvite(actor: ActorContextResolved, input: Omit<CreatorBusinessInvite, "id" | "createdAt" | "updatedAt" | "status" | "createdByUserId">) {
     await this.assertBusinessCanManagePlaces(actor, input.businessProfileId, input.targetPlaceIds);
+    if (this.businessPremium && !(await this.businessPremium.canAccessCreatorCollab(input.businessProfileId))) {
+      throw new ValidationError(["creator collaboration requires business premium"]);
+    }
     const nowIso = this.now().toISOString();
 
     if (this.subscriptions && this.accessEngine) {
@@ -114,6 +119,9 @@ export class CollaborationService {
 
   async createCampaign(actor: ActorContextResolved, input: Omit<CreatorBusinessCampaign, "id" | "createdAt" | "updatedAt" | "createdByUserId">, placeIds: string[]) {
     await this.assertBusinessCanManagePlaces(actor, input.businessProfileId, placeIds);
+    if (this.businessPremium && !(await this.businessPremium.canRunBusinessCampaigns(input.businessProfileId))) {
+      throw new ValidationError(["campaign controls require business premium"]);
+    }
     const nowIso = this.now().toISOString();
     const campaign: CreatorBusinessCampaign = { ...input, id: randomUUID(), createdByUserId: actor.userId, createdAt: nowIso, updatedAt: nowIso };
     await this.store.createCampaign(campaign);
