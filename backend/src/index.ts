@@ -76,3 +76,13 @@ export * from "./telemetry/types.js";
 export * from "./telemetry/telemetryService.js";
 export * from "./telemetry/memoryStore.js";
 export * from "./telemetry/validation.js";
+
+export * from "./subscriptions/types.js";
+export * from "./subscriptions/catalog.js";
+export * from "./subscriptions/entitlementDefinitions.js";
+export * from "./subscriptions/resolver.js";
+export * from "./subscriptions/usage.js";
+export * from "./subscriptions/service.js";
+export * from "./subscriptions/policy.js";
+export * from "./subscriptions/http.js";
+export * from "./subscriptions/billing/provider.js";
