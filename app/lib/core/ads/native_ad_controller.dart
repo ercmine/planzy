@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'ad_placement.dart';
+import 'ad_policy.dart';
 import 'ads_manager.dart';
 
 enum NativeAdLoadState { idle, loading, ready, failed, hidden }
@@ -22,6 +25,7 @@ class NativeAdController {
 
   NativeAd? _ad;
   bool _disposed = false;
+  int _attempt = 0;
 
   NativeAd? get ad => _ad;
 
@@ -30,7 +34,8 @@ class NativeAdController {
       return;
     }
 
-    if (!_adsManager.canShowPlacement(placement)) {
+    final placementDecision = _adsManager.placementDecision(placement);
+    if (!placementDecision.shouldShowAd) {
       state.value = NativeAdLoadState.hidden;
       return;
     }
@@ -41,6 +46,7 @@ class NativeAdController {
     final loadedAd = await _adsManager.loadNativeAd(
       placement: placement,
       slotId: slotId,
+      attempt: _attempt,
       onLoaded: () {
         if (!_disposed) {
           state.value = NativeAdLoadState.ready;
@@ -48,7 +54,7 @@ class NativeAdController {
       },
       onFailed: (_) {
         if (!_disposed) {
-          state.value = NativeAdLoadState.failed;
+          _handleFailure();
         }
       },
     );
@@ -62,6 +68,26 @@ class NativeAdController {
     if (loadedAd == null && state.value == NativeAdLoadState.loading) {
       state.value = NativeAdLoadState.hidden;
     }
+  }
+
+  Future<void> _handleFailure() async {
+    final decision = _adsManager.onInventoryFailure(placement, _attempt);
+    _attempt += 1;
+
+    if (decision.action == AdRenderAction.allowRetryLater) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (!_disposed) {
+        await load();
+      }
+      return;
+    }
+
+    if (decision.action == AdRenderAction.show) {
+      state.value = NativeAdLoadState.ready;
+      return;
+    }
+
+    state.value = NativeAdLoadState.failed;
   }
 
   Future<void> retry() => load();

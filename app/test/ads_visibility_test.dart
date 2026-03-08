@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:perbug/core/ads/ad_placement.dart';
+import 'package:perbug/core/ads/ad_policy.dart';
 import 'package:perbug/core/ads/ads_config.dart';
 import 'package:perbug/core/ads/ads_visibility.dart';
 
@@ -15,18 +17,38 @@ void main() {
     adsWindowSize: 50,
   );
 
-  test('hides for ad-free users', () {
-    final visibility = AdsVisibility(config: enabledConfig, isAdFreeUser: true);
-    expect(visibility.canShow('resultsInlineBanner'), isFalse);
-  });
-
-  test('supports placement allow list', () {
+  test('elite users never see ads', () {
     final visibility = AdsVisibility(
       config: enabledConfig,
-      placementsEnabled: const {'resultsInlineBanner'},
+      entitlement: const AdEntitlementSnapshot(planCode: 'elite', isAnonymous: false),
     );
 
-    expect(visibility.canShow('resultsInlineBanner'), isTrue);
-    expect(visibility.canShow('deckInlineNative'), isFalse);
+    expect(visibility.decisionForPlacement(AdPlacement.resultsInlineBanner).shouldShowAd, isFalse);
+  });
+
+  test('plus users get reduced insertion policy', () {
+    final visibility = AdsVisibility(
+      config: enabledConfig,
+      entitlement: const AdEntitlementSnapshot(
+        planCode: 'plus',
+        isAnonymous: false,
+        isSubscriptionActive: true,
+      ),
+    );
+
+    final insertion = visibility.insertionPolicyFor(AdPlacement.resultsInlineBanner);
+    expect(insertion, isNotNull);
+    expect(insertion!.frequency, greaterThan(8));
+    expect(insertion.maxAdsPerWindow, 1);
+  });
+
+  test('unknown entitlement suppresses ads to avoid flicker', () {
+    final visibility = AdsVisibility(
+      config: enabledConfig,
+      entitlement: const AdEntitlementSnapshot(isResolved: false),
+    );
+
+    final decision = visibility.decisionForPlacement(AdPlacement.resultsInlineBanner);
+    expect(decision.action, AdRenderAction.skipDueToUnknownEntitlement);
   });
 }

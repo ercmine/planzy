@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
 import '../core/ads/ad_deck_injector.dart';
+import '../core/ads/ad_policy.dart';
 import '../core/ads/ads_config.dart';
 import '../core/ads/ads_diagnostics.dart';
 import '../core/ads/ads_manager.dart';
@@ -59,7 +60,7 @@ final adsServiceProvider = Provider<AdsService>((ref) {
 });
 
 final adDeckInjectorProvider = Provider<AdDeckInjector>((ref) {
-  return AdDeckInjector(config: ref.watch(adsConfigProvider));
+  return AdDeckInjector(visibility: ref.watch(adsVisibilityProvider));
 });
 
 
@@ -67,8 +68,16 @@ final adsDiagnosticsProvider = Provider<AdsDiagnostics>((ref) {
   return const AdsDiagnostics();
 });
 
+final adEntitlementSnapshotProvider = Provider<AdEntitlementSnapshot>((ref) {
+  // TODO: Wire to billing/subscription entitlement endpoint once available in app state.
+  return const AdEntitlementSnapshot(isAnonymous: true, planCode: 'free', isResolved: true);
+});
+
 final adsVisibilityProvider = Provider<AdsVisibility>((ref) {
-  return AdsVisibility(config: ref.watch(adsConfigProvider));
+  return AdsVisibility(
+    config: ref.watch(adsConfigProvider),
+    entitlement: ref.watch(adEntitlementSnapshotProvider),
+  );
 });
 
 final adsManagerProvider = Provider<AdsManager>((ref) {
