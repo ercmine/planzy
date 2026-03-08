@@ -11,13 +11,20 @@ export interface PlaceFieldAttribution {
   reason: string;
 }
 
+export type DescriptionSourceType = "provider_editorial" | "provider" | "structured_synthesis" | "minimal_fallback";
+export type DescriptionStatus = "empty" | "provider" | "synthesized" | "fallback";
+
 export interface PlaceDescriptionCandidate {
   id: string;
   text: string;
-  sourceType: "provider" | "editorial" | "ai_generated" | "derived";
+  sourceType: DescriptionSourceType;
   provider?: string;
   sourceRecordId?: string;
   attribution?: string;
+  confidence: number;
+  language?: string;
+  freshnessTimestamp?: string;
+  generationMethod: "provider_text" | "structured_summary" | "minimal_summary";
   createdAt: string;
 }
 
@@ -74,8 +81,17 @@ export interface CanonicalPlace {
   socialLinks: Record<string, string>;
   shortDescription?: string;
   longDescription?: string;
+  descriptionStatus: DescriptionStatus;
   descriptionSourceType?: PlaceDescriptionCandidate["sourceType"];
+  descriptionSourceProvider?: string;
   descriptionSourceAttribution?: string;
+  descriptionConfidence: number;
+  descriptionGeneratedAt?: string;
+  descriptionVersion: number;
+  descriptionLanguage?: string;
+  descriptionGenerationMethod?: PlaceDescriptionCandidate["generationMethod"];
+  alternateDescriptions: PlaceDescriptionCandidate[];
+  descriptionProvenance: Array<{ candidateId: string; provider?: string; sourceRecordId?: string; sourceType: DescriptionSourceType }>;
   aiGeneratedDescription: boolean;
   editorialDescription: boolean;
   descriptionCandidates: PlaceDescriptionCandidate[];

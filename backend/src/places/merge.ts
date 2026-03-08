@@ -1,4 +1,5 @@
 import { resolveCanonicalCategory } from "./categoryNormalization.js";
+import { enrichPlaceDescriptions } from "./descriptionEnrichment.js";
 import { buildSlug, geohashLite, stableHash } from "./normalization.js";
 import type {
   CanonicalPhoto,
@@ -6,7 +7,6 @@ import type {
   MatchResult,
   MergeSummary,
   NormalizedProviderPlace,
-  PlaceDescriptionCandidate,
   PlaceFieldAttribution,
   PlaceSourceRecord
 } from "./types.js";
@@ -98,19 +98,13 @@ export function mergeIntoCanonicalPlace(params: {
   const timestamp = nowIso();
   const category = resolveCanonicalCategory(normalized.providerCategories, normalized.name);
 
-  const descriptionCandidate: PlaceDescriptionCandidate | undefined = normalized.descriptionSnippet
-    ? {
-        id: stableHash([sourceRecord.sourceRecordId, normalized.descriptionSnippet]).slice(0, 12),
-        text: normalized.descriptionSnippet,
-        sourceType: "provider",
-        provider: normalized.provider,
-        sourceRecordId: sourceRecord.sourceRecordId,
-        attribution: normalized.provider,
-        createdAt: timestamp
-      }
-    : undefined;
-
   const incomingPhotos = normalized.photos.map((photo) => buildPhoto(sourceRecord.sourceRecordId, normalized.provider, photo));
+  const enrichedDescription = enrichPlaceDescriptions({
+    existingPlace,
+    normalized,
+    sourceRecord,
+    canonicalCategory: category.canonicalCategory
+  });
 
   let place: CanonicalPlace;
   let changedFields: string[] = [];
@@ -148,13 +142,27 @@ export function mergeIntoCanonicalPlace(params: {
       orderingUrl: normalized.orderingUrl,
       bookingUrl: normalized.bookingUrl,
       socialLinks: normalized.socialLinks,
-      shortDescription: normalized.descriptionSnippet,
-      longDescription: normalized.descriptionSnippet,
-      descriptionSourceType: descriptionCandidate?.sourceType,
-      descriptionSourceAttribution: descriptionCandidate?.attribution,
+      shortDescription: enrichedDescription.shortDescription,
+      longDescription: enrichedDescription.longDescription,
+      descriptionStatus: enrichedDescription.descriptionStatus,
+      descriptionSourceType: enrichedDescription.descriptionSourceType,
+      descriptionSourceProvider: enrichedDescription.descriptionSourceProvider,
+      descriptionSourceAttribution: enrichedDescription.descriptionSourceAttribution,
+      descriptionConfidence: enrichedDescription.descriptionConfidence,
+      descriptionGeneratedAt: enrichedDescription.descriptionGeneratedAt,
+      descriptionVersion: enrichedDescription.descriptionVersion,
+      descriptionLanguage: enrichedDescription.descriptionLanguage,
+      descriptionGenerationMethod: enrichedDescription.descriptionGenerationMethod,
+      alternateDescriptions: enrichedDescription.alternates,
+      descriptionProvenance: enrichedDescription.candidates.map((candidate) => ({
+        candidateId: candidate.id,
+        provider: candidate.provider,
+        sourceRecordId: candidate.sourceRecordId,
+        sourceType: candidate.sourceType
+      })),
       aiGeneratedDescription: false,
-      editorialDescription: false,
-      descriptionCandidates: descriptionCandidate ? [descriptionCandidate] : [],
+      editorialDescription: enrichedDescription.descriptionSourceType === "provider_editorial",
+      descriptionCandidates: enrichedDescription.candidates,
       primaryPhoto: gallery[0],
       photoGallery: gallery,
       providerPhotoRefs: incomingPhotos
@@ -215,13 +223,33 @@ export function mergeIntoCanonicalPlace(params: {
     place.orderingUrl = chooseString(place.orderingUrl, normalized.orderingUrl);
     place.bookingUrl = chooseString(place.bookingUrl, normalized.bookingUrl);
     place.socialLinks = { ...place.socialLinks, ...normalized.socialLinks };
-    if (descriptionCandidate) {
-      place.descriptionCandidates = [...place.descriptionCandidates, descriptionCandidate];
-      if (!place.manualOverrides.descriptionCandidateId) {
-        place.shortDescription = chooseString(place.shortDescription, descriptionCandidate.text);
-        place.longDescription = chooseString(place.longDescription, descriptionCandidate.text);
-        place.descriptionSourceType = descriptionCandidate.sourceType;
-        place.descriptionSourceAttribution = descriptionCandidate.attribution;
+    place.descriptionCandidates = [...place.descriptionCandidates, ...enrichedDescription.candidates];
+    place.alternateDescriptions = [...place.alternateDescriptions, ...enrichedDescription.alternates];
+    place.descriptionProvenance = [
+      ...place.descriptionProvenance,
+      ...enrichedDescription.candidates.map((candidate) => ({
+        candidateId: candidate.id,
+        provider: candidate.provider,
+        sourceRecordId: candidate.sourceRecordId,
+        sourceType: candidate.sourceType
+      }))
+    ];
+
+    if (!place.manualOverrides.descriptionCandidateId && enrichedDescription.shortDescription) {
+      const shouldUpgrade = enrichedDescription.descriptionConfidence >= (place.descriptionConfidence ?? 0);
+      if (shouldUpgrade) {
+        place.shortDescription = enrichedDescription.shortDescription;
+        place.longDescription = enrichedDescription.longDescription;
+        place.descriptionStatus = enrichedDescription.descriptionStatus;
+        place.descriptionSourceType = enrichedDescription.descriptionSourceType;
+        place.descriptionSourceProvider = enrichedDescription.descriptionSourceProvider;
+        place.descriptionSourceAttribution = enrichedDescription.descriptionSourceAttribution;
+        place.descriptionConfidence = enrichedDescription.descriptionConfidence;
+        place.descriptionGeneratedAt = enrichedDescription.descriptionGeneratedAt;
+        place.descriptionVersion = enrichedDescription.descriptionVersion;
+        place.descriptionLanguage = enrichedDescription.descriptionLanguage;
+        place.descriptionGenerationMethod = enrichedDescription.descriptionGenerationMethod;
+        place.editorialDescription = enrichedDescription.descriptionSourceType === "provider_editorial";
       }
     }
 

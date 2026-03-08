@@ -65,7 +65,7 @@ function mapResult(candidate: RankedCandidate, includeExplain: boolean, reasons?
   return {
     placeId: candidate.place.canonicalPlaceId,
     title: candidate.place.name,
-    shortDescription: candidate.place.description,
+    shortDescription: candidate.place.shortDescription ?? candidate.place.description,
     primaryCategory: candidate.place.primaryCategory,
     secondaryCategories: candidate.place.secondaryCategories,
     city: candidate.place.city,
@@ -79,8 +79,10 @@ function mapResult(candidate: RankedCandidate, includeExplain: boolean, reasons?
     metadata: {
       rankingScore: candidate.score,
       trendingScore: candidate.place.trendingScore,
-      recommendationReasons: reasons
+      recommendationReasons: reasons,
+      description: candidate.place.descriptionMetadata
     },
+    longDescription: candidate.place.longDescription,
     userContext: { saved: false, reviewed: false },
     explain: includeExplain ? candidate.explain : undefined
   };
@@ -95,7 +97,7 @@ async function rankPlaces(repo: PlaceDiscoveryRepository, context: DiscoveryQuer
 
   return places
     .map((place): RankedCandidate => {
-      const textCorpus = [place.name, place.description, ...place.keywords, place.primaryCategory, ...place.secondaryCategories, place.city, place.neighborhood]
+      const textCorpus = [place.name, place.shortDescription, place.longDescription, place.description, ...place.keywords, place.primaryCategory, ...place.secondaryCategories, place.city, place.neighborhood]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
