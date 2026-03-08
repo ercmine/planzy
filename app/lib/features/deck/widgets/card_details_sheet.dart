@@ -10,7 +10,6 @@ import '../../../models/plan.dart';
 import '../../../providers/app_providers.dart';
 import '../../ideas/widgets/friend_idea_badge.dart';
 import '../../specials/specials_widgets.dart';
-import '../../venue_claim/claim_venue_sheet.dart';
 import 'category_pill.dart';
 
 class CardDetailsSheet extends ConsumerWidget {
@@ -86,20 +85,6 @@ class CardDetailsSheet extends ConsumerWidget {
             if (plan.location.address?.isNotEmpty == true) ...[
               const SizedBox(height: AppSpacing.m),
               Text(plan.location.address!),
-            ],
-            if (plan.isVenueLike) ...[
-              const SizedBox(height: AppSpacing.m),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  await showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) => ClaimVenueSheet(plan: plan),
-                  );
-                },
-                icon: const Icon(Icons.verified_user_outlined),
-                label: const Text('Claim this venue'),
-              ),
             ],
             const SizedBox(height: AppSpacing.m),
             Wrap(

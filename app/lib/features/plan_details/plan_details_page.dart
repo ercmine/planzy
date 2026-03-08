@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../api/client.dart';
-import 'claim_venue_sheet.dart';
-
 class PlanViewModel {
   final String id;
   final String title;
@@ -25,24 +22,11 @@ class PlanViewModel {
 
 class PlanDetailsPage extends StatelessWidget {
   final PlanViewModel plan;
-  final ApiClient apiClient;
 
   const PlanDetailsPage({
     super.key,
     required this.plan,
-    required this.apiClient,
   });
-
-  bool get _isVenueLike {
-    final providerLower = plan.provider.toLowerCase();
-    if (providerLower == 'google' || providerLower == 'yelp') {
-      return true;
-    }
-    if ((plan.kind ?? '').toLowerCase() == 'theater') {
-      return true;
-    }
-    return (plan.address ?? '').trim().isNotEmpty;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,24 +54,6 @@ class PlanDetailsPage extends StatelessWidget {
                 )
                 .toList(),
           ),
-          const SizedBox(height: 24),
-          if (_isVenueLike)
-            ElevatedButton.icon(
-              onPressed: () {
-                showModalBottomSheet<void>(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => ClaimVenueSheet(
-                    apiClient: apiClient,
-                    venueId: plan.sourceId,
-                    provider: plan.provider,
-                    planId: plan.id,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.verified_user_outlined),
-              label: const Text('Claim this venue'),
-            ),
         ],
       ),
     );
