@@ -52,11 +52,14 @@ class DeckState {
     this.hasMore = true,
     this.lastBatchMix,
     this.shownPlanIds = const <String>[],
+    this.answeredPlanIds = const <String>{},
     this.undoStack = const <DeckSwipeRecord>[],
     this.usedFallback = false,
     this.locationRequired = false,
     this.showCachedResultsNotice = false,
     this.usingOfflineCachedData = false,
+    this.isLoadingNextBatch = false,
+    this.nextBatchErrorMessage,
   });
 
   factory DeckState.initial(String sessionId) =>
@@ -72,11 +75,14 @@ class DeckState {
   final bool hasMore;
   final DeckSourceMix? lastBatchMix;
   final List<String> shownPlanIds;
+  final Set<String> answeredPlanIds;
   final List<DeckSwipeRecord> undoStack;
   final bool usedFallback;
   final bool locationRequired;
   final bool showCachedResultsNotice;
   final bool usingOfflineCachedData;
+  final bool isLoadingNextBatch;
+  final String? nextBatchErrorMessage;
 
   DeckState copyWith({
     String? sessionId,
@@ -91,11 +97,15 @@ class DeckState {
     bool? hasMore,
     DeckSourceMix? lastBatchMix,
     List<String>? shownPlanIds,
+    Set<String>? answeredPlanIds,
     List<DeckSwipeRecord>? undoStack,
     bool? usedFallback,
     bool? locationRequired,
     bool? showCachedResultsNotice,
     bool? usingOfflineCachedData,
+    bool? isLoadingNextBatch,
+    String? nextBatchErrorMessage,
+    bool clearNextBatchError = false,
   }) {
     return DeckState(
       sessionId: sessionId ?? this.sessionId,
@@ -108,6 +118,7 @@ class DeckState {
       hasMore: hasMore ?? this.hasMore,
       lastBatchMix: lastBatchMix ?? this.lastBatchMix,
       shownPlanIds: shownPlanIds ?? this.shownPlanIds,
+      answeredPlanIds: answeredPlanIds ?? this.answeredPlanIds,
       undoStack: undoStack ?? this.undoStack,
       usedFallback: usedFallback ?? this.usedFallback,
       locationRequired: locationRequired ?? this.locationRequired,
@@ -115,6 +126,10 @@ class DeckState {
           showCachedResultsNotice ?? this.showCachedResultsNotice,
       usingOfflineCachedData:
           usingOfflineCachedData ?? this.usingOfflineCachedData,
+      isLoadingNextBatch: isLoadingNextBatch ?? this.isLoadingNextBatch,
+      nextBatchErrorMessage: clearNextBatchError
+          ? null
+          : (nextBatchErrorMessage ?? this.nextBatchErrorMessage),
     );
   }
 }

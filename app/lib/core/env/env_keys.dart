@@ -5,6 +5,7 @@ class EnvKeys {
   static const String enableDebugLogs = 'ENABLE_DEBUG_LOGS';
   static const String associatedDomain = 'ASSOCIATED_DOMAIN';
   static const String adsEnabled = 'ADS_ENABLED';
+  static const String perbugDisableAds = 'PERBUG_DISABLE_ADS';
   static const String adsAdmobAppIdIos = 'ADS_ADMOB_APP_ID_IOS';
   static const String adsAdmobAppIdAndroid = 'ADS_ADMOB_APP_ID_ANDROID';
   static const String adsNativeUnitIdIos = 'ADS_NATIVE_UNIT_ID_IOS';

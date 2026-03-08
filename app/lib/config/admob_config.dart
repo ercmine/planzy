@@ -11,19 +11,17 @@ class AdMobConfig {
   static const String iosAppId = 'ca-app-pub-9929942639121200~6500929043';
   static const String iosNativeUnitId = 'ca-app-pub-9929942639121200/9298482776';
 
-  static const String androidTestNativeUnitId =
-      'ca-app-pub-3940256099942544/2247696110';
-  static const String iosTestNativeUnitId =
-      'ca-app-pub-3940256099942544/3986624511';
-
   static const String nativeFactoryId = 'perbugNativeAdFactory';
 
   static const int firstAdAfterItem = 3;
   static const int adInterval = 8;
 
-  static bool get isTestAdsEnabled => kDebugMode;
-
-  static List<String> get testDeviceIds => const <String>[];
+  static List<String> get testDeviceIds {
+    if (!kDebugMode) {
+      return const <String>[];
+    }
+    return const <String>['SIMULATOR'];
+  }
 
   static bool get isSupportedPlatform => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
@@ -43,14 +41,6 @@ class AdMobConfig {
   static String get nativeUnitId {
     if (kIsWeb) {
       return '';
-    }
-    if (isTestAdsEnabled) {
-      if (Platform.isAndroid) {
-        return androidTestNativeUnitId;
-      }
-      if (Platform.isIOS) {
-        return iosTestNativeUnitId;
-      }
     }
 
     if (Platform.isAndroid) {

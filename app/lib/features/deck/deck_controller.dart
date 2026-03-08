@@ -51,7 +51,7 @@ class DeckController extends StateNotifier<DeckState> {
   final LocationController _locationController;
   final AdDeckInjector _adDeckInjector;
 
-  static const int _batchLimit = 25;
+  static const int _batchLimit = 20;
   static const double _debugDefaultLat = 44.8620;
   static const double _debugDefaultLng = -93.5590;
 
@@ -81,9 +81,12 @@ class DeckController extends StateNotifier<DeckState> {
       items: const <DeckItem>[],
       undoStack: const <DeckSwipeRecord>[],
       shownPlanIds: const <String>[],
+      answeredPlanIds: const <String>{},
       locationRequired: false,
       showCachedResultsNotice: false,
       usingOfflineCachedData: false,
+      isLoadingNextBatch: false,
+      clearNextBatchError: true,
     );
     await _loadBatch(reset: true);
   }
@@ -130,7 +133,7 @@ class DeckController extends StateNotifier<DeckState> {
     await _emitCardViewedIfNeeded(plan);
 
     await _swipesRepository.recordSwipe(_sessionId, plan, action, position);
-    await _enqueueTelemetry(
+    unawaited(_enqueueTelemetry(
       TelemetryEventInput.swipe(
         planId: plan.id,
         action: action.name,
@@ -138,10 +141,11 @@ class DeckController extends StateNotifier<DeckState> {
         cursor: state.nextCursor,
         source: plan.source,
       ),
-    );
+    ));
 
     final nextPlans = [...state.plans]..removeAt(0);
     final shownIds = {...state.shownPlanIds, plan.id}.toList(growable: false);
+    final answeredPlanIds = {...state.answeredPlanIds, plan.id};
     final undo = [
       DeckSwipeRecord(plan: plan, action: action, position: position),
       ...state.undoStack,
@@ -152,7 +156,9 @@ class DeckController extends StateNotifier<DeckState> {
       items: _adDeckInjector.inject(plans: nextPlans),
       undoStack: undo,
       shownPlanIds: shownIds,
+      answeredPlanIds: answeredPlanIds,
       clearError: true,
+      clearNextBatchError: true,
     );
 
     if (kDebugMode) {
@@ -161,6 +167,38 @@ class DeckController extends StateNotifier<DeckState> {
 
     _startViewingTopCard();
     await loadMoreIfNeeded();
+
+    if (state.plans.isEmpty) {
+      await loadNextBatch();
+    }
+  }
+
+  Future<void> loadNextBatch() async {
+    if (state.isLoadingNextBatch || state.locationRequired) {
+      return;
+    }
+
+    state = state.copyWith(
+      isLoadingNextBatch: true,
+      clearNextBatchError: true,
+      clearError: true,
+    );
+
+    await _loadBatch(reset: true);
+
+    if (state.errorMessage != null) {
+      state = state.copyWith(
+        isLoadingNextBatch: false,
+        nextBatchErrorMessage: "Couldn't load new plans. Tap to retry.",
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      isLoadingNextBatch: false,
+      answeredPlanIds: const <String>{},
+      clearNextBatchError: true,
+    );
   }
 
   Future<void> handleSwipeDirection(CardSwiperDirection direction) async {
@@ -334,6 +372,8 @@ class DeckController extends StateNotifier<DeckState> {
       usedFallback: false,
       showCachedResultsNotice: showCachedNotice,
       usingOfflineCachedData: usingOfflineCachedData,
+      answeredPlanIds: reset ? const <String>{} : state.answeredPlanIds,
+      clearNextBatchError: true,
     );
 
     _enqueueTelemetry(
@@ -423,7 +463,13 @@ class DeckController extends StateNotifier<DeckState> {
   }
 
   Future<void> _enqueueTelemetry(TelemetryEventInput event) async {
-    await _telemetryRepository.enqueueEvent(_sessionId, event);
-    await _telemetryDispatcher.notifyEventQueued(_sessionId);
+    try {
+      await _telemetryRepository.enqueueEvent(_sessionId, event);
+      await _telemetryDispatcher.notifyEventQueued(_sessionId);
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[Telemetry] enqueue failed: $error');
+      }
+    }
   }
 }
