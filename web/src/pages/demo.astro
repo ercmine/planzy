@@ -1,0 +1,27 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import { createSeo } from '@/lib/seo';
+
+const seo = createSeo({
+  title: 'Demo Preview',
+  description: 'Preview how Perbug surfaces live nearby plans with category filters and swipe decisions.',
+  path: '/demo/'
+});
+---
+
+<BaseLayout {...seo}>
+  <Container class="py-16">
+    <h1 class="text-4xl font-bold">Perbug Demo Preview</h1>
+    <p class="mt-4 max-w-2xl text-slate-300">
+      This preview shows the core flow: choose categories, browse live nearby results, and swipe yes/no/maybe to lock in a plan.
+    </p>
+    <div class="mt-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+      <p class="text-sm text-slate-400">Demo module placeholder</p>
+      <div class="mt-4 grid gap-3 sm:grid-cols-2">
+        <div class="rounded-xl border border-slate-800 bg-slate-950 p-4">Category picks: Coffee, Food, Activity</div>
+        <div class="rounded-xl border border-slate-800 bg-slate-950 p-4">Live ranking: updated every 20 seconds</div>
+      </div>
+    </div>
+  </Container>
+</BaseLayout>

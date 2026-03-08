@@ -1,0 +1,42 @@
+---
+import Container from './Container.astro';
+
+const items = [
+  { name: 'Moonshot Coffee', distance: '0.4 mi', trend: '+46% now', tag: 'Coffee' },
+  { name: 'Lantern Taco Bar', distance: '0.8 mi', trend: '+32% now', tag: 'Food' },
+  { name: 'Arcade Social Club', distance: '1.1 mi', trend: 'Live DJ in 15m', tag: 'Activity' }
+];
+---
+
+<section class="py-[var(--space-section)]">
+  <Container class="grid gap-8 lg:grid-cols-[1.1fr_1fr] lg:items-center">
+    <div>
+      <h2 class="text-3xl font-semibold">Live results, built for right now</h2>
+      <p class="mt-3 text-slate-300">Perbug continuously refreshes nearby options so you can skip stale lists and find what is actually happening.</p>
+      <ul class="mt-6 space-y-2 text-slate-300">
+        <li>• Real-time popularity signals and timing hints.</li>
+        <li>• Location-aware ranking without creepy tracking.</li>
+        <li>• Saves and shares your final plan in one tap.</li>
+      </ul>
+    </div>
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+      <div class="mb-3 flex items-center justify-between text-sm text-slate-400">
+        <span>Live nearby now</span>
+        <span class="rounded-full bg-slate-800 px-3 py-1 text-brand-300">Updated 20s ago</span>
+      </div>
+      <div class="space-y-3">
+        {items.map((item) => (
+          <article class="rounded-xl border border-slate-800 bg-slate-950/80 p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="font-semibold">{item.name}</p>
+                <p class="text-sm text-slate-400">{item.tag} • {item.distance}</p>
+              </div>
+              <p class="text-sm font-semibold text-brand-300">{item.trend}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </Container>
+</section>
