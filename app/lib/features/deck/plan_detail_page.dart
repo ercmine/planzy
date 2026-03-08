@@ -220,10 +220,9 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
       }
       final created = await repo.createReview(
         placeId: _plan.sourceId,
-        rating: _selectedRating,
-        text: text,
-        displayName: displayName,
-        anonymous: _anonymous,
+        rating: _selectedRating == 0 ? null : _selectedRating,
+        body: text,
+        displayName: _anonymous ? 'Anonymous' : displayName,
       );
       if (!mounted) return;
       setState(() {
@@ -554,7 +553,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
         : _reviews.map((review) => review.rating).reduce((a, b) => a + b) / _reviews.length;
 
     return _Section(
-      title: 'Perbug Limited Reviews',
+      title: 'Perbug Reviews',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -575,14 +574,39 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${review.displayName} • ${review.rating}/5'),
+                    Text('${review.author.displayName}${review.rating == null ? '' : ' • ${review.rating}/5'}'),
                     const SizedBox(height: 4),
-                    Text(review.text),
+                    Text(review.body),
                     const SizedBox(height: 4),
                     Text(
                       _formatReviewDate(review.createdAt),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                    if (review.editedAt != null)
+                      Text('Edited', style: Theme.of(context).textTheme.bodySmall),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () async {
+                            if (review.viewerHasHelpfulVote) {
+                              await ref.read(reviewsRepositoryProvider).valueOrNull?.unvoteHelpful(review.id);
+                            } else {
+                              await ref.read(reviewsRepositoryProvider).valueOrNull?.voteHelpful(review.id);
+                            }
+                            await _loadReviews();
+                          },
+                          child: Text(review.viewerHasHelpfulVote ? 'Helpful ✓' : 'Helpful'),
+                        ),
+                        Text('${review.helpfulCount}'),
+                      ],
+                    ),
+                    if (review.businessReply != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)),
+                        child: Text('Business response: ${review.businessReply!.body}'),
+                      ),
                   ],
                 ),
               ),

@@ -220,7 +220,7 @@ describe("server diagnostic and alias routes", () => {
     const listResponse = await fetch(`${baseUrl}/places/abc/reviews`);
     expect(listResponse.status).toBe(200);
     await expect(listResponse.json()).resolves.toMatchObject({
-      reviews: [expect.objectContaining({ rating: 5, text: "Loved it", displayName: "Alex" })]
+      reviews: [expect.objectContaining({ rating: 5, text: "Loved it", author: expect.objectContaining({ displayName: "Alex" }) })]
     });
   });
 
