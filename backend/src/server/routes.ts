@@ -45,6 +45,8 @@ import { getPlaceReviewVideoSection } from "../reviews/placeVideoSection.js";
 import type { SavedHttpHandlers } from "../saved/http.js";
 import type { OutingPlannerService } from "../outingPlanner/service.js";
 import { createOutingPlannerHandlers } from "../outingPlanner/http.js";
+import type { ModerationService } from "../moderation/service.js";
+import type { ReportReasonCode } from "../moderation/types.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -62,6 +64,27 @@ export function applyCors(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
 }
 
+
+
+function normalizeReportReason(value: unknown): ReportReasonCode {
+  const allowed: ReportReasonCode[] = [
+    "spam",
+    "harassment_bullying",
+    "hate_abusive_language",
+    "sexual_explicit",
+    "graphic_violent",
+    "dangerous_illegal",
+    "misleading_fake_review",
+    "off_topic_irrelevant",
+    "impersonation_stolen_content",
+    "privacy_violation",
+    "self_harm_concern",
+    "scam_fraud",
+    "other"
+  ];
+  const reason = String(value ?? "other").trim() as ReportReasonCode;
+  return allowed.includes(reason) ? reason : "other";
+}
 function assertAdmin(req: IncomingMessage): boolean {
   const expectedKey = process.env.ADMIN_API_KEY;
   if (!expectedKey) return false;
@@ -89,6 +112,7 @@ export function createRoutes(
     discovery?: DiscoveryHttpHandlerDeps;
     savedHandlers?: SavedHttpHandlers;
     outingPlannerService?: OutingPlannerService;
+    moderationService?: ModerationService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -686,6 +710,29 @@ export function createRoutes(
             editWindowMinutes: Number(process.env.REVIEW_EDIT_WINDOW_MINUTES ?? 30)
           });
 
+          if (deps.moderationService) {
+            await deps.moderationService.analyzeContent({
+              target: { targetType: "review", targetId: created.id, reviewId: created.id, subjectUserId: userId, placeId: created.placeId },
+              text,
+              actorUserId: userId,
+              metadata: { rating: created.rating, mediaCount: mediaUploadIds.length }
+            });
+            for (const media of created.media) {
+              await deps.moderationService.analyzeContent({
+                target: { targetType: "review_media", targetId: media.id, reviewId: created.id, mediaId: media.id, subjectUserId: userId, placeId: created.placeId },
+                caption: media.caption,
+                title: media.caption,
+                actorUserId: userId,
+                metadata: {
+                  mimeType: media.mimeType,
+                  checksum: media.checksum,
+                  hasPoster: Boolean(media.posterUrl),
+                  hasThumbnail: Boolean(media.variants.thumbnailUrl)
+                }
+              });
+            }
+          }
+
           if (deps?.accessEngine && deps?.subscriptionService) {
             const resolvedTarget = deps?.accountsService
               ? deps.accountsService.resolveSubscriptionTarget(actor)
@@ -923,6 +970,14 @@ export function createRoutes(
         const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
         const reason = String(payload.reason ?? "").trim() || "unspecified";
         await deps.reviewsStore.reportReview(reviewId, userIdHeader, reason);
+        if (deps.moderationService) {
+          await deps.moderationService.submitReport({
+            target: { targetType: "review", targetId: reviewId, reviewId },
+            reporterUserId: userIdHeader,
+            reasonCode: normalizeReportReason(payload.reason),
+            note: payload.note == null ? undefined : String(payload.note)
+          });
+        }
         sendJson(res, 202, { ok: true });
         return;
       }
@@ -936,7 +991,100 @@ export function createRoutes(
         const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
         const reason = String(payload.reason ?? "").trim() || "unspecified";
         await deps.reviewsStore.reportReviewMedia(mediaId, userIdHeader, reason);
+        if (deps.moderationService) {
+          await deps.moderationService.submitReport({
+            target: { targetType: "review_media", targetId: mediaId, mediaId, reviewId: payload.reviewId == null ? undefined : String(payload.reviewId) },
+            reporterUserId: userIdHeader,
+            reasonCode: normalizeReportReason(payload.reason),
+            note: payload.note == null ? undefined : String(payload.note)
+          });
+        }
         sendJson(res, 202, { ok: true });
+        return;
+      }
+
+
+
+      if (normalizedPath === "/v1/moderation/reports" && req.method === "POST" && deps?.moderationService) {
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const targetType = String(payload.targetType ?? "").trim();
+        const targetId = String(payload.targetId ?? "").trim();
+        if (!targetType || !targetId) throw new ValidationError(["targetType and targetId are required"]);
+        const result = await deps.moderationService.submitReport({
+          target: {
+            targetType: targetType as never,
+            targetId,
+            reviewId: payload.reviewId == null ? undefined : String(payload.reviewId),
+            mediaId: payload.mediaId == null ? undefined : String(payload.mediaId),
+            placeId: payload.placeId == null ? undefined : String(payload.placeId),
+            subjectUserId: payload.subjectUserId == null ? undefined : String(payload.subjectUserId)
+          },
+          reporterUserId: userIdHeader,
+          reasonCode: normalizeReportReason(payload.reasonCode ?? payload.reason),
+          note: payload.note == null ? undefined : String(payload.note)
+        });
+        sendJson(res, 202, result);
+        return;
+      }
+
+      if (normalizedPath === "/v1/admin/moderation/queue" && req.method === "GET" && deps?.moderationService) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 401, { error: "unauthorized" });
+          return;
+        }
+        const queue = deps.moderationService.listQueue({
+          targetType: (url.searchParams.get("targetType") ?? undefined) as never,
+          state: (url.searchParams.get("state") ?? undefined) as never,
+          severity: (url.searchParams.get("severity") ?? undefined) as never,
+          unresolvedOnly: String(url.searchParams.get("unresolvedOnly") ?? "true") === "true",
+          limit: Number(url.searchParams.get("limit") ?? "50")
+        });
+        sendJson(res, 200, { queue });
+        return;
+      }
+
+      if (normalizedPath === "/v1/admin/moderation/decision" && req.method === "POST" && deps?.moderationService) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 401, { error: "unauthorized" });
+          return;
+        }
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const targetType = String(payload.targetType ?? "").trim();
+        const targetId = String(payload.targetId ?? "").trim();
+        const decisionType = String(payload.decisionType ?? "").trim();
+        if (!targetType || !targetId || !decisionType) throw new ValidationError(["targetType, targetId, and decisionType are required"]);
+        const decision = await deps.moderationService.adminDecision({
+          target: {
+            targetType: targetType as never,
+            targetId,
+            reviewId: payload.reviewId == null ? undefined : String(payload.reviewId),
+            mediaId: payload.mediaId == null ? undefined : String(payload.mediaId),
+            placeId: payload.placeId == null ? undefined : String(payload.placeId),
+            subjectUserId: payload.subjectUserId == null ? undefined : String(payload.subjectUserId)
+          },
+          decisionType: decisionType as never,
+          reasonCode: String(payload.reasonCode ?? "admin_decision"),
+          notes: payload.notes == null ? undefined : String(payload.notes),
+          actorUserId: String(readHeader(req, "x-user-id") ?? "admin")
+        });
+        sendJson(res, 200, { decision });
+        return;
+      }
+
+      const moderationTargetMatch = /^\/v1\/admin\/moderation\/targets\/([^/]+)\/([^/]+)$/.exec(normalizedPath);
+      if (moderationTargetMatch && req.method === "GET" && deps?.moderationService) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 401, { error: "unauthorized" });
+          return;
+        }
+        const targetType = decodeURIComponent(moderationTargetMatch[1] ?? "");
+        const targetId = decodeURIComponent(moderationTargetMatch[2] ?? "");
+        const details = deps.moderationService.getTargetDetails({ targetType: targetType as never, targetId });
+        sendJson(res, 200, details);
         return;
       }
 
@@ -988,6 +1136,13 @@ export function createRoutes(
           content: clean,
           moderationRequired
         });
+        if (deps.moderationService) {
+          await deps.moderationService.analyzeContent({
+            target: { targetType: "business_review_response", targetId: response.id, reviewId, placeId: review.placeId, subjectUserId: actor.userId },
+            text: clean,
+            actorUserId: actor.userId
+          });
+        }
         sendJson(res, 201, { response });
         return;
       }
@@ -1026,6 +1181,13 @@ export function createRoutes(
             content: clean,
             moderationRequired
           });
+          if (deps.moderationService) {
+            await deps.moderationService.analyzeContent({
+              target: { targetType: "business_review_response", targetId: response.id, reviewId, placeId: review.placeId, subjectUserId: actor.userId },
+              text: clean,
+              actorUserId: actor.userId
+            });
+          }
           if (response.id !== responseId) throw new ValidationError(["business response id mismatch"]);
           sendJson(res, 200, { response });
           return;
