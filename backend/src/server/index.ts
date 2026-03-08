@@ -1,5 +1,7 @@
 import { fileURLToPath } from "node:url";
 
+import { MemoryAccountsStore } from "../accounts/memoryStore.js";
+import { AccountsService } from "../accounts/service.js";
 import { ClickTracker, MemoryClickStore } from "../analytics/clicks/index.js";
 import { createDeckHandler } from "../api/sessions/deckHandler.js";
 import { createIdeasHandlers } from "../api/sessions/ideasHandler.js";
@@ -58,6 +60,7 @@ export function createServer(options?: CreateServerOptions) {
   const usageStore = new MemoryUsageStore();
   const subscriptionService = new SubscriptionService(usageStore, new DevBillingProvider());
   const entitlementPolicy = new EntitlementPolicyService(subscriptionService);
+  const accountsService = new AccountsService(new MemoryAccountsStore());
 
   const deckHandler = createDeckHandler({
     router: deckRouter,
@@ -76,7 +79,8 @@ export function createServer(options?: CreateServerOptions) {
     telemetryService,
     reviewsStore,
     subscriptionService,
-    entitlementPolicy
+    entitlementPolicy,
+    accountsService
   });
 }
 

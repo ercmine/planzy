@@ -1,6 +1,8 @@
 export interface CreateReviewInput {
   placeId: string;
   userId: string;
+  actingProfileType?: "PERSONAL" | "CREATOR" | "BUSINESS";
+  actingProfileId?: string;
   displayName: string;
   rating: number;
   text: string;
@@ -12,6 +14,8 @@ export interface PlaceReview {
   id: string;
   placeId: string;
   userId: string;
+  actingProfileType: "PERSONAL" | "CREATOR" | "BUSINESS";
+  actingProfileId: string;
   displayName: string;
   rating: number;
   text: string;
