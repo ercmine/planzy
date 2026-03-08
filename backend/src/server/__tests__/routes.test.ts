@@ -250,4 +250,58 @@ describe("server diagnostic and alias routes", () => {
       code: "missing_api_key"
     });
   });
+  it("supports review photo upload attach and media reporting", async () => {
+    const uploadRes = await fetch(`${baseUrl}/v1/reviews/media/uploads`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-user-id": "user-photo-1"
+      },
+      body: JSON.stringify({
+        fileName: "latte.png",
+        mimeType: "image/png",
+        base64Data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZQn8AAAAASUVORK5CYII="
+      })
+    });
+    expect(uploadRes.status).toBe(201);
+    const uploadPayload = await uploadRes.json() as { upload: { id: string } };
+
+    const createReview = await fetch(`${baseUrl}/places/abc/reviews`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-user-id": "user-photo-1"
+      },
+      body: JSON.stringify({ text: "", displayName: "Photo Alex", mediaUploadIds: [uploadPayload.upload.id] })
+    });
+    expect(createReview.status).toBe(201);
+    const createdPayload = await createReview.json() as { review: { id: string; media: Array<{ id: string }> } };
+    expect(createdPayload.review.media.length).toBeGreaterThan(0);
+
+    const publicList = await fetch(`${baseUrl}/places/abc/reviews`);
+    expect(publicList.status).toBe(200);
+    const publicPayload = await publicList.json() as { reviews: Array<{ id: string }> };
+    expect(Array.isArray(publicPayload.reviews)).toBe(true);
+    expect(publicPayload.reviews.length).toBeGreaterThan(0);
+
+    const mine = await fetch(`${baseUrl}/places/abc/reviews/me`, { headers: { "x-user-id": "user-photo-1" } });
+    expect(mine.status).toBe(200);
+    await expect(mine.json()).resolves.toMatchObject({
+      review: expect.objectContaining({
+        mediaCount: 1,
+        media: [expect.objectContaining({ mimeType: "image/png" })]
+      })
+    });
+
+    const reportMedia = await fetch(`${baseUrl}/reviews/media/${encodeURIComponent(createdPayload.review.media[0]!.id)}/report`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-user-id": "reporter-user"
+      },
+      body: JSON.stringify({ reason: "nsfw" })
+    });
+    expect(reportMedia.status).toBe(202);
+  });
+
 });
