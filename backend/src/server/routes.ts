@@ -4,8 +4,10 @@ import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import { createAccountsHttpHandlers } from "../accounts/http.js";
 import { createDiscoveryHttpHandlers } from "../discovery/http.js";
 import { createCreatorHttpHandlers } from "../creator/http.js";
+import { createCreatorMonetizationHttpHandlers } from "../creatorMonetization/http.js";
 import type { AccountsService } from "../accounts/service.js";
 import type { CreatorService } from "../creator/service.js";
+import type { CreatorMonetizationService } from "../creatorMonetization/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
 import { PermissionAction, ProfileType } from "../accounts/types.js";
 import type { ActorContextResolved } from "../accounts/types.js";
@@ -67,6 +69,7 @@ export function createRoutes(
     accessEngine?: FeatureQuotaEngine;
     accountsService?: AccountsService;
     creatorService?: CreatorService;
+    creatorMonetizationService?: CreatorMonetizationService;
     discovery?: DiscoveryHttpHandlerDeps;
     savedHandlers?: SavedHttpHandlers;
   }
@@ -80,6 +83,7 @@ export function createRoutes(
   const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
+  const creatorMonetizationHandlers = deps?.creatorMonetizationService ? createCreatorMonetizationHttpHandlers(deps.creatorMonetizationService) : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -854,6 +858,43 @@ export function createRoutes(
         return;
       }
 
+
+
+      if (creatorMonetizationHandlers) {
+        const monetizationProfileMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/monetization$/);
+        if (req.method === "GET" && monetizationProfileMatch) {
+          await creatorMonetizationHandlers.getProfile(req, res, decodeURIComponent(monetizationProfileMatch[1] ?? ""));
+          return;
+        }
+        if (req.method === "PATCH" && monetizationProfileMatch) {
+          await creatorMonetizationHandlers.updateSettings(req, res, decodeURIComponent(monetizationProfileMatch[1] ?? ""));
+          return;
+        }
+
+        if (req.method === "POST" && normalizedPath === "/v1/creator/tips/intents") {
+          await creatorMonetizationHandlers.createTipIntent(req, res);
+          return;
+        }
+
+        const premiumGuideMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/guides\/([^/]+)\/monetization$/);
+        if (req.method === "PATCH" && premiumGuideMatch) {
+          await creatorMonetizationHandlers.setGuidePremium(req, res, decodeURIComponent(premiumGuideMatch[1] ?? ""), decodeURIComponent(premiumGuideMatch[2] ?? ""));
+          return;
+        }
+
+        const membershipPlanMatch = normalizedPath.match(/^\/v1\/creator\/profiles\/([^/]+)\/membership-plans$/);
+        if (req.method === "POST" && membershipPlanMatch) {
+          await creatorMonetizationHandlers.createMembershipPlan(req, res, decodeURIComponent(membershipPlanMatch[1] ?? ""));
+          return;
+        }
+
+        const adminMonetizationMatch = normalizedPath.match(/^\/v1\/admin\/creator\/profiles\/([^/]+)\/monetization$/);
+        if (req.method === "PATCH" && adminMonetizationMatch) {
+          if (!assertAdmin(req)) return sendJson(res, 403, { error: "forbidden" });
+          await creatorMonetizationHandlers.adminStatus(req, res, decodeURIComponent(adminMonetizationMatch[1] ?? ""));
+          return;
+        }
+      }
 
       if (creatorHandlers) {
         if (req.method === "POST" && normalizedPath === "/v1/creator/profiles") {

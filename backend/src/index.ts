@@ -95,3 +95,5 @@ export * from "./accounts/http.js";
 
 export * from "./places/index.js";
 export * from "./discovery/index.js";
+
+export * from "./creatorMonetization/index.js";

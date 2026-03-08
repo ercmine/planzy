@@ -4,6 +4,7 @@ import { MemoryAccountsStore } from "../accounts/memoryStore.js";
 import { AccountsService } from "../accounts/service.js";
 import { MemoryCreatorStore } from "../creator/memoryStore.js";
 import { CreatorService } from "../creator/service.js";
+import { CreatorMonetizationService, MemoryCreatorMonetizationStore } from "../creatorMonetization/index.js";
 import { ClickTracker, MemoryClickStore } from "../analytics/clicks/index.js";
 import { createDeckHandler } from "../api/sessions/deckHandler.js";
 import { createIdeasHandlers } from "../api/sessions/ideasHandler.js";
@@ -78,7 +79,9 @@ export function createServer(options?: CreateServerOptions) {
   const entitlementPolicy = new EntitlementPolicyService(subscriptionService);
   const accessEngine = new FeatureQuotaEngine(subscriptionService, new MemoryAccessUsageStore());
   const accountsService = new AccountsService(new MemoryAccountsStore());
-  const creatorService = new CreatorService(new MemoryCreatorStore(), accountsService, reviewsStore, subscriptionService, accessEngine);
+  const creatorStore = new MemoryCreatorStore();
+  const monetizationService = new CreatorMonetizationService(new MemoryCreatorMonetizationStore(), accountsService, subscriptionService, creatorStore, accessEngine);
+  const creatorService = new CreatorService(creatorStore, accountsService, reviewsStore, subscriptionService, accessEngine, monetizationService);
   const savedService = new SavedService(new MemorySavedStore(), subscriptionService, accessEngine);
 
   const discoveryRepository = new InMemoryDiscoveryRepository();
@@ -117,6 +120,7 @@ export function createServer(options?: CreateServerOptions) {
     accessEngine,
     accountsService,
     creatorService,
+    creatorMonetizationService: monetizationService,
     savedHandlers: createSavedHttpHandlers(savedService),
     discovery: {
       searchService: placeSearchService,

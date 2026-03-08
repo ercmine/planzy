@@ -98,7 +98,15 @@ export type EntitlementKey =
   | "can_access_beta_features"
   | "can_purchase_promotions"
   | "can_be_featured"
-  | "can_receive_priority_ranking";
+  | "can_receive_priority_ranking"
+  | "creator_tips_enabled"
+  | "creator_premium_content_enabled"
+  | "creator_featured_eligibility"
+  | "creator_extended_upload_limits"
+  | "creator_premium_analytics"
+  | "creator_membership_hooks_enabled"
+  | "creator_video_extended_limits"
+  | "creator_priority_review_support";
 
 export type EntitlementValue = boolean | number | string;
 

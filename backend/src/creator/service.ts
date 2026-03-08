@@ -127,13 +127,19 @@ function normalizeGuideSections(guideId: string, sections: Array<Partial<GuideSe
   })).sort((a, b) => a.sortOrder - b.sortOrder).map((section, index) => ({ ...section, sortOrder: index }));
 }
 
+
+interface GuideMonetizationGate {
+  evaluateGuideAccess(viewerUserId: string | undefined, creatorProfileId: string, guideId: string): { locked: boolean; previewSummary?: string };
+}
+
 export class CreatorService {
   constructor(
     private readonly store: CreatorStore,
     private readonly accounts: AccountsService,
     private readonly reviews: ReviewsStore,
     private readonly subscriptions?: SubscriptionService,
-    private readonly accessEngine?: FeatureQuotaEngine
+    private readonly accessEngine?: FeatureQuotaEngine,
+    private readonly monetizationGate?: GuideMonetizationGate
   ) {}
 
   private async ensureCreatorFeature(userId: string, profileId: string, feature: keyof typeof FEATURE_KEYS): Promise<void> {
@@ -605,6 +611,10 @@ export class CreatorService {
     if (!guide) throw new Error("GUIDE_NOT_FOUND");
     if (!isPublicApprovedGuide(guide) && viewerUserId !== profile.userId) {
       throw new Error("GUIDE_NOT_FOUND");
+    }
+    const gate = this.monetizationGate?.evaluateGuideAccess(viewerUserId, profile.id, guide.id);
+    if (gate?.locked && viewerUserId !== profile.userId) {
+      return { ...guide, body: "", placeItems: [], sections: [], monetization: { mode: guide.monetization?.mode ?? "premium", access: guide.monetization?.access ?? "premium", lockedReasonCode: guide.monetization?.lockedReasonCode, gatingSource: guide.monetization?.gatingSource, previewSummary: gate.previewSummary ?? guide.monetization?.previewSummary } };
     }
     this.store.incrementGuideView(guide.id, profile.id, new Date().toISOString().slice(0, 10));
     return guide;
