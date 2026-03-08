@@ -19,14 +19,15 @@ describe("review trust domain", () => {
   });
 
   it("aggregates verification evidence levels", () => {
-    const weak = aggregateVerificationLevel([{ id: "1", userId: "u1", placeId: "p", evidenceType: "check_in", evidenceStrength: 20, source: "system", createdAt: new Date().toISOString() }]);
+    const weak = aggregateVerificationLevel([{ id: "1", userId: "u1", placeId: "p", reviewId: "r1", evidenceType: "check_in", sourceType: "system", evidenceStatus: "active", confidenceScore: 20, strengthLevel: "weak", observedAt: new Date().toISOString(), privacyClass: "sensitive", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]);
     const verified = aggregateVerificationLevel([
-      { id: "1", userId: "u1", placeId: "p", evidenceType: "check_in", evidenceStrength: 60, source: "system", createdAt: new Date().toISOString() },
-      { id: "2", userId: "u1", placeId: "p", evidenceType: "receipt", evidenceStrength: 70, source: "integration", createdAt: new Date().toISOString() },
-      { id: "3", userId: "u1", placeId: "p", evidenceType: "admin_manual", evidenceStrength: 60, source: "admin", createdAt: new Date().toISOString() }
+      { id: "1", userId: "u1", placeId: "p", reviewId: "r1", evidenceType: "check_in", sourceType: "system", evidenceStatus: "active", confidenceScore: 60, strengthLevel: "medium", observedAt: new Date().toISOString(), privacyClass: "sensitive", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      { id: "2", userId: "u1", placeId: "p", reviewId: "r1", evidenceType: "receipt", sourceType: "integration", evidenceStatus: "active", confidenceScore: 70, strengthLevel: "strong", observedAt: new Date().toISOString(), privacyClass: "restricted", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      { id: "3", userId: "u1", placeId: "p", reviewId: "r1", evidenceType: "admin_manual_verification", sourceType: "admin", evidenceStatus: "active", confidenceScore: 60, strengthLevel: "strong", observedAt: new Date().toISOString(), privacyClass: "restricted", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
     ]);
 
     expect(weak.verificationLevel).toBe("none");
+    expect(weak.publicLabel).toBe("Not verified");
     expect(verified.verificationLevel).toBe("verified");
   });
 

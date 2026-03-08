@@ -574,7 +574,16 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${review.author.displayName}${review.rating == null ? '' : ' • ${review.rating}/5'}'),
+                    Row(
+                      children: [
+                        Expanded(child: Text('${review.author.displayName}${review.rating == null ? '' : ' • ${review.rating}/5'}')),
+                        if (review.trust?.isVerifiedVisit == true)
+                          Chip(
+                            label: Text(review.trust?.verificationLabel ?? 'Verified Visit'),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 4),
                     Text(review.body),
                     const SizedBox(height: 4),

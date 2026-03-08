@@ -16,6 +16,8 @@ import type {
   ReviewSort,
   TrustOverrideInput,
   UpsertVerificationEvidenceInput,
+  ReviewVerificationOverrideInput,
+  VisitSessionInput,
   ReviewsStore,
   UpdateReviewInput
 } from "./store.js";
@@ -28,7 +30,8 @@ import {
   type ReviewerTrustProfile,
   type ReviewerTrustStatus,
   type TrustAuditLog,
-  type VerificationEvidence
+  type VerificationEvidence,
+  type ReviewVerificationSummary
 } from "./trust.js";
 
 type ReviewRow = Omit<PlaceReview, "trust" | "viewerHasHelpfulVote" | "canEdit"> & { moderationReason?: string };
@@ -116,6 +119,9 @@ export class MemoryReviewsStore implements ReviewsStore {
   private readonly trustProfiles = new Map<string, ReviewerTrustProfile>();
   private readonly reviewTrustSignals = new Map<string, ReviewTrustSignals>();
   private readonly verificationEvidence = new Map<string, VerificationEvidence[]>();
+  private readonly verificationSummaries = new Map<string, ReviewVerificationSummary>();
+  private readonly visitSessions = new Map<string, Array<{ id: string; userId: string; placeId?: string; startedAt: string; endedAt?: string; confidenceScore: number; sourceType: string; sessionStatus: string; metadata?: Record<string, unknown> }>>();
+  private readonly usedSourceIds = new Set<string>();
   private readonly trustAuditLogs = new Map<string, TrustAuditLog[]>();
 
   async listByPlace(input: ListReviewsInput): Promise<ListReviewsResult> {
@@ -386,20 +392,80 @@ export class MemoryReviewsStore implements ReviewsStore {
     return this.reviewTrustSignals.get(reviewId) ?? null;
   }
 
+  async getReviewVerificationSummary(reviewId: string): Promise<ReviewVerificationSummary | null> {
+    return this.verificationSummaries.get(reviewId) ?? null;
+  }
+
+  async listEligibleEvidenceForUser(input: { userId: string; placeId: string; reviewId?: string }): Promise<VerificationEvidence[]> {
+    const list = this.verificationEvidence.get(`${input.userId}:${input.placeId}`) ?? [];
+    return list.filter((item) => !item.reviewId || !input.reviewId || item.reviewId === input.reviewId);
+  }
+
+  async createVisitSession(input: VisitSessionInput): Promise<{ id: string }> {
+    const id = randomUUID();
+    const list = this.visitSessions.get(input.userId) ?? [];
+    list.push({
+      id,
+      userId: input.userId,
+      placeId: input.placeId,
+      startedAt: input.startedAt,
+      endedAt: input.endedAt,
+      confidenceScore: input.confidenceScore,
+      sourceType: input.sourceType,
+      sessionStatus: input.sessionStatus ?? (input.endedAt ? "ended" : "active"),
+      metadata: input.metadata
+    });
+    this.visitSessions.set(input.userId, list);
+    return { id };
+  }
+
+  async applyReviewVerificationOverride(input: ReviewVerificationOverrideInput): Promise<ReviewVerificationSummary> {
+    const review = this.byId.get(input.reviewId);
+    if (!review) throw new ValidationError(["review not found"]);
+    const summary = this.verificationSummaries.get(input.reviewId) ?? aggregateVerificationLevel([], new Date());
+    const next: ReviewVerificationSummary = {
+      ...summary,
+      reviewId: input.reviewId,
+      verificationLevel: input.status === "verified" ? "verified" : "rejected",
+      verificationScore: input.status === "verified" ? Math.max(90, summary.verificationScore) : 0,
+      verifiedVisitBadgeEligible: input.status === "verified",
+      publicLabel: input.status === "verified" ? "Verified Visit" : "Not verified",
+      overriddenByModerator: input.actorUserId,
+      overrideStatus: input.status,
+      computedAt: new Date().toISOString(),
+      internalReasonCodes: [...new Set([...(summary.internalReasonCodes ?? []), `manual_override_${input.status}`, ...(input.reason ? [input.reason] : [])])]
+    };
+    this.verificationSummaries.set(input.reviewId, next);
+    this.recomputeTrustForReview(input.reviewId, new Date());
+    return next;
+  }
+
   async upsertVerificationEvidence(input: UpsertVerificationEvidenceInput): Promise<VerificationEvidence> {
-    if (input.evidenceStrength <= 0 || input.evidenceStrength > 100) throw new ValidationError(["evidenceStrength must be between 1 and 100"]);
+    const confidenceScore = Number(input.confidenceScore ?? input.evidenceStrength ?? 0);
+    if (confidenceScore <= 0 || confidenceScore > 100) throw new ValidationError(["confidenceScore must be between 1 and 100"]);
+    if (input.sourceId && this.usedSourceIds.has(input.sourceId)) throw new ValidationError(["source evidence already used"]);
+    const now = new Date().toISOString();
     const item: VerificationEvidence = {
       id: randomUUID(),
       userId: input.userId,
       placeId: input.placeId,
+      reviewId: input.linkedReviewId,
       evidenceType: input.evidenceType,
-      evidenceStrength: input.evidenceStrength,
-      source: input.source ?? "system",
-      linkedReviewId: input.linkedReviewId,
+      sourceType: input.sourceType ?? "system",
+      sourceId: input.sourceId,
+      evidenceStatus: input.evidenceStatus ?? "active",
+      confidenceScore,
+      strengthLevel: input.strengthLevel ?? (confidenceScore >= 80 ? "strong" : confidenceScore >= 45 ? "medium" : "weak"),
+      observedAt: input.observedAt ?? now,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
       expiresAt: input.expiresAt,
+      privacyClass: input.privacyClass ?? "sensitive",
       metadata: input.metadata,
-      createdAt: new Date().toISOString()
+      createdAt: now,
+      updatedAt: now
     };
+    if (input.sourceId) this.usedSourceIds.add(input.sourceId);
     const key = `${input.userId}:${input.placeId}`;
     const list = this.verificationEvidence.get(key) ?? [];
     list.push(item);
@@ -642,6 +708,8 @@ export class MemoryReviewsStore implements ReviewsStore {
         reviewerTrustStatus: reviewerProfile?.trustStatus ?? "none",
         reviewTrustDesignation: trustSignals?.reviewTrustDesignation ?? "standard",
         verificationLevel: trustSignals?.verificationLevel ?? "none",
+        verificationLabel: trustSignals?.verificationPublicLabel ?? "Not verified",
+        isVerifiedVisit: (trustSignals?.verificationLevel === "verified" || trustSignals?.verificationLevel === "probable"),
         trustBadges: trustSignals?.badgeIds ?? [],
         rankingBoostWeight: trustSignals?.rankingBoostWeight ?? 0
       }
@@ -669,18 +737,34 @@ export class MemoryReviewsStore implements ReviewsStore {
     if (!review) return;
     const reviewerProfile = this.trustProfiles.get(review.authorUserId) ?? this.createDefaultTrustProfile(review.authorUserId, now);
     const evidence = this.verificationEvidence.get(`${review.authorUserId}:${review.placeId}`) ?? [];
-    const linkedEvidence = evidence.filter((item) => !item.linkedReviewId || item.linkedReviewId === reviewId);
-    const verification = aggregateVerificationLevel(linkedEvidence);
+    const linkedEvidence = evidence.filter((item) => !item.reviewId || item.reviewId === reviewId);
+    const computedSummary = aggregateVerificationLevel(linkedEvidence.map((item) => ({ ...item, reviewId })), now);
+    const existingSummary = this.verificationSummaries.get(reviewId);
+    let verificationSummary: ReviewVerificationSummary = computedSummary;
+    if (existingSummary?.overrideStatus) {
+      verificationSummary = {
+        ...computedSummary,
+        reviewId,
+        overriddenByModerator: existingSummary.overriddenByModerator,
+        overrideStatus: existingSummary.overrideStatus,
+        verificationLevel: existingSummary.overrideStatus === "verified" ? "verified" : "rejected",
+        verificationScore: existingSummary.overrideStatus === "verified" ? Math.max(computedSummary.verificationScore, 90) : 0,
+        verifiedVisitBadgeEligible: existingSummary.overrideStatus === "verified",
+        publicLabel: existingSummary.overrideStatus === "verified" ? "Verified Visit" : "Not verified",
+        internalReasonCodes: [...new Set([...(computedSummary.internalReasonCodes ?? []), ...(existingSummary.internalReasonCodes ?? [])])]
+      };
+    }
+    this.verificationSummaries.set(reviewId, verificationSummary);
     const quality = evaluateReviewQuality({ body: review.body, rating: review.rating, mediaCount: review.mediaCount });
     const reviewerStatus: ReviewerTrustStatus = reviewerProfile.manualOverrideStatus ?? reviewerProfile.trustStatus;
     const moderationEligible = review.moderationState === "published";
     const isTrustedEligible = moderationEligible && quality.isTrustedEligible && reviewerStatus === "trusted";
     const reviewTrustDesignation = isTrustedEligible
-      ? (verification.verificationLevel === "verified" || verification.verificationLevel === "probable" ? "trusted_verified" : "trusted")
-      : (verification.verificationLevel === "verified" || verification.verificationLevel === "probable" ? "verified" : "standard");
+      ? (verificationSummary.verificationLevel === "verified" || verificationSummary.verificationLevel === "probable" ? "trusted_verified" : "trusted")
+      : (verificationSummary.verificationLevel === "verified" || verificationSummary.verificationLevel === "probable" ? "verified" : "standard");
     const badgeIds = [
       ...(reviewerStatus === "trusted" ? ["trusted_reviewer", "perbug_limited"] as const : []),
-      ...(verification.verificationLevel !== "none" ? ["verified_visit"] as const : []),
+      ...((verificationSummary.verificationLevel === "verified" || verificationSummary.verificationLevel === "probable") ? ["verified_visit"] as const : []),
       ...(reviewTrustDesignation === "trusted" || reviewTrustDesignation === "trusted_verified" ? ["trusted_review"] as const : [])
     ];
     const rankingBoostWeight = computeRankingBoost({
@@ -688,7 +772,7 @@ export class MemoryReviewsStore implements ReviewsStore {
       helpfulCount: review.helpfulCount,
       reviewerTrustScore: reviewerProfile.trustScore,
       moderationState: review.moderationState,
-      verificationLevel: verification.verificationLevel,
+      verificationLevel: verificationSummary.verificationLevel,
       mediaCount: review.mediaCount,
       suspiciousPenalty: reviewerProfile.suspiciousPenaltyScore
     });
@@ -698,11 +782,13 @@ export class MemoryReviewsStore implements ReviewsStore {
       reviewerUserId: review.authorUserId,
       reviewerTrustStatusSnapshot: reviewerStatus,
       reviewTrustDesignation,
-      verificationLevel: verification.verificationLevel,
+      verificationLevel: verificationSummary.verificationLevel,
       qualityScore: quality.qualityScore,
       originalityScore: quality.originalityScore,
       completenessScore: quality.completenessScore,
-      evidenceScore: verification.evidenceScore,
+      verificationScore: verificationSummary.verificationScore,
+      verificationPublicLabel: verificationSummary.publicLabel,
+      evidenceScore: verificationSummary.verificationScore,
       helpfulnessScoreSnapshot: review.helpfulCount,
       rankingBoostWeight,
       isTrustedEligible,

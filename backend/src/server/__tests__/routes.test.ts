@@ -343,6 +343,12 @@ describe("server diagnostic and alias routes", () => {
       trustSignals: expect.objectContaining({ verificationLevel: expect.stringMatching(/probable|verified/) })
     });
 
+    const verificationSummary = await fetch(`${baseUrl}/v1/trust/reviews/${created.review.id}/verification`);
+    expect(verificationSummary.status).toBe(200);
+    await expect(verificationSummary.json()).resolves.toMatchObject({
+      summary: expect.objectContaining({ publicLabel: expect.stringMatching(/Visit|verified|Not verified/i) })
+    });
+
     const forbidden = await fetch(`${baseUrl}/v1/trust/reviewers/trust-user`);
     expect(forbidden.status).toBe(403);
 
@@ -362,6 +368,19 @@ describe("server diagnostic and alias routes", () => {
     expect(override.status).toBe(200);
     await expect(override.json()).resolves.toMatchObject({
       profile: expect.objectContaining({ trustStatus: "revoked" })
+    });
+
+    const reviewOverride = await fetch(`${baseUrl}/v1/trust/reviews/${created.review.id}/verification`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-admin-key": "admin-test-key"
+      },
+      body: JSON.stringify({ status: "rejected", reason: "spoof_detected", actorUserId: "moderator-1" })
+    });
+    expect(reviewOverride.status).toBe(200);
+    await expect(reviewOverride.json()).resolves.toMatchObject({
+      summary: expect.objectContaining({ verificationLevel: "rejected" })
     });
   });
 
