@@ -5,6 +5,7 @@ import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import { handleMerchantHttpError, createMerchantHttpHandlers } from "../merchant/http.js";
 import type { MerchantService } from "../merchant/service.js";
 import { ValidationError } from "../plans/errors.js";
+import { categoryToIncludedTypes, GooglePlacesError, searchNearby } from "../services/googlePlaces.js";
 import { createTelemetryHttpHandlers } from "../telemetry/http.js";
 import type { TelemetryService } from "../telemetry/telemetryService.js";
 import { createVenueClaimsHttpHandlers, readHeader, sendJson } from "../venues/claims/http.js";
@@ -57,38 +58,108 @@ export function createRoutes(
         sendJson(res, 200, {
           ok: true,
           service: "perbug-api",
+          version: "1.0.0",
           time: new Date().toISOString()
         });
         return;
       }
 
       if (req.method === "GET" && normalizedPath === "/plans") {
-        sendJson(res, 200, [
-          {
-            id: "sample-plan-1",
-            title: "Coffee walk",
-            category: "coffee",
-            source: "stub"
-          }
-        ]);
+        const lat = parseRequiredNumber(url.searchParams, "lat");
+        const lng = parseRequiredNumber(url.searchParams, "lng");
+        const radius = Number(url.searchParams.get("radius") ?? "2500");
+        const limit = Number(url.searchParams.get("limit") ?? "20");
+        const category = url.searchParams.get("category") ?? "food";
+
+        const places = await searchNearby({
+          lat,
+          lng,
+          radiusMeters: radius,
+          maxResults: limit,
+          includedTypes: categoryToIncludedTypes(category)
+        });
+
+        const plans = places.map((place) => ({
+          id: `google:${place.id}`,
+          title: place.displayName?.text ?? "Untitled place",
+          category,
+          source: "google",
+          placeId: place.id,
+          address: place.formattedAddress,
+          lat: place.location?.latitude,
+          lng: place.location?.longitude,
+          rating: place.rating,
+          userRatingCount: place.userRatingCount,
+          priceLevel: place.priceLevel,
+          googleMapsUri: place.googleMapsUri,
+          websiteUri: place.websiteUri,
+          photo: place.photos?.[0]?.name
+        }));
+
+        sendJson(res, 200, plans);
         return;
       }
 
       if (req.method === "GET" && normalizedPath === "/live-results") {
+        const lat = parseRequiredNumber(url.searchParams, "lat");
+        const lng = parseRequiredNumber(url.searchParams, "lng");
+        const radius = Number(url.searchParams.get("radius") ?? "2500");
+        const category = url.searchParams.get("category") ?? "food";
+        const sessionId = url.searchParams.get("sessionId") ?? "live-session";
+
+        const places = await searchNearby({
+          lat,
+          lng,
+          radiusMeters: radius,
+          maxResults: 20,
+          includedTypes: categoryToIncludedTypes(category)
+        });
+
+        const ranked = places
+          .map((place) => ({
+            place,
+            score: (place.rating ?? 0) + Math.log10((place.userRatingCount ?? 0) + 1)
+          }))
+          .sort((left, right) => right.score - left.score);
+
+        const top = ranked[0];
+
         sendJson(res, 200, {
-          results: [
-            {
-              sessionId: "demo-session",
-              topPlanId: "sample-plan-1",
-              topPlanTitle: "Coffee walk",
-              score: 0.91
-            }
-          ],
+          results: top
+            ? [
+                {
+                  sessionId,
+                  topPlanId: `google:${top.place.id}`,
+                  topPlanTitle: top.place.displayName?.text ?? "Untitled place",
+                  score: Number(top.score.toFixed(3))
+                }
+              ]
+            : [],
           summary: {
-            activeSessions: 1,
+            activeSessions: top ? 1 : 0,
             generatedAt: new Date().toISOString()
           }
         });
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/places/photo") {
+        const name = url.searchParams.get("name");
+        const maxWidthPx = Number(url.searchParams.get("maxWidthPx") ?? "800");
+        const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+
+        if (!apiKey) {
+          throw new GooglePlacesError("missing_api_key", "GOOGLE_MAPS_API_KEY is not configured", 503);
+        }
+
+        if (!name) {
+          throw new GooglePlacesError("invalid_input", "name query parameter is required", 400, { field: "name" });
+        }
+
+        const mediaUrl = `https://places.googleapis.com/v1/${encodeURI(name)}/media?key=${encodeURIComponent(apiKey)}&maxWidthPx=${Math.max(1, Math.min(1600, maxWidthPx))}`;
+        res.statusCode = 302;
+        res.setHeader("Location", mediaUrl);
+        res.end();
         return;
       }
 
@@ -221,6 +292,15 @@ export function createRoutes(
         return;
       }
 
+      if (error instanceof GooglePlacesError) {
+        sendJson(res, error.statusCode, {
+          error: error.message,
+          code: error.code,
+          details: error.details
+        });
+        return;
+      }
+
       sendJson(res, 500, { error: "Internal Server Error" });
     }
   };
@@ -235,7 +315,7 @@ function normalizeAliasPath(pathname: string): string {
     return pathname.slice("/api".length);
   }
 
-  const v1AliasPaths = ["/plans", "/live-results", "/health"];
+  const v1AliasPaths = ["/plans", "/live-results", "/health", "/places/photo"];
   if (pathname.startsWith("/v1/")) {
     const withoutPrefix = pathname.slice("/v1".length);
     if (v1AliasPaths.some((aliasPath) => withoutPrefix === aliasPath || withoutPrefix.startsWith(`${aliasPath}/`))) {
@@ -244,4 +324,13 @@ function normalizeAliasPath(pathname: string): string {
   }
 
   return pathname;
+}
+
+function parseRequiredNumber(searchParams: URLSearchParams, paramName: string): number {
+  const raw = searchParams.get(paramName);
+  if (raw === null || raw.trim() === "") {
+    throw new GooglePlacesError("invalid_input", `${paramName} query parameter is required`, 400, { field: paramName });
+  }
+
+  return Number(raw);
 }
