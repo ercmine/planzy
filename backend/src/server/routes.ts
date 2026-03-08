@@ -28,6 +28,7 @@ import type { TelemetryService } from "../telemetry/telemetryService.js";
 import { createVenueClaimsHttpHandlers, parseJsonBody, readHeader, sendJson } from "../venues/claims/http.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 import type { ReviewsStore } from "../reviews/store.js";
+import type { SavedHttpHandlers } from "../saved/http.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -64,6 +65,7 @@ export function createRoutes(
     accessEngine?: FeatureQuotaEngine;
     accountsService?: AccountsService;
     discovery?: DiscoveryHttpHandlerDeps;
+    savedHandlers?: SavedHttpHandlers;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -598,6 +600,58 @@ export function createRoutes(
         }
         if (req.method === "GET" && normalizedPath === "/v1/subscription/authorize") {
           await subscriptionHandlers.authorizeAction(req, res);
+          return;
+        }
+      }
+
+      if (deps?.savedHandlers) {
+        if (req.method === "POST" && normalizedPath === "/v1/saved/places") {
+          await deps.savedHandlers.savePlace(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/saved") {
+          await deps.savedHandlers.listSaved(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/saved/lists") {
+          await deps.savedHandlers.createList(req, res);
+          return;
+        }
+
+        const savedPlaceDeleteMatch = /^\/v1\/saved\/places\/([^/]+)$/.exec(normalizedPath);
+        if (savedPlaceDeleteMatch && req.method === "DELETE") {
+          await deps.savedHandlers.unsavePlace(req, res, decodeURIComponent(savedPlaceDeleteMatch[1] ?? ""));
+          return;
+        }
+
+        const savedListMatch = /^\/v1\/saved\/lists\/([^/]+)$/.exec(normalizedPath);
+        if (savedListMatch) {
+          const listId = decodeURIComponent(savedListMatch[1] ?? "");
+          if (req.method === "GET") {
+            await deps.savedHandlers.getList(req, res, listId);
+            return;
+          }
+          if (req.method === "PATCH") {
+            await deps.savedHandlers.updateList(req, res, listId);
+            return;
+          }
+        }
+
+        const listAddMatch = /^\/v1\/saved\/lists\/([^/]+)\/places$/.exec(normalizedPath);
+        if (listAddMatch && req.method === "POST") {
+          await deps.savedHandlers.addPlaceToList(req, res, decodeURIComponent(listAddMatch[1] ?? ""));
+          return;
+        }
+
+        const listRemoveMatch = /^\/v1\/saved\/lists\/([^/]+)\/places\/([^/]+)$/.exec(normalizedPath);
+        if (listRemoveMatch && req.method === "DELETE") {
+          await deps.savedHandlers.removePlaceFromList(req, res, decodeURIComponent(listRemoveMatch[1] ?? ""), decodeURIComponent(listRemoveMatch[2] ?? ""));
+          return;
+        }
+
+        const publicListsMatch = /^\/v1\/profiles\/([^/]+)\/lists$/.exec(normalizedPath);
+        if (publicListsMatch && req.method === "GET") {
+          await deps.savedHandlers.listPublicByUser(req, res, decodeURIComponent(publicListsMatch[1] ?? ""));
           return;
         }
       }

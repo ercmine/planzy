@@ -32,6 +32,9 @@ import { FeatureQuotaEngine, MemoryAccessUsageStore } from "../subscriptions/acc
 import { SubscriptionService } from "../subscriptions/service.js";
 import { MemoryUsageStore } from "../subscriptions/usage.js";
 import { TelemetryService } from "../telemetry/telemetryService.js";
+import { createSavedHttpHandlers } from "../saved/http.js";
+import { SavedService } from "../saved/service.js";
+import { MemorySavedStore } from "../saved/store.js";
 import { VenueClaimsService } from "../venues/claims/claimsService.js";
 import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
 import { createHttpServer } from "./httpServer.js";
@@ -73,6 +76,7 @@ export function createServer(options?: CreateServerOptions) {
   const entitlementPolicy = new EntitlementPolicyService(subscriptionService);
   const accessEngine = new FeatureQuotaEngine(subscriptionService, new MemoryAccessUsageStore());
   const accountsService = new AccountsService(new MemoryAccountsStore());
+  const savedService = new SavedService(new MemorySavedStore(), subscriptionService, accessEngine);
 
   const discoveryRepository = new InMemoryDiscoveryRepository();
   const placeSearchService = new PlaceSearchService(discoveryRepository);
@@ -109,6 +113,7 @@ export function createServer(options?: CreateServerOptions) {
     entitlementPolicy,
     accessEngine,
     accountsService,
+    savedHandlers: createSavedHttpHandlers(savedService),
     discovery: {
       searchService: placeSearchService,
       browseService: categoryBrowseService,

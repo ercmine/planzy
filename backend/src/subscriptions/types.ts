@@ -74,6 +74,7 @@ export type EntitlementKey =
   | "priority_support"
   | "max_saved_places"
   | "max_custom_lists"
+  | "max_places_per_list"
   | "max_text_reviews_per_month"
   | "max_photo_reviews_per_month"
   | "max_video_reviews_per_month"

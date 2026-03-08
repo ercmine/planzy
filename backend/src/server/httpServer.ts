@@ -11,6 +11,7 @@ import type { SubscriptionService } from "../subscriptions/service.js";
 import type { TelemetryService } from "../telemetry/telemetryService.js";
 import type { ReviewsStore } from "../reviews/store.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
+import type { SavedHttpHandlers } from "../saved/http.js";
 import { createRoutes } from "./routes.js";
 
 export function matchPath(pattern: string, pathname: string): Record<string, string> | null {
@@ -56,6 +57,7 @@ export function createHttpServer(
     accessEngine?: FeatureQuotaEngine;
     accountsService?: AccountsService;
     discovery?: DiscoveryHttpHandlerDeps;
+    savedHandlers?: SavedHttpHandlers;
   }
 ): Server {
   const route = createRoutes(service, merchantService, deps);
