@@ -1,6 +1,41 @@
 import type { CreatorProfileStatus, CreatorSocialLink } from "../accounts/types.js";
 
 export type GuideStatus = "draft" | "published" | "hidden" | "archived";
+export type GuideFormatType = "guide" | "collection" | "itinerary" | "list";
+export type GuideType = "city" | "neighborhood" | "themed" | "best_of" | "itinerary" | "recommendation" | "hidden_gems";
+export type GuideModerationStatus = "pending" | "approved" | "flagged" | "removed";
+export type GuideVisibility = "public" | "private" | "unlisted";
+
+export interface GuideSection {
+  id: string;
+  guideId: string;
+  title: string;
+  description?: string;
+  sortOrder: number;
+  sectionType?: "intro" | "day" | "morning" | "afternoon" | "evening" | "neighborhood" | "theme" | "custom";
+}
+
+export interface GuidePlaceItem {
+  id: string;
+  guideId: string;
+  placeId: string;
+  sortOrder: number;
+  sectionId?: string;
+  dayIndex?: number;
+  timeBlock?: "morning" | "afternoon" | "evening" | "night";
+  creatorNote?: string;
+  tip?: string;
+  recommendedDurationMinutes?: number;
+  bestTimeLabel?: string;
+  budgetLabel?: string;
+  isFeatured: boolean;
+  attachedReviewId?: string;
+  attachedVideoReviewId?: string;
+  customTitleOverride?: string;
+  mediaOverrideUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface CreatorGuide {
   id: string;
@@ -9,11 +44,20 @@ export interface CreatorGuide {
   slug: string;
   summary: string;
   body: string;
+  guideType: GuideType;
+  formatType: GuideFormatType;
   coverUrl?: string;
+  heroImageMediaId?: string;
+  heroVideoMediaId?: string;
+  city?: string;
+  region?: string;
+  estimatedDurationMinutes?: number;
+  moderationStatus: GuideModerationStatus;
   status: GuideStatus;
-  visibility: "public" | "private";
+  visibility: GuideVisibility;
   tags: string[];
-  placeIds: string[];
+  placeItems: GuidePlaceItem[];
+  sections: GuideSection[];
   publishedAt?: string;
   createdAt: string;
   updatedAt: string;

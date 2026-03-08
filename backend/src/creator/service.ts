@@ -5,11 +5,11 @@ import { CreatorProfileStatus } from "../accounts/types.js";
 import type { CreatorProfile, CreatorSocialLink, CreatorSocialPlatform } from "../accounts/types.js";
 import { ValidationError } from "../plans/errors.js";
 import type { PlaceReview, ReviewsStore } from "../reviews/store.js";
-import { FEATURE_KEYS, type FeatureQuotaEngine } from "../subscriptions/accessEngine.js";
+import { FEATURE_KEYS, QUOTA_KEYS, type FeatureQuotaEngine } from "../subscriptions/accessEngine.js";
 import type { SubscriptionService } from "../subscriptions/service.js";
 import { SubscriptionTargetType } from "../subscriptions/types.js";
 import type { CreatorStore } from "./store.js";
-import type { CreatorAnalyticsSummary, CreatorFeedItem, CreatorFeedItemType, CreatorFeedResult, CreatorGuide, CreatorPlaceContentResult, FollowedCreatorSummary, PublicCreatorProfileView } from "./types.js";
+import type { CreatorAnalyticsSummary, CreatorFeedItem, CreatorFeedItemType, CreatorFeedResult, CreatorGuide, CreatorPlaceContentResult, FollowedCreatorSummary, GuidePlaceItem, GuideSection, PublicCreatorProfileView } from "./types.js";
 
 const RESERVED_SLUGS = new Set(["admin", "api", "creator", "creators", "settings", "support"]);
 const SOCIAL_HOSTS: Record<CreatorSocialPlatform, string[]> = {
@@ -74,6 +74,57 @@ function normalizeSocialLinks(links: Array<{ platform: CreatorSocialPlatform; ur
       updatedAt: now
     };
   });
+}
+
+function isPublicApprovedGuide(guide: CreatorGuide): boolean {
+  return guide.status === "published" && guide.visibility === "public" && guide.moderationStatus === "approved";
+}
+
+function normalizeGuidePlaceItems(guideId: string, items: Array<Partial<GuidePlaceItem>> | undefined, now: string, max: number): GuidePlaceItem[] {
+  const next = (items ?? []).slice(0, max).map((item, index) => ({
+    id: typeof item.id === "string" && item.id ? item.id : `gpi_${randomUUID()}`,
+    guideId,
+    placeId: String(item.placeId ?? "").trim(),
+    sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : index,
+    sectionId: item.sectionId,
+    dayIndex: item.dayIndex,
+    timeBlock: item.timeBlock,
+    creatorNote: item.creatorNote?.slice(0, 500),
+    tip: item.tip?.slice(0, 280),
+    recommendedDurationMinutes: item.recommendedDurationMinutes,
+    bestTimeLabel: item.bestTimeLabel?.slice(0, 80),
+    budgetLabel: item.budgetLabel?.slice(0, 80),
+    isFeatured: Boolean(item.isFeatured),
+    attachedReviewId: item.attachedReviewId,
+    attachedVideoReviewId: item.attachedVideoReviewId,
+    customTitleOverride: item.customTitleOverride?.slice(0, 120),
+    mediaOverrideUrl: item.mediaOverrideUrl,
+    createdAt: typeof item.createdAt === "string" ? item.createdAt : now,
+    updatedAt: now
+  })).filter((item) => item.placeId);
+
+  const deduped: GuidePlaceItem[] = [];
+  const seen = new Set<string>();
+  for (const item of next.sort((a, b) => a.sortOrder - b.sortOrder)) {
+    const dedupeKey = `${item.placeId}:${item.dayIndex ?? "x"}:${item.timeBlock ?? "x"}`;
+    if (!item.dayIndex && !item.timeBlock && seen.has(item.placeId)) continue;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(item.placeId);
+    seen.add(dedupeKey);
+    deduped.push({ ...item, sortOrder: deduped.length });
+  }
+  return deduped;
+}
+
+function normalizeGuideSections(guideId: string, sections: Array<Partial<GuideSection>> | undefined): GuideSection[] {
+  return (sections ?? []).slice(0, 20).map((section, index) => ({
+    id: typeof section.id === "string" && section.id ? section.id : `gs_${randomUUID()}`,
+    guideId,
+    title: String(section.title ?? "Section").trim().slice(0, 120),
+    description: section.description?.slice(0, 400),
+    sortOrder: typeof section.sortOrder === "number" ? section.sortOrder : index,
+    sectionType: section.sectionType
+  })).sort((a, b) => a.sortOrder - b.sortOrder).map((section, index) => ({ ...section, sortOrder: index }));
 }
 
 export class CreatorService {
@@ -249,7 +300,7 @@ export class CreatorService {
               avatarUrl: profileMap.get(guide.creatorProfileId)?.avatarUrl,
               isFollowing: true
             },
-            placeId: guide.placeIds[0],
+            placeId: guide.placeItems[0]?.placeId,
             title: guide.title,
             summary: guide.summary,
             media: guide.coverUrl ? { thumbnailUrl: guide.coverUrl, url: guide.coverUrl, mediaType: "photo" } : undefined,
@@ -343,7 +394,7 @@ export class CreatorService {
       .listProfiles()
       .filter((profile) => profile.isPublic && profile.status === CreatorProfileStatus.ACTIVE)
       .flatMap((profile) => this.store.listGuidesByCreator(profile.id).map((guide) => ({ profile, guide })))
-      .filter((row) => row.guide.status === "published" && row.guide.visibility === "public" && row.guide.placeIds.includes(placeId))
+      .filter((row) => row.guide.status === "published" && row.guide.visibility === "public" && row.guide.moderationStatus === "approved" && row.guide.placeItems.some((item) => item.placeId === placeId))
       .map(({ profile, guide }): CreatorFeedItem => ({
         feedItemType: "guide",
         contentId: guide.id,
@@ -396,7 +447,7 @@ export class CreatorService {
     const reviews = await this.listPublicReviewsByCreator(profile.id, opts?.reviewSort, opts?.reviewLimit, viewerUserId);
     const guides = this.store
       .listGuidesByCreator(profile.id)
-      .filter((g) => g.status === "published" && g.visibility === "public")
+      .filter((g) => isPublicApprovedGuide(g))
       .sort((a, b) => (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt))
       .slice(0, Math.min(50, opts?.guideLimit ?? 20));
     this.store.incrementProfileView(profile.id, new Date().toISOString().slice(0, 10));
@@ -437,23 +488,44 @@ export class CreatorService {
     return rows;
   }
 
-  createGuide(userId: string, creatorProfileId: string, input: { title: string; summary: string; body: string; coverUrl?: string; tags?: string[]; placeIds?: string[]; status?: "draft" | "published" | "hidden" | "archived" }): CreatorGuide {
+  async createGuide(userId: string, creatorProfileId: string, input: Partial<CreatorGuide> & { title: string; summary: string; body?: string }): Promise<CreatorGuide> {
     const profile = this.ensureOwner(userId, creatorProfileId);
+    await this.ensureCreatorFeature(userId, creatorProfileId, "GUIDES_CREATE");
     const now = new Date().toISOString();
     const status = input.status ?? "draft";
     if (status === "published" && profile.status !== CreatorProfileStatus.ACTIVE) throw new Error("CREATOR_NOT_ACTIVE");
+    const existingCount = this.store.listGuidesByCreator(creatorProfileId).length;
+    if (this.accessEngine) {
+      const quota = await this.accessEngine.checkQuotaAccess({ targetType: SubscriptionTargetType.CREATOR, targetId: creatorProfileId }, QUOTA_KEYS.GUIDES_PER_CREATOR, existingCount + 1);
+      if (!quota.allowed) throw new Error("GUIDE_QUOTA_EXCEEDED");
+    }
+
+    const guideId = `cg_${randomUUID()}`;
+    const placeItems = normalizeGuidePlaceItems(guideId, input.placeItems, now, 100);
+    if (status === "published" && placeItems.length === 0) throw new ValidationError(["published guides must include at least one place"]);
+
+    const slugBase = slugify(input.slug ?? input.title);
     const guide: CreatorGuide = {
-      id: `cg_${randomUUID()}`,
+      id: guideId,
       creatorProfileId,
       title: input.title.trim().slice(0, 140),
-      slug: `${slugify(input.title)}-${randomUUID().slice(0, 6)}`,
+      slug: `${slugBase || "guide"}-${randomUUID().slice(0, 6)}`,
       summary: input.summary.trim().slice(0, 500),
-      body: input.body.trim(),
+      body: (input.body ?? "").trim(),
+      guideType: input.guideType ?? "recommendation",
+      formatType: input.formatType ?? "guide",
       coverUrl: input.coverUrl,
+      heroImageMediaId: input.heroImageMediaId,
+      heroVideoMediaId: input.heroVideoMediaId,
+      city: input.city?.slice(0, 120),
+      region: input.region?.slice(0, 120),
+      estimatedDurationMinutes: input.estimatedDurationMinutes,
+      moderationStatus: status === "published" ? "approved" : (input.moderationStatus ?? "pending"),
       status,
-      visibility: status === "published" ? "public" : "private",
-      tags: (input.tags ?? []).slice(0, 8),
-      placeIds: (input.placeIds ?? []).slice(0, 20),
+      visibility: input.visibility ?? (status === "published" ? "public" : "private"),
+      tags: (input.tags ?? []).slice(0, 10),
+      placeItems,
+      sections: normalizeGuideSections(guideId, input.sections),
       publishedAt: status === "published" ? now : undefined,
       createdAt: now,
       updatedAt: now
@@ -462,22 +534,35 @@ export class CreatorService {
     return guide;
   }
 
-  updateGuide(userId: string, guideId: string, input: Partial<Pick<CreatorGuide, "title" | "summary" | "body" | "coverUrl" | "tags" | "placeIds" | "status">>): CreatorGuide {
+  async updateGuide(userId: string, guideId: string, input: Partial<CreatorGuide>): Promise<CreatorGuide> {
     const existing = this.store.getGuideById(guideId);
     if (!existing) throw new Error("GUIDE_NOT_FOUND");
     this.ensureOwner(userId, existing.creatorProfileId);
     const now = new Date().toISOString();
     const nextStatus = input.status ?? existing.status;
+    const placeItems = input.placeItems ? normalizeGuidePlaceItems(existing.id, input.placeItems, now, 100) : existing.placeItems;
+    if (nextStatus === "published" && placeItems.length === 0) throw new ValidationError(["published guides must include at least one place"]);
+
     const guide: CreatorGuide = {
       ...existing,
       title: input.title?.trim().slice(0, 140) ?? existing.title,
+      slug: input.slug ? `${slugify(input.slug)}-${existing.id.slice(-6)}` : existing.slug,
       summary: input.summary?.trim().slice(0, 500) ?? existing.summary,
       body: input.body?.trim() ?? existing.body,
+      guideType: input.guideType ?? existing.guideType,
+      formatType: input.formatType ?? existing.formatType,
       coverUrl: input.coverUrl ?? existing.coverUrl,
-      tags: (input.tags ?? existing.tags).slice(0, 8),
-      placeIds: (input.placeIds ?? existing.placeIds).slice(0, 20),
+      heroImageMediaId: input.heroImageMediaId ?? existing.heroImageMediaId,
+      heroVideoMediaId: input.heroVideoMediaId ?? existing.heroVideoMediaId,
+      city: input.city ?? existing.city,
+      region: input.region ?? existing.region,
+      estimatedDurationMinutes: input.estimatedDurationMinutes ?? existing.estimatedDurationMinutes,
+      moderationStatus: input.moderationStatus ?? existing.moderationStatus,
+      tags: (input.tags ?? existing.tags).slice(0, 10),
+      sections: input.sections ? normalizeGuideSections(existing.id, input.sections) : existing.sections,
+      placeItems,
       status: nextStatus,
-      visibility: nextStatus === "published" ? "public" : "private",
+      visibility: input.visibility ?? (nextStatus === "published" ? "public" : "private"),
       publishedAt: nextStatus === "published" ? existing.publishedAt ?? now : undefined,
       updatedAt: now
     };
@@ -485,12 +570,40 @@ export class CreatorService {
     return guide;
   }
 
+  async searchGuides(input?: { query?: string; city?: string; guideType?: CreatorGuide["guideType"]; limit?: number; cursor?: string }): Promise<{ items: CreatorGuide[]; nextCursor?: string }> {
+    const limit = Math.max(1, Math.min(input?.limit ?? 20, 50));
+    const query = String(input?.query ?? "").trim().toLowerCase();
+    const all = this.store.listProfiles()
+      .flatMap((profile) => this.store.listGuidesByCreator(profile.id))
+      .filter((guide) => isPublicApprovedGuide(guide))
+      .filter((guide) => !input?.city || guide.city?.toLowerCase() === input.city.toLowerCase())
+      .filter((guide) => !input?.guideType || guide.guideType === input.guideType)
+      .filter((guide) => {
+        if (!query) return true;
+        return guide.title.toLowerCase().includes(query)
+          || guide.summary.toLowerCase().includes(query)
+          || guide.body.toLowerCase().includes(query)
+          || guide.tags.some((tag) => tag.toLowerCase().includes(query))
+          || guide.placeItems.some((item) => item.placeId.toLowerCase().includes(query));
+      })
+      .sort((a, b) => (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt));
+
+    const cursor = decodeFeedCursor(input?.cursor);
+    const startIndex = cursor ? all.findIndex((g) => (g.publishedAt ?? g.createdAt) === cursor.surfacedAt && g.id === cursor.key) + 1 : 0;
+    const page = all.slice(Math.max(0, startIndex), Math.max(0, startIndex) + limit);
+    const tail = page.at(-1);
+    return {
+      items: page,
+      nextCursor: tail ? encodeFeedCursor({ surfacedAt: tail.publishedAt ?? tail.createdAt, key: tail.id }) : undefined
+    };
+  }
+
   getGuideBySlug(slug: string, guideSlug: string, viewerUserId?: string): CreatorGuide {
     const profile = this.store.getProfileBySlug(slug);
     if (!profile) throw new Error("CREATOR_NOT_FOUND");
     const guide = this.store.getGuideBySlug(profile.id, guideSlug);
     if (!guide) throw new Error("GUIDE_NOT_FOUND");
-    if (!(guide.status === "published" && guide.visibility === "public") && viewerUserId !== profile.userId) {
+    if (!isPublicApprovedGuide(guide) && viewerUserId !== profile.userId) {
       throw new Error("GUIDE_NOT_FOUND");
     }
     this.store.incrementGuideView(guide.id, profile.id, new Date().toISOString().slice(0, 10));
@@ -510,7 +623,7 @@ export class CreatorService {
     return {
       totalFollowers: this.store.countFollowers(profile.id),
       totalPublicReviews: profile.publicReviewsCount,
-      totalPublicGuides: guides.filter((g) => g.status === "published" && g.visibility === "public").length,
+      totalPublicGuides: guides.filter((g) => isPublicApprovedGuide(g)).length,
       profileViews,
       guideViews,
       topGuides,

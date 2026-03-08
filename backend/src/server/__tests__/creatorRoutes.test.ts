@@ -45,7 +45,7 @@ describe("creator profile routes", () => {
     const guideRes = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creator.profile.id)}/guides`, {
       method: "POST",
       headers: creatorHeaders,
-      body: JSON.stringify({ title: "Best Tacos", summary: "Austin picks", body: "- spot1", status: "published" })
+      body: JSON.stringify({ title: "Best Tacos", summary: "Austin picks", body: "- spot1", status: "published", city: "Austin", formatType: "collection", guideType: "city", placeItems: [{ placeId: "p-austin-1", creatorNote: "Order al pastor" }] })
     });
     expect(guideRes.status).toBe(201);
     const guide = await guideRes.json() as { guide: { slug: string; id: string } };
@@ -129,7 +129,7 @@ describe("creator profile routes", () => {
     const guideRes = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfile.creatorProfile.id)}/guides`, {
       method: "POST",
       headers: creatorHeaders,
-      body: JSON.stringify({ title: "Top pizza", summary: "Great spots", body: "Try these", placeIds: ["p-feed"], status: "published" })
+      body: JSON.stringify({ title: "Top pizza", summary: "Great spots", body: "Try these", status: "published", placeItems: [{ placeId: "p-feed", creatorNote: "must try" }] })
     });
     expect(guideRes.status).toBe(201);
 
@@ -180,6 +180,12 @@ describe("creator profile routes", () => {
       items: expect.arrayContaining([
         expect.objectContaining({ creatorProfileId: creatorProfile.creatorProfile.id, placeId: "p-feed" })
       ])
+    });
+
+    const searchGuides = await fetch(`${baseUrl}/v1/guides/search?q=pizza`, { headers: viewerHeaders });
+    expect(searchGuides.status).toBe(200);
+    await expect(searchGuides.json()).resolves.toMatchObject({
+      items: [expect.objectContaining({ title: "Top pizza" })]
     });
 
     const unfollowRes = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfile.creatorProfile.id)}/follow`, {
