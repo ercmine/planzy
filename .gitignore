@@ -7,6 +7,8 @@ web/dist/
 
 # Environment files
 .env
+.env.*
+!.env.example
 *.env.local
 web/.env
 
