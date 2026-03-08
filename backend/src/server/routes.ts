@@ -289,7 +289,12 @@ export function createRoutes(
         const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
         const fileName = String(payload.fileName ?? "upload").trim();
         const mimeType = String(payload.mimeType ?? "").trim().toLowerCase();
-        const base64Data = String(payload.base64Data ?? "").trim();
+        const base64Data = payload.base64Data == null ? undefined : String(payload.base64Data).trim();
+        const mediaType = String(payload.mediaType ?? (mimeType.startsWith("video/") ? "video" : "photo")).trim() as "photo" | "video";
+        const fileSizeBytes = payload.fileSizeBytes == null ? undefined : Number(payload.fileSizeBytes);
+        const durationMs = payload.durationMs == null ? undefined : Number(payload.durationMs);
+        const width = payload.width == null ? undefined : Number(payload.width);
+        const height = payload.height == null ? undefined : Number(payload.height);
 
         if (deps?.accessEngine && deps?.subscriptionService) {
           const actor = deps?.accountsService
@@ -301,15 +306,35 @@ export function createRoutes(
           const target = { targetId: resolvedTarget.accountId, targetType: resolvedTarget.accountType as never };
           deps.subscriptionService.ensureAccount(target.targetId, target.targetType);
 
-          const canUpload = await deps.accessEngine.checkFeatureAccess(target, FEATURE_KEYS.UPLOAD_PHOTOS);
+          const canUpload = await deps.accessEngine.checkFeatureAccess(target, mediaType === "video" ? FEATURE_KEYS.UPLOAD_VIDEOS : FEATURE_KEYS.UPLOAD_PHOTOS);
           if (!canUpload.allowed) {
             sendJson(res, 403, { access: canUpload });
             return;
           }
         }
 
-        const upload = await deps.reviewsStore.createMediaUpload({ ownerUserId: userIdHeader, fileName, mimeType, base64Data });
+        const upload = await deps.reviewsStore.createMediaUpload({ ownerUserId: userIdHeader, mediaType, fileName, mimeType, base64Data, fileSizeBytes, durationMs, width, height });
         sendJson(res, 201, { upload });
+        return;
+      }
+
+      const reviewMediaUploadFinalizeMatch = /^\/v1\/reviews\/media\/uploads\/([^/]+)\/finalize$/.exec(normalizedPath);
+      if (reviewMediaUploadFinalizeMatch && req.method === "POST" && deps?.reviewsStore) {
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        const uploadId = decodeURIComponent(reviewMediaUploadFinalizeMatch[1] ?? "");
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const upload = await deps.reviewsStore.finalizeMediaUpload({
+          uploadId,
+          ownerUserId: userIdHeader,
+          fileSizeBytes: payload.fileSizeBytes == null ? undefined : Number(payload.fileSizeBytes),
+          durationMs: payload.durationMs == null ? undefined : Number(payload.durationMs),
+          width: payload.width == null ? undefined : Number(payload.width),
+          height: payload.height == null ? undefined : Number(payload.height),
+          checksum: payload.checksum == null ? undefined : String(payload.checksum)
+        });
+        sendJson(res, 200, { upload });
         return;
       }
 
@@ -456,7 +481,7 @@ export function createRoutes(
             throw new ValidationError(["rating must be between 1 and 5"], "Invalid review payload");
           }
           if (text.length > 1000 || (text.length < 5 && mediaUploadIds.length === 0)) {
-            throw new ValidationError(["text length must be between 5 and 1000 characters unless photos are attached"], "Invalid review payload");
+            throw new ValidationError(["text length must be between 5 and 1000 characters unless media is attached"], "Invalid review payload");
           }
 
           const created = await deps.reviewsStore.createOrReplace({

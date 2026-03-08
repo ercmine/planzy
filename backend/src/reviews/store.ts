@@ -19,8 +19,15 @@ export interface ReviewMedia {
   displayOrder: number;
   isPrimary: boolean;
   moderationState: ModerationState;
+  processingState: "upload_pending" | "uploaded" | "queued" | "processing" | "ready" | "failed";
+  visibilityState: "owner_only" | "public" | "blocked";
   moderationReason?: string;
+  processingErrorCode?: string;
+  processingErrorMessage?: string;
   uploadedByUserId: string;
+  durationMs?: number;
+  playbackUrl?: string;
+  posterUrl?: string;
   variants: {
     thumbnailUrl?: string;
     mediumUrl?: string;
@@ -33,6 +40,7 @@ export interface ReviewMedia {
 
 export interface ReviewMediaUpload {
   id: string;
+  mediaType: ReviewMediaType;
   ownerUserId: string;
   storageProvider: "memory" | "s3" | "gcs";
   storageKey: string;
@@ -41,8 +49,10 @@ export interface ReviewMediaUpload {
   fileSizeBytes: number;
   width: number;
   height: number;
+  durationMs?: number;
   checksum: string;
-  status: "pending" | "attached" | "expired";
+  processingProfile?: "review_video_v1";
+  status: "pending" | "uploaded" | "attached" | "expired";
   createdAt: string;
   expiresAt: string;
   attachedReviewId?: string;
@@ -126,10 +136,25 @@ export interface UpdateReviewInput {
 
 export interface CreateReviewMediaUploadInput {
   ownerUserId: string;
+  mediaType?: ReviewMediaType;
   fileName: string;
   mimeType: string;
-  base64Data: string;
+  base64Data?: string;
+  fileSizeBytes?: number;
+  durationMs?: number;
+  width?: number;
+  height?: number;
   now?: Date;
+}
+
+export interface FinalizeReviewMediaUploadInput {
+  uploadId: string;
+  ownerUserId: string;
+  fileSizeBytes?: number;
+  durationMs?: number;
+  width?: number;
+  height?: number;
+  checksum?: string;
 }
 
 export interface ReviewMediaReport {
@@ -166,6 +191,7 @@ export interface ReviewsStore {
   unvoteHelpful(reviewId: string, userId: string): Promise<PlaceReview>;
   reportReview(reviewId: string, userId: string, reason: string): Promise<void>;
   createMediaUpload(input: CreateReviewMediaUploadInput): Promise<ReviewMediaUpload>;
+  finalizeMediaUpload(input: FinalizeReviewMediaUploadInput): Promise<ReviewMediaUpload>;
   getMediaUpload(uploadId: string): Promise<ReviewMediaUpload | null>;
   reportReviewMedia(mediaId: string, userId: string, reason: string): Promise<void>;
   setReviewMediaModerationState(reviewId: string, mediaId: string, state: ModerationState, reason?: string, now?: Date): Promise<ReviewMedia>;
