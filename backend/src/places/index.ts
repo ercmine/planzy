@@ -6,3 +6,4 @@ export { mergeIntoCanonicalPlace } from "./merge.js";
 export * from "./memoryStore.js";
 export * from "./service.js";
 export { normalizePhone, normalizeUrl } from "./normalization.js";
+export * from "./ingestion.js";
