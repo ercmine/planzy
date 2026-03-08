@@ -26,18 +26,26 @@ class AdSlot {
 
 abstract class DeckItem {
   const DeckItem();
+
+  String get itemKey;
 }
 
 class DeckPlanItem extends DeckItem {
   const DeckPlanItem(this.plan);
 
   final Plan plan;
+
+  @override
+  String get itemKey => 'plan:${plan.id}';
 }
 
 class DeckAdItem extends DeckItem {
   const DeckAdItem(this.slot);
 
   final AdSlot slot;
+
+  @override
+  String get itemKey => 'ad:${slot.slotId}';
 }
 
 class DeckState {
@@ -49,6 +57,7 @@ class DeckState {
     this.plans = const <Plan>[],
     this.items = const <DeckItem>[],
     this.currentIndex = 0,
+    this.currentItemKey,
     this.nextCursor,
     this.hasMore = true,
     this.lastBatchMix,
@@ -74,6 +83,7 @@ class DeckState {
   final List<Plan> plans;
   final List<DeckItem> items;
   final int currentIndex;
+  final String? currentItemKey;
   final String? nextCursor;
   final bool hasMore;
   final DeckSourceMix? lastBatchMix;
@@ -97,6 +107,8 @@ class DeckState {
     List<Plan>? plans,
     List<DeckItem>? items,
     int? currentIndex,
+    String? currentItemKey,
+    bool clearCurrentItemKey = false,
     String? nextCursor,
     bool clearCursor = false,
     bool? hasMore,
@@ -121,6 +133,9 @@ class DeckState {
       plans: plans ?? this.plans,
       items: items ?? this.items,
       currentIndex: currentIndex ?? this.currentIndex,
+      currentItemKey: clearCurrentItemKey
+          ? null
+          : (currentItemKey ?? this.currentItemKey),
       nextCursor: clearCursor ? null : (nextCursor ?? this.nextCursor),
       hasMore: hasMore ?? this.hasMore,
       lastBatchMix: lastBatchMix ?? this.lastBatchMix,
