@@ -40,6 +40,7 @@ import '../models/session.dart';
 import '../repositories/deck_repository.dart';
 import '../repositories/ideas_repository.dart';
 import '../repositories/live_results_repository.dart';
+import '../repositories/reviews_repository.dart';
 import '../repositories/sessions_repository.dart';
 import '../repositories/swipes_repository.dart';
 import '../repositories/telemetry_repository.dart';
@@ -103,6 +104,12 @@ final ideasRepositoryProvider = FutureProvider<IdeasRepository>((ref) async {
 final liveResultsRepositoryProvider = FutureProvider<LiveResultsRepository>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);
   return LiveResultsRepository(apiClient: apiClient);
+});
+
+
+final reviewsRepositoryProvider = FutureProvider<ReviewsRepository>((ref) async {
+  final apiClient = await ref.watch(apiClientProvider.future);
+  return ReviewsRepository(apiClient: apiClient);
 });
 
 final telemetryQueueStoreProvider = FutureProvider<TelemetryQueueStore>((ref) async {

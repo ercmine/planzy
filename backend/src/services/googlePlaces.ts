@@ -1,5 +1,6 @@
 const GOOGLE_PLACES_NEARBY_ENDPOINT = "https://places.googleapis.com/v1/places:searchNearby";
 const GOOGLE_PLACES_TIMEOUT_MS = 8_000;
+const GOOGLE_PLACES_DETAILS_BASE = "https://places.googleapis.com/v1/places";
 
 const GOOGLE_PLACES_FIELD_MASK = [
   "places.id",
@@ -38,6 +39,28 @@ export interface GooglePlace {
   websiteUri?: string;
   photos?: Array<{ name?: string }>;
 }
+
+export interface GooglePlaceDetail extends GooglePlace {
+  nationalPhoneNumber?: string;
+  regularOpeningHours?: { weekdayDescriptions?: string[] };
+  editorialSummary?: { text?: string; languageCode?: string };
+}
+
+const GOOGLE_PLACE_DETAILS_FIELD_MASK = [
+  "id",
+  "displayName",
+  "formattedAddress",
+  "location",
+  "rating",
+  "userRatingCount",
+  "priceLevel",
+  "googleMapsUri",
+  "websiteUri",
+  "nationalPhoneNumber",
+  "regularOpeningHours.weekdayDescriptions",
+  "photos",
+  "editorialSummary"
+].join(",");
 
 export type GooglePlacesErrorCode = "missing_api_key" | "invalid_input" | "upstream_error";
 
@@ -147,6 +170,56 @@ export async function searchNearby(input: SearchNearbyInput): Promise<GooglePlac
       throw new GooglePlacesError("upstream_error", "Google Places API request timed out", 502);
     }
 
+    throw new GooglePlacesError("upstream_error", "Failed to reach Google Places API", 502, {
+      cause: error instanceof Error ? error.message : String(error)
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function fetchPlaceDetail(placeId: string): Promise<GooglePlaceDetail> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    throw new GooglePlacesError("missing_api_key", "GOOGLE_MAPS_API_KEY is not configured", 503);
+  }
+
+  if (!placeId || !/^[a-zA-Z0-9_\-.]+$/.test(placeId)) {
+    throw new GooglePlacesError("invalid_input", "placeId is invalid", 400, { placeId });
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GOOGLE_PLACES_TIMEOUT_MS);
+  const endpointBase = process.env.GOOGLE_PLACES_DETAILS_ENDPOINT_BASE ?? GOOGLE_PLACES_DETAILS_BASE;
+  const endpoint = `${endpointBase}/${encodeURIComponent(placeId)}`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": GOOGLE_PLACE_DETAILS_FIELD_MASK
+      },
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new GooglePlacesError("upstream_error", "Google Place detail request failed", 502, {
+        upstreamStatus: response.status,
+        upstreamBody: errorBody.slice(0, 500)
+      });
+    }
+
+    return (await response.json()) as GooglePlaceDetail;
+  } catch (error) {
+    if (error instanceof GooglePlacesError) {
+      throw error;
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new GooglePlacesError("upstream_error", "Google Place detail request timed out", 502);
+    }
     throw new GooglePlacesError("upstream_error", "Failed to reach Google Places API", 502, {
       cause: error instanceof Error ? error.message : String(error)
     });

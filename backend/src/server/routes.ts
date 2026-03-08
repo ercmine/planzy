@@ -5,11 +5,12 @@ import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import { handleMerchantHttpError, createMerchantHttpHandlers } from "../merchant/http.js";
 import type { MerchantService } from "../merchant/service.js";
 import { ValidationError } from "../plans/errors.js";
-import { categoryToIncludedTypes, GooglePlacesError, searchNearby } from "../services/googlePlaces.js";
+import { categoryToIncludedTypes, fetchPlaceDetail, GooglePlacesError, searchNearby } from "../services/googlePlaces.js";
 import { createTelemetryHttpHandlers } from "../telemetry/http.js";
 import type { TelemetryService } from "../telemetry/telemetryService.js";
-import { createVenueClaimsHttpHandlers, readHeader, sendJson } from "../venues/claims/http.js";
+import { createVenueClaimsHttpHandlers, parseJsonBody, readHeader, sendJson } from "../venues/claims/http.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
+import type { ReviewsStore } from "../reviews/store.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -29,7 +30,7 @@ function assertAdmin(req: IncomingMessage): boolean {
 export function createRoutes(
   service: VenueClaimsService,
   merchantService: MerchantService,
-  deps?: { deckHandler?: SessionDeckHandler; ideasHandlers?: SessionIdeasHandlers; telemetryService?: TelemetryService }
+  deps?: { deckHandler?: SessionDeckHandler; ideasHandlers?: SessionIdeasHandlers; telemetryService?: TelemetryService; reviewsStore?: ReviewsStore }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
   const merchantHandlers = createMerchantHttpHandlers(merchantService);
@@ -107,6 +108,86 @@ export function createRoutes(
 
         sendJson(res, 200, plans);
         return;
+      }
+
+      const placeDetailMatch = /^\/places\/([^/]+)$/.exec(normalizedPath);
+      if (req.method === "GET" && placeDetailMatch) {
+        const placeId = decodeURIComponent(placeDetailMatch[1] ?? "");
+        const place = await fetchPlaceDetail(placeId);
+        const publicApiBaseUrl = process.env.PUBLIC_API_BASE_URL ?? DEFAULT_PUBLIC_API_BASE_URL;
+        const photos = (place.photos ?? [])
+          .map((photo) => ({
+            name: photo.name,
+            url: photo.name
+              ? `${publicApiBaseUrl}/photo?name=${encodeURIComponent(photo.name)}&maxWidthPx=1200`
+              : undefined
+          }))
+          .filter((photo) => Boolean(photo.name));
+
+        sendJson(res, 200, {
+          id: place.id,
+          title: place.displayName?.text,
+          description: place.editorialSummary?.text,
+          address: place.formattedAddress,
+          lat: place.location?.latitude,
+          lng: place.location?.longitude,
+          rating: place.rating,
+          userRatingCount: place.userRatingCount,
+          priceLevel: place.priceLevel,
+          googleMapsUri: place.googleMapsUri,
+          websiteUri: place.websiteUri,
+          phone: place.nationalPhoneNumber,
+          openingHoursText: place.regularOpeningHours?.weekdayDescriptions,
+          photos,
+          photo: photos[0]?.name,
+          photoUrl: photos[0]?.url
+        });
+        return;
+      }
+
+      const reviewsMatch = /^\/places\/([^/]+)\/reviews$/.exec(normalizedPath);
+      if (reviewsMatch && deps?.reviewsStore) {
+        const placeId = decodeURIComponent(reviewsMatch[1] ?? "");
+
+        if (req.method === "GET") {
+          const reviews = await deps.reviewsStore.listByPlace(placeId);
+          sendJson(res, 200, { reviews });
+          return;
+        }
+
+        if (req.method === "POST") {
+          const body = await parseJsonBody(req);
+          if (!body || typeof body !== "object" || Array.isArray(body)) {
+            throw new ValidationError(["body must be a JSON object"], "Invalid review payload");
+          }
+
+          const payload = body as Record<string, unknown>;
+          const rating = Number(payload.rating);
+          const text = String(payload.text ?? "").trim();
+          const anonymous = Boolean(payload.anonymous);
+          const userId = String(readHeader(req, "x-user-id") ?? payload.userId ?? "anonymous-user").trim();
+          const displayNameRaw = String(payload.displayName ?? "").trim();
+          const displayName = anonymous ? "Anonymous" : (displayNameRaw || "Perbug User");
+
+          if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+            throw new ValidationError(["rating must be between 1 and 5"], "Invalid review payload");
+          }
+          if (text.length < 5 || text.length > 1000) {
+            throw new ValidationError(["text length must be between 5 and 1000 characters"], "Invalid review payload");
+          }
+
+          const created = await deps.reviewsStore.create({
+            placeId,
+            userId,
+            displayName,
+            rating: Math.round(rating),
+            text,
+            anonymous
+          });
+
+          sendJson(res, 201, { review: created });
+          return;
+        }
       }
 
       if (req.method === "GET" && normalizedPath === "/live-results") {
@@ -351,7 +432,7 @@ function normalizeAliasPath(pathname: string): string {
     return pathname.slice("/api".length);
   }
 
-  const v1AliasPaths = ["/plans", "/live-results", "/health", "/photo", "/photos", "/photos/media", "/places/photo"];
+  const v1AliasPaths = ["/plans", "/live-results", "/health", "/photo", "/photos", "/photos/media", "/places/photo", "/places"];
   if (pathname.startsWith("/v1/")) {
     const withoutPrefix = pathname.slice("/v1".length);
     if (v1AliasPaths.some((aliasPath) => withoutPrefix === aliasPath || withoutPrefix.startsWith(`${aliasPath}/`))) {

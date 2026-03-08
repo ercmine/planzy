@@ -34,6 +34,23 @@ describe("server diagnostic and alias routes", () => {
         return;
       }
 
+
+      if (req.method === "GET" && reqUrl.pathname === "/v1/places/abc") {
+        res.statusCode = 200;
+        res.setHeader("content-type", "application/json");
+        res.end(
+          JSON.stringify({
+            id: "abc",
+            displayName: { text: "Coffee Place" },
+            editorialSummary: { text: "Great beans and cozy seating." },
+            formattedAddress: "123 Main",
+            location: { latitude: 44.85, longitude: -93.54 },
+            photos: [{ name: "places/abc/photos/def" }, { name: "places/abc/photos/ghi" }]
+          })
+        );
+        return;
+      }
+
       if (req.method === "GET" && reqUrl.pathname === "/v1/places/abc/photos/def/media") {
         res.statusCode = 200;
         res.setHeader("content-type", "image/jpeg");
@@ -57,6 +74,7 @@ describe("server diagnostic and alias routes", () => {
     googleBaseUrl = `http://127.0.0.1:${googleAddress.port}`;
     process.env.GOOGLE_PLACES_NEARBY_ENDPOINT = `${googleBaseUrl}/v1/places:searchNearby`;
     process.env.GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = `${googleBaseUrl}/v1`;
+    process.env.GOOGLE_PLACES_DETAILS_ENDPOINT_BASE = `${googleBaseUrl}/v1/places`;
 
     server = createServer();
     await new Promise<void>((resolve) => {
@@ -74,6 +92,7 @@ describe("server diagnostic and alias routes", () => {
   afterAll(async () => {
     delete process.env.GOOGLE_PLACES_NEARBY_ENDPOINT;
     delete process.env.GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL;
+    delete process.env.GOOGLE_PLACES_DETAILS_ENDPOINT_BASE;
 
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
@@ -150,6 +169,37 @@ describe("server diagnostic and alias routes", () => {
     const v1PlansResponse = await fetch(`${baseUrl}/v1/plans?lat=44.85&lng=-93.54`);
     expect(v1PlansResponse.status).toBe(200);
   });
+
+
+  it("serves place details and per-place reviews", async () => {
+    const detailResponse = await fetch(`${baseUrl}/places/abc`);
+    expect(detailResponse.status).toBe(200);
+    await expect(detailResponse.json()).resolves.toMatchObject({
+      id: "abc",
+      description: "Great beans and cozy seating.",
+      photos: expect.arrayContaining([
+        expect.objectContaining({ name: "places/abc/photos/def" }),
+        expect.objectContaining({ name: "places/abc/photos/ghi" })
+      ])
+    });
+
+    const createResponse = await fetch(`${baseUrl}/places/abc/reviews`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-user-id": "user-1"
+      },
+      body: JSON.stringify({ rating: 5, text: "Loved it", displayName: "Alex", anonymous: false })
+    });
+    expect(createResponse.status).toBe(201);
+
+    const listResponse = await fetch(`${baseUrl}/places/abc/reviews`);
+    expect(listResponse.status).toBe(200);
+    await expect(listResponse.json()).resolves.toMatchObject({
+      reviews: [expect.objectContaining({ rating: 5, text: "Loved it", displayName: "Alex" })]
+    });
+  });
+
 
   it("proxies Google Places photos and returns cache headers", async () => {
     const response = await fetch(`${baseUrl}/photo?name=places/abc/photos/def&maxWidthPx=800&maxHeightPx=800`);

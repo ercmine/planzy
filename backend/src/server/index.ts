@@ -13,6 +13,7 @@ import { CuratedProvider } from "../plans/curated/index.js";
 import { ProviderRouter } from "../plans/router/providerRouter.js";
 import type { ProviderRouter as ProviderRouterType } from "../plans/router/providerRouter.js";
 import { MemoryTelemetryStore } from "../telemetry/memoryStore.js";
+import { MemoryReviewsStore } from "../reviews/memoryStore.js";
 import { TelemetryService } from "../telemetry/telemetryService.js";
 import { VenueClaimsService } from "../venues/claims/claimsService.js";
 import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
@@ -49,6 +50,7 @@ export function createServer(options?: CreateServerOptions) {
   const clickTracker = new ClickTracker(clickStore);
   const telemetryStore = new MemoryTelemetryStore();
   const telemetryService = new TelemetryService(telemetryStore, { clickTracker });
+  const reviewsStore = new MemoryReviewsStore();
 
   const deckHandler = createDeckHandler({
     router: deckRouter,
@@ -61,7 +63,7 @@ export function createServer(options?: CreateServerOptions) {
     logger: options?.logger
   });
 
-  return createHttpServer(service, merchantService, { deckHandler, ideasHandlers, telemetryService });
+  return createHttpServer(service, merchantService, { deckHandler, ideasHandlers, telemetryService, reviewsStore });
 }
 
 export function main(): void {

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -11,6 +12,7 @@ import '../../core/format/formatters.dart';
 import '../../core/json_parsers.dart';
 import '../../core/validation/url.dart';
 import '../../models/deep_links.dart';
+import '../../models/place_review.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
 import 'widgets/category_pill.dart';
@@ -38,12 +40,33 @@ class PlanDetailPage extends ConsumerStatefulWidget {
 class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   late Plan _plan;
   bool _isLoadingDetails = false;
+  String? _detailsError;
+  int _selectedPhotoIndex = 0;
+
+  bool _isLoadingReviews = false;
+  bool _isSubmittingReview = false;
+  String? _reviewsError;
+  List<PlaceReview> _reviews = const <PlaceReview>[];
+
+  final _reviewFormKey = GlobalKey<FormState>();
+  final _reviewTextController = TextEditingController();
+  final _displayNameController = TextEditingController();
+  int _selectedRating = 0;
+  bool _anonymous = false;
 
   @override
   void initState() {
     super.initState();
     _plan = widget.plan;
     _loadDetailsIfNeeded();
+    _loadReviews();
+  }
+
+  @override
+  void dispose() {
+    _reviewTextController.dispose();
+    _displayNameController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDetailsIfNeeded() async {
@@ -57,24 +80,115 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
       return;
     }
 
-    setState(() => _isLoadingDetails = true);
+    if (kDebugMode) {
+      debugPrint('Plan detail load: id=${_plan.id} sourceId=${_plan.sourceId}');
+    }
+
+    setState(() {
+      _isLoadingDetails = true;
+      _detailsError = null;
+    });
+
     try {
-      final detailJson = await apiClient.fetchPlanDetail(_plan.id) ??
-          await apiClient.fetchPlaceDetail(_plan.sourceId);
+      final detailJson = await apiClient.fetchPlanDetail(_plan.id) ?? await apiClient.fetchPlaceDetail(_plan.sourceId);
       if (!mounted || detailJson == null) {
         return;
       }
-      final merged = _mergePlanWithDetails(
-        basePlan: _plan,
-        details: detailJson,
-        apiClient: apiClient,
-      );
-      setState(() => _plan = merged);
-    } catch (_) {
-      // Fall back to existing plan data; page remains usable.
+
+      if (kDebugMode) {
+        debugPrint('Plan detail response keys: ${detailJson.keys.toList()}');
+      }
+
+      final merged = mergePlanWithDetails(basePlan: _plan, details: detailJson, apiClient: apiClient);
+      if (kDebugMode) {
+        debugPrint('Parsed detail descriptionLength=${merged.description?.length ?? 0} photoCount=${merged.photos?.length ?? 0}');
+      }
+
+      setState(() {
+        _plan = merged;
+        _selectedPhotoIndex = 0;
+      });
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Plan detail load failed: $error');
+      }
+      setState(() => _detailsError = 'Could not load extra details.');
     } finally {
       if (mounted) {
         setState(() => _isLoadingDetails = false);
+      }
+    }
+  }
+
+  Future<void> _loadReviews() async {
+    final repo = ref.read(reviewsRepositoryProvider).valueOrNull;
+    if (repo == null) {
+      return;
+    }
+    setState(() {
+      _isLoadingReviews = true;
+      _reviewsError = null;
+    });
+
+    try {
+      final reviews = await repo.fetchForPlace(_plan.sourceId);
+      if (kDebugMode) {
+        debugPrint('Reviews fetch count=${reviews.length} for place=${_plan.sourceId}');
+      }
+      if (!mounted) return;
+      setState(() => _reviews = reviews);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _reviewsError = 'Could not load reviews.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingReviews = false);
+      }
+    }
+  }
+
+  Future<void> _submitReview() async {
+    final formState = _reviewFormKey.currentState;
+    if (formState == null || !formState.validate() || _isSubmittingReview) {
+      return;
+    }
+
+    final repo = ref.read(reviewsRepositoryProvider).valueOrNull;
+    if (repo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reviews service unavailable.')));
+      return;
+    }
+
+    setState(() => _isSubmittingReview = true);
+    final text = _reviewTextController.text.trim();
+    final displayName = _displayNameController.text.trim();
+
+    try {
+      if (kDebugMode) {
+        debugPrint('Review submit payload place=${_plan.sourceId} rating=$_selectedRating textLen=${text.length} anonymous=$_anonymous');
+      }
+      final created = await repo.createReview(
+        placeId: _plan.sourceId,
+        rating: _selectedRating,
+        text: text,
+        displayName: displayName,
+        anonymous: _anonymous,
+      );
+      if (!mounted) return;
+      setState(() {
+        _reviews = [created, ..._reviews];
+        _reviewTextController.clear();
+        _displayNameController.clear();
+        _selectedRating = 0;
+        _anonymous = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review submitted.')));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not submit review.')));
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmittingReview = false);
       }
     }
   }
@@ -85,6 +199,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     final photos = plan.photos ?? const <PlanPhoto>[];
     final address = plan.location.address;
     final distance = _distanceLabel(plan);
+    final description = plan.description?.trim();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Plan details')),
@@ -102,27 +217,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
             ],
           ),
           const SizedBox(height: AppSpacing.m),
-          _buildHeroPhoto(context, photos),
-          if (photos.length > 1) ...[
-            const SizedBox(height: AppSpacing.s),
-            SizedBox(
-              height: 84,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: photos.length,
-                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.s),
-                itemBuilder: (_, index) {
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: AspectRatio(
-                      aspectRatio: 1,
-                      child: _buildNetworkImage(photos[index].url),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+          _buildPhotoGallery(context, photos),
           const SizedBox(height: AppSpacing.m),
           _Section(
             title: 'Details',
@@ -137,8 +232,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                     const Icon(Icons.star, size: 16, color: Colors.amber),
                     if (plan.reviewCount != null) Text(' (${plan.reviewCount})'),
                   ]),
-                if (plan.priceLevel != null)
-                  Text('Price ${formatPriceLevel(plan.priceLevel)}'),
+                if (plan.priceLevel != null) Text('Price ${formatPriceLevel(plan.priceLevel)}'),
                 if (distance != null) Text(distance),
               ],
             ),
@@ -153,11 +247,14 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
           const SizedBox(height: AppSpacing.m),
           _Section(
             title: 'About',
-            child: Text(
-              plan.description?.trim().isNotEmpty == true
-                  ? plan.description!
-                  : 'No description available yet.',
-            ),
+            child: _isLoadingDetails && (description == null || description.isEmpty)
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                    child: LinearProgressIndicator(),
+                  )
+                : Text((description != null && description.isNotEmpty)
+                    ? description
+                    : 'Description is not provided by this place source.'),
           ),
           if (plan.phone?.trim().isNotEmpty == true) ...[
             const SizedBox(height: AppSpacing.m),
@@ -179,6 +276,8 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
             ),
           ],
           const SizedBox(height: AppSpacing.m),
+          _buildReviewsSection(context),
+          const SizedBox(height: AppSpacing.m),
           Wrap(
             spacing: AppSpacing.s,
             runSpacing: AppSpacing.s,
@@ -199,16 +298,16 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
               ),
             ],
           ),
-          if (_isLoadingDetails) ...[
-            const SizedBox(height: AppSpacing.m),
-            const LinearProgressIndicator(),
+          if (_detailsError != null) ...[
+            const SizedBox(height: AppSpacing.s),
+            Text(_detailsError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildHeroPhoto(BuildContext context, List<PlanPhoto> photos) {
+  Widget _buildPhotoGallery(BuildContext context, List<PlanPhoto> photos) {
     if (photos.isEmpty) {
       return Container(
         height: 220,
@@ -220,11 +319,146 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
       );
     }
 
-    return Hero(
-      tag: widget.heroTag ?? 'plan-photo-${_plan.id}',
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SizedBox(height: 220, child: _buildNetworkImage(photos.first.url)),
+    final selected = photos[_selectedPhotoIndex.clamp(0, photos.length - 1)];
+    return Column(
+      children: [
+        Hero(
+          tag: widget.heroTag ?? 'plan-photo-${_plan.id}',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(height: 220, width: double.infinity, child: _buildNetworkImage(selected.url)),
+          ),
+        ),
+        if (photos.length > 1) ...[
+          const SizedBox(height: AppSpacing.s),
+          SizedBox(
+            height: 84,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: photos.length,
+              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.s),
+              itemBuilder: (_, index) {
+                final photo = photos[index];
+                final selected = index == _selectedPhotoIndex;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedPhotoIndex = index),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: selected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: AspectRatio(
+                        aspectRatio: 1,
+                        child: _buildNetworkImage(photo.url),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildReviewsSection(BuildContext context) {
+    final average = _reviews.isEmpty
+        ? null
+        : _reviews.map((review) => review.rating).reduce((a, b) => a + b) / _reviews.length;
+
+    return _Section(
+      title: 'Perbug Limited Reviews',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_isLoadingReviews) const LinearProgressIndicator(),
+          if (_reviewsError != null)
+            Text(_reviewsError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          if (average != null) ...[
+            Text('Average ${average.toStringAsFixed(1)} (${_reviews.length})'),
+            const SizedBox(height: AppSpacing.s),
+          ],
+          if (!_isLoadingReviews && _reviews.isEmpty && _reviewsError == null)
+            const Text('No Perbug Limited reviews yet. Be the first to review.'),
+          ..._reviews.map(
+            (review) => Card(
+              margin: const EdgeInsets.only(bottom: AppSpacing.s),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.s),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${review.displayName} • ${review.rating}/5'),
+                    const SizedBox(height: 4),
+                    Text(review.text),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatReviewDate(review.createdAt),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s),
+          Form(
+            key: _reviewFormKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<int>(
+                  value: _selectedRating == 0 ? null : _selectedRating,
+                  decoration: const InputDecoration(labelText: 'Rating'),
+                  items: List.generate(
+                    5,
+                    (index) => DropdownMenuItem<int>(value: index + 1, child: Text('${index + 1}')),
+                  ),
+                  onChanged: (value) => setState(() => _selectedRating = value ?? 0),
+                  validator: (value) => value == null ? 'Rating is required' : null,
+                ),
+                const SizedBox(height: AppSpacing.s),
+                TextFormField(
+                  controller: _displayNameController,
+                  decoration: const InputDecoration(labelText: 'Display name (optional)'),
+                  enabled: !_anonymous,
+                ),
+                const SizedBox(height: AppSpacing.s),
+                SwitchListTile(
+                  title: const Text('Post as anonymous'),
+                  value: _anonymous,
+                  onChanged: (value) => setState(() => _anonymous = value),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                TextFormField(
+                  controller: _reviewTextController,
+                  decoration: const InputDecoration(labelText: 'Write your review'),
+                  maxLines: 3,
+                  validator: (value) {
+                    final text = value?.trim() ?? '';
+                    if (text.isEmpty) return 'Review text is required';
+                    if (text.length < 5) return 'Review must be at least 5 characters';
+                    if (text.length > 1000) return 'Review must be less than 1000 characters';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppSpacing.s),
+                FilledButton(
+                  onPressed: _isSubmittingReview ? null : _submitReview,
+                  child: _isSubmittingReview
+                      ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Submit review'),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -264,6 +498,13 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     }
     final meters = _haversineMeters(fromLat, fromLng, plan.location.lat, plan.location.lng);
     return formatDistanceMeters(meters);
+  }
+
+  String _formatReviewDate(DateTime date) {
+    final local = date.toLocal();
+    final mm = local.month.toString().padLeft(2, '0');
+    final dd = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$mm-$dd';
   }
 
   Future<void> _openMaps(BuildContext context, Plan plan) async {
@@ -314,7 +555,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   }
 }
 
-Plan _mergePlanWithDetails({
+Plan mergePlanWithDetails({
   required Plan basePlan,
   required Map<String, dynamic> details,
   required ApiClient apiClient,
@@ -328,8 +569,10 @@ Plan _mergePlanWithDetails({
   final mapsLink = details['googleMapsUri']?.toString() ?? basePlan.deepLinks?.mapsLink;
   final websiteLink = details['websiteUri']?.toString() ?? basePlan.deepLinks?.websiteLink;
 
+  final description = pickDetailDescription(details) ?? basePlan.description;
+
   return basePlan.copyWith(
-    description: details['description']?.toString() ?? basePlan.description,
+    description: description,
     location: PlanLocation(
       lat: detailLat ?? basePlan.location.lat,
       lng: detailLng ?? basePlan.location.lng,
@@ -340,13 +583,32 @@ Plan _mergePlanWithDetails({
     priceLevel: parseInt(details['priceLevel']) ?? basePlan.priceLevel,
     phone: details['phone']?.toString() ?? basePlan.phone,
     openingHoursText:
-        parseOpeningHoursText(details['openingHoursText'] ?? details['openingHours']) ??
-            basePlan.openingHoursText,
+        parseOpeningHoursText(details['openingHoursText'] ?? details['openingHours']) ?? basePlan.openingHoursText,
     photos: mergedPhotos,
     deepLinks: (mapsLink?.isNotEmpty == true || websiteLink?.isNotEmpty == true)
         ? DeepLinks(mapsLink: mapsLink, websiteLink: websiteLink)
         : basePlan.deepLinks,
   );
+}
+
+String? pickDetailDescription(Map<String, dynamic> details) {
+  final candidates = [
+    details['description'],
+    details['editorialSummary'],
+    details['editorialSummary'] is Map<String, dynamic>
+        ? (details['editorialSummary'] as Map<String, dynamic>)['text']
+        : null,
+    details['summary'],
+    details['about'],
+  ];
+
+  for (final candidate in candidates) {
+    final value = candidate?.toString().trim();
+    if (value != null && value.isNotEmpty) {
+      return value;
+    }
+  }
+  return null;
 }
 
 List<PlanPhoto>? _photosFromDetail({
