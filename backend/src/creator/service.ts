@@ -9,6 +9,7 @@ import { FEATURE_KEYS, QUOTA_KEYS, type FeatureQuotaEngine } from "../subscripti
 import type { SubscriptionService } from "../subscriptions/service.js";
 import { SubscriptionTargetType } from "../subscriptions/types.js";
 import type { CreatorStore } from "./store.js";
+import type { CreatorVerificationService } from "../creatorVerification/service.js";
 import type { CreatorAnalyticsSummary, CreatorFeedItem, CreatorFeedItemType, CreatorFeedResult, CreatorGuide, CreatorPlaceContentResult, FollowedCreatorSummary, GuidePlaceItem, GuideSection, PublicCreatorProfileView } from "./types.js";
 
 const RESERVED_SLUGS = new Set(["admin", "api", "creator", "creators", "settings", "support"]);
@@ -139,7 +140,8 @@ export class CreatorService {
     private readonly reviews: ReviewsStore,
     private readonly subscriptions?: SubscriptionService,
     private readonly accessEngine?: FeatureQuotaEngine,
-    private readonly monetizationGate?: GuideMonetizationGate
+    private readonly monetizationGate?: GuideMonetizationGate,
+    private readonly verificationService?: CreatorVerificationService
   ) {}
 
   private async ensureCreatorFeature(userId: string, profileId: string, feature: keyof typeof FEATURE_KEYS): Promise<void> {
@@ -276,7 +278,8 @@ export class CreatorService {
                 slug: profileMap.get(review.authorProfileId)?.slug ?? "",
                 displayName: review.author.displayName,
                 avatarUrl: review.author.avatarUrl,
-                isFollowing: true
+                isFollowing: true,
+                verification: this.verificationService?.getPublicBadgeForCreator(review.authorProfileId) ?? { isVerified: false }
               },
               placeId: review.placeId,
               summary: review.text.slice(0, 280),
@@ -304,7 +307,8 @@ export class CreatorService {
               slug: profileMap.get(guide.creatorProfileId)?.slug ?? "",
               displayName: profileMap.get(guide.creatorProfileId)?.displayName ?? "Creator",
               avatarUrl: profileMap.get(guide.creatorProfileId)?.avatarUrl,
-              isFollowing: true
+              isFollowing: true,
+              verification: this.verificationService?.getPublicBadgeForCreator(guide.creatorProfileId) ?? { isVerified: false }
             },
             placeId: guide.placeItems[0]?.placeId,
             title: guide.title,
@@ -382,7 +386,8 @@ export class CreatorService {
             slug: profile?.slug ?? "",
             displayName: review.author.displayName,
             avatarUrl: review.author.avatarUrl,
-            isFollowing: viewerUserId ? Boolean(this.store.getFollow(review.authorProfileId, viewerUserId)) : false
+            isFollowing: viewerUserId ? Boolean(this.store.getFollow(review.authorProfileId, viewerUserId)) : false,
+            verification: this.verificationService?.getPublicBadgeForCreator(review.authorProfileId) ?? { isVerified: false }
           },
           placeId: review.placeId,
           summary: review.text.slice(0, 280),
@@ -410,7 +415,8 @@ export class CreatorService {
           slug: profile.slug,
           displayName: profile.displayName,
           avatarUrl: profile.avatarUrl,
-          isFollowing: viewerUserId ? Boolean(this.store.getFollow(profile.id, viewerUserId)) : false
+          isFollowing: viewerUserId ? Boolean(this.store.getFollow(profile.id, viewerUserId)) : false,
+          verification: this.verificationService?.getPublicBadgeForCreator(profile.id) ?? { isVerified: false }
         },
         placeId,
         title: guide.title,
@@ -475,6 +481,7 @@ export class CreatorService {
       publicReviewsCount: reviews.length,
       publicGuidesCount: guides.length,
       badges: profile.badges,
+      verification: this.verificationService?.getPublicBadgeForCreator(profile.id) ?? { isVerified: false },
       status: profile.status,
       isFollowing: viewerUserId ? Boolean(this.store.getFollow(profile.id, viewerUserId)) : false,
       reviews,

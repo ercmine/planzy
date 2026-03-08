@@ -251,4 +251,82 @@ describe("creator profile routes", () => {
     expect(analyticsDenied.status).toBe(200);
   });
 
+  it("supports creator verification lifecycle and admin moderation", async () => {
+    const creatorHeaders = { "x-user-id": "creator-verify-1", "content-type": "application/json" };
+    await fetch(`${baseUrl}/v1/profiles/creator`, { method: "POST", headers: creatorHeaders, body: JSON.stringify({ creatorName: "Verify Me" }) });
+    await fetch(`${baseUrl}/v1/creator/profiles`, { method: "POST", headers: creatorHeaders, body: JSON.stringify({ displayName: "Verify Me", slug: "verify-me", bio: "bio", handle: "verifyme" }) });
+    const identity = await fetch(`${baseUrl}/v1/identity`, { headers: { "x-user-id": "creator-verify-1" } });
+    const payload = await identity.json() as { creatorProfile?: { id: string } };
+    const creatorProfileId = payload.creatorProfile?.id ?? "";
+
+    await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfileId)}`, {
+      method: "PATCH",
+      headers: creatorHeaders,
+      body: JSON.stringify({ avatarUrl: "https://img.test/avatar.png", socialLinks: [{ platform: "instagram", url: "https://www.instagram.com/verify-me" }] })
+    });
+
+    await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfileId)}/guides`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ title: "Guide one", summary: "s", status: "published", placeItems: [{ placeId: "p-verify" }] })
+    });
+    await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfileId)}/guides`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ title: "Guide two", summary: "s", status: "published", placeItems: [{ placeId: "p-verify-2" }] })
+    });
+
+    const eligibility = await fetch(`${baseUrl}/v1/creator/verification/eligibility`, { headers: { "x-user-id": "creator-verify-1" } });
+    expect(eligibility.status).toBe(200);
+    await expect(eligibility.json()).resolves.toMatchObject({ eligible: true });
+
+    const draft = await fetch(`${baseUrl}/v1/creator/verification/draft`, {
+      method: "PUT",
+      headers: creatorHeaders,
+      body: JSON.stringify({ reason: "I am a local creator", niche: "food", portfolioLinks: ["https://portfolio.test"], socialLinks: ["https://instagram.com/verifyme"] })
+    });
+    expect(draft.status).toBe(200);
+
+    const submittedRes = await fetch(`${baseUrl}/v1/creator/verification/submit`, { method: "POST", headers: { "x-user-id": "creator-verify-1" } });
+    expect(submittedRes.status).toBe(200);
+    const submitted = await submittedRes.json() as { application: { id: string; status: string } };
+    expect(submitted.application.status).toBe("submitted");
+
+    const adminHeaders = { "x-user-id": "admin-reviewer", "x-admin-key": "test-admin", "content-type": "application/json" };
+    const list = await fetch(`${baseUrl}/v1/admin/creator/verification/applications?status=submitted`, { headers: adminHeaders });
+    expect(list.status).toBe(200);
+
+    const nonAdmin = await fetch(`${baseUrl}/v1/admin/creator/verification/applications`, { headers: { "x-user-id": "not-admin" } });
+    expect(nonAdmin.status).toBe(403);
+
+    const underReview = await fetch(`${baseUrl}/v1/admin/creator/verification/applications/${encodeURIComponent(submitted.application.id)}/under-review`, {
+      method: "POST",
+      headers: adminHeaders,
+      body: JSON.stringify({ note: "reviewing" })
+    });
+    expect(underReview.status).toBe(200);
+
+    const approve = await fetch(`${baseUrl}/v1/admin/creator/verification/applications/${encodeURIComponent(submitted.application.id)}/approve`, {
+      method: "POST",
+      headers: adminHeaders,
+      body: JSON.stringify({ note: "approved" })
+    });
+    expect(approve.status).toBe(200);
+
+    const publicProfile = await fetch(`${baseUrl}/v1/creators/verify-me`);
+    expect(publicProfile.status).toBe(200);
+    await expect(publicProfile.json()).resolves.toMatchObject({ profile: { verification: { isVerified: true, badgeType: "verified_creator" } } });
+
+    const revoke = await fetch(`${baseUrl}/v1/admin/creator/verification/profiles/${encodeURIComponent(creatorProfileId)}/revoke`, {
+      method: "POST",
+      headers: adminHeaders,
+      body: JSON.stringify({ reasonCode: "policy_violation", publicMessage: "revoked" })
+    });
+    expect(revoke.status).toBe(200);
+
+    const statusAfter = await fetch(`${baseUrl}/v1/creator/verification/status`, { headers: { "x-user-id": "creator-verify-1" } });
+    expect(statusAfter.status).toBe(200);
+    await expect(statusAfter.json()).resolves.toMatchObject({ status: "revoked", badge: { isVerified: false } });
+  });
+
 });
