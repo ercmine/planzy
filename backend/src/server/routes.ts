@@ -12,6 +12,8 @@ import { ValidationError } from "../plans/errors.js";
 import { createSubscriptionHttpHandlers } from "../subscriptions/http.js";
 import type { EntitlementPolicyService } from "../subscriptions/policy.js";
 import type { SubscriptionService } from "../subscriptions/service.js";
+import { SubscriptionTargetType } from "../subscriptions/types.js";
+import { FEATURE_KEYS, FeatureQuotaEngine, QUOTA_KEYS, type PremiumContentDescriptor } from "../subscriptions/accessEngine.js";
 import {
   buildCategorySearchPlan,
   getCategoryDefinition,
@@ -27,6 +29,13 @@ import type { ReviewsStore } from "../reviews/store.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
+
+const PREMIUM_CONTENT: Record<string, PremiumContentDescriptor> = {
+  "article-free-city-guide": { contentId: "article-free-city-guide", visibility: "free" },
+  "article-premium-hidden-gems": { contentId: "article-premium-hidden-gems", visibility: "premium" },
+  "creator-growth-playbook": { contentId: "creator-growth-playbook", visibility: "creator_only" },
+  "business-ads-template-pack": { contentId: "business-ads-template-pack", visibility: "business_only" }
+};
 
 export function applyCors(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -50,6 +59,7 @@ export function createRoutes(
     reviewsStore?: ReviewsStore;
     subscriptionService?: SubscriptionService;
     entitlementPolicy?: EntitlementPolicyService;
+    accessEngine?: FeatureQuotaEngine;
     accountsService?: AccountsService;
   }
 ) {
@@ -242,7 +252,60 @@ export function createRoutes(
             );
           }
 
-          if (deps?.entitlementPolicy && deps?.subscriptionService) {
+          const body = await parseJsonBody(req);
+          if (!body || typeof body !== "object" || Array.isArray(body)) {
+            throw new ValidationError(["body must be a JSON object"], "Invalid review payload");
+          }
+
+          const payload = body as Record<string, unknown>;
+          const videoPayload = payload.video && typeof payload.video === "object" ? payload.video as Record<string, unknown> : undefined;
+
+          if (deps?.accessEngine && deps?.subscriptionService) {
+            const resolvedTarget = deps?.accountsService
+              ? deps.accountsService.resolveSubscriptionTarget(actor)
+              : { accountId: userIdHeader, accountType: "USER" };
+            const target = { targetId: resolvedTarget.accountId, targetType: resolvedTarget.accountType as never };
+            deps.subscriptionService.ensureAccount(target.targetId, target.targetType);
+
+            const featureDecision = await deps.accessEngine.checkFeatureAccess(target, FEATURE_KEYS.REVIEWS_WRITE);
+            if (!featureDecision.allowed) {
+              sendJson(res, 403, { access: featureDecision });
+              return;
+            }
+
+            const dailyQuota = await deps.accessEngine.checkQuotaAccess(target, QUOTA_KEYS.REVIEWS_WRITE_PER_DAY, 1);
+            if (!dailyQuota.allowed) {
+              sendJson(res, 403, { error: "USAGE_LIMIT_REACHED", access: dailyQuota });
+              return;
+            }
+
+            const monthlyQuota = await deps.accessEngine.checkQuotaAccess(target, QUOTA_KEYS.REVIEWS_WRITE_PER_MONTH, 1);
+            if (!monthlyQuota.allowed) {
+              sendJson(res, 403, { error: "USAGE_LIMIT_REACHED", access: monthlyQuota });
+              return;
+            }
+
+            if (videoPayload) {
+              const reviewVideoDecision = await deps.accessEngine.checkFeatureAccess(target, FEATURE_KEYS.REVIEWS_VIDEO_WRITE);
+              if (!reviewVideoDecision.allowed) {
+                sendJson(res, 403, { access: { ...reviewVideoDecision, denialReason: "review_privilege_required" } });
+                return;
+              }
+
+              const durationSeconds = Number(videoPayload.durationSeconds ?? 0);
+              const sizeMb = Number(videoPayload.sizeMb ?? 0);
+              const durationQuota = await deps.accessEngine.checkQuotaAccess(target, QUOTA_KEYS.UPLOAD_VIDEO_DURATION_SECONDS, durationSeconds || 0);
+              if (!durationQuota.allowed) {
+                sendJson(res, 403, { error: "USAGE_LIMIT_REACHED", access: { ...durationQuota, denialReason: "video_limit_reached", submittedDurationSeconds: durationSeconds } });
+                return;
+              }
+              const sizeQuota = await deps.accessEngine.checkQuotaAccess(target, QUOTA_KEYS.UPLOAD_VIDEO_SIZE_MB, sizeMb || 0);
+              if (!sizeQuota.allowed) {
+                sendJson(res, 403, { error: "USAGE_LIMIT_REACHED", access: { ...sizeQuota, denialReason: "video_limit_reached", submittedSizeMb: sizeMb } });
+                return;
+              }
+            }
+          } else if (deps?.entitlementPolicy && deps?.subscriptionService) {
             let subscriptionAccountId = userIdHeader;
             let subscriptionAccountType: string = "USER";
             if (deps?.accountsService) {
@@ -250,18 +313,10 @@ export function createRoutes(
               subscriptionAccountId = target.accountId;
               subscriptionAccountType = target.accountType;
             }
-
             deps.subscriptionService.ensureAccount(subscriptionAccountId, subscriptionAccountType as never);
             const decision = await deps.entitlementPolicy.can(subscriptionAccountId, "create_review");
             if (!decision.allowed) {
               sendJson(res, 403, { error: decision.reasonCode, message: decision.message, requiredPlan: decision.requiredPlan });
-              return;
-            }
-
-            const resolved = deps.subscriptionService.getCurrentEntitlements(subscriptionAccountId).values;
-            const quotaDecision = await deps.entitlementPolicy.checkQuota(subscriptionAccountId, "text_reviews", Number(resolved.max_text_reviews_per_month));
-            if (!quotaDecision.allowed) {
-              sendJson(res, 403, { error: quotaDecision.reasonCode, message: quotaDecision.message, usage: quotaDecision.usage, limit: quotaDecision.limit });
               return;
             }
           }
@@ -273,13 +328,6 @@ export function createRoutes(
               return;
             }
           }
-
-          const body = await parseJsonBody(req);
-          if (!body || typeof body !== "object" || Array.isArray(body)) {
-            throw new ValidationError(["body must be a JSON object"], "Invalid review payload");
-          }
-
-          const payload = body as Record<string, unknown>;
           const rating = Number(payload.rating);
           const text = String(payload.text ?? "").trim();
           const anonymous = Boolean(payload.anonymous);
@@ -305,7 +353,18 @@ export function createRoutes(
             anonymous
           });
 
-          if (subscriptionHandlers) {
+          if (deps?.accessEngine && deps?.subscriptionService) {
+            const resolvedTarget = deps?.accountsService
+              ? deps.accountsService.resolveSubscriptionTarget(actor)
+              : { accountId: userIdHeader, accountType: "USER" };
+            const target = { targetId: resolvedTarget.accountId, targetType: resolvedTarget.accountType as never };
+            await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.REVIEWS_WRITE_PER_DAY, 1);
+            await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.REVIEWS_WRITE_PER_MONTH, 1);
+            if (videoPayload) {
+              await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.REVIEWS_VIDEO_PER_MONTH, 1);
+              await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.UPLOAD_VIDEOS_PER_MONTH, 1);
+            }
+          } else if (subscriptionHandlers) {
             const usageAccountId = deps?.accountsService ? deps.accountsService.resolveSubscriptionTarget(actor).accountId : userId;
             await subscriptionHandlers.recordReviewUsage(usageAccountId);
           }
@@ -313,6 +372,71 @@ export function createRoutes(
           sendJson(res, 201, { review: created });
           return;
         }
+      }
+
+      if (deps?.accessEngine && req.method === "POST" && normalizedPath === "/v1/ai/place-summary") {
+        const userId = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userId) throw new ValidationError(["x-user-id header is required"]);
+        const accountType = deps?.accountsService
+          ? deps.accountsService.resolveSubscriptionTarget({ userId, profileType: ProfileType.PERSONAL, profileId: userId, roles: [] }).accountType as never
+          : "USER" as never;
+        const target = { targetType: accountType, targetId: userId };
+        const feature = await deps.accessEngine.checkFeatureAccess(target, FEATURE_KEYS.AI_PLACE_SUMMARY);
+        if (!feature.allowed) {
+          sendJson(res, 403, { access: { ...feature, denialReason: "not_in_plan" } });
+          return;
+        }
+        const daily = await deps.accessEngine.checkAndConsumeQuota(target, QUOTA_KEYS.AI_REQUESTS_PER_DAY, 1);
+        if (!daily.allowed) {
+          sendJson(res, 403, { access: daily });
+          return;
+        }
+        const monthly = await deps.accessEngine.checkAndConsumeQuota(target, QUOTA_KEYS.AI_REQUESTS_PER_MONTH, 1);
+        if (!monthly.allowed) {
+          sendJson(res, 403, { access: monthly });
+          return;
+        }
+        sendJson(res, 200, {
+          summary: "AI place summary is currently mocked in backend route integration.",
+          usage: { daily, monthly }
+        });
+        return;
+      }
+
+      const premiumContentMatch = /^\/v1\/content\/([^/]+)$/.exec(normalizedPath);
+      if (deps?.accessEngine && req.method === "GET" && premiumContentMatch) {
+        const userId = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userId) throw new ValidationError(["x-user-id header is required"]);
+        const contentId = decodeURIComponent(premiumContentMatch[1] ?? "");
+        const descriptor = PREMIUM_CONTENT[contentId];
+        if (!descriptor) {
+          sendJson(res, 404, { error: "content_not_found" });
+          return;
+        }
+
+        const target = { targetType: SubscriptionTargetType.USER, targetId: userId };
+        const decision = await deps.accessEngine.checkPremiumContentAccess(target, descriptor);
+        if (!decision.allowed) {
+          sendJson(res, 403, { access: decision });
+          return;
+        }
+
+        await deps.accessEngine.consumeQuota(target, QUOTA_KEYS.CONTENT_PREMIUM_VIEWS_PER_MONTH, 1);
+        sendJson(res, 200, {
+          content: { id: descriptor.contentId, visibility: descriptor.visibility, body: "Premium content payload placeholder" },
+          access: decision
+        });
+        return;
+      }
+
+      if (deps?.accessEngine && req.method === "GET" && normalizedPath === "/v1/access/summary") {
+        const userId = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userId) throw new ValidationError(["x-user-id header is required"]);
+        const target = { targetType: SubscriptionTargetType.USER, targetId: userId };
+        const features = await deps.accessEngine.getFeatureAccessSummary(target);
+        const quotas = await deps.accessEngine.getQuotaSummary(target);
+        sendJson(res, 200, { features, quotas });
+        return;
       }
 
       if (accountHandlers) {

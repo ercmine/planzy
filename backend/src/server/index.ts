@@ -18,6 +18,7 @@ import { MemoryTelemetryStore } from "../telemetry/memoryStore.js";
 import { MemoryReviewsStore } from "../reviews/memoryStore.js";
 import { DevBillingProvider } from "../subscriptions/billing/provider.js";
 import { EntitlementPolicyService } from "../subscriptions/policy.js";
+import { FeatureQuotaEngine, MemoryAccessUsageStore } from "../subscriptions/accessEngine.js";
 import { SubscriptionService } from "../subscriptions/service.js";
 import { MemoryUsageStore } from "../subscriptions/usage.js";
 import { TelemetryService } from "../telemetry/telemetryService.js";
@@ -60,6 +61,7 @@ export function createServer(options?: CreateServerOptions) {
   const usageStore = new MemoryUsageStore();
   const subscriptionService = new SubscriptionService(usageStore, new DevBillingProvider());
   const entitlementPolicy = new EntitlementPolicyService(subscriptionService);
+  const accessEngine = new FeatureQuotaEngine(subscriptionService, new MemoryAccessUsageStore());
   const accountsService = new AccountsService(new MemoryAccountsStore());
 
   const deckHandler = createDeckHandler({
@@ -80,6 +82,7 @@ export function createServer(options?: CreateServerOptions) {
     reviewsStore,
     subscriptionService,
     entitlementPolicy,
+    accessEngine,
     accountsService
   });
 }
