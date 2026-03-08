@@ -52,6 +52,10 @@ class DeckController extends StateNotifier<DeckState> {
   final AdDeckInjector _adDeckInjector;
 
   static const int _batchLimit = 20;
+  static const int _prefetchThreshold = 5;
+  static const int _minNewItems = 10;
+  static const int _maxExtraFetchAttempts = 3;
+  static const List<int> _radiusPattern = <int>[5000, 10000, 30000];
   static const double _debugDefaultLat = 44.8620;
   static const double _debugDefaultLng = -93.5590;
 
@@ -82,11 +86,13 @@ class DeckController extends StateNotifier<DeckState> {
       undoStack: const <DeckSwipeRecord>[],
       shownPlanIds: const <String>[],
       answeredPlanIds: const <String>{},
+      seenPlanIds: const <String>{},
       locationRequired: false,
       showCachedResultsNotice: false,
       usingOfflineCachedData: false,
       isLoadingNextBatch: false,
       clearNextBatchError: true,
+      currentIndex: 0,
     );
     await _loadBatch(reset: true);
   }
@@ -99,8 +105,9 @@ class DeckController extends StateNotifier<DeckState> {
     }
   }
 
-  Future<void> loadMoreIfNeeded() async {
-    if (state.plans.length <= 8 && state.hasMore && !state.isLoadingMore) {
+  Future<void> maybePrefetchMore() async {
+    final remaining = state.plans.length - state.currentIndex;
+    if (remaining <= _prefetchThreshold && !state.isLoadingMore && !state.isLoadingNextBatch) {
       await _loadBatch();
     }
   }
@@ -110,20 +117,22 @@ class DeckController extends StateNotifier<DeckState> {
       return;
     }
 
-    const currentIndex = 0;
+    final currentIndex = state.currentIndex;
     if (kDebugMode) {
       debugPrint('[Deck] vote=${action.name.toUpperCase()} idx=$currentIndex len=${state.items.length}');
     }
 
+    if (currentIndex >= state.items.length) {
+      return;
+    }
     final topItem = state.items[currentIndex];
     if (topItem is DeckAdItem) {
-      final nextItems = [...state.items]..removeAt(currentIndex);
-      state = state.copyWith(items: nextItems, clearError: true);
+      state = state.copyWith(currentIndex: currentIndex + 1, clearError: true);
       if (kDebugMode) {
         debugPrint('[Deck] after idx=0 len=${state.items.length}');
       }
       _startViewingTopCard();
-      await loadMoreIfNeeded();
+      await maybePrefetchMore();
       return;
     }
 
@@ -143,7 +152,7 @@ class DeckController extends StateNotifier<DeckState> {
       ),
     ));
 
-    final nextPlans = [...state.plans]..removeAt(0);
+    final nextPlans = [...state.plans]..removeAt(currentIndex);
     final shownIds = {...state.shownPlanIds, plan.id}.toList(growable: false);
     final answeredPlanIds = {...state.answeredPlanIds, plan.id};
     final undo = [
@@ -154,9 +163,11 @@ class DeckController extends StateNotifier<DeckState> {
     state = state.copyWith(
       plans: nextPlans,
       items: _adDeckInjector.inject(plans: nextPlans),
+      currentIndex: 0,
       undoStack: undo,
       shownPlanIds: shownIds,
       answeredPlanIds: answeredPlanIds,
+      seenPlanIds: {...state.seenPlanIds, plan.id},
       clearError: true,
       clearNextBatchError: true,
     );
@@ -166,7 +177,7 @@ class DeckController extends StateNotifier<DeckState> {
     }
 
     _startViewingTopCard();
-    await loadMoreIfNeeded();
+    await maybePrefetchMore();
 
     if (state.plans.isEmpty) {
       await loadNextBatch();
@@ -184,7 +195,7 @@ class DeckController extends StateNotifier<DeckState> {
       clearError: true,
     );
 
-    await _loadBatch(reset: true);
+    await _loadBatch();
 
     if (state.errorMessage != null) {
       state = state.copyWith(
@@ -196,7 +207,6 @@ class DeckController extends StateNotifier<DeckState> {
 
     state = state.copyWith(
       isLoadingNextBatch: false,
-      answeredPlanIds: const <String>{},
       clearNextBatchError: true,
     );
   }
@@ -227,6 +237,7 @@ class DeckController extends StateNotifier<DeckState> {
     state = state.copyWith(
       plans: nextPlans,
       items: _adDeckInjector.inject(plans: nextPlans),
+      currentIndex: 0,
       undoStack: remainingUndo,
     );
     _startViewingTopCard();
@@ -326,21 +337,63 @@ class DeckController extends StateNotifier<DeckState> {
 
       final filters = session.filters;
       final requestedCursor = reset ? null : state.nextCursor;
-      final params = DeckQueryParams(
-        cursor: requestedCursor,
-        maxResults: _batchLimit,
-        lat: location.lat,
-        lng: location.lng,
-        radiusMeters: filters.radiusMeters,
-        categories: filters.categories.map((e) => e.name).toList(growable: false),
-        openNow: filters.openNow,
-        priceLevelMax: filters.priceLevelMax,
-        timeStart: filters.timeWindow?.startISO,
-        timeEnd: filters.timeWindow?.endISO,
+      var supportsCursor = state.nextCursor != null || requestedCursor != null;
+      final radiusMeters = supportsCursor
+          ? filters.radiusMeters
+          : _radiusPattern[(state.seenPlanIds.length ~/ _batchLimit) % _radiusPattern.length];
+
+      final batches = <Plan>[];
+      String? nextCursor = requestedCursor;
+      var attempts = 0;
+      while (attempts <= _maxExtraFetchAttempts && batches.length < _minNewItems) {
+        final pageParams = DeckQueryParams(
+          cursor: nextCursor,
+          maxResults: _batchLimit,
+          lat: location.lat,
+          lng: location.lng,
+          radiusMeters: supportsCursor
+              ? radiusMeters
+              : _radiusPattern[(state.seenPlanIds.length + attempts * _prefetchThreshold) %
+                  _radiusPattern.length],
+          categories: filters.categories.map((e) => e.name).toList(growable: false),
+          openNow: filters.openNow,
+          priceLevelMax: filters.priceLevelMax,
+          timeStart: filters.timeWindow?.startISO,
+          timeEnd: filters.timeWindow?.endISO,
+          seed: _sessionId,
+        );
+        final batch = await _deckRepository.fetchDeckBatch(_sessionId, pageParams);
+        if (batch.nextCursor != null) {
+          supportsCursor = true;
+        }
+        nextCursor = batch.nextCursor;
+        final fresh = batch.plans.where((plan) => !state.seenPlanIds.contains(plan.id));
+        batches.addAll(fresh);
+        if (!supportsCursor && batch.plans.isEmpty) {
+          break;
+        }
+        if (supportsCursor && nextCursor == null) {
+          break;
+        }
+        attempts++;
+      }
+
+      _applyBatch(
+        DeckBatchResponse(
+          sessionId: _sessionId,
+          plans: batches,
+          nextCursor: nextCursor,
+          mix: const DeckSourceMix(),
+        ),
+        reset: reset,
+        requestedCursor: requestedCursor,
       );
 
-      final batch = await _deckRepository.fetchDeckBatch(_sessionId, params);
-      _applyBatch(batch, reset: reset, requestedCursor: requestedCursor);
+      if (batches.length < _minNewItems) {
+        state = state.copyWith(
+          nextBatchErrorMessage: 'You\'re out of new nearby plans. Try expanding your radius.',
+        );
+      }
     } catch (error) {
       state = state.copyWith(
         isLoadingInitial: false,
@@ -357,7 +410,10 @@ class DeckController extends StateNotifier<DeckState> {
     bool showCachedNotice = false,
     bool usingOfflineCachedData = false,
   }) {
-    final merged = reset ? batch.plans : [...state.plans, ...batch.plans];
+    final filteredBatchPlans = batch.plans
+        .where((plan) => !state.seenPlanIds.contains(plan.id))
+        .toList(growable: false);
+    final merged = reset ? filteredBatchPlans : [...state.plans, ...filteredBatchPlans];
     final deduped =
         <String, Plan>{for (final plan in merged) plan.id: plan}.values.toList();
 
@@ -366,13 +422,15 @@ class DeckController extends StateNotifier<DeckState> {
       isLoadingMore: false,
       plans: deduped,
       items: _adDeckInjector.inject(plans: deduped),
+      currentIndex: 0,
       nextCursor: batch.nextCursor,
-      hasMore: batch.nextCursor != null,
+      hasMore: batch.nextCursor != null || filteredBatchPlans.isNotEmpty,
       lastBatchMix: batch.mix,
       usedFallback: false,
       showCachedResultsNotice: showCachedNotice,
       usingOfflineCachedData: usingOfflineCachedData,
       answeredPlanIds: reset ? const <String>{} : state.answeredPlanIds,
+      seenPlanIds: {...state.seenPlanIds, ...filteredBatchPlans.map((p) => p.id)},
       clearNextBatchError: true,
     );
 

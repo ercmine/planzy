@@ -183,7 +183,7 @@ void main() {
     controller.dispose();
   });
 
-  test('fetch error falls back to cached batch when available', () async {
+  test('fetch error sets error message', () async {
     final created = await sessionsRepository.createLocalSession(
       title: 'Test',
       filters: const SessionFilters(),
@@ -192,10 +192,72 @@ void main() {
 
     when(() => deckRepository.fetchDeckBatch(created.sessionId, any()))
         .thenThrow(Exception('boom'));
-    when(() => deckRepository.getCachedDeckBatch(created.sessionId, any())).thenReturn(
-      _batch([
-        _plan('cached-1'),
-      ], nextCursor: null, sessionId: created.sessionId),
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+
+    expect(controller.state.plans, isEmpty);
+    expect(controller.state.errorMessage, isNotNull);
+    controller.dispose();
+  });
+
+  test('prefetch triggers when remaining is at threshold', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'Prefetch',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer(
+      (_) async => _batch(
+        [for (var i = 0; i < 6; i++) _plan('prefetch-$i')],
+        nextCursor: 'cursor-next',
+        sessionId: created.sessionId,
+      ),
+    );
+
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+    await controller.maybePrefetchMore();
+
+    verify(() => deckRepository.fetchDeckBatch(created.sessionId, any())).called(greaterThan(1));
+    controller.dispose();
+  });
+
+  test('duplicate IDs are filtered while appending', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'Dedupe',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer(
+      (_) async => _batch(
+        [for (var i = 0; i < 10; i++) _plan('dupe-$i')],
+        nextCursor: 'cursor-1',
+        sessionId: created.sessionId,
+      ),
     );
 
     final controller = DeckController(
@@ -212,8 +274,25 @@ void main() {
     await Future<void>.microtask(() {});
     await Future<void>.microtask(() {});
 
-    expect(controller.state.plans.first.id, 'cached-1');
-    expect(controller.state.showCachedResultsNotice, true);
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer(
+      (_) async => _batch(
+        [
+          _plan('dupe-0'),
+          _plan('dupe-1'),
+          _plan('fresh-1'),
+          _plan('fresh-2'),
+        ],
+        nextCursor: null,
+        sessionId: created.sessionId,
+      ),
+    );
+
+    await controller.swipeTop(SwipeAction.yes);
+
+    final ids = controller.state.plans.map((p) => p.id).toList(growable: false);
+    expect(ids.toSet().length, ids.length);
+    expect(ids.contains('fresh-1'), true);
+    expect(ids.contains('fresh-2'), true);
     controller.dispose();
   });
 }

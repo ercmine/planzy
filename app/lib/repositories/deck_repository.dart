@@ -20,6 +20,7 @@ class DeckQueryParams {
 
   const DeckQueryParams({
     this.cursor,
+    this.seed,
     this.maxResults,
     this.lat,
     this.lng,
@@ -33,6 +34,7 @@ class DeckQueryParams {
   });
 
   final String? cursor;
+  final String? seed;
   final int? maxResults;
   final double? lat;
   final double? lng;
@@ -46,6 +48,7 @@ class DeckQueryParams {
 
   Map<String, dynamic> toCacheMap() => <String, dynamic>{
         'cursor': cursor,
+        'seed': seed,
         'maxResults': _clampedMaxResults,
         'lat': lat,
         'lng': lng,
@@ -61,6 +64,7 @@ class DeckQueryParams {
   Map<String, String?> toQueryMap({required String defaultLocale}) {
     return <String, String?>{
       'cursor': cursor,
+      'seed': seed,
       'maxResults': _clampedMaxResults.toString(),
       'lat': lat == null ? null : lat!.toStringAsFixed(6),
       'lng': lng == null ? null : lng!.toStringAsFixed(6),
@@ -124,6 +128,7 @@ class DeckRepository {
         queryParameters: params.toQueryMap(defaultLocale: 'en-US'),
       );
       responseList = _extractPlansList(response);
+      final nextCursor = _extractNextCursor(response);
       final plans = responseList
           .map((item) {
             if (item is! Map<String, dynamic>) {
@@ -143,7 +148,7 @@ class DeckRepository {
       final deck = DeckBatchResponse(
         sessionId: sessionId,
         plans: plans,
-        nextCursor: null,
+        nextCursor: nextCursor,
         mix: DeckSourceMix(
           providersUsed: plans.map((p) => p.source).toSet().toList(growable: false),
           planSourceCounts: _sourceCounts(plans),
@@ -198,6 +203,19 @@ List<dynamic> _extractPlansList(Object decoded) {
     'Parse error: expected plans array, {plans:[...]}, or {results:[...]}',
     details: decoded,
   );
+}
+
+String? _extractNextCursor(Object decoded) {
+  if (decoded is! Map<String, dynamic>) {
+    return null;
+  }
+
+  final cursor = decoded['nextCursor'] ?? decoded['cursor'] ?? decoded['pageToken'];
+  if (cursor == null) {
+    return null;
+  }
+  final value = cursor.toString().trim();
+  return value.isEmpty ? null : value;
 }
 
 

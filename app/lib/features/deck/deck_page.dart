@@ -109,6 +109,25 @@ class _DeckPageState extends ConsumerState<DeckPage> {
       );
     }
 
+    if (state.items.isEmpty && (state.isLoadingMore || state.isLoadingNextBatch)) {
+      return _scaffoldWithBody(
+        const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 3),
+              ),
+              SizedBox(height: AppSpacing.m),
+              Text('Finding more plans for you...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (state.items.isEmpty) {
       return _scaffoldWithBody(
         RetryView(
@@ -148,7 +167,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                 onSwipe: (previousIndex, currentIndex, direction) {
                   setState(() => _voteInFlight = false);
                   controller.handleSwipeDirection(direction);
-                  controller.loadMoreIfNeeded();
+                  controller.maybePrefetchMore();
                   return true;
                 },
                 cardBuilder: (context, index, _, __) {
