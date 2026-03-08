@@ -1,4 +1,4 @@
-import type { CampaignContentLink, CampaignParticipant, CollaborationAuditEvent, CollaborationNotification, CreatorBusinessCampaign, CreatorBusinessInvite, FeaturedCreatorContentPlacement } from "./types.js";
+import type { CampaignContentLink, CampaignParticipant, CollaborationAuditEvent, CreatorBusinessCampaign, CreatorBusinessInvite, FeaturedCreatorContentPlacement } from "./types.js";
 
 export interface CollaborationStore {
   createInvite(invite: CreatorBusinessInvite): Promise<void>;
@@ -26,6 +26,4 @@ export interface CollaborationStore {
   appendAuditEvent(event: CollaborationAuditEvent): Promise<void>;
   listAuditEvents(entityType?: CollaborationAuditEvent["entityType"], entityId?: string): Promise<CollaborationAuditEvent[]>;
 
-  createNotification(notification: CollaborationNotification): Promise<void>;
-  listNotificationsByUser(userId: string): Promise<CollaborationNotification[]>;
 }

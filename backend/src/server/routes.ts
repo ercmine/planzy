@@ -49,6 +49,9 @@ import type { OutingPlannerService } from "../outingPlanner/service.js";
 import { createOutingPlannerHandlers } from "../outingPlanner/http.js";
 import type { ModerationService } from "../moderation/service.js";
 import type { ReportReasonCode } from "../moderation/types.js";
+import { createNotificationHttpHandlers } from "../notifications/http.js";
+import type { NotificationService } from "../notifications/service.js";
+import type { NotificationCategory } from "../notifications/types.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -116,6 +119,7 @@ export function createRoutes(
     savedHandlers?: SavedHttpHandlers;
     outingPlannerService?: OutingPlannerService;
     moderationService?: ModerationService;
+    notificationService?: NotificationService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -134,6 +138,7 @@ export function createRoutes(
   const collaborationHandlers = deps?.collaborationService && deps?.accountsService ? createCollaborationHttpHandlers(deps.collaborationService, deps.accountsService) : null;
   const businessPremiumHandlers = deps?.businessPremiumService ? createBusinessPremiumHttpHandlers(deps.businessPremiumService) : null;
   const outingPlannerHandlers = deps?.outingPlannerService ? createOutingPlannerHandlers(deps.outingPlannerService) : null;
+  const notificationHandlers = deps?.notificationService ? createNotificationHttpHandlers(deps.notificationService) : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -154,6 +159,38 @@ export function createRoutes(
           service: "perbug-api",
           version: "1.0.0"
         });
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/notifications" && notificationHandlers) {
+        await notificationHandlers.list(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/notifications/unread-count" && notificationHandlers) {
+        await notificationHandlers.unreadCount(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/notifications/mark-all-read" && notificationHandlers) {
+        await notificationHandlers.markAllRead(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/notifications/preferences" && notificationHandlers) {
+        await notificationHandlers.getPreferences(req, res);
+        return;
+      }
+
+      const notificationMarkReadMatch = /^\/v1\/notifications\/([^/]+)\/read$/.exec(normalizedPath);
+      if (notificationMarkReadMatch && req.method === "POST" && notificationHandlers) {
+        await notificationHandlers.markRead(req, res, decodeURIComponent(notificationMarkReadMatch[1] ?? ""));
+        return;
+      }
+
+      const notificationPreferenceMatch = /^\/v1\/notifications\/preferences\/([^/]+)$/.exec(normalizedPath);
+      if (notificationPreferenceMatch && req.method === "PUT" && notificationHandlers) {
+        await notificationHandlers.updatePreference(req, res, decodeURIComponent(notificationPreferenceMatch[1] ?? "") as NotificationCategory);
         return;
       }
 
@@ -955,6 +992,17 @@ export function createRoutes(
         if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
         if (req.method === "POST") {
           const review = await deps.reviewsStore.voteHelpful(reviewId, userIdHeader);
+          if (deps.notificationService && review.authorUserId !== userIdHeader && deps.accountsService) {
+            const actor = deps.accountsService.getIdentitySummary(userIdHeader);
+            await deps.notificationService.notify({
+              eventId: `review.helpful:${reviewId}:${userIdHeader}`,
+              type: "review.liked",
+              recipientUserId: review.authorUserId,
+              actor: { userId: userIdHeader, displayName: actor.personalProfile.displayName, profileType: "user" },
+              reviewId,
+              placeId: review.placeId
+            });
+          }
           sendJson(res, 200, { review });
           return;
         }
@@ -1075,6 +1123,16 @@ export function createRoutes(
           notes: payload.notes == null ? undefined : String(payload.notes),
           actorUserId: String(readHeader(req, "x-user-id") ?? "admin")
         });
+        if (deps.notificationService && decisionType === "approve" && payload.subjectUserId) {
+          await deps.notificationService.notify({
+            eventId: `moderation.approve:${targetType}:${targetId}`,
+            type: "review.approved",
+            recipientUserId: String(payload.subjectUserId),
+            reviewId: targetId,
+            placeId: String(payload.placeId ?? ""),
+            placeName: payload.placeName == null ? undefined : String(payload.placeName)
+          });
+        }
         sendJson(res, 200, { decision });
         return;
       }
@@ -1145,6 +1203,18 @@ export function createRoutes(
             target: { targetType: "business_review_response", targetId: response.id, reviewId, placeId: review.placeId, subjectUserId: actor.userId },
             text: clean,
             actorUserId: actor.userId
+          });
+        }
+        if (deps.notificationService && review.authorUserId !== actor.userId && deps.accountsService) {
+          const business = deps.accountsService.getBusinessProfileById(actor.profileId);
+          await deps.notificationService.notify({
+            eventId: `business.reply:${response.id}`,
+            type: "review.business_reply.created",
+            recipientUserId: review.authorUserId,
+            actor: { userId: actor.userId, businessId: actor.profileId, displayName: business?.businessName ?? "Business", profileType: "business" },
+            reviewId,
+            placeId: review.placeId,
+            snippet: response.content
           });
         }
         sendJson(res, 201, { response });

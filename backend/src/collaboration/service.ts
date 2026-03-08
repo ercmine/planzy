@@ -9,6 +9,7 @@ import { QUOTA_KEYS, type FeatureQuotaEngine } from "../subscriptions/accessEngi
 import { SubscriptionTargetType } from "../subscriptions/types.js";
 import type { SubscriptionService } from "../subscriptions/service.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
+import type { NotificationService } from "../notifications/service.js";
 import type { CollaborationStore } from "./store.js";
 import type { CampaignContentLink, CampaignStatus, CreatorBusinessCampaign, CreatorBusinessInvite, FeaturedCreatorContentPlacement } from "./types.js";
 
@@ -33,6 +34,7 @@ export class CollaborationService {
     private readonly accessEngine?: FeatureQuotaEngine,
     private readonly businessAnalytics?: BusinessAnalyticsService,
     private readonly businessPremium?: BusinessPremiumService,
+    private readonly notifications?: NotificationService,
     private readonly now: () => Date = () => new Date()
   ) {}
 
@@ -75,7 +77,17 @@ export class CollaborationService {
     const invite: CreatorBusinessInvite = { ...input, id: randomUUID(), createdByUserId: actor.userId, status: "invited", createdAt: nowIso, updatedAt: nowIso };
     await this.store.createInvite(invite);
     await this.store.appendAuditEvent({ id: randomUUID(), entityType: "invite", entityId: invite.id, action: "created", actorUserId: actor.userId, businessProfileId: invite.businessProfileId, creatorProfileId: invite.creatorProfileId, createdAt: nowIso });
-    await this.store.createNotification({ id: randomUUID(), recipientUserId: invite.creatorProfileId, type: "invite_created", payload: { inviteId: invite.id, businessProfileId: invite.businessProfileId }, createdAt: nowIso });
+    const business = this.accounts.getBusinessProfileById(invite.businessProfileId);
+    await this.notifications?.notify({
+      eventId: `collab.invite.created:${invite.id}`,
+      type: "collaboration.invite.received",
+      recipientUserId: this.accounts.getCreatorProfileById(invite.creatorProfileId)?.userId ?? invite.creatorProfileId,
+      actor: { userId: actor.userId, businessId: invite.businessProfileId, displayName: business?.businessName, profileType: "business" },
+      inviteId: invite.id,
+      title: invite.title,
+      businessProfileId: invite.businessProfileId,
+      occurredAt: nowIso
+    });
     return invite;
   }
 
@@ -95,7 +107,15 @@ export class CollaborationService {
     if (!updated) throw new ValidationError(["invite not found"]);
 
     await this.store.appendAuditEvent({ id: randomUUID(), entityType: "invite", entityId: invite.id, action: nextStatus, actorUserId: actor.userId, businessProfileId: invite.businessProfileId, creatorProfileId: invite.creatorProfileId, createdAt: nowIso });
-    await this.store.createNotification({ id: randomUUID(), recipientUserId: invite.createdByUserId, type: nextStatus === "accepted" ? "invite_accepted" : "invite_declined", payload: { inviteId: invite.id }, createdAt: nowIso });
+    const creator = this.accounts.getCreatorProfileById(invite.creatorProfileId);
+    await this.notifications?.notify({
+      eventId: `collab.invite.${nextStatus}:${invite.id}`,
+      type: nextStatus === "accepted" ? "collaboration.invite.accepted" : "collaboration.invite.declined",
+      recipientUserId: invite.createdByUserId,
+      actor: { userId: actor.userId, displayName: creator?.displayName ?? creator?.creatorName, profileType: "creator" },
+      inviteId: invite.id,
+      occurredAt: nowIso
+    });
 
     if (nextStatus === "accepted") {
       const businessActor = this.accounts.resolveActingContext(invite.createdByUserId, { profileType: ProfileType.BUSINESS, profileId: invite.businessProfileId });
@@ -173,6 +193,4 @@ export class CollaborationService {
     const rows = await this.store.listFeaturedPlacementsForPlace(placeId);
     return rows.filter((x) => x.isActive);
   }
-
-  async listMyNotifications(actor: ActorContextResolved) { return this.store.listNotificationsByUser(actor.profileId); }
 }

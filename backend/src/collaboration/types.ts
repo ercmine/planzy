@@ -13,5 +13,3 @@ export interface CampaignContentLink { id: string; campaignId: string; creatorPr
 export interface FeaturedCreatorContentPlacement { id: string; businessProfileId: string; placeId: string; creatorProfileId: string; contentType: CampaignContentLink["contentType"]; contentId: string; sourceCampaignId?: string; sourceCampaignContentLinkId?: string; sortOrder: number; isActive: boolean; approvedByCreator: boolean; disclosureLabel: DisclosureLabel; createdAt: string; updatedAt: string; }
 
 export interface CollaborationAuditEvent { id: string; entityType: "invite" | "campaign" | "content_link" | "featured_content"; entityId: string; action: string; actorUserId: string; businessProfileId?: string; creatorProfileId?: string; metadata?: Record<string, unknown>; createdAt: string; }
-
-export interface CollaborationNotification { id: string; recipientUserId: string; type: "invite_created" | "invite_accepted" | "invite_declined" | "campaign_status_changed" | "campaign_content_linked" | "featured_content_added" | "featured_content_removed"; payload: Record<string, unknown>; createdAt: string; }
