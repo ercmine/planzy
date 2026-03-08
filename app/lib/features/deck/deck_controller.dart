@@ -107,10 +107,18 @@ class DeckController extends StateNotifier<DeckState> {
       return;
     }
 
-    final topItem = state.items.first;
+    const currentIndex = 0;
+    if (kDebugMode) {
+      debugPrint('[Deck] vote=${action.name.toUpperCase()} idx=$currentIndex len=${state.items.length}');
+    }
+
+    final topItem = state.items[currentIndex];
     if (topItem is DeckAdItem) {
-      final nextItems = [...state.items]..removeAt(0);
+      final nextItems = [...state.items]..removeAt(currentIndex);
       state = state.copyWith(items: nextItems, clearError: true);
+      if (kDebugMode) {
+        debugPrint('[Deck] after idx=0 len=${state.items.length}');
+      }
       _startViewingTopCard();
       await loadMoreIfNeeded();
       return;
@@ -146,6 +154,10 @@ class DeckController extends StateNotifier<DeckState> {
       shownPlanIds: shownIds,
       clearError: true,
     );
+
+    if (kDebugMode) {
+      debugPrint('[Deck] after idx=0 len=${state.items.length}');
+    }
 
     _startViewingTopCard();
     await loadMoreIfNeeded();

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/spacing.dart';
 import '../../../core/format/formatters.dart';
+import '../../../core/validation/url.dart';
 import '../../../models/plan.dart';
 import '../../ideas/widgets/friend_idea_badge.dart';
 import 'category_pill.dart';
@@ -53,7 +54,7 @@ class _DeckCardState extends State<DeckCard> {
       return;
     }
     _prefetchedForPlan.add(widget.plan.id);
-    for (final url in widget.prefetchImageUrls.take(2)) {
+    for (final url in widget.prefetchImageUrls.take(2).where(isHttpUrl)) {
       precacheImage(NetworkImage(url), context);
     }
   }
@@ -86,7 +87,7 @@ class _DeckCardState extends State<DeckCard> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        if (plan.photos?.firstOrNull != null)
+                        if (isHttpUrl(plan.photos?.firstOrNull?.url))
                           CachedNetworkImage(
                             imageUrl: plan.photos!.first.url,
                             fit: BoxFit.cover,

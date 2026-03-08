@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/spacing.dart';
 import '../../../core/links/link_launcher.dart';
 import '../../../core/links/link_types.dart';
+import '../../../core/validation/url.dart';
 import '../../../models/plan.dart';
 import '../../../providers/app_providers.dart';
 import '../../ideas/widgets/friend_idea_badge.dart';
@@ -61,14 +62,19 @@ class CardDetailsSheet extends ConsumerWidget {
                     final photo = plan.photos![index];
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: CachedNetworkImage(
-                        imageUrl: photo.url,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
-                      ),
+                      child: isHttpUrl(photo.url)
+                          ? CachedNetworkImage(
+                              imageUrl: photo.url,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => const Center(
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+                            )
+                          : ColoredBox(
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              child: const Icon(Icons.photo, size: 56),
+                            ),
                     );
                   },
                 ),

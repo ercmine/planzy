@@ -4,6 +4,7 @@ import '../api/api_client.dart';
 import '../api/api_error.dart';
 import '../api/endpoints.dart';
 import '../core/json_parsers.dart';
+import '../core/validation/url.dart';
 import '../core/logging/log.dart';
 import '../core/cache/local_store.dart';
 import '../core/cache/memory_cache.dart';
@@ -260,6 +261,7 @@ Plan _planFromApi(Map<String, dynamic> json) {
       ?.toString();
 
   final photoUrl = json['photoUrl']?.toString();
+  final safePhotoUrl = isHttpUrl(photoUrl) ? photoUrl : null;
   final mapsUri = json['googleMapsUri']?.toString();
   final websiteUri = json['websiteUri']?.toString();
 
@@ -273,7 +275,7 @@ Plan _planFromApi(Map<String, dynamic> json) {
     priceLevel: parseInt(json['priceLevel']),
     rating: parseDouble(json['rating']),
     reviewCount: parseInt(json['userRatingCount']),
-    photos: photoUrl == null || photoUrl.isEmpty ? null : [PlanPhoto(url: photoUrl)],
+    photos: safePhotoUrl == null || safePhotoUrl.isEmpty ? null : [PlanPhoto(url: safePhotoUrl)],
     deepLinks: (mapsUri != null && mapsUri.isNotEmpty) ||
             (websiteUri != null && websiteUri.isNotEmpty)
         ? DeepLinks(mapsLink: mapsUri, websiteLink: websiteUri)

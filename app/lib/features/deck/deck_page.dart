@@ -11,6 +11,7 @@ import '../../core/env/env.dart';
 import '../../core/location/location_permission_service.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/widgets/retry_view.dart';
+import '../../core/validation/url.dart';
 import '../../providers/app_providers.dart';
 import 'deck_controller.dart';
 import 'deck_state.dart';
@@ -149,6 +150,9 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                   return true;
                 },
                 cardBuilder: (context, index, _, __) {
+                  if (index < 0 || index >= state.items.length) {
+                    return const SizedBox.shrink();
+                  }
                   final item = state.items[index];
                   if (item is DeckAdItem) {
                     final c = _adControllers.putIfAbsent(
@@ -172,6 +176,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                           ? p.plan.photos!.first.url
                           : null)
                       .whereType<String>()
+                      .where(isHttpUrl)
                       .toList(growable: false);
 
                   return DeckCard(
