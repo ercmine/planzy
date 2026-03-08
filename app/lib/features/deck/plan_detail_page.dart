@@ -6,8 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../ads/native_ad_card.dart';
 import '../../api/api_client.dart';
 import '../../app/theme/spacing.dart';
+import '../../core/ads/ad_placement.dart';
+import '../../core/ads/native_ad_controller.dart';
 import '../../core/format/formatters.dart';
 import '../../core/json_parsers.dart';
 import '../../core/validation/url.dart';
@@ -58,6 +61,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   final _displayNameController = TextEditingController();
   int _selectedRating = 0;
   bool _anonymous = false;
+  NativeAdController? _detailAdController;
 
   @override
   void initState() {
@@ -71,6 +75,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   void dispose() {
     _reviewTextController.dispose();
     _displayNameController.dispose();
+    _detailAdController?.dispose();
     super.dispose();
   }
 
@@ -241,6 +246,14 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
         setState(() => _isSubmittingReview = false);
       }
     }
+  }
+
+  NativeAdController _getDetailAdController() {
+    return _detailAdController ??= NativeAdController(
+      adsManager: ref.read(adsManagerProvider),
+      slotId: 'place-detail-${widget.plan.id}',
+      placement: AdPlacement.placeDetailInlineBanner,
+    );
   }
 
   @override
@@ -439,6 +452,11 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
           ],
           const SizedBox(height: AppSpacing.m),
           _buildReviewsSection(context),
+          const SizedBox(height: AppSpacing.m),
+          NativeAdCard(
+            controller: _getDetailAdController(),
+            placement: AdPlacement.placeDetailInlineBanner,
+          ),
           const SizedBox(height: AppSpacing.m),
           _Section(
             title: 'Perbug creator and business tools',
@@ -863,7 +881,6 @@ class _Section extends StatelessWidget {
 
   final String title;
   final Widget child;
-
   @override
   Widget build(BuildContext context) {
     return Column(

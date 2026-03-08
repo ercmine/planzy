@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -7,18 +9,21 @@ import '../../config/admob_config.dart';
 class AdsService {
   AdsService();
 
-  bool _initialized = false;
+  Future<void>? _initializeFuture;
 
-  Future<void> initialize() async {
-    if (_initialized || !AdMobConfig.isSupportedPlatform) {
-      return;
+  Future<void> initialize() {
+    if (!AdMobConfig.isSupportedPlatform) {
+      return Future<void>.value();
     }
+    _initializeFuture ??= _initializeInternal();
+    return _initializeFuture!;
+  }
 
+  Future<void> _initializeInternal() async {
     await MobileAds.instance.updateRequestConfiguration(
       AdMobConfig.requestConfiguration,
     );
     await MobileAds.instance.initialize();
-    _initialized = true;
   }
 
   NativeAd buildNativeAd({
