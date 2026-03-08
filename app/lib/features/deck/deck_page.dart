@@ -221,6 +221,41 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                 ),
               ),
             ],
+
+            if (state.nextBatchErrorMessage != null) ...[
+              const SizedBox(height: AppSpacing.s),
+              Material(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: controller.loadNextBatch,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.s),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            state.nextBatchErrorMessage!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onErrorContainer,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.s),
+                        Text(
+                          'Retry',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onErrorContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
             if (kDebugMode && envConfig.enableDebugLogs) ...[
               const SizedBox(height: AppSpacing.s),
               Container(
@@ -235,7 +270,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                 ),
               ),
             ],
-            if (state.isLoadingMore) ...[
+            if (state.isLoadingMore || state.isLoadingNextBatch) ...[
               const SizedBox(height: AppSpacing.s),
               const LinearProgressIndicator(),
             ],

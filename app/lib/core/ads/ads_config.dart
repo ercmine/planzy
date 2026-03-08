@@ -21,8 +21,11 @@ class AdsConfig {
   });
 
   factory AdsConfig.fromEnv({required EnvFlavor flavor}) {
+    final disableAdsForDebug =
+        kDebugMode && _parseBool(dotenv.maybeGet(EnvKeys.perbugDisableAds), fallback: false);
+
     return AdsConfig(
-      enabled: _parseBool(dotenv.maybeGet(EnvKeys.adsEnabled), fallback: true),
+      enabled: !disableAdsForDebug && _parseBool(dotenv.maybeGet(EnvKeys.adsEnabled), fallback: true),
       admobAppIdIos: AdMobConfig.iosAppId,
       admobAppIdAndroid: AdMobConfig.androidAppId,
       nativeUnitIdIos: AdMobConfig.iosNativeUnitId,

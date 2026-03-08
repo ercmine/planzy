@@ -53,6 +53,11 @@ final class PerbugNativeAdFactory: NSObject, FLTNativeAdFactory {
     bodyLabel.font = .systemFont(ofSize: 14)
     bodyLabel.numberOfLines = 2
 
+    let advertiserLabel = UILabel()
+    advertiserLabel.font = .systemFont(ofSize: 12)
+    advertiserLabel.textColor = .secondaryLabel
+    advertiserLabel.numberOfLines = 1
+
     let iconView = UIImageView()
     iconView.translatesAutoresizingMaskIntoConstraints = false
     iconView.widthAnchor.constraint(equalToConstant: 40).isActive = true
@@ -71,7 +76,7 @@ final class PerbugNativeAdFactory: NSObject, FLTNativeAdFactory {
     footer.spacing = 8
     footer.alignment = .center
 
-    let stack = UIStackView(arrangedSubviews: [mediaView, headlineLabel, bodyLabel, footer])
+    let stack = UIStackView(arrangedSubviews: [mediaView, headlineLabel, bodyLabel, advertiserLabel, footer])
     stack.axis = .vertical
     stack.spacing = 8
     stack.translatesAutoresizingMaskIntoConstraints = false
@@ -89,6 +94,7 @@ final class PerbugNativeAdFactory: NSObject, FLTNativeAdFactory {
     adView.bodyView = bodyLabel
     adView.iconView = iconView
     adView.callToActionView = ctaButton
+    adView.advertiserView = advertiserLabel
 
     headlineLabel.text = nativeAd.headline
     bodyLabel.text = nativeAd.body
@@ -107,6 +113,9 @@ final class PerbugNativeAdFactory: NSObject, FLTNativeAdFactory {
     } else {
       ctaButton.isHidden = true
     }
+
+    advertiserLabel.text = nativeAd.advertiser
+    advertiserLabel.isHidden = nativeAd.advertiser == nil
 
     mediaView.mediaContent = nativeAd.mediaContent
     adView.nativeAd = nativeAd
