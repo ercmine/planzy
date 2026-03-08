@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { InMemoryDiscoveryRepository } from "../memoryRepository.js";
 import {
@@ -11,6 +11,11 @@ import {
   TrendingService
 } from "../services.js";
 import type { CreatorDocument, GuideDocument, PlaceDocument, UserRecommendationProfile } from "../types.js";
+import { SubscriptionService } from "../../subscriptions/service.js";
+import { DevBillingProvider } from "../../subscriptions/billing/provider.js";
+import { MemoryUsageStore } from "../../subscriptions/usage.js";
+import { PremiumExperienceService } from "../../subscriptions/premiumExperience.js";
+import { SubscriptionTargetType } from "../../subscriptions/types.js";
 
 const NOW = Date.now();
 const daysAgo = (days: number) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString();
@@ -69,14 +74,26 @@ const COLD_START: UserRecommendationProfile = {
 };
 
 describe("discovery services", () => {
+  const subscriptions = new SubscriptionService(new MemoryUsageStore(), new DevBillingProvider());
+  subscriptions.ensureAccount("u1", SubscriptionTargetType.USER);
+  subscriptions.ensureAccount("new-user", SubscriptionTargetType.USER);
+  subscriptions.ensureAccount("plus-user", SubscriptionTargetType.USER);
+  subscriptions.ensureAccount("elite-user", SubscriptionTargetType.USER);
+
+  beforeAll(async () => {
+    await subscriptions.startSubscriptionChange("plus-user", "user-plus");
+    await subscriptions.startSubscriptionChange("elite-user", "user-pro");
+  });
+
+  const premiumExperience = new PremiumExperienceService(subscriptions);
   const repo = new InMemoryDiscoveryRepository(PLACES, [PROFILE, COLD_START], CREATORS, GUIDES);
   const search = new PlaceSearchService(repo);
   const browse = new CategoryBrowseService(repo);
   const nearby = new NearbyDiscoveryService(repo);
   const trending = new TrendingService(repo);
-  const recommendations = new RecommendationService(repo);
+  const recommendations = new RecommendationService(repo, premiumExperience);
   const cityPage = new CityPageService(trending, recommendations, browse);
-  const feed = new DiscoveryFeedService(recommendations, nearby, trending, browse, search);
+  const feed = new DiscoveryFeedService(recommendations, nearby, trending, browse, search, premiumExperience);
 
   it("searches and paginates with cursor", async () => {
     const first = await search.search({ query: "coffee", city: "austin", pageSize: 1 });
@@ -142,6 +159,20 @@ describe("discovery services", () => {
     expect(mixedFeed.items.every((item) => item.type === "place" || item.type === "ad")).toBe(true);
   });
 
+
+  it("adjusts ad density by premium tier", async () => {
+    const freeFeed = await feed.feed("u1", "for_you", { city: "austin", pageSize: 12 });
+    const plusFeed = await feed.feed("plus-user", "for_you", { city: "austin", pageSize: 12 });
+    const eliteFeed = await feed.feed("elite-user", "for_you", { city: "austin", pageSize: 12 });
+
+    const freeAds = freeFeed.items.filter((item) => item.type === "ad").length;
+    const plusAds = plusFeed.items.filter((item) => item.type === "ad").length;
+    const eliteAds = eliteFeed.items.filter((item) => item.type === "ad").length;
+
+    expect(freeAds).toBeGreaterThanOrEqual(plusAds);
+    expect(plusAds).toBeGreaterThanOrEqual(eliteAds);
+    expect(eliteAds).toBe(0);
+  });
   it("composes city page sections", async () => {
     const page = await cityPage.getCityPage("u1", "austin");
     expect(page.city.slug).toBe("austin");

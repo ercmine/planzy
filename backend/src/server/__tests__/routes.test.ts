@@ -162,6 +162,20 @@ describe("server diagnostic and alias routes", () => {
       mode: "trending",
       items: expect.any(Array)
     });
+
+    const premiumStateRes = await fetch(`${baseUrl}/v1/discovery/premium/experience`, {
+      headers: { "x-user-id": "u-premium-route" }
+    });
+    expect(premiumStateRes.status).toBe(200);
+    await expect(premiumStateRes.json()).resolves.toMatchObject({
+      state: expect.objectContaining({ planTier: expect.any(String), adTier: expect.any(String) })
+    });
+
+    const premiumModulesRes = await fetch(`${baseUrl}/v1/discovery/premium/modules`, {
+      headers: { "x-user-id": "u-premium-route" }
+    });
+    expect(premiumModulesRes.status).toBe(200);
+    await expect(premiumModulesRes.json()).resolves.toMatchObject({ modules: expect.any(Array) });
   });
 
   it("serves plans and live-results under bare and /api aliases", async () => {

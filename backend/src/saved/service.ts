@@ -121,9 +121,9 @@ export class SavedService {
       if (!feature.allowed) {
         return { error: "saved_places_not_allowed", access: feature } as const;
       }
-      const quota = await this.accessEngine.checkQuotaAccess(target, QUOTA_KEYS.LISTS_TOTAL_SAVED_PLACES, 1);
-      if (!quota.allowed || items.length >= (quota.limit ?? 0)) {
-        return { error: "list_items_limit_reached", access: quota } as const;
+      const listQuota = await this.accessEngine.checkQuotaAccess(target, QUOTA_KEYS.LISTS_ITEMS_PER_LIST, 1);
+      if (!listQuota.allowed || items.length >= (listQuota.limit ?? 0)) {
+        return { error: "list_items_limit_reached", access: listQuota } as const;
       }
       await this.store.upsertListItem({ listId: input.listId, placeId: input.placeId, addedBy: input.addedBy, addedAt: new Date().toISOString() });
       list.itemCount = items.length + 1;

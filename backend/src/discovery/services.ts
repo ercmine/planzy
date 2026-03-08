@@ -25,6 +25,8 @@ import type {
   TrendingResponse,
   UserRecommendationProfile
 } from "./types.js";
+import { PlanTier } from "../subscriptions/types.js";
+import type { PremiumExperienceService } from "../subscriptions/premiumExperience.js";
 
 interface RankedCandidate {
   place: PlaceDocument;
@@ -168,6 +170,13 @@ function applyBaseEligibility(place: PlaceDocument): boolean {
   return true;
 }
 
+
+function recommendationLimitMultiplier(planTier: PlanTier): number {
+  if (planTier === PlanTier.ELITE) return 2.2;
+  if (planTier === PlanTier.PLUS) return 1.5;
+  return 1;
+}
+
 function applyBaseFilters(place: PlaceDocument, context: DiscoveryQueryContext): boolean {
   if (!applyBaseEligibility(place)) return false;
   if (context.filters?.openNow && place.openNow !== true) return false;
@@ -184,7 +193,7 @@ function applyBaseFilters(place: PlaceDocument, context: DiscoveryQueryContext):
 }
 
 class CandidateGenerator {
-  constructor(private readonly repo: PlaceDiscoveryRepository) {}
+  constructor(private readonly repo: PlaceDiscoveryRepository, private readonly premiumExperience?: PremiumExperienceService) {}
 
   async generate(profile: UserRecommendationProfile | undefined, context: RecommendationContext): Promise<PlaceDocument[]> {
     const all = (await this.repo.listPlaces()).filter((place) => applyBaseEligibility(place) && place.qualityScore >= DEFAULT_RECOMMENDATION_CONFIG.limits.qualityFloor);
@@ -210,7 +219,9 @@ class CandidateGenerator {
       }
     }
 
-    return [...merged.values()].slice(0, DEFAULT_RECOMMENDATION_CONFIG.limits.maxCandidates);
+    const tier = context.userId ? this.premiumExperience?.getPlanTier(context.userId) ?? PlanTier.FREE : PlanTier.FREE;
+    const maxCandidates = Math.floor(DEFAULT_RECOMMENDATION_CONFIG.limits.maxCandidates * recommendationLimitMultiplier(tier));
+    return [...merged.values()].slice(0, maxCandidates);
   }
 }
 
@@ -406,8 +417,8 @@ export class RecommendationService {
   private readonly scorer = new RecommendationScorer();
   private readonly balancer = new DiversityBalancer();
 
-  constructor(private readonly repo: PlaceDiscoveryRepository) {
-    this.generator = new CandidateGenerator(repo);
+  constructor(private readonly repo: PlaceDiscoveryRepository, private readonly premiumExperience?: PremiumExperienceService) {
+    this.generator = new CandidateGenerator(repo, premiumExperience);
   }
 
   async getPersonalizedRecommendations(userId: string | undefined, context: DiscoveryQueryContext): Promise<RecommendationsResponse> {
@@ -422,8 +433,18 @@ export class RecommendationService {
     const profile = userId ? await this.repo.getRecommendationProfile(userId) : undefined;
     const recommendationContext = buildRecommendationContext(context, userId);
     const candidates = await this.generator.generate(profile, recommendationContext);
+    const premiumTier = userId ? (this.premiumExperience?.getRecommendationTierContext(userId)?.tier ?? "standard") : "standard";
+    const rerankBoost = premiumTier === "elite" ? 1.12 : premiumTier === "enhanced" ? 1.06 : 1;
+
     const ranked = candidates
-      .map((place) => this.scorer.score(place, recommendationContext, profile))
+      .filter((place) => applyBaseFilters(place, context))
+      .map((place) => {
+        const base = this.scorer.score(place, recommendationContext, profile);
+        if (premiumTier === "standard") return base;
+        const qualityLift = 1 + ((place.qualityScore + (place.creatorTrustScore ?? 0.4)) / 2) * 0.08;
+        const personalizedLift = base.reasons.some((reason) => reason.includes("you")) ? rerankBoost : 1;
+        return { ...base, score: base.score * qualityLift * personalizedLift };
+      })
       .filter((candidate) => !profile?.hiddenPlaceIds.includes(candidate.place.canonicalPlaceId))
       .sort((a, b) => b.score - a.score || a.place.canonicalPlaceId.localeCompare(b.place.canonicalPlaceId));
     const diversified = this.balancer.balance(ranked);
@@ -508,12 +529,14 @@ export class RecommendationService {
 }
 
 export class AdInsertionService {
-  insert(organic: DiscoveryFeedCard[], spacing: number): DiscoveryFeedCard[] {
+  insert(organic: DiscoveryFeedCard[], spacing: number, maxAds: number): DiscoveryFeedCard[] {
     const mixed: DiscoveryFeedCard[] = [];
     let shown = 0;
+    let inserted = 0;
     for (const card of organic) {
-      if (shown > 0 && shown % spacing === 0) {
+      if (shown > 0 && shown % spacing === 0 && inserted < maxAds) {
         mixed.push({ type: "ad", id: `ad-${shown}`, placementKey: "feed-inline" });
+        inserted += 1;
       }
       mixed.push(card);
       shown += 1;
@@ -530,7 +553,8 @@ export class DiscoveryFeedService {
     private readonly nearbyService: NearbyDiscoveryService,
     private readonly trendingService: TrendingService,
     private readonly browseService: CategoryBrowseService,
-    private readonly searchService: PlaceSearchService
+    private readonly searchService: PlaceSearchService,
+    private readonly premiumExperience?: PremiumExperienceService
   ) {}
 
   async feed(userId: string | undefined, mode: DiscoveryFeedMode, context: DiscoveryQueryContext): Promise<DiscoveryFeedResponse> {
@@ -548,7 +572,10 @@ export class DiscoveryFeedService {
     }
 
     const organicCards: DiscoveryFeedCard[] = organicItems.map((item) => ({ type: "place", id: item.placeId, place: item }));
-    const cards = this.adService.insert(organicCards, 4);
+    const adTier = userId ? this.premiumExperience?.adTierForUser(userId) ?? "standard" : "standard";
+    const adSpacing = adTier === "reduced" ? 12 : 4;
+    const maxAds = adTier === "none" ? 0 : (adTier === "reduced" ? 1 : 3);
+    const cards = this.adService.insert(organicCards, adSpacing, maxAds).filter((item) => adTier === "none" ? item.type !== "ad" : true);
     return {
       mode,
       items: cards,
