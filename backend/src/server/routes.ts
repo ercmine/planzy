@@ -3,7 +3,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import { createAccountsHttpHandlers } from "../accounts/http.js";
 import { createDiscoveryHttpHandlers } from "../discovery/http.js";
+import { createCreatorHttpHandlers } from "../creator/http.js";
 import type { AccountsService } from "../accounts/service.js";
+import type { CreatorService } from "../creator/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
 import { PermissionAction, ProfileType } from "../accounts/types.js";
 import type { ActorContextResolved } from "../accounts/types.js";
@@ -64,6 +66,7 @@ export function createRoutes(
     entitlementPolicy?: EntitlementPolicyService;
     accessEngine?: FeatureQuotaEngine;
     accountsService?: AccountsService;
+    creatorService?: CreatorService;
     discovery?: DiscoveryHttpHandlerDeps;
     savedHandlers?: SavedHttpHandlers;
   }
@@ -76,6 +79,7 @@ export function createRoutes(
     : null;
   const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
+  const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -718,6 +722,59 @@ export function createRoutes(
         return;
       }
 
+
+      if (creatorHandlers) {
+        if (req.method === "POST" && normalizedPath === "/v1/creator/profiles") {
+          await creatorHandlers.upsertProfile(req, res);
+          return;
+        }
+
+        const creatorProfileMatch = /^\/v1\/creator\/profiles\/([^/]+)$/.exec(normalizedPath);
+        if (creatorProfileMatch && req.method === "PATCH") {
+          await creatorHandlers.updateProfile(req, res, decodeURIComponent(creatorProfileMatch[1] ?? ""));
+          return;
+        }
+
+        const publicCreatorMatch = /^\/v1\/creators\/([^/]+)$/.exec(normalizedPath);
+        if (publicCreatorMatch && req.method === "GET") {
+          await creatorHandlers.getPublicProfile(req, res, decodeURIComponent(publicCreatorMatch[1] ?? ""));
+          return;
+        }
+
+        const followMatch = /^\/v1\/creator\/profiles\/([^/]+)\/follow$/.exec(normalizedPath);
+        if (followMatch && req.method === "POST") {
+          await creatorHandlers.follow(req, res, decodeURIComponent(followMatch[1] ?? ""));
+          return;
+        }
+        if (followMatch && req.method === "DELETE") {
+          await creatorHandlers.unfollow(req, res, decodeURIComponent(followMatch[1] ?? ""));
+          return;
+        }
+
+        const guidesMatch = /^\/v1\/creator\/profiles\/([^/]+)\/guides$/.exec(normalizedPath);
+        if (guidesMatch && req.method === "POST") {
+          await creatorHandlers.createGuide(req, res, decodeURIComponent(guidesMatch[1] ?? ""));
+          return;
+        }
+
+        const guidePatchMatch = /^\/v1\/creator\/guides\/([^/]+)$/.exec(normalizedPath);
+        if (guidePatchMatch && req.method === "PATCH") {
+          await creatorHandlers.updateGuide(req, res, decodeURIComponent(guidePatchMatch[1] ?? ""));
+          return;
+        }
+
+        const publicGuideMatch = /^\/v1\/creators\/([^/]+)\/guides\/([^/]+)$/.exec(normalizedPath);
+        if (publicGuideMatch && req.method === "GET") {
+          await creatorHandlers.getGuide(req, res, decodeURIComponent(publicGuideMatch[1] ?? ""), decodeURIComponent(publicGuideMatch[2] ?? ""));
+          return;
+        }
+
+        const analyticsMatch = /^\/v1\/creator\/profiles\/([^/]+)\/analytics$/.exec(normalizedPath);
+        if (analyticsMatch && req.method === "GET") {
+          await creatorHandlers.analytics(req, res, decodeURIComponent(analyticsMatch[1] ?? ""));
+          return;
+        }
+      }
       if (accountHandlers) {
         if (req.method === "GET" && normalizedPath === "/v1/identity") {
           await accountHandlers.getCurrentIdentity(req, res);

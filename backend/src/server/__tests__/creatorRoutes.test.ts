@@ -1,0 +1,112 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { createServer } from "../index.js";
+
+describe("creator profile routes", () => {
+  let server: ReturnType<typeof createServer>;
+  let baseUrl: string;
+
+  beforeAll(async () => {
+    server = createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("invalid address");
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  });
+
+  it("supports public creator profile, follow/unfollow, guides, and private analytics", async () => {
+    const creatorHeaders = { "x-user-id": "creator-1", "content-type": "application/json" };
+    const createRes = await fetch(`${baseUrl}/v1/profiles/creator`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ creatorName: "Ava Guide" })
+    });
+    expect(createRes.status).toBe(201);
+    const creator = await createRes.json() as { profile: { id: string } };
+
+    const upsertRes = await fetch(`${baseUrl}/v1/creator/profiles`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ displayName: "Ava Guide", slug: "ava-guide", bio: "Food creator" })
+    });
+    expect(upsertRes.status).toBe(200);
+
+    const patchRes = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creator.profile.id)}`, {
+      method: "PATCH",
+      headers: creatorHeaders,
+      body: JSON.stringify({ socialLinks: [{ platform: "instagram", url: "https://www.instagram.com/ava" }] })
+    });
+    expect(patchRes.status).toBe(200);
+
+    const guideRes = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creator.profile.id)}/guides`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ title: "Best Tacos", summary: "Austin picks", body: "- spot1", status: "published" })
+    });
+    expect(guideRes.status).toBe(201);
+    const guide = await guideRes.json() as { guide: { slug: string; id: string } };
+
+    const viewerHeaders = { "x-user-id": "viewer-1" };
+    const publicProfile = await fetch(`${baseUrl}/v1/creators/ava-guide`, { headers: viewerHeaders });
+    expect(publicProfile.status).toBe(200);
+    await expect(publicProfile.json()).resolves.toMatchObject({
+      profile: {
+        slug: "ava-guide",
+        followerCount: 0,
+        guides: [expect.objectContaining({ title: "Best Tacos" })]
+      }
+    });
+
+    const followRes = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creator.profile.id)}/follow`, {
+      method: "POST",
+      headers: viewerHeaders
+    });
+    expect(followRes.status).toBe(200);
+    await expect(followRes.json()).resolves.toMatchObject({ isFollowing: true, followerCount: 1 });
+
+    const guidePublic = await fetch(`${baseUrl}/v1/creators/ava-guide/guides/${encodeURIComponent(guide.guide.slug)}`, { headers: viewerHeaders });
+    expect(guidePublic.status).toBe(200);
+
+    const analyticsAsViewer = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creator.profile.id)}/analytics`, { headers: viewerHeaders });
+    expect(analyticsAsViewer.status).toBe(403);
+
+    const analyticsAsOwner = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creator.profile.id)}/analytics`, {
+      headers: { "x-user-id": "creator-1" }
+    });
+    expect(analyticsAsOwner.status).toBe(200);
+    await expect(analyticsAsOwner.json()).resolves.toMatchObject({ summary: { totalFollowers: 1 } });
+
+    const unfollowRes = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creator.profile.id)}/follow`, {
+      method: "DELETE",
+      headers: viewerHeaders
+    });
+    expect(unfollowRes.status).toBe(200);
+    await expect(unfollowRes.json()).resolves.toMatchObject({ isFollowing: false, followerCount: 0 });
+  });
+
+  it("rejects malformed social links", async () => {
+    const headers = { "x-user-id": "creator-2", "content-type": "application/json" };
+    await fetch(`${baseUrl}/v1/profiles/creator`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ creatorName: "Bad Link" })
+    });
+    await fetch(`${baseUrl}/v1/creator/profiles`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ displayName: "Bad Link", slug: "bad-link" })
+    });
+    const identity = await fetch(`${baseUrl}/v1/identity`, { headers: { "x-user-id": "creator-2" } });
+    const payload = await identity.json() as { creatorProfile: { id: string } };
+    const res = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(payload.creatorProfile.id)}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ socialLinks: [{ platform: "instagram", url: "https://evil.com/ava" }] })
+    });
+    expect(res.status).toBe(400);
+  });
+});

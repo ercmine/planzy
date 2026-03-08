@@ -5,6 +5,7 @@ import type {
   BusinessReply,
   CreateReviewInput,
   CreateReviewMediaUploadInput,
+  ListReviewsByAuthorProfileInput,
   ListReviewsInput,
   ListReviewsResult,
   ModerationState,
@@ -132,6 +133,23 @@ export class MemoryReviewsStore implements ReviewsStore {
   async getByPlaceAndAuthor(placeId: string, authorUserId: string): Promise<PlaceReview | null> {
     const row = [...this.byId.values()].find((item) => (item.placeId === placeId || item.canonicalPlaceId === placeId) && item.authorUserId === authorUserId && !item.deletedAt);
     return row ? this.toView(row, authorUserId) : null;
+  }
+
+  async listByAuthorProfile(input: ListReviewsByAuthorProfileInput): Promise<PlaceReview[]> {
+    const rows = [...this.byId.values()].filter((row) => {
+      if (row.authorProfileType !== input.authorProfileType || row.authorProfileId !== input.authorProfileId) return false;
+      if (input.viewerUserId && row.authorUserId === input.viewerUserId) return !row.deletedAt;
+      return PUBLIC_STATES.includes(row.moderationState) && !row.deletedAt;
+    });
+
+    rows.sort((a, b) => {
+      if (input.sort === "top") {
+        if (a.helpfulCount !== b.helpfulCount) return b.helpfulCount - a.helpfulCount;
+      }
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+
+    return rows.slice(0, Math.max(1, Math.min(input.limit ?? 20, 50))).map((row) => this.toView(row, input.viewerUserId));
   }
 
   async createOrReplace(input: CreateReviewInput): Promise<PlaceReview> {

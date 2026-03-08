@@ -179,8 +179,18 @@ export interface ListReviewsResult {
   nextCursor?: string;
 }
 
+
+export interface ListReviewsByAuthorProfileInput {
+  authorProfileType: "PERSONAL" | "CREATOR" | "BUSINESS";
+  authorProfileId: string;
+  viewerUserId?: string;
+  sort?: "latest" | "top";
+  limit?: number;
+}
+
 export interface ReviewsStore {
   listByPlace(input: ListReviewsInput): Promise<ListReviewsResult>;
+  listByAuthorProfile(input: ListReviewsByAuthorProfileInput): Promise<PlaceReview[]>;
   getById(reviewId: string, viewerUserId?: string, includeHidden?: boolean): Promise<PlaceReview | null>;
   getByPlaceAndAuthor(placeId: string, authorUserId: string): Promise<PlaceReview | null>;
   createOrReplace(input: CreateReviewInput): Promise<PlaceReview>;
