@@ -1,25 +1,55 @@
 ---
-import CTAButtons from './CTAButtons.astro';
 import Container from './Container.astro';
+
+const socialProof = [
+  { label: 'Plans surfaced today', value: '12,480' },
+  { label: 'Loved in', value: 'Austin, TX' },
+  { label: 'Avg. match time', value: 'under 30 sec' }
+];
 ---
 
-<section class="py-20 sm:py-28">
+<section class="bg-hero-glow py-16 sm:py-20">
   <Container class="grid items-center gap-10 lg:grid-cols-2">
     <div class="space-y-6">
-      <p class="text-sm font-semibold uppercase tracking-wide text-brand-600">Planning, in sync</p>
-      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Run better planning sessions with Perbug.</h1>
-      <p class="text-lg text-slate-600 dark:text-slate-300">
-        Guide teams from idea capture to aligned execution with transparent sessions, focused decisions, and lightweight telemetry.
+      <p class="text-sm font-semibold uppercase tracking-[0.2em] text-brand-400">Live plans near you</p>
+      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Plans that match your moment.</h1>
+      <p class="max-w-xl text-lg text-slate-300">
+        Perbug finds the best nearby coffee, food, bars, and activities—live, location-based, and always up to date.
       </p>
-      <CTAButtons />
+      <div class="flex flex-wrap gap-3">
+        <a href="/downloads/" class="rounded-lg bg-brand-500 px-5 py-3 font-semibold text-slate-950 shadow-soft hover:bg-brand-400">Get the App</a>
+        <a href="/demo/" class="rounded-lg border border-slate-600 px-5 py-3 font-semibold text-slate-100 hover:border-neon-purple">Try the Demo</a>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-3">
+        {socialProof.map((stat) => (
+          <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+            <p class="text-xl font-semibold text-brand-400">{stat.value}</p>
+            <p class="text-xs text-slate-400">{stat.label}</p>
+          </div>
+        ))}
+      </div>
     </div>
-    <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-soft dark:border-slate-800 dark:bg-slate-900">
-      <h2 class="mb-3 text-xl font-semibold">Why teams choose Perbug</h2>
-      <ul class="space-y-3 text-slate-600 dark:text-slate-300">
-        <li>• Guided session flows to move from brainstorm to decision quickly.</li>
-        <li>• Shared visibility across facilitators, participants, and stakeholders.</li>
-        <li>• Mobile-first experience with fast onboarding and clear outcomes.</li>
-      </ul>
+    <div class="rounded-3xl border border-slate-700 bg-slate-900/70 p-4 shadow-glow">
+      <div class="mx-auto max-w-xs rounded-[2rem] border border-slate-700 bg-slate-950 p-4">
+        <div class="mb-4 h-2 w-20 rounded-full bg-slate-700"></div>
+        <div class="space-y-3">
+          <div class="rounded-2xl border border-slate-800 bg-slate-900 p-3">
+            <p class="text-xs text-slate-400">Trending now • 0.4 mi</p>
+            <p class="font-semibold">Moonshot Coffee</p>
+            <p class="text-xs text-slate-300">Open mic starts in 20 min</p>
+          </div>
+          <div class="rounded-2xl border border-slate-800 bg-slate-900 p-3">
+            <p class="text-xs text-slate-400">Popular tonight • 0.9 mi</p>
+            <p class="font-semibold">Nori Alley</p>
+            <p class="text-xs text-slate-300">2-for-1 ramen until 8pm</p>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-center text-xs font-semibold">
+            <div class="rounded-lg border border-rose-500/40 px-2 py-1 text-rose-300">No</div>
+            <div class="rounded-lg border border-amber-500/40 px-2 py-1 text-amber-300">Maybe</div>
+            <div class="rounded-lg border border-brand-400/40 px-2 py-1 text-brand-300">Yes</div>
+          </div>
+        </div>
+      </div>
     </div>
   </Container>
 </section>

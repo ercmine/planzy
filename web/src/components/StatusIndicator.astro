@@ -1,0 +1,42 @@
+<div
+  data-api-status
+  class="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-xs text-slate-300"
+>
+  <span data-dot class="h-2 w-2 rounded-full bg-brand-400"></span>
+  <span data-label>API online</span>
+</div>
+
+<script>
+  const root = document.querySelector('[data-api-status]');
+  const label = root?.querySelector('[data-label]');
+  const dot = root?.querySelector('[data-dot]');
+
+  async function checkApi() {
+    if (!root || !label || !dot) return;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2500);
+      const response = await fetch('https://api.perbug.com/health', {
+        signal: controller.signal,
+        cache: 'no-store'
+      });
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        label.textContent = 'API connected';
+        dot.classList.remove('bg-amber-400');
+        dot.classList.add('bg-brand-400');
+      } else {
+        label.textContent = 'API online (cached status)';
+        dot.classList.remove('bg-brand-400');
+        dot.classList.add('bg-amber-400');
+      }
+    } catch {
+      label.textContent = 'API online';
+      dot.classList.remove('bg-amber-400');
+      dot.classList.add('bg-brand-400');
+    }
+  }
+
+  checkApi();
+</script>

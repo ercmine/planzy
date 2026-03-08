@@ -1,17 +1,22 @@
+@import './tokens.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
 html {
-  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-50;
+  @apply bg-slate-950 text-slate-50 antialiased;
 }
 
 body {
   @apply min-h-screen font-sans;
+  background:
+    radial-gradient(circle at 15% 5%, rgba(54, 244, 160, 0.09), transparent 35%),
+    radial-gradient(circle at 90% 0%, rgba(155, 123, 255, 0.1), transparent 42%),
+    var(--color-bg);
 }
 
 a {
@@ -19,5 +24,5 @@ a {
 }
 
 .prose pre {
-  @apply rounded-xl border border-slate-200/60 dark:border-slate-700;
+  @apply rounded-xl border border-slate-700;
 }

@@ -8,9 +8,10 @@ interface Props {
   description: string;
   canonical: string;
   ogImage?: string;
+  structuredData?: Record<string, unknown> | Record<string, unknown>[];
 }
 
-const { title, description, canonical, ogImage = '/social-card.svg' } = Astro.props;
+const { title, description, canonical, ogImage = '/social-card.svg', structuredData } = Astro.props;
 ---
 
 <!doctype html>
@@ -31,6 +32,7 @@ const { title, description, canonical, ogImage = '/social-card.svg' } = Astro.pr
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+    {structuredData && <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />}
   </head>
   <body>
     <Header />

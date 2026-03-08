@@ -7,7 +7,7 @@ export type SeoInput = {
 };
 
 export const defaultDescription =
-  'Perbug helps teams align, plan, and ship with shared session workflows and lightweight telemetry.';
+  'Perbug helps you discover the best nearby plans with live results, category filters, and fast swipe decisions.';
 
 export function createSeo({ title, description, path = '/' }: SeoInput) {
   const canonical = new URL(path, publicConfig.PERBUG_SITE_URL).toString();

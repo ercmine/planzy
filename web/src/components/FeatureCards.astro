@@ -1,0 +1,28 @@
+---
+import Container from './Container.astro';
+
+const features = [
+  { title: 'Live Results', desc: 'See what is trending nearby right now, from packed coffee spots to tonight-only specials.' },
+  { title: 'Swipe Decisions', desc: 'Use yes/no/maybe cards to quickly narrow options without decision fatigue.' },
+  { title: 'Category Filters', desc: 'Dial in the plan with categories like coffee, food, bars, activities, and more.' },
+  { title: 'Save & Share Plans', desc: 'Keep favorites for later and send your final pick to friends in one tap.' },
+  { title: 'Privacy-first Location', desc: 'Location is used only to rank relevant nearby options, never sold as ad data.' }
+];
+---
+
+<section id="features" class="py-[var(--space-section)]">
+  <Container>
+    <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <h2 class="text-3xl font-semibold">Everything you need in 10 seconds</h2>
+      <a href="/demo/" class="text-sm font-semibold text-brand-400 hover:text-brand-300">See demo preview →</a>
+    </div>
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {features.map((feature) => (
+        <article class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+          <h3 class="text-lg font-semibold">{feature.title}</h3>
+          <p class="mt-2 text-slate-300">{feature.desc}</p>
+        </article>
+      ))}
+    </div>
+  </Container>
+</section>

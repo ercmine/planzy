@@ -1,23 +1,30 @@
 ---
 import Container from './Container.astro';
+import PixelBugIcon from './PixelBugIcon.astro';
+import StatusIndicator from './StatusIndicator.astro';
 
 const links = [
-  { href: '/', label: 'Home' },
-  { href: '/downloads/', label: 'Downloads' },
-  { href: '/docs/', label: 'Docs' },
-  { href: '/privacy/', label: 'Privacy' },
-  { href: '/terms/', label: 'Terms' },
-  { href: '/support/', label: 'Support' }
+  { href: '#how-it-works', label: 'How it works' },
+  { href: '#features', label: 'Features' },
+  { href: '#faq', label: 'FAQ' },
+  { href: '/downloads/', label: 'Downloads' }
 ];
 ---
 
-<header class="border-b border-slate-200/80 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
-  <Container class="flex h-16 items-center justify-between">
-    <a href="/" class="flex items-center gap-3 font-semibold">
-      <img src="/logo.svg" alt="Perbug" class="h-7 w-auto" />
+<header class="sticky top-0 z-20 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur">
+  <Container class="flex min-h-16 items-center justify-between gap-4 py-3">
+    <a href="/" class="flex items-center gap-2 text-brand-400">
+      <PixelBugIcon class="h-6 w-6" />
+      <span class="text-base font-semibold tracking-wide text-slate-100">Perbug</span>
     </a>
-    <nav class="hidden gap-5 text-sm text-slate-600 dark:text-slate-300 md:flex">
-      {links.map((link) => <a href={link.href} class="hover:text-brand-600">{link.label}</a>)}
+    <nav class="hidden items-center gap-5 text-sm text-slate-300 md:flex">
+      {links.map((link) => <a href={link.href} class="hover:text-brand-400">{link.label}</a>)}
     </nav>
+    <div class="flex items-center gap-3">
+      <div class="hidden md:block"><StatusIndicator /></div>
+      <a href="/downloads/" class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-400">
+        Get the App
+      </a>
+    </div>
   </Container>
 </header>
