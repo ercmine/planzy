@@ -262,9 +262,9 @@ Plan _planFromApi(Map<String, dynamic> json) {
 
   final photo = json['photo']?.toString();
   final photoUrl = json['photoUrl']?.toString();
-  final safePhotoUrl = isHttpUrl(photoUrl) ? photoUrl : null;
   final mapsUri = json['googleMapsUri']?.toString();
   final websiteUri = json['websiteUri']?.toString();
+  final photos = _parsePhotos(json: json, apiClient: apiClient, fallbackPhoto: photo, fallbackPhotoUrl: photoUrl);
 
   return Plan(
     id: id,
@@ -272,11 +272,14 @@ Plan _planFromApi(Map<String, dynamic> json) {
     sourceId: (json['placeId'] ?? json['sourceId'] ?? id).toString(),
     title: title,
     category: category,
+    description: json['description']?.toString(),
     location: PlanLocation(lat: lat, lng: lng, address: address),
     priceLevel: parseInt(json['priceLevel']),
     rating: parseDouble(json['rating']),
-    reviewCount: parseInt(json['userRatingCount']),
-    photos: safePhotoUrl == null || safePhotoUrl.isEmpty ? null : [PlanPhoto(url: safePhotoUrl)],
+    reviewCount: parseInt(json['userRatingCount'] ?? json['reviewCount']),
+    photos: photos,
+    phone: json['phone']?.toString(),
+    openingHoursText: parseOpeningHoursText(json['openingHoursText'] ?? json['openingHours']),
     deepLinks: (mapsUri != null && mapsUri.isNotEmpty) ||
             (websiteUri != null && websiteUri.isNotEmpty)
         ? DeepLinks(mapsLink: mapsUri, websiteLink: websiteUri)
@@ -286,7 +289,49 @@ Plan _planFromApi(Map<String, dynamic> json) {
       'placeId': json['placeId']?.toString(),
       'address': address,
       'photo': photo,
-      'photoUrl': safePhotoUrl,
+      'photoUrl': photoUrl,
     },
   );
+}
+
+List<PlanPhoto>? _parsePhotos({
+  required Map<String, dynamic> json,
+  required ApiClient apiClient,
+  String? fallbackPhoto,
+  String? fallbackPhotoUrl,
+}) {
+  final out = <PlanPhoto>[];
+
+  final rawPhotos = json['photos'];
+  if (rawPhotos is List) {
+    for (final raw in rawPhotos) {
+      if (raw is Map<String, dynamic>) {
+        final token = raw['name']?.toString() ?? raw['photoReference']?.toString() ?? raw['token']?.toString();
+        final url = apiClient.buildPhotoUrl(raw['url']?.toString() ?? token);
+        if (url != null && isHttpUrl(url)) {
+          out.add(
+            PlanPhoto(
+              url: url,
+              width: parseInt(raw['widthPx']),
+              height: parseInt(raw['heightPx']),
+              token: token,
+            ),
+          );
+        }
+        continue;
+      }
+      final token = raw?.toString();
+      final url = apiClient.buildPhotoUrl(token);
+      if (url != null && isHttpUrl(url)) {
+        out.add(PlanPhoto(url: url, token: token));
+      }
+    }
+  }
+
+  final fallback = apiClient.buildPhotoUrl(fallbackPhotoUrl ?? fallbackPhoto);
+  if (fallback != null && isHttpUrl(fallback) && out.every((photo) => photo.url != fallback)) {
+    out.insert(0, PlanPhoto(url: fallback, token: fallbackPhoto));
+  }
+
+  return out.isEmpty ? null : out;
 }

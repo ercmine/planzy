@@ -37,6 +37,10 @@ class PlanApiModel {
     this.websiteUri,
     this.photo,
     this.photoUrl,
+    this.photos,
+    this.description,
+    this.phone,
+    this.openingHoursText,
   });
 
   final String id;
@@ -54,6 +58,10 @@ class PlanApiModel {
   final String? websiteUri;
   final String? photo;
   final String? photoUrl;
+  final List<String>? photos;
+  final String? description;
+  final String? phone;
+  final List<String>? openingHoursText;
 
   factory PlanApiModel.fromJson(Map<String, dynamic> json) {
     return PlanApiModel(
@@ -72,6 +80,10 @@ class PlanApiModel {
       websiteUri: json['websiteUri']?.toString(),
       photo: json['photo']?.toString(),
       photoUrl: json['photoUrl']?.toString(),
+      photos: parseStringList(json['photos']),
+      description: json['description']?.toString(),
+      phone: json['phone']?.toString(),
+      openingHoursText: parseStringList(json['openingHoursText'] ?? json['openingHours']),
     );
   }
 }

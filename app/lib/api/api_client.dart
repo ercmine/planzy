@@ -115,6 +115,43 @@ class ApiClient {
     );
   }
 
+  Future<JsonMap?> getJsonOrNull(
+    String path, {
+    Map<String, String?>? queryParameters,
+    Set<int> nullableStatusCodes = const {404, 501},
+  }) async {
+    try {
+      return await getJson(path, queryParameters: queryParameters);
+    } on ApiError catch (error) {
+      final statusCode = error.statusCode;
+      if (statusCode != null && nullableStatusCodes.contains(statusCode)) {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  Future<JsonMap?> fetchPlanDetail(String planId) {
+    return getJsonOrNull('/plans/$planId');
+  }
+
+  Future<JsonMap?> fetchPlaceDetail(String placeId) {
+    return getJsonOrNull('/places/$placeId');
+  }
+
+  String? buildPhotoUrl(String? token) {
+    if (token == null || token.isEmpty) {
+      return null;
+    }
+    if (token.startsWith('http://') || token.startsWith('https://')) {
+      return token;
+    }
+    if (token.startsWith('file://')) {
+      return null;
+    }
+    return buildUri('/photos', <String, String?>{'name': token}).toString();
+  }
+
   Future<Object> getDecoded(String path, {Map<String, String?>? queryParameters}) {
     return _send(
       method: 'GET',
