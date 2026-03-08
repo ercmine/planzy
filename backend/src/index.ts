@@ -92,3 +92,5 @@ export * from "./accounts/store.js";
 export * from "./accounts/memoryStore.js";
 export * from "./accounts/service.js";
 export * from "./accounts/http.js";
+
+export * from "./places/index.js";

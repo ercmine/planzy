@@ -1,0 +1,8 @@
+export * from "./types.js";
+export * from "./categoryNormalization.js";
+export * from "./adapters.js";
+export { findPlaceMatch } from "./matcher.js";
+export { mergeIntoCanonicalPlace } from "./merge.js";
+export * from "./memoryStore.js";
+export * from "./service.js";
+export { normalizePhone, normalizeUrl } from "./normalization.js";
