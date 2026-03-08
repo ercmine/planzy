@@ -150,7 +150,8 @@ void main() {
         'priceLevel': 2,
         'googleMapsUri': 'https://maps.google.com',
         'websiteUri': 'https://venue.example',
-        'photo': 'https://cdn.example/p.jpg',
+        'photo': 'places/abc/photos/def',
+        'photoUrl': 'https://api.perbug.com/photos?name=places%2Fabc%2Fphotos%2Fdef&maxWidthPx=800',
         'unexpected': 'ignored',
       });
       expect(plan.id, 'sample-plan-1');
@@ -160,6 +161,8 @@ void main() {
       expect(plan.placeId, 'abc123');
       expect(plan.lat, 44.1);
       expect(plan.googleMapsUri, contains('maps.google.com'));
+      expect(plan.photo, startsWith('places/'));
+      expect(plan.photoUrl, contains('/photos?name='));
     });
 
     test('parses live-results response shape', () {
