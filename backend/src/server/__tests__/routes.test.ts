@@ -303,5 +303,67 @@ describe("server diagnostic and alias routes", () => {
     });
     expect(reportMedia.status).toBe(202);
   });
+  it("supports trust evidence, trust signals, and admin trust overrides", async () => {
+    process.env.ADMIN_API_KEY = "admin-test-key";
+
+    const create = await fetch(`${baseUrl}/places/trust-place/reviews`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-user-id": "trust-user"
+      },
+      body: JSON.stringify({
+        text: "Visited for dinner and tested several dishes. Service was fast, portions were generous, and the ambience was comfortable for a long conversation.",
+        displayName: "Trust User",
+        rating: 5
+      })
+    });
+    expect(create.status).toBe(201);
+    const created = await create.json() as { review: { id: string } };
+
+    const evidence = await fetch(`${baseUrl}/v1/trust/evidence`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-user-id": "trust-user"
+      },
+      body: JSON.stringify({
+        userId: "trust-user",
+        placeId: "trust-place",
+        linkedReviewId: created.review.id,
+        evidenceType: "check_in",
+        evidenceStrength: 100
+      })
+    });
+    expect(evidence.status).toBe(201);
+
+    const trustRes = await fetch(`${baseUrl}/reviews/${created.review.id}/trust`);
+    expect(trustRes.status).toBe(200);
+    await expect(trustRes.json()).resolves.toMatchObject({
+      trustSignals: expect.objectContaining({ verificationLevel: expect.stringMatching(/probable|verified/) })
+    });
+
+    const forbidden = await fetch(`${baseUrl}/v1/trust/reviewers/trust-user`);
+    expect(forbidden.status).toBe(403);
+
+    const adminProfile = await fetch(`${baseUrl}/v1/trust/reviewers/trust-user`, {
+      headers: { "x-admin-key": "admin-test-key" }
+    });
+    expect(adminProfile.status).toBe(200);
+
+    const override = await fetch(`${baseUrl}/v1/trust/reviewers/trust-user/override`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-admin-key": "admin-test-key"
+      },
+      body: JSON.stringify({ status: "revoked", reason: "policy_violation", actorUserId: "moderator-1" })
+    });
+    expect(override.status).toBe(200);
+    await expect(override.json()).resolves.toMatchObject({
+      profile: expect.objectContaining({ trustStatus: "revoked" })
+    });
+  });
+
 
 });
