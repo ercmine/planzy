@@ -13,10 +13,17 @@ import type {
   PlaceDocument,
   PlaceResultItem,
   RankingExplain,
-  RecommendationsResponse,
+  RecommendationConfig,
+  RecommendationContext,
   RecommendationProfile,
+  RecommendationSignal,
+  RecommendationsResponse,
+  RelatedPlacesResponse,
   SearchResponse,
-  TrendingResponse
+  SuggestedCreatorsResponse,
+  SuggestedGuidesResponse,
+  TrendingResponse,
+  UserRecommendationProfile
 } from "./types.js";
 
 interface RankedCandidate {
@@ -24,11 +31,45 @@ interface RankedCandidate {
   score: number;
   explain: RankingExplain;
   distanceMeters?: number;
+  reasons: string[];
+  signalBreakdown?: { finalScore: number; signals: RecommendationSignal[] };
+  diversityBucket: string;
 }
 
 interface PagingCursorState {
   offset: number;
 }
+
+const DEFAULT_RECOMMENDATION_CONFIG: RecommendationConfig = {
+  weights: {
+    categoryInterest: 0.19,
+    cityRelevance: 0.14,
+    savedPlaceSimilarity: 0.15,
+    engagementSimilarity: 0.12,
+    creatorAffinity: 0.1,
+    qualityTrust: 0.13,
+    trendingBackstop: 0.07,
+    freshness: 0.06,
+    novelty: 0.08,
+    repetitionPenalty: 0.08,
+    negativeFeedbackPenalty: 0.12
+  },
+  limits: {
+    maxCandidates: 200,
+    maxPerCategory: 3,
+    maxPerCreator: 2,
+    maxPerChain: 2,
+    qualityFloor: 0.25
+  },
+  geo: {
+    nearbyRadiusMeters: 4_000,
+    locationBoost: 0.15
+  },
+  coldStartMix: {
+    trendingWeight: 0.55,
+    qualityWeight: 0.45
+  }
+};
 
 function decodeCursor(cursor: string | undefined): PagingCursorState {
   if (!cursor) return { offset: 0 };
@@ -56,12 +97,34 @@ function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number):
   return 2 * r * Math.asin(Math.sqrt(q));
 }
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
 function clampPageSize(value: number | undefined): number {
   const requested = Number(value ?? 20);
   return Math.max(1, Math.min(50, Number.isFinite(requested) ? requested : 20));
 }
 
-function mapResult(candidate: RankedCandidate, includeExplain: boolean, reasons?: string[]): PlaceResultItem {
+function buildRecommendationContext(context: DiscoveryQueryContext, userId?: string): RecommendationContext {
+  return {
+    userId,
+    anonymous: !userId,
+    city: context.city,
+    lat: context.lat,
+    lng: context.lng,
+    radiusMeters: Math.max(200, Math.min(50_000, Number(context.radiusMeters ?? DEFAULT_RECOMMENDATION_CONFIG.geo.nearbyRadiusMeters))),
+    surface: context.surface ?? "for_you",
+    categoryFilter: context.categoryId ?? context.categorySlug,
+    placeId: context.placeId,
+    creatorId: context.creatorId,
+    cursor: context.cursor,
+    pageSize: clampPageSize(context.pageSize),
+    explain: Boolean(context.explain)
+  };
+}
+
+function mapResult(candidate: RankedCandidate, includeExplain: boolean): PlaceResultItem {
   return {
     placeId: candidate.place.canonicalPlaceId,
     title: candidate.place.name,
@@ -79,58 +142,15 @@ function mapResult(candidate: RankedCandidate, includeExplain: boolean, reasons?
     metadata: {
       rankingScore: candidate.score,
       trendingScore: candidate.place.trendingScore,
-      recommendationReasons: reasons,
-      description: candidate.place.descriptionMetadata
+      recommendationReasons: candidate.reasons,
+      description: candidate.place.descriptionMetadata,
+      diversityBucket: candidate.diversityBucket,
+      explanation: includeExplain ? candidate.signalBreakdown : undefined
     },
     longDescription: candidate.place.longDescription,
     userContext: { saved: false, reviewed: false },
     explain: includeExplain ? candidate.explain : undefined
   };
-}
-
-async function rankPlaces(repo: PlaceDiscoveryRepository, context: DiscoveryQueryContext, profile?: RecommendationProfile): Promise<RankedCandidate[]> {
-  const places = await repo.listPlaces();
-  const terms = tokenize(context.query);
-  const categoryToken = (context.categoryId ?? context.categorySlug ?? "").toLowerCase();
-  const cityToken = String(context.city ?? "").toLowerCase();
-  const radius = Math.max(100, Math.min(50_000, Number(context.radiusMeters ?? 4_000)));
-
-  return places
-    .map((place): RankedCandidate => {
-      const textCorpus = [place.name, place.shortDescription, place.longDescription, place.description, ...place.keywords, place.primaryCategory, ...place.secondaryCategories, place.city, place.neighborhood]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const textMatch = terms.length === 0 ? 0.6 : terms.filter((term) => textCorpus.includes(term)).length / terms.length;
-      const categoryFit = !categoryToken ? 0.6 : ([place.primaryCategory, ...place.secondaryCategories].join(" ").toLowerCase().includes(categoryToken) ? 1 : 0);
-      const cityFit = !cityToken ? 0.5 : String(place.city ?? "").toLowerCase().includes(cityToken) ? 1 : 0;
-      const distance = context.lat !== undefined && context.lng !== undefined
-        ? distanceMeters(context.lat, context.lng, place.lat, place.lng)
-        : undefined;
-      const distanceFit = distance === undefined ? 0.5 : Math.max(0, 1 - Math.min(distance, radius) / radius);
-      const personalization = !profile ? 0.5 : profile.preferredCategories.some((cat) => place.primaryCategory.includes(cat)) ? 1 : 0.35;
-      const quality = place.qualityScore;
-      const popularity = place.popularityScore;
-      const trending = place.trendingScore;
-
-      const score = (textMatch * 0.28) + (categoryFit * 0.2) + (cityFit * 0.12) + (distanceFit * 0.14) + (quality * 0.1) + (popularity * 0.08) + (trending * 0.03) + (personalization * 0.05);
-      return {
-        place,
-        score,
-        distanceMeters: distance,
-        explain: {
-          score,
-          contributions: { textMatch, categoryFit, cityFit, distanceFit, quality, popularity, trending, personalization },
-          reasonCodes: [textMatch > 0.7 ? "query_match" : "broad_match", categoryFit > 0.7 ? "category_fit" : "category_backfill"]
-        }
-      };
-    })
-    .filter((candidate) => (candidate.distanceMeters === undefined || candidate.distanceMeters <= radius) && candidate.explain.contributions.categoryFit > 0)
-    .filter((candidate) => {
-      if (!context.filters?.openNow) return true;
-      return candidate.place.openNow === true;
-    })
-    .sort((a, b) => b.score - a.score || a.place.canonicalPlaceId.localeCompare(b.place.canonicalPlaceId));
 }
 
 function paginate<T>(items: T[], pageSize: number, cursor?: string): CursorPage<T> {
@@ -141,6 +161,175 @@ function paginate<T>(items: T[], pageSize: number, cursor?: string): CursorPage<
     items: page,
     nextCursor: nextOffset < items.length ? encodeCursor({ offset: nextOffset }) : undefined
   };
+}
+
+function applyBaseEligibility(place: PlaceDocument): boolean {
+  if (place.moderationState === "suppressed" || place.isClosed) return false;
+  return true;
+}
+
+function applyBaseFilters(place: PlaceDocument, context: DiscoveryQueryContext): boolean {
+  if (!applyBaseEligibility(place)) return false;
+  if (context.filters?.openNow && place.openNow !== true) return false;
+  if (context.filters?.minRating && (place.rating ?? 0) < context.filters.minRating) return false;
+  if (context.filters?.hasPhotos && place.imageUrls.length === 0) return false;
+  if (context.filters?.hasReviews && (place.reviewCount ?? 0) === 0) return false;
+  if (context.filters?.priceLevels?.length && !context.filters.priceLevels.includes(place.priceLevel ?? -1)) return false;
+  if ((context.categoryId || context.categorySlug)) {
+    const token = String(context.categoryId ?? context.categorySlug).toLowerCase();
+    const categories = [place.primaryCategory, ...place.secondaryCategories].join(" ").toLowerCase();
+    if (!categories.includes(token)) return false;
+  }
+  return true;
+}
+
+class CandidateGenerator {
+  constructor(private readonly repo: PlaceDiscoveryRepository) {}
+
+  async generate(profile: UserRecommendationProfile | undefined, context: RecommendationContext): Promise<PlaceDocument[]> {
+    const all = (await this.repo.listPlaces()).filter((place) => applyBaseEligibility(place) && place.qualityScore >= DEFAULT_RECOMMENDATION_CONFIG.limits.qualityFloor);
+    const byCity = all.filter((place) => !context.city || String(place.city ?? "").toLowerCase() === context.city.toLowerCase());
+    const cityPool = byCity.length > 0 ? byCity : all;
+
+    const profileCategoryPool = profile
+      ? cityPool.filter((place) => profile.categoryWeights[place.primaryCategory] || profile.savedPlaceCategories[place.primaryCategory])
+      : [];
+    const creatorPool = profile
+      ? cityPool.filter((place) => place.creatorId && (profile.creatorAffinity[place.creatorId] ?? 0) > 0)
+      : [];
+    const nearbyPool = context.lat !== undefined && context.lng !== undefined
+      ? cityPool.filter((place) => distanceMeters(context.lat!, context.lng!, place.lat, place.lng) <= context.radiusMeters)
+      : [];
+    const trendingPool = [...cityPool].sort((a, b) => b.trendingScore - a.trendingScore).slice(0, 60);
+    const highQualityPool = [...cityPool].sort((a, b) => b.qualityScore - a.qualityScore).slice(0, 60);
+
+    const merged = new Map<string, PlaceDocument>();
+    for (const pool of [nearbyPool, profileCategoryPool, creatorPool, trendingPool, highQualityPool]) {
+      for (const place of pool) {
+        merged.set(place.canonicalPlaceId, place);
+      }
+    }
+
+    return [...merged.values()].slice(0, DEFAULT_RECOMMENDATION_CONFIG.limits.maxCandidates);
+  }
+}
+
+class RecommendationScorer {
+  score(place: PlaceDocument, context: RecommendationContext, profile: RecommendationProfile | undefined): RankedCandidate {
+    const weights = DEFAULT_RECOMMENDATION_CONFIG.weights;
+    const categories = [place.primaryCategory, ...place.secondaryCategories];
+    const categorySignal = profile ? Math.max(...categories.map((c) => profile.categoryWeights[c] ?? profile.engagementCategoryWeights[c] ?? 0), 0.1) : 0.35;
+    const citySignal = context.city
+      ? clamp01(String(place.city ?? "").toLowerCase() === context.city.toLowerCase() ? 1 : 0.2)
+      : profile?.homeCity && place.city
+        ? clamp01(place.city.toLowerCase() === profile.homeCity.toLowerCase() ? 0.8 : 0.3)
+        : 0.55;
+
+    const savedSimilarity = profile ? clamp01((profile.savedPlaceCategories[place.primaryCategory] ?? 0) * 0.8 + (profile.savedPlaceIds.includes(place.canonicalPlaceId) ? -0.5 : 0.2)) : 0.35;
+    const engagement = profile ? clamp01(profile.engagementCategoryWeights[place.primaryCategory] ?? 0.3) : 0.4;
+    const creatorAffinity = profile && place.creatorId ? clamp01(profile.creatorAffinity[place.creatorId] ?? 0.2) : 0.2;
+    const qualityTrust = clamp01((place.qualityScore * 0.7) + ((place.creatorTrustScore ?? 0.5) * 0.3));
+    const trending = clamp01((place.popularityScore * 0.4) + (place.trendingScore * 0.6));
+
+    const freshnessDays = (Date.now() - new Date(place.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+    const freshness = clamp01(1 - Math.min(120, freshnessDays) / 120);
+    const novelty = profile ? clamp01(1 - (profile.categoryWeights[place.primaryCategory] ?? 0.2) * (1 - profile.noveltyTolerance)) : 0.5;
+    const repetitionPenalty = profile?.seenPlaceIds.includes(place.canonicalPlaceId) ? 1 : 0;
+    const negativeFeedbackPenalty = profile && (profile.hiddenPlaceIds.includes(place.canonicalPlaceId) || profile.excludedPlaceIds.includes(place.canonicalPlaceId)) ? 1 : 0;
+
+    const signals: RecommendationSignal[] = [
+      { signal: "category_interest", value: categorySignal, weight: weights.categoryInterest, contribution: categorySignal * weights.categoryInterest, reasonCode: "matched_favorite_category" },
+      { signal: "location_relevance", value: citySignal, weight: weights.cityRelevance, contribution: citySignal * weights.cityRelevance, reasonCode: "city_context_match" },
+      { signal: "saved_place_similarity", value: savedSimilarity, weight: weights.savedPlaceSimilarity, contribution: savedSimilarity * weights.savedPlaceSimilarity, reasonCode: "similar_to_saved_places" },
+      { signal: "engagement_history", value: engagement, weight: weights.engagementSimilarity, contribution: engagement * weights.engagementSimilarity, reasonCode: "aligned_with_recent_engagement" },
+      { signal: "creator_affinity", value: creatorAffinity, weight: weights.creatorAffinity, contribution: creatorAffinity * weights.creatorAffinity, reasonCode: "creator_you_engage_with" },
+      { signal: "quality_trust", value: qualityTrust, weight: weights.qualityTrust, contribution: qualityTrust * weights.qualityTrust, reasonCode: "trusted_high_quality_place" },
+      { signal: "trending_backstop", value: trending, weight: weights.trendingBackstop, contribution: trending * weights.trendingBackstop, reasonCode: "trending_backstop" },
+      { signal: "freshness", value: freshness, weight: weights.freshness, contribution: freshness * weights.freshness, reasonCode: "fresh_listing_signal" },
+      { signal: "novelty", value: novelty, weight: weights.novelty, contribution: novelty * weights.novelty, reasonCode: "adjacent_discovery" },
+      { signal: "repetition_penalty", value: repetitionPenalty, weight: -weights.repetitionPenalty, contribution: repetitionPenalty * -weights.repetitionPenalty, reasonCode: "recently_seen_penalty" },
+      { signal: "negative_feedback", value: negativeFeedbackPenalty, weight: -weights.negativeFeedbackPenalty, contribution: negativeFeedbackPenalty * -weights.negativeFeedbackPenalty, reasonCode: "hidden_or_not_interested_penalty" }
+    ];
+
+    if (profile?.coldStart) {
+      const base = (trending * DEFAULT_RECOMMENDATION_CONFIG.coldStartMix.trendingWeight) + (qualityTrust * DEFAULT_RECOMMENDATION_CONFIG.coldStartMix.qualityWeight);
+      signals.push({ signal: "trending_backstop", value: base, weight: 0.4, contribution: base * 0.4, reasonCode: "cold_start_quality_trending_mix" });
+    }
+
+    const score = signals.reduce((sum, signal) => sum + signal.contribution, 0);
+    const reasonCodes = signals.filter((signal) => signal.contribution > 0.02).map((signal) => signal.reasonCode).slice(0, 4);
+    return {
+      place,
+      score,
+      reasons: reasonCodes,
+      diversityBucket: `${place.primaryCategory}:${place.city ?? "global"}`,
+      explain: {
+        score,
+        contributions: Object.fromEntries(signals.map((signal) => [signal.signal, signal.contribution])),
+        reasonCodes
+      },
+      signalBreakdown: { finalScore: score, signals }
+    };
+  }
+}
+
+class DiversityBalancer {
+  balance(candidates: RankedCandidate[]): RankedCandidate[] {
+    const maxPerCategory = DEFAULT_RECOMMENDATION_CONFIG.limits.maxPerCategory;
+    const maxPerCreator = DEFAULT_RECOMMENDATION_CONFIG.limits.maxPerCreator;
+    const maxPerChain = DEFAULT_RECOMMENDATION_CONFIG.limits.maxPerChain;
+    const categoryCount = new Map<string, number>();
+    const creatorCount = new Map<string, number>();
+    const chainCount = new Map<string, number>();
+
+    const diversified: RankedCandidate[] = [];
+    for (const candidate of candidates) {
+      const category = candidate.place.primaryCategory;
+      const creator = candidate.place.creatorId ?? "";
+      const chain = candidate.place.chainId ?? "";
+      if ((categoryCount.get(category) ?? 0) >= maxPerCategory) continue;
+      if (creator && (creatorCount.get(creator) ?? 0) >= maxPerCreator) continue;
+      if (chain && (chainCount.get(chain) ?? 0) >= maxPerChain) continue;
+      categoryCount.set(category, (categoryCount.get(category) ?? 0) + 1);
+      if (creator) creatorCount.set(creator, (creatorCount.get(creator) ?? 0) + 1);
+      if (chain) chainCount.set(chain, (chainCount.get(chain) ?? 0) + 1);
+      diversified.push(candidate);
+    }
+
+    return diversified.length > 0 ? diversified : candidates;
+  }
+}
+
+async function rankPlaces(repo: PlaceDiscoveryRepository, context: DiscoveryQueryContext): Promise<RankedCandidate[]> {
+  const places = (await repo.listPlaces()).filter((place) => applyBaseFilters(place, context));
+  const terms = tokenize(context.query);
+  const cityToken = String(context.city ?? "").toLowerCase();
+  const radius = Math.max(100, Math.min(50_000, Number(context.radiusMeters ?? 4_000)));
+
+  return places
+    .map((place): RankedCandidate => {
+      const textCorpus = [place.name, place.shortDescription, place.longDescription, place.description, ...place.keywords, place.primaryCategory, ...place.secondaryCategories, place.city, place.neighborhood]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      const textMatch = terms.length === 0 ? 0.6 : terms.filter((term) => textCorpus.includes(term)).length / terms.length;
+      const cityFit = !cityToken ? 0.5 : String(place.city ?? "").toLowerCase().includes(cityToken) ? 1 : 0;
+      const distance = context.lat !== undefined && context.lng !== undefined
+        ? distanceMeters(context.lat, context.lng, place.lat, place.lng)
+        : undefined;
+      const distanceFit = distance === undefined ? 0.5 : Math.max(0, 1 - Math.min(distance, radius) / radius);
+      const score = (textMatch * 0.5) + (cityFit * 0.2) + (distanceFit * 0.1) + (place.qualityScore * 0.15) + (place.trendingScore * 0.05);
+      return {
+        place,
+        score,
+        distanceMeters: distance,
+        reasons: [textMatch > 0.7 ? "query_match" : "broad_match"],
+        diversityBucket: `${place.primaryCategory}:${place.city ?? "global"}`,
+        explain: { score, contributions: { textMatch, cityFit, distanceFit }, reasonCodes: ["search"] }
+      };
+    })
+    .filter((candidate) => candidate.distanceMeters === undefined || candidate.distanceMeters <= radius)
+    .sort((a, b) => b.score - a.score || a.place.canonicalPlaceId.localeCompare(b.place.canonicalPlaceId));
 }
 
 export class PlaceSearchService {
@@ -199,41 +388,122 @@ export class TrendingService {
   constructor(private readonly repo: PlaceDiscoveryRepository) {}
 
   async list(context: DiscoveryQueryContext): Promise<TrendingResponse> {
-    const places = await this.repo.listPlaces();
+    const places = (await this.repo.listPlaces()).filter((place) => applyBaseFilters(place, context));
     const scoped = places.filter((place) => (!context.city || place.city === context.city) && (!context.categoryId || place.primaryCategory.includes(context.categoryId)));
     const sorted = [...scoped].sort((a, b) => b.trendingScore - a.trendingScore || b.popularityScore - a.popularityScore);
     const page = paginate(sorted, clampPageSize(context.pageSize), context.cursor);
     return {
       scope: { type: context.city ? "city" : context.categoryId ? "category" : "global", city: context.city, categoryId: context.categoryId },
       window: { key: "7d" },
-      items: page.items.map((place) => mapResult({ place, score: place.trendingScore, explain: { score: place.trendingScore, contributions: { trending: place.trendingScore }, reasonCodes: ["trending"] } }, false)),
+      items: page.items.map((place) => mapResult({ place, score: place.trendingScore, reasons: ["trending"], diversityBucket: `${place.primaryCategory}:${place.city ?? "global"}`, explain: { score: place.trendingScore, contributions: { trending: place.trendingScore }, reasonCodes: ["trending"] } }, false)),
       nextCursor: page.nextCursor
     };
   }
 }
 
 export class RecommendationService {
-  constructor(private readonly repo: PlaceDiscoveryRepository) {}
+  private readonly generator: CandidateGenerator;
+  private readonly scorer = new RecommendationScorer();
+  private readonly balancer = new DiversityBalancer();
+
+  constructor(private readonly repo: PlaceDiscoveryRepository) {
+    this.generator = new CandidateGenerator(repo);
+  }
+
+  async getPersonalizedRecommendations(userId: string | undefined, context: DiscoveryQueryContext): Promise<RecommendationsResponse> {
+    return this.recommend(userId, context);
+  }
+
+  async getRecommendedPlacesForContext(userId: string | undefined, context: DiscoveryQueryContext): Promise<RecommendationsResponse> {
+    return this.recommend(userId, context);
+  }
 
   async recommend(userId: string | undefined, context: DiscoveryQueryContext): Promise<RecommendationsResponse> {
     const profile = userId ? await this.repo.getRecommendationProfile(userId) : undefined;
-    const ranked = await rankPlaces(this.repo, context, profile);
-    const filtered = ranked.filter((candidate) => !profile?.excludedPlaceIds.includes(candidate.place.canonicalPlaceId));
-    const diversified: RankedCandidate[] = [];
-    const categoryRun = new Map<string, number>();
-    for (const candidate of filtered) {
-      const count = categoryRun.get(candidate.place.primaryCategory) ?? 0;
-      if (count >= 2) continue;
-      categoryRun.set(candidate.place.primaryCategory, count + 1);
-      diversified.push(candidate);
-    }
-    const fallback = diversified.length > 0 ? diversified : filtered;
-    const page = paginate(fallback, clampPageSize(context.pageSize), context.cursor);
+    const recommendationContext = buildRecommendationContext(context, userId);
+    const candidates = await this.generator.generate(profile, recommendationContext);
+    const ranked = candidates
+      .map((place) => this.scorer.score(place, recommendationContext, profile))
+      .filter((candidate) => !profile?.hiddenPlaceIds.includes(candidate.place.canonicalPlaceId))
+      .sort((a, b) => b.score - a.score || a.place.canonicalPlaceId.localeCompare(b.place.canonicalPlaceId));
+    const diversified = this.balancer.balance(ranked);
+    const page = paginate(diversified, recommendationContext.pageSize, recommendationContext.cursor);
     return {
       mode: profile ? "user" : "guest",
-      items: page.items.map((item) => mapResult(item, false, [profile ? "similar_to_saved" : "trending_in_city"])),
+      items: page.items.map((item) => mapResult(item, recommendationContext.explain)),
       nextCursor: page.nextCursor
     };
+  }
+
+  async getRelatedPlacesForPlace(userId: string | undefined, placeId: string, context: DiscoveryQueryContext): Promise<RelatedPlacesResponse> {
+    const places = await this.repo.listPlaces();
+    const anchor = places.find((place) => place.canonicalPlaceId === placeId);
+    if (!anchor) return { placeId, items: [] };
+
+    const profile = userId ? await this.repo.getRecommendationProfile(userId) : undefined;
+    const recommendationContext = buildRecommendationContext({ ...context, city: context.city ?? anchor.city, categoryId: context.categoryId ?? anchor.primaryCategory, surface: "place_detail" }, userId);
+
+    const related = places
+      .filter((place) => place.canonicalPlaceId !== placeId)
+      .filter((place) => applyBaseFilters(place, context))
+      .map((place) => {
+        const candidate = this.scorer.score(place, recommendationContext, profile);
+        const overlap = [place.primaryCategory, ...place.secondaryCategories].some((category) => [anchor.primaryCategory, ...anchor.secondaryCategories].includes(category)) ? 0.15 : 0;
+        candidate.score += overlap;
+        if (overlap > 0) candidate.reasons = [...candidate.reasons, "related_category_overlap"];
+        return candidate;
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const deduped = this.balancer.balance(related);
+    const page = paginate(deduped, clampPageSize(context.pageSize ?? 8), context.cursor);
+    return { placeId, items: page.items.map((item) => mapResult(item, Boolean(context.explain))), nextCursor: page.nextCursor };
+  }
+
+  async getSuggestedCreators(userId: string | undefined, context: DiscoveryQueryContext): Promise<SuggestedCreatorsResponse> {
+    const profile = userId ? await this.repo.getRecommendationProfile(userId) : undefined;
+    const creators = await this.repo.listCreators();
+    const items = creators
+      .map((creator) => {
+        const affinity = profile ? profile.creatorAffinity[creator.creatorId] ?? 0.2 : 0.2;
+        const categoryFit = profile ? Math.max(...creator.categoryFocus.map((category) => profile.categoryWeights[category] ?? 0), 0.2) : 0.3;
+        const cityFit = context.city && creator.city ? (creator.city.toLowerCase() === context.city.toLowerCase() ? 1 : 0.4) : 0.7;
+        const score = affinity * 0.45 + categoryFit * 0.25 + creator.qualityScore * 0.15 + creator.trustScore * 0.15 * cityFit;
+        return {
+          creatorId: creator.creatorId,
+          displayName: creator.displayName,
+          score,
+          reasons: [affinity > 0.4 ? "creator_you_follow_or_view" : "trusted_creator", cityFit > 0.8 ? "active_in_current_city" : "broad_creator_discovery"]
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, clampPageSize(context.pageSize ?? 6));
+
+    return { items };
+  }
+
+  async getSuggestedGuides(userId: string | undefined, context: DiscoveryQueryContext): Promise<SuggestedGuidesResponse> {
+    const profile = userId ? await this.repo.getRecommendationProfile(userId) : undefined;
+    const guides = await this.repo.listGuides();
+    const items = guides
+      .filter((guide) => !context.city || !guide.city || guide.city.toLowerCase() === context.city.toLowerCase())
+      .map((guide) => {
+        const categoryWeight = profile ? profile.categoryWeights[guide.category] ?? profile.engagementCategoryWeights[guide.category] ?? 0.3 : 0.3;
+        const creatorWeight = profile ? profile.creatorAffinity[guide.creatorId] ?? 0.25 : 0.25;
+        const score = categoryWeight * 0.4 + creatorWeight * 0.3 + guide.qualityScore * 0.3;
+        return {
+          guideId: guide.guideId,
+          creatorId: guide.creatorId,
+          title: guide.title,
+          score,
+          reasons: [categoryWeight > 0.45 ? "guide_matches_your_interests" : "high_quality_guide", creatorWeight > 0.45 ? "from_creator_you_engage_with" : ""
+          ].filter(Boolean)
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, clampPageSize(context.pageSize ?? 6));
+
+    return { items };
   }
 }
 
@@ -266,7 +536,7 @@ export class DiscoveryFeedService {
   async feed(userId: string | undefined, mode: DiscoveryFeedMode, context: DiscoveryQueryContext): Promise<DiscoveryFeedResponse> {
     let organicItems: PlaceResultItem[] = [];
     if (mode === "for_you") {
-      organicItems = (await this.recommendationService.recommend(userId, context)).items;
+      organicItems = (await this.recommendationService.recommend(userId, { ...context, surface: "home" })).items;
     } else if (mode === "nearby") {
       organicItems = (await this.nearbyService.nearby(context)).items;
     } else if (mode === "trending") {
@@ -296,7 +566,7 @@ export class CityPageService {
 
   async getCityPage(userId: string | undefined, city: string): Promise<CityPageResponse> {
     const trending = await this.trendingService.list({ city, pageSize: 8 });
-    const recommended = await this.recommendationService.recommend(userId, { city, pageSize: 8 });
+    const recommended = await this.recommendationService.recommend(userId, { city, pageSize: 8, surface: "city" });
     const foodShelf = await this.browseService.browse({ city, categoryId: "food", pageSize: 8 });
     return {
       city: { id: city.toLowerCase().replace(/\s+/g, "-"), slug: city.toLowerCase().replace(/\s+/g, "-"), name: city },

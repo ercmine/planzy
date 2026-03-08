@@ -23,6 +23,9 @@ export class QueryNormalizationService {
       pageSize: Math.max(1, Math.min(50, parseNumber(params.get("pageSize")) ?? 20)),
       cursor: params.get("cursor") ?? undefined,
       explain: params.get("debug") === "1" || params.get("explain") === "1",
+      surface: (params.get("surface") as DiscoveryQueryContext["surface"]) ?? undefined,
+      placeId: params.get("placeId") ?? undefined,
+      creatorId: params.get("creatorId") ?? undefined,
       filters: {
         openNow: params.get("openNow") === "1",
         minRating: parseNumber(params.get("minRating")),
