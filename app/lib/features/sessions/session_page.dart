@@ -87,7 +87,7 @@ class SessionPage extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.s),
               OutlinedButton(
-                onPressed: () => context.go('/sessions/${session.sessionId}/settings'),
+                onPressed: () => context.push('/sessions/${session.sessionId}/settings'),
                 child: const Text('Settings'),
               ),
             ],
