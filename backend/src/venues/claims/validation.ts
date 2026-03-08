@@ -18,7 +18,8 @@ function isObject(v: unknown): v is Record<string, unknown> { return typeof v ==
 function str(v: unknown, key: string, details: string[], max: number, req = false): string | undefined {
   if (v === undefined || v === null) { if (req) details.push(`${key} is required`); return undefined; }
   if (typeof v !== "string") { details.push(`${key} must be a string`); return undefined; }
-  const t = sanitizeText(v, { source: "user", maxLen: max, profanityMode: "none", allowNewlines: true }).trim();
+  const cleaned = sanitizeText(v, { source: "user", maxLen: max, profanityMode: "none", allowNewlines: true });
+  const t = (cleaned ?? "").trim();
   if (req && t.length === 0) details.push(`${key} cannot be empty`);
   return t || undefined;
 }

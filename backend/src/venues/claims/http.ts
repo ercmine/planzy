@@ -119,6 +119,32 @@ export function createVenueClaimsHttpHandlers(service: VenueClaimsService, deps?
     sendJson(res, 200, await service.getPlaceManagementState(placeId, actorFromRequest(req)));
   }
 
+  async function handleUpdateOfficialDescription(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    const body = (await parseJsonBody(req)) as { content?: string };
+    sendJson(res, 200, await service.updateOfficialDescription(placeId, body.content, actorFromRequest(req)));
+  }
+
+  async function handleSubmitCategorySuggestion(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    const body = (await parseJsonBody(req)) as { primaryCategoryId?: string; secondaryCategoryIds?: string[]; reason?: string };
+    sendJson(res, 200, await service.submitCategorySuggestion(placeId, body, actorFromRequest(req)));
+  }
+
+  async function handleUpdateManagedHours(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    sendJson(res, 200, await service.updateManagedHours(placeId, await parseJsonBody(req) as never, actorFromRequest(req)));
+  }
+
+  async function handleUpsertBusinessLink(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    sendJson(res, 200, await service.upsertBusinessLink(placeId, await parseJsonBody(req) as never, actorFromRequest(req)));
+  }
+
+  async function handleUpsertMenuServices(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    sendJson(res, 200, await service.upsertMenuServices(placeId, await parseJsonBody(req) as never, actorFromRequest(req)));
+  }
+
+  async function handleUpsertBusinessImage(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    sendJson(res, 200, await service.upsertBusinessImage(placeId, await parseJsonBody(req) as never, actorFromRequest(req)));
+  }
+
   return {
     handleCreate,
     handleList,
@@ -131,7 +157,13 @@ export function createVenueClaimsHttpHandlers(service: VenueClaimsService, deps?
     handleReviewClaim,
     handleRevokeOwnership,
     handleUpsertOfficialContent,
-    handlePlaceManagementState
+    handlePlaceManagementState,
+    handleUpdateOfficialDescription,
+    handleSubmitCategorySuggestion,
+    handleUpdateManagedHours,
+    handleUpsertBusinessLink,
+    handleUpsertMenuServices,
+    handleUpsertBusinessImage
   };
 }
 

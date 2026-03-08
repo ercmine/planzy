@@ -1,13 +1,22 @@
 import type {
   BusinessClaimEvidenceRecord,
   BusinessManagedPlaceContentRecord,
+  BusinessManagedPlaceImage,
+  BusinessManagedPlaceProfile,
+  BusinessManagedHours,
+  BusinessManagedChangeAuditRecord,
+  BusinessPlaceCategorySuggestion,
   BusinessPlaceClaimRecord,
+  BusinessPlaceLink,
+  BusinessPlaceMenuServiceCatalog,
   ClaimAuditEvent,
   ClaimStatus,
   ListClaimsOptions,
   ListClaimsResult,
+  OfficialBusinessDescription,
   PlaceBusinessOwnershipRecord
 } from "./types.js";
+
 
 export interface VenueClaimStore {
   createClaim(input: BusinessPlaceClaimRecord): Promise<void>;
@@ -28,6 +37,31 @@ export interface VenueClaimStore {
 
   upsertBusinessContent(input: BusinessManagedPlaceContentRecord): Promise<void>;
   listBusinessContent(placeId: string): Promise<BusinessManagedPlaceContentRecord[]>;
+
+
+  upsertBusinessManagedPlaceProfile(input: BusinessManagedPlaceProfile): Promise<void>;
+  getBusinessManagedPlaceProfile(placeId: string): Promise<BusinessManagedPlaceProfile | null>;
+
+  upsertOfficialDescription(input: OfficialBusinessDescription): Promise<void>;
+  getOfficialDescription(placeId: string): Promise<OfficialBusinessDescription | null>;
+
+  upsertCategorySuggestion(input: BusinessPlaceCategorySuggestion): Promise<void>;
+  listCategorySuggestions(placeId: string): Promise<BusinessPlaceCategorySuggestion[]>;
+
+  upsertManagedHours(input: BusinessManagedHours): Promise<void>;
+  getManagedHours(placeId: string): Promise<BusinessManagedHours | null>;
+
+  upsertBusinessLink(input: BusinessPlaceLink): Promise<void>;
+  listBusinessLinks(placeId: string): Promise<BusinessPlaceLink[]>;
+
+  upsertMenuServiceCatalog(input: BusinessPlaceMenuServiceCatalog): Promise<void>;
+  listMenuServiceCatalogs(placeId: string): Promise<BusinessPlaceMenuServiceCatalog[]>;
+
+  upsertBusinessImage(input: BusinessManagedPlaceImage): Promise<void>;
+  listBusinessImages(placeId: string): Promise<BusinessManagedPlaceImage[]>;
+
+  appendBusinessManagedAuditEvent(input: BusinessManagedChangeAuditRecord): Promise<void>;
+  listBusinessManagedAuditEvents(placeId: string): Promise<BusinessManagedChangeAuditRecord[]>;
 
   appendAuditEvent(input: ClaimAuditEvent): Promise<void>;
   listAuditEvents(placeId: string): Promise<ClaimAuditEvent[]>;
