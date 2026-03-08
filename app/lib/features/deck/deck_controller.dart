@@ -278,7 +278,7 @@ class DeckController extends StateNotifier<DeckState> {
       final requestedCursor = reset ? null : state.nextCursor;
       final params = DeckQueryParams(
         cursor: requestedCursor,
-        limit: _batchLimit,
+        maxResults: _batchLimit,
         lat: location.lat,
         lng: location.lng,
         radiusMeters: filters.radiusMeters,

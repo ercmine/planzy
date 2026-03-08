@@ -10,9 +10,13 @@ import '../models/deep_links.dart';
 import '../models/plan.dart';
 
 class DeckQueryParams {
+  static const int _defaultMaxResults = 20;
+  static const int _minMaxResults = 1;
+  static const int _maxMaxResults = 20;
+
   const DeckQueryParams({
     this.cursor,
-    this.limit,
+    this.maxResults,
     this.lat,
     this.lng,
     this.radiusMeters,
@@ -25,7 +29,7 @@ class DeckQueryParams {
   });
 
   final String? cursor;
-  final int? limit;
+  final int? maxResults;
   final double? lat;
   final double? lng;
   final int? radiusMeters;
@@ -38,7 +42,7 @@ class DeckQueryParams {
 
   Map<String, dynamic> toCacheMap() => <String, dynamic>{
         'cursor': cursor,
-        'limit': limit,
+        'maxResults': _clampedMaxResults,
         'lat': lat,
         'lng': lng,
         'radiusMeters': radiusMeters,
@@ -53,7 +57,7 @@ class DeckQueryParams {
   Map<String, String?> toQueryMap({required String defaultLocale}) {
     return <String, String?>{
       'cursor': cursor,
-      'limit': limit?.toString(),
+      'maxResults': _clampedMaxResults.toString(),
       'lat': lat == null ? null : lat!.toStringAsFixed(6),
       'lng': lng == null ? null : lng!.toStringAsFixed(6),
       'radiusMeters': radiusMeters?.toString(),
@@ -65,6 +69,9 @@ class DeckQueryParams {
       'locale': locale ?? defaultLocale,
     };
   }
+
+  int get _clampedMaxResults =>
+      (maxResults ?? _defaultMaxResults).clamp(_minMaxResults, _maxMaxResults);
 }
 
 class DeckRepository {
