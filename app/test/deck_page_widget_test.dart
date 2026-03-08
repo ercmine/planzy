@@ -71,7 +71,7 @@ class _FakeLocationController extends LocationController {
 }
 
 void main() {
-  testWidgets('Deck page renders and Yes removes top plan', (tester) async {
+  testWidgets('Deck page renders next card after Yes swipe', (tester) async {
     final deckRepository = _MockDeckRepository();
     final swipesRepository = _MockSwipesRepository();
     final telemetryRepository = _MockTelemetryRepository();
@@ -100,9 +100,9 @@ void main() {
     when(() => deckRepository.fetchDeckBatch(session.sessionId, any())).thenAnswer(
       (_) async => DeckBatchResponse(
         sessionId: session.sessionId,
-        plans: [_plan('plan-1')],
+        plans: [_plan('plan-1'), _plan('plan-2')],
         nextCursor: null,
-        mix: const DeckSourceMix(planSourceCounts: {'google': 1}),
+        mix: const DeckSourceMix(planSourceCounts: {'google': 2}),
       ),
     );
 
@@ -154,7 +154,8 @@ void main() {
     await tester.tap(find.byIcon(Icons.check));
     await tester.pumpAndSettle();
 
-    expect(find.text('No results nearby'), findsOneWidget);
+    expect(find.text('Plan plan-2'), findsOneWidget);
+    expect(find.text('Plan plan-1'), findsNothing);
   });
 }
 

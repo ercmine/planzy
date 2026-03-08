@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
@@ -61,6 +62,7 @@ class DeckController extends StateNotifier<DeckState> {
 
   DateTime? _viewStartedAt;
   String? _viewPlanId;
+  int _batchRequestCounter = 0;
 
   @override
   void dispose() {
@@ -127,9 +129,11 @@ class DeckController extends StateNotifier<DeckState> {
     }
     final topItem = state.items[currentIndex];
     if (topItem is DeckAdItem) {
+      final oldIndex = currentIndex;
+      final nextIndex = currentIndex + 1;
       state = state.copyWith(currentIndex: currentIndex + 1, clearError: true);
       if (kDebugMode) {
-        debugPrint('[Deck] after idx=0 len=${state.items.length}');
+        debugPrint('[Deck] next oldIdx=$oldIndex -> newIdx=$nextIndex len=${state.items.length}');
       }
       _startViewingTopCard();
       await maybePrefetchMore();
@@ -141,24 +145,17 @@ class DeckController extends StateNotifier<DeckState> {
 
     await _emitCardViewedIfNeeded(plan);
 
-    await _swipesRepository.recordSwipe(_sessionId, plan, action, position);
-    unawaited(_enqueueTelemetry(
-      TelemetryEventInput.swipe(
-        planId: plan.id,
-        action: action.name,
-        position: position,
-        cursor: state.nextCursor,
-        source: plan.source,
-      ),
-    ));
-
-    final nextPlans = [...state.plans]..removeAt(currentIndex);
+    final oldLength = state.items.length;
+    final nextPlans = state.plans.where((candidate) => candidate.id != plan.id).toList(growable: false);
     final shownIds = {...state.shownPlanIds, plan.id}.toList(growable: false);
     final answeredPlanIds = {...state.answeredPlanIds, plan.id};
     final undo = [
       DeckSwipeRecord(plan: plan, action: action, position: position),
       ...state.undoStack,
     ];
+
+    final oldPlanId = plan.id;
+    final nextTopPlanId = nextPlans.isEmpty ? null : nextPlans.first.id;
 
     state = state.copyWith(
       plans: nextPlans,
@@ -173,11 +170,25 @@ class DeckController extends StateNotifier<DeckState> {
     );
 
     if (kDebugMode) {
-      debugPrint('[Deck] after idx=0 len=${state.items.length}');
+      debugPrint(
+        '[Deck] next oldIdx=$currentIndex oldId=$oldPlanId -> newIdx=0 newId=${nextTopPlanId ?? 'none'} '
+        'lenBefore=$oldLength lenAfter=${state.items.length}',
+      );
     }
 
     _startViewingTopCard();
     await maybePrefetchMore();
+
+    await _swipesRepository.recordSwipe(_sessionId, plan, action, position);
+    unawaited(_enqueueTelemetry(
+      TelemetryEventInput.swipe(
+        planId: plan.id,
+        action: action.name,
+        position: position,
+        cursor: state.nextCursor,
+        source: plan.source,
+      ),
+    ));
 
     if (state.plans.isEmpty) {
       await loadNextBatch();
@@ -325,6 +336,8 @@ class DeckController extends StateNotifier<DeckState> {
     );
 
     try {
+      final requestId = ++_batchRequestCounter;
+      final preLoadLength = state.plans.length;
       final session = await _sessionsRepository.getById(_sessionId);
       if (session == null) {
         state = state.copyWith(
@@ -389,6 +402,13 @@ class DeckController extends StateNotifier<DeckState> {
         requestedCursor: requestedCursor,
       );
 
+      if (kDebugMode) {
+        debugPrint(
+          '[Deck] fetch complete request=$requestId lenBefore=$preLoadLength lenAfter=${state.plans.length} '
+          'cursor=${state.nextCursor ?? 'none'}',
+        );
+      }
+
       if (batches.length < _minNewItems) {
         state = state.copyWith(
           nextBatchErrorMessage: 'You\'re out of new nearby plans. Try expanding your radius.',
@@ -417,12 +437,17 @@ class DeckController extends StateNotifier<DeckState> {
     final deduped =
         <String, Plan>{for (final plan in merged) plan.id: plan}.values.toList();
 
+    final previousIndex = state.currentIndex;
+    final nextIndex = reset
+        ? 0
+        : math.min(previousIndex, math.max(0, deduped.length - 1));
+
     state = state.copyWith(
       isLoadingInitial: false,
       isLoadingMore: false,
       plans: deduped,
       items: _adDeckInjector.inject(plans: deduped),
-      currentIndex: 0,
+      currentIndex: nextIndex,
       nextCursor: batch.nextCursor,
       hasMore: batch.nextCursor != null || filteredBatchPlans.isNotEmpty,
       lastBatchMix: batch.mix,
@@ -493,12 +518,15 @@ class DeckController extends StateNotifier<DeckState> {
   }
 
   void _startViewingTopCard() {
-    if (state.items.isEmpty || state.items.first is! DeckPlanItem) {
+    if (state.items.isEmpty ||
+        state.currentIndex < 0 ||
+        state.currentIndex >= state.items.length ||
+        state.items[state.currentIndex] is! DeckPlanItem) {
       _viewStartedAt = null;
       _viewPlanId = null;
       return;
     }
-    final topPlan = (state.items.first as DeckPlanItem).plan;
+    final topPlan = (state.items[state.currentIndex] as DeckPlanItem).plan;
     _viewStartedAt = DateTime.now();
     _viewPlanId = topPlan.id;
   }

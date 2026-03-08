@@ -183,6 +183,174 @@ void main() {
     controller.dispose();
   });
 
+  test('advancing from card 0 moves deck to card 1', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'Advance once',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer(
+      (_) async => _batch([
+        _plan('p0'),
+        _plan('p1'),
+      ], nextCursor: null, sessionId: created.sessionId),
+    );
+
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+
+    await controller.swipeTop(SwipeAction.yes);
+
+    expect(controller.state.plans.first.id, 'p1');
+    expect(controller.state.currentIndex, 0);
+    controller.dispose();
+  });
+
+  test('advancing multiple times walks deck in order', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'Advance many',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer(
+      (_) async => _batch([
+        _plan('p0'),
+        _plan('p1'),
+        _plan('p2'),
+      ], nextCursor: null, sessionId: created.sessionId),
+    );
+
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+
+    await controller.swipeTop(SwipeAction.yes);
+    expect(controller.state.plans.first.id, 'p1');
+    await controller.swipeTop(SwipeAction.no);
+    expect(controller.state.plans.first.id, 'p2');
+    expect(controller.state.plans.length, 1);
+    controller.dispose();
+  });
+
+  test('in-flight fetch append does not snap deck back to previous card', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'Race condition',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    final delayedFetch = Completer<DeckBatchResponse>();
+    var callCount = 0;
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer((_) {
+      callCount++;
+      if (callCount == 1) {
+        return Future<DeckBatchResponse>.value(
+          _batch([
+            _plan('p0'),
+            _plan('p1'),
+          ], nextCursor: 'cursor-2', sessionId: created.sessionId),
+        );
+      }
+      return delayedFetch.future;
+    });
+
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+
+    final prefetchFuture = controller.maybePrefetchMore();
+    await Future<void>.microtask(() {});
+
+    await controller.swipeTop(SwipeAction.yes);
+    expect(controller.state.plans.first.id, 'p1');
+
+    delayedFetch.complete(
+      _batch([
+        _plan('p2'),
+        _plan('p3'),
+      ], nextCursor: null, sessionId: created.sessionId),
+    );
+    await prefetchFuture;
+
+    expect(controller.state.plans.first.id, 'p1');
+    expect(controller.state.plans.map((p) => p.id), containsAll(<String>['p1', 'p2', 'p3']));
+    controller.dispose();
+  });
+
+  test('exhausting deck then loading next batch advances correctly', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'Exhaust and refill',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    var callCount = 0;
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer((_) async {
+      callCount++;
+      if (callCount == 1) {
+        return _batch([
+          _plan('p0'),
+        ], nextCursor: 'cursor-next', sessionId: created.sessionId);
+      }
+      return _batch([
+        _plan('p1'),
+      ], nextCursor: null, sessionId: created.sessionId);
+    });
+
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+
+    await controller.swipeTop(SwipeAction.yes);
+
+    expect(controller.state.plans.first.id, 'p1');
+    expect(controller.state.currentIndex, 0);
+    controller.dispose();
+  });
+
   test('fetch error sets error message', () async {
     final created = await sessionsRepository.createLocalSession(
       title: 'Test',
