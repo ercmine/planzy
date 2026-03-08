@@ -31,9 +31,9 @@ class PlanLocation with _$PlanLocation {
 class PlanPhoto with _$PlanPhoto {
   const factory PlanPhoto({
     required String url,
+    String? token,
     int? width,
     int? height,
-    String? token,
   }) = _PlanPhoto;
 
   factory PlanPhoto.fromJson(Map<String, dynamic> json) =>
@@ -59,17 +59,17 @@ class Plan with _$Plan {
     required String sourceId,
     required String title,
     required String category,
-    String? description,
     required PlanLocation location,
+    String? description,
     @JsonKey(fromJson: parseDouble) double? distanceMeters,
+    PlanHours? hours,
+    @JsonKey(fromJson: parseOpeningHoursText) List<String>? openingHoursText,
+    String? phone,
+    DeepLinks? deepLinks,
+    List<PlanPhoto>? photos,
     @JsonKey(fromJson: parseInt) int? priceLevel,
     @JsonKey(fromJson: parseDouble) double? rating,
     @JsonKey(fromJson: parseInt) int? reviewCount,
-    List<PlanPhoto>? photos,
-    PlanHours? hours,
-    String? phone,
-    @JsonKey(fromJson: parseOpeningHoursText) List<String>? openingHoursText,
-    DeepLinks? deepLinks,
     Map<String, dynamic>? metadata,
   }) = _Plan;
 
