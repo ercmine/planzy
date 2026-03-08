@@ -229,13 +229,33 @@ export function createRoutes(
         const place = await fetchPlaceDetail(placeId);
         const publicApiBaseUrl = process.env.PUBLIC_API_BASE_URL ?? DEFAULT_PUBLIC_API_BASE_URL;
         const photos = (place.photos ?? [])
-          .map((photo) => ({
-            name: photo.name,
-            url: photo.name
-              ? `${publicApiBaseUrl}/photo?name=${encodeURIComponent(photo.name)}&maxWidthPx=1200`
-              : undefined
-          }))
-          .filter((photo) => Boolean(photo.name));
+          .map((photo, index) => {
+            if (!photo.name) {
+              return undefined;
+            }
+            const encoded = encodeURIComponent(photo.name);
+            return {
+              id: `google:${photo.name}`,
+              name: photo.name,
+              token: photo.name,
+              sourceProvider: "google_places",
+              sourceType: "provider",
+              provider: "google_places",
+              thumbnailUrl: `${publicApiBaseUrl}/photo?name=${encoded}&maxWidthPx=240&maxHeightPx=240`,
+              mediumUrl: `${publicApiBaseUrl}/photo?name=${encoded}&maxWidthPx=800&maxHeightPx=600`,
+              largeUrl: `${publicApiBaseUrl}/photo?name=${encoded}&maxWidthPx=1200&maxHeightPx=900`,
+              fullUrl: `${publicApiBaseUrl}/photo?name=${encoded}&maxWidthPx=1600&maxHeightPx=1200`,
+              url: `${publicApiBaseUrl}/photo?name=${encoded}&maxWidthPx=1200&maxHeightPx=900`,
+              width: photo.widthPx,
+              height: photo.heightPx,
+              isPrimary: index === 0,
+              sortOrder: index,
+              rankScore: (photo.widthPx ?? 0) * (photo.heightPx ?? 0),
+              attributionText: photo.authorAttributions?.[0]?.displayName,
+              status: "active"
+            };
+          })
+          .filter((photo): photo is NonNullable<typeof photo> => Boolean(photo));
 
         sendJson(res, 200, {
           id: place.id,

@@ -208,4 +208,46 @@ describe("matching + merge + idempotency", () => {
     expect(place?.photoGallery.length).toBe(2);
     expect(place?.rawHoursText).toContain("Mon 5PM-11PM");
   });
+
+  it("merges multi-source galleries with stable primary selection", () => {
+    const store = new InMemoryPlaceStore();
+    const service = new PlaceNormalizationService(store);
+
+    const first = service.importProviderPlace({
+      provider: "google_places",
+      rawPayload: {
+        id: "gallery-1",
+        displayName: { text: "Gallery Cafe" },
+        location: { latitude: 37.77, longitude: -122.42 },
+        photos: [
+          { name: "hero", widthPx: 1280, heightPx: 720 },
+          { name: "inside", widthPx: 1000, heightPx: 700 }
+        ]
+      }
+    });
+
+    service.importProviderPlace({
+      provider: "foursquare",
+      rawPayload: {
+        fsq_id: "fsq-gallery-1",
+        name: "Gallery Cafe",
+        geocodes: { main: { latitude: 37.77001, longitude: -122.42003 } },
+        location: { formatted_address: "300 Market Street, San Francisco, CA", country: "US" },
+        photos: [
+          { id: "hero", prefix: "https://img/", suffix: ".jpg", width: 900, height: 600 },
+          { id: "patio", prefix: "https://img/", suffix: "2.jpg", width: 1600, height: 1000 }
+        ]
+      }
+    });
+
+    const place = service.getCanonicalPlace(first.canonicalPlaceId);
+    expect(place?.photoGallery.length).toBeGreaterThanOrEqual(3);
+    expect(place?.photoGallery[0]?.isPrimary).toBe(true);
+
+    const beforePrimary = place?.primaryPhoto?.canonicalPhotoId;
+    service.rebuildCanonicalPlace(first.canonicalPlaceId);
+    const rebuilt = service.getCanonicalPlace(first.canonicalPlaceId);
+    expect(rebuilt?.primaryPhoto?.canonicalPhotoId).toBe(beforePrimary);
+  });
+
 });

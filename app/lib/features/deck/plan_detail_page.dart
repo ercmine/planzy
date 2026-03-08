@@ -292,7 +292,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
             ],
           ),
           const SizedBox(height: AppSpacing.m),
-          _buildPhotoGallery(context, viewData.photos),
+          _buildPhotoGallery(context, viewData.photos, isLoading: _isLoadingDetails),
           const SizedBox(height: AppSpacing.m),
           _Section(
             title: 'Overview',
@@ -470,7 +470,18 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     );
   }
 
-  Widget _buildPhotoGallery(BuildContext context, List<PlaceDetailPhoto> photos) {
+  Widget _buildPhotoGallery(BuildContext context, List<PlaceDetailPhoto> photos, {required bool isLoading}) {
+    if (isLoading && photos.isEmpty) {
+      return Container(
+        height: 220,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
     if (photos.isEmpty) {
       return Container(
         height: 220,
@@ -489,7 +500,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
           tag: widget.heroTag ?? 'plan-photo-${_plan.id}',
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: SizedBox(height: 220, width: double.infinity, child: _buildNetworkImage(selected.url)),
+            child: SizedBox(height: 220, width: double.infinity, child: _buildNetworkImage(selected.heroUrl)),
           ),
         ),
         if (photos.length > 1) ...[
@@ -515,11 +526,21 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: AspectRatio(aspectRatio: 1, child: _buildNetworkImage(photo.url)),
+                      child: AspectRatio(aspectRatio: 1, child: _buildNetworkImage(photo.thumbUrl)),
                     ),
                   ),
                 );
               },
+            ),
+          ),
+        ],
+        if (selected.attributionText?.trim().isNotEmpty == true) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Photo: ${selected.attributionText}',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
         ],

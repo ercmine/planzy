@@ -121,11 +121,13 @@ export const googlePlacesAdapter: ProviderAdapter = {
       phone: raw.nationalPhoneNumber,
       websiteUrl: raw.websiteUri,
       rawHoursText: raw.regularOpeningHours?.weekdayDescriptions ?? [],
-      photos: (raw.photos ?? []).map((photo) => ({
+      photos: (raw.photos ?? []).map((photo, index) => ({
         providerPhotoRef: photo.name,
+        sourcePhotoId: photo.name,
         width: photo.widthPx,
         height: photo.heightPx,
-        attributionText: photo.authorAttributions?.[0]?.displayName
+        attributionText: photo.authorAttributions?.[0]?.displayName,
+        isPrimary: index === 0
       })),
       descriptionSnippet: raw.editorialSummary?.text,
       permanentlyClosed: raw.businessStatus === "CLOSED_PERMANENTLY",
@@ -178,12 +180,18 @@ export const foursquareAdapter: ProviderAdapter = {
       rawHoursText: raw.hours?.display ? [raw.hours.display] : [],
       descriptionSnippet: raw.description,
       permanentlyClosed: raw.closed_bucket === "very_likely",
-      photos: (raw.photos ?? []).map((photo) => ({
+      photos: (raw.photos ?? []).map((photo, index) => ({
         providerPhotoRef: photo.id,
-        url: photo.prefix && photo.suffix ? `${photo.prefix}original${photo.suffix}` : undefined,
+        sourcePhotoId: photo.id,
+        thumbnailUrl: photo.prefix && photo.suffix ? `${photo.prefix}300x300${photo.suffix}` : undefined,
+        mediumUrl: photo.prefix && photo.suffix ? `${photo.prefix}800x600${photo.suffix}` : undefined,
+        largeUrl: photo.prefix && photo.suffix ? `${photo.prefix}1200x900${photo.suffix}` : undefined,
+        fullUrl: photo.prefix && photo.suffix ? `${photo.prefix}original${photo.suffix}` : undefined,
+        url: photo.prefix && photo.suffix ? `${photo.prefix}800x600${photo.suffix}` : undefined,
         width: photo.width,
         height: photo.height,
-        attributionText: photo.credit?.name
+        attributionText: photo.credit?.name,
+        isPrimary: index === 0
       })),
       sourceUrl: ctx.sourceUrl,
       raw

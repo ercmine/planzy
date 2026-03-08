@@ -186,6 +186,29 @@ void main() {
 
     expect(find.textContaining('Excellent experience'), findsOneWidget);
   });
+
+  testWidgets('detail page renders empty gallery fallback when no photos available', (tester) async {
+    final fakeApi = _FakeApiClient(details: const {'description': 'No photos yet'});
+    final fakeReviews = _FakeReviewsRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWith((ref) async => fakeApi),
+          reviewsRepositoryProvider.overrideWith((ref) async => fakeReviews),
+        ],
+        child: MaterialApp(
+          theme: buildAppTheme(Brightness.light),
+          home: PlanDetailPage(plan: _basePlan(), sessionId: 's1'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.photo_library_outlined), findsOneWidget);
+  });
+
 }
 
 Plan _basePlan() => Plan(
