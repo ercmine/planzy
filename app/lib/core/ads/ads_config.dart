@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import '../../config/admob_config.dart';
 import '../env/env.dart';
 import '../env/env_keys.dart';
 
@@ -20,31 +21,24 @@ class AdsConfig {
   });
 
   factory AdsConfig.fromEnv({required EnvFlavor flavor}) {
-    final isDev = flavor == EnvFlavor.dev;
     return AdsConfig(
-      enabled: _parseBool(dotenv.maybeGet(EnvKeys.adsEnabled), fallback: false),
-      // Google official test IDs by default for non-production/testing:
-      // Android app: ca-app-pub-3940256099942544~3347511713
-      // iOS app: ca-app-pub-3940256099942544~1458002511
-      admobAppIdIos: dotenv.maybeGet(EnvKeys.adsAdmobAppIdIos) ??
-          (isDev ? 'ca-app-pub-3940256099942544~1458002511' : ''),
-      admobAppIdAndroid: dotenv.maybeGet(EnvKeys.adsAdmobAppIdAndroid) ??
-          (isDev ? 'ca-app-pub-3940256099942544~3347511713' : ''),
-      // Plugin-supported test unit IDs for native advanced:
-      // Android native: ca-app-pub-3940256099942544/2247696110
-      // iOS native: ca-app-pub-3940256099942544/3986624511
-      nativeUnitIdIos: dotenv.maybeGet(EnvKeys.adsNativeUnitIdIos) ??
-          (isDev ? 'ca-app-pub-3940256099942544/3986624511' : ''),
-      nativeUnitIdAndroid: dotenv.maybeGet(EnvKeys.adsNativeUnitIdAndroid) ??
-          (isDev ? 'ca-app-pub-3940256099942544/2247696110' : ''),
-      frequencyN: _parseInt(dotenv.maybeGet(EnvKeys.adsFrequencyN), fallback: 10),
-      placeFirstAfter: _parseInt(dotenv.maybeGet(EnvKeys.adsPlaceFirstAfter), fallback: 3),
+      enabled: _parseBool(dotenv.maybeGet(EnvKeys.adsEnabled), fallback: true),
+      admobAppIdIos: AdMobConfig.iosAppId,
+      admobAppIdAndroid: AdMobConfig.androidAppId,
+      nativeUnitIdIos: AdMobConfig.iosNativeUnitId,
+      nativeUnitIdAndroid: AdMobConfig.androidNativeUnitId,
+      frequencyN: _parseInt(
+        dotenv.maybeGet(EnvKeys.adsFrequencyN),
+        fallback: AdMobConfig.adInterval,
+      ),
+      placeFirstAfter: _parseInt(
+        dotenv.maybeGet(EnvKeys.adsPlaceFirstAfter),
+        fallback: AdMobConfig.firstAdAfterItem,
+      ),
       maxAdsPerWindow: 3,
       adsWindowSize: 50,
     );
   }
-
-
 
   factory AdsConfig.disabled() {
     return const AdsConfig(
@@ -53,7 +47,7 @@ class AdsConfig {
       admobAppIdAndroid: '',
       nativeUnitIdIos: '',
       nativeUnitIdAndroid: '',
-      frequencyN: 10,
+      frequencyN: 8,
       placeFirstAfter: 3,
       maxAdsPerWindow: 3,
       adsWindowSize: 50,
@@ -73,32 +67,6 @@ class AdsConfig {
   bool get isSupportedPlatform => !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   bool get isUsable => enabled && isSupportedPlatform;
-
-  String currentNativeUnitId() {
-    if (kIsWeb) {
-      return '';
-    }
-    if (Platform.isIOS) {
-      return nativeUnitIdIos;
-    }
-    if (Platform.isAndroid) {
-      return nativeUnitIdAndroid;
-    }
-    return '';
-  }
-
-  String currentAppId() {
-    if (kIsWeb) {
-      return '';
-    }
-    if (Platform.isIOS) {
-      return admobAppIdIos;
-    }
-    if (Platform.isAndroid) {
-      return admobAppIdAndroid;
-    }
-    return '';
-  }
 
   static bool _parseBool(String? value, {required bool fallback}) {
     if (value == null) {

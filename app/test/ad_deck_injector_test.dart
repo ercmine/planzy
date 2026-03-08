@@ -11,7 +11,7 @@ void main() {
     admobAppIdAndroid: 'android',
     nativeUnitIdIos: 'ios-native',
     nativeUnitIdAndroid: 'android-native',
-    frequencyN: 10,
+    frequencyN: 8,
     placeFirstAfter: 3,
     maxAdsPerWindow: 3,
     adsWindowSize: 50,
@@ -36,7 +36,7 @@ void main() {
     expect(adIndexes, isNotEmpty);
     expect(adIndexes.first, greaterThanOrEqualTo(3));
     for (var i = 1; i < adIndexes.length; i++) {
-      expect(adIndexes[i] - adIndexes[i - 1], greaterThanOrEqualTo(10));
+      expect(adIndexes[i] - adIndexes[i - 1], greaterThanOrEqualTo(8));
     }
   });
 }

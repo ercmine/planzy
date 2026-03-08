@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../ads/native_ad_card.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import '../../core/ads/native_ad_controller.dart';
@@ -13,7 +14,6 @@ import '../../core/widgets/retry_view.dart';
 import '../../providers/app_providers.dart';
 import 'deck_controller.dart';
 import 'deck_state.dart';
-import 'widgets/ad_deck_card.dart';
 import 'widgets/card_details_sheet.dart';
 import 'widgets/deck_actions_bar.dart';
 import 'widgets/deck_card.dart';
@@ -156,7 +156,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                         slotId: item.slot.slotId,
                       ),
                     );
-                    return AdDeckCard(
+                    return NativeAdCard(
                       key: ValueKey(item.slot.slotId),
                       controller: c,
                     );

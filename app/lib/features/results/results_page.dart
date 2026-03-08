@@ -1,20 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../ads/native_ad_card.dart';
 import '../../app/theme/spacing.dart';
+import '../../config/admob_config.dart';
+import '../../core/ads/native_ad_controller.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
+import 'results_controller.dart';
+import 'results_state.dart';
 import 'widgets/results_plan_tile.dart';
 
-class ResultsPage extends ConsumerWidget {
+class ResultsPage extends ConsumerStatefulWidget {
   const ResultsPage({required this.sessionId, super.key});
 
   final String sessionId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(resultsControllerProvider(sessionId));
-    final controller = ref.read(resultsControllerProvider(sessionId).notifier);
+  ConsumerState<ResultsPage> createState() => _ResultsPageState();
+}
+
+class _ResultsPageState extends ConsumerState<ResultsPage> {
+  final Map<String, NativeAdController> _adControllers = <String, NativeAdController>{};
+
+  @override
+  void dispose() {
+    for (final c in _adControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(resultsControllerProvider(widget.sessionId));
+    final controller = ref.read(resultsControllerProvider(widget.sessionId).notifier);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Results')),
@@ -68,13 +88,7 @@ class ResultsPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.s),
                 ],
-                for (final item in state.topPicks)
-                  ResultsPlanTile(
-                    item: item,
-                    isLocked: state.lockedPlanId == item.plan.id,
-                    onTap: () => _showCardDetailsSheet(context, item.plan),
-                    onLockIn: () => controller.lockIn(item.plan),
-                  ),
+                ..._buildFeedTiles(state, controller),
                 if (state.activeSessions != null || state.generatedAt != null)
                   Padding(
                     padding: const EdgeInsets.only(top: AppSpacing.s),
@@ -96,6 +110,43 @@ class ResultsPage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildFeedTiles(ResultsState state, ResultsController controller) {
+    final widgets = <Widget>[];
+    for (var i = 0; i < state.topPicks.length; i++) {
+      final item = state.topPicks[i];
+
+      final shouldInsertAd = i >= AdMobConfig.firstAdAfterItem &&
+          (i - AdMobConfig.firstAdAfterItem) % AdMobConfig.adInterval == 0;
+      if (shouldInsertAd) {
+        final slotId = 'results-slot-$i';
+        final adController = _adControllers.putIfAbsent(
+          slotId,
+          () => NativeAdController(
+            adsService: ref.read(adsServiceProvider),
+            slotId: slotId,
+          ),
+        );
+        widgets.add(
+          NativeAdCard(
+            key: ValueKey(slotId),
+            controller: adController,
+          ),
+        );
+      }
+
+      widgets.add(
+        ResultsPlanTile(
+          item: item,
+          isLocked: state.lockedPlanId == item.plan.id,
+          onTap: () => _showCardDetailsSheet(context, item.plan),
+          onLockIn: () => controller.lockIn(item.plan),
+        ),
+      );
+    }
+
+    return widgets;
   }
 
   void _showCardDetailsSheet(BuildContext context, Plan plan) {

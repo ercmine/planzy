@@ -53,7 +53,7 @@ final adsConfigProvider = Provider<AdsConfig>((ref) {
 });
 
 final adsServiceProvider = Provider<AdsService>((ref) {
-  return AdsService(config: ref.watch(adsConfigProvider));
+  return AdsService();
 });
 
 final adDeckInjectorProvider = Provider<AdDeckInjector>((ref) {

@@ -1,3 +1,4 @@
+import '../../config/admob_config.dart';
 import '../../features/deck/deck_state.dart';
 import '../../models/plan.dart';
 import 'ads_config.dart';
@@ -15,18 +16,10 @@ class AdDeckInjector {
     }
 
     final items = <DeckItem>[];
-    var organicCount = 0;
-    var adsInWindow = 0;
-    var plansSinceAd = _config.frequencyN;
-
-    for (final plan in plans) {
-      final withinFirstWindow = organicCount < _config.adsWindowSize;
-      final canInsertAd =
-          organicCount >= _config.placeFirstAfter &&
-          plansSinceAd >= _config.frequencyN &&
-          (!withinFirstWindow || adsInWindow < _config.maxAdsPerWindow);
-
-      if (canInsertAd) {
+    for (var i = 0; i < plans.length; i++) {
+      final shouldInsertAd = i >= AdMobConfig.firstAdAfterItem &&
+          (i - AdMobConfig.firstAdAfterItem) % AdMobConfig.adInterval == 0;
+      if (shouldInsertAd) {
         final position = items.length;
         items.add(
           DeckAdItem(
@@ -36,15 +29,9 @@ class AdDeckInjector {
             ),
           ),
         );
-        plansSinceAd = 0;
-        if (withinFirstWindow) {
-          adsInWindow += 1;
-        }
       }
 
-      items.add(DeckPlanItem(plan));
-      organicCount += 1;
-      plansSinceAd += 1;
+      items.add(DeckPlanItem(plans[i]));
     }
 
     return items;
