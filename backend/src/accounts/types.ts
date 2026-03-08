@@ -24,6 +24,25 @@ export enum VerificationStatus {
   VERIFIED = "VERIFIED"
 }
 
+export enum CreatorProfileStatus {
+  ACTIVE = "ACTIVE",
+  PENDING = "PENDING",
+  HIDDEN = "HIDDEN",
+  SUSPENDED = "SUSPENDED"
+}
+
+export type CreatorSocialPlatform = "website" | "instagram" | "tiktok" | "x" | "youtube" | "linkedin";
+
+export interface CreatorSocialLink {
+  id: string;
+  platform: CreatorSocialPlatform;
+  url: string;
+  label?: string;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export enum ProfileVisibility {
   PRIVATE = "PRIVATE",
   PUBLIC = "PUBLIC"
@@ -79,11 +98,23 @@ export interface CreatorProfile {
   id: string;
   userId: string;
   creatorName: string;
+  displayName: string;
+  slug: string;
   handle?: string;
   bio?: string;
-  category?: string;
-  links: string[];
   avatarUrl?: string;
+  coverUrl?: string;
+  websiteUrl?: string;
+  category?: string;
+  tags: string[];
+  socialLinks: CreatorSocialLink[];
+  followerCount: number;
+  followingCount: number;
+  publicReviewsCount: number;
+  publicGuidesCount: number;
+  badges: string[];
+  status: CreatorProfileStatus;
+  isPublic: boolean;
   bannerUrl?: string;
   verificationStatus: VerificationStatus;
   visibility: ProfileVisibility;
