@@ -13,8 +13,9 @@ function userId(req: IncomingMessage): string {
 function mapError(res: ServerResponse, error: unknown): void {
   const code = error instanceof Error ? error.message : "UNKNOWN";
   if (["CREATOR_NOT_FOUND", "GUIDE_NOT_FOUND"].includes(code)) return sendJson(res, 404, { error: code });
+  if (["GUIDE_QUOTA_EXCEEDED"].includes(code)) return sendJson(res, 429, { error: code });
   if (["CREATOR_NOT_FOLLOWABLE"].includes(code)) return sendJson(res, 400, { error: code });
-  if (["CREATOR_CONTEXT_NOT_ALLOWED", "CREATOR_ROLE_REQUIRED"].includes(code)) return sendJson(res, 403, { error: code });
+  if (["CREATOR_CONTEXT_NOT_ALLOWED", "CREATOR_ROLE_REQUIRED", "CREATOR_PLAN_REQUIRED"].includes(code)) return sendJson(res, 403, { error: code });
   if (["SLUG_TAKEN"].includes(code)) return sendJson(res, 409, { error: code });
   if (error instanceof ValidationError) return sendJson(res, 400, { error: error.message, details: error.details });
   throw error;
@@ -118,7 +119,7 @@ export function createCreatorHttpHandlers(service: CreatorService) {
 
     async createGuide(req: IncomingMessage, res: ServerResponse, creatorProfileId: string): Promise<void> {
       try {
-        const guide = service.createGuide(userId(req), creatorProfileId, await parseJsonBody(req) as never);
+        const guide = await service.createGuide(userId(req), creatorProfileId, await parseJsonBody(req) as never);
         sendJson(res, 201, { guide });
       } catch (error) {
         mapError(res, error);
@@ -127,7 +128,7 @@ export function createCreatorHttpHandlers(service: CreatorService) {
 
     async updateGuide(req: IncomingMessage, res: ServerResponse, guideId: string): Promise<void> {
       try {
-        const guide = service.updateGuide(userId(req), guideId, await parseJsonBody(req) as never);
+        const guide = await service.updateGuide(userId(req), guideId, await parseJsonBody(req) as never);
         sendJson(res, 200, { guide });
       } catch (error) {
         mapError(res, error);
@@ -144,6 +145,22 @@ export function createCreatorHttpHandlers(service: CreatorService) {
       }
     },
 
+
+
+    async searchGuides(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      try {
+        const search = new URL(req.url ?? "", "http://localhost").searchParams;
+        const query = String(search.get("q") ?? "").trim() || undefined;
+        const city = String(search.get("city") ?? "").trim() || undefined;
+        const guideType = String(search.get("guideType") ?? "").trim() || undefined;
+        const cursor = String(search.get("cursor") ?? "").trim() || undefined;
+        const limit = Number(search.get("limit") ?? "20");
+        const result = await service.searchGuides({ query, city, guideType: guideType as never, cursor, limit });
+        sendJson(res, 200, result);
+      } catch (error) {
+        mapError(res, error);
+      }
+    },
     async analytics(req: IncomingMessage, res: ServerResponse, creatorProfileId: string): Promise<void> {
       try {
         const summary = service.getCreatorAnalytics(userId(req), creatorProfileId);

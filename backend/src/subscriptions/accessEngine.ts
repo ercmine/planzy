@@ -28,7 +28,12 @@ export const FEATURE_KEYS = {
   MODERATION_PRIORITY_QUEUE: "moderation.priority_queue",
   LISTS_SAVE_PLACES: "lists.save_places",
   LISTS_CREATE_CUSTOM: "lists.create_custom",
-  LISTS_CREATE_PUBLIC: "lists.create_public"
+  LISTS_CREATE_PUBLIC: "lists.create_public",
+  GUIDES_CREATE: "guides.create",
+  GUIDES_ITINERARIES: "guides.itineraries",
+  GUIDES_ATTACH_VIDEO: "guides.attach_video",
+  GUIDES_DISCOVERY: "guides.discovery",
+  GUIDES_PLACE_SURFACING: "guides.place_surfacing"
 } as const;
 
 export type FeatureKey = typeof FEATURE_KEYS[keyof typeof FEATURE_KEYS];
@@ -51,7 +56,9 @@ export const QUOTA_KEYS = {
   CREATOR_FEATURED_SUBMISSIONS_PER_MONTH: "quota.creator.featured_submissions_per_month",
   BUSINESS_TEAM_MEMBERS: "quota.business.team_members",
   BUSINESS_PROMOTED_PLACES: "quota.business.promoted_places",
-  BUSINESS_CAMPAIGNS_PER_MONTH: "quota.business.campaigns_per_month"
+  BUSINESS_CAMPAIGNS_PER_MONTH: "quota.business.campaigns_per_month",
+  GUIDES_PER_CREATOR: "quota.guides.per_creator",
+  GUIDE_PLACES_PER_GUIDE: "quota.guides.places_per_guide"
 } as const;
 
 export type QuotaKey = typeof QUOTA_KEYS[keyof typeof QUOTA_KEYS];
@@ -164,7 +171,9 @@ const QUOTA_DEFAULTS: Record<QuotaKey, { limit: number; resetWindow: QuotaResetW
   [QUOTA_KEYS.CREATOR_FEATURED_SUBMISSIONS_PER_MONTH]: { limit: 0, resetWindow: QuotaResetWindow.MONTHLY, unit: "count" },
   [QUOTA_KEYS.BUSINESS_TEAM_MEMBERS]: { limit: 1, resetWindow: QuotaResetWindow.NONE, unit: "count" },
   [QUOTA_KEYS.BUSINESS_PROMOTED_PLACES]: { limit: 0, resetWindow: QuotaResetWindow.NONE, unit: "count" },
-  [QUOTA_KEYS.BUSINESS_CAMPAIGNS_PER_MONTH]: { limit: 0, resetWindow: QuotaResetWindow.MONTHLY, unit: "count" }
+  [QUOTA_KEYS.BUSINESS_CAMPAIGNS_PER_MONTH]: { limit: 0, resetWindow: QuotaResetWindow.MONTHLY, unit: "count" },
+  [QUOTA_KEYS.GUIDES_PER_CREATOR]: { limit: 0, resetWindow: QuotaResetWindow.NONE, unit: "count" },
+  [QUOTA_KEYS.GUIDE_PLACES_PER_GUIDE]: { limit: 20, resetWindow: QuotaResetWindow.NONE, unit: "count" }
 };
 
 interface UsageRow {
@@ -237,7 +246,12 @@ function planFeatureMapping(plan: PlanDefinition, entitlements: Record<string, E
     [FEATURE_KEYS.MODERATION_PRIORITY_QUEUE]: Boolean(entitlements.priority_support),
     [FEATURE_KEYS.LISTS_SAVE_PLACES]: Number(entitlements.max_saved_places ?? 0) > 0,
     [FEATURE_KEYS.LISTS_CREATE_CUSTOM]: Number(entitlements.max_custom_lists ?? 0) > 0,
-    [FEATURE_KEYS.LISTS_CREATE_PUBLIC]: !Boolean(entitlements.ads_enabled)
+    [FEATURE_KEYS.LISTS_CREATE_PUBLIC]: !Boolean(entitlements.ads_enabled),
+    [FEATURE_KEYS.GUIDES_CREATE]: Boolean(entitlements.creator_profile_enabled),
+    [FEATURE_KEYS.GUIDES_ITINERARIES]: plan.tier !== "FREE",
+    [FEATURE_KEYS.GUIDES_ATTACH_VIDEO]: Number(entitlements.max_video_reviews_per_month ?? 0) > 0,
+    [FEATURE_KEYS.GUIDES_DISCOVERY]: Boolean(entitlements.creator_profile_enabled),
+    [FEATURE_KEYS.GUIDES_PLACE_SURFACING]: Boolean(entitlements.creator_profile_enabled)
   };
 }
 
@@ -260,7 +274,9 @@ function planQuotaMapping(entitlements: Record<string, EntitlementValue>): Recor
     [QUOTA_KEYS.CREATOR_FEATURED_SUBMISSIONS_PER_MONTH]: Number(entitlements.max_featured_posts ?? QUOTA_DEFAULTS[QUOTA_KEYS.CREATOR_FEATURED_SUBMISSIONS_PER_MONTH].limit),
     [QUOTA_KEYS.BUSINESS_TEAM_MEMBERS]: Number(entitlements.business_team_members ?? QUOTA_DEFAULTS[QUOTA_KEYS.BUSINESS_TEAM_MEMBERS].limit),
     [QUOTA_KEYS.BUSINESS_PROMOTED_PLACES]: Number(entitlements.max_places_claimed ?? QUOTA_DEFAULTS[QUOTA_KEYS.BUSINESS_PROMOTED_PLACES].limit),
-    [QUOTA_KEYS.BUSINESS_CAMPAIGNS_PER_MONTH]: Number(entitlements.business_promotions ? 10 : QUOTA_DEFAULTS[QUOTA_KEYS.BUSINESS_CAMPAIGNS_PER_MONTH].limit)
+    [QUOTA_KEYS.BUSINESS_CAMPAIGNS_PER_MONTH]: Number(entitlements.business_promotions ? 10 : QUOTA_DEFAULTS[QUOTA_KEYS.BUSINESS_CAMPAIGNS_PER_MONTH].limit),
+    [QUOTA_KEYS.GUIDES_PER_CREATOR]: Number(entitlements.max_creator_guides ?? QUOTA_DEFAULTS[QUOTA_KEYS.GUIDES_PER_CREATOR].limit),
+    [QUOTA_KEYS.GUIDE_PLACES_PER_GUIDE]: Number(entitlements.max_places_per_list ?? QUOTA_DEFAULTS[QUOTA_KEYS.GUIDE_PLACES_PER_GUIDE].limit)
   };
 }
 
