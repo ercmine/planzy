@@ -5,10 +5,9 @@ import type { Logger } from "../../logging/loggerTypes.js";
 import { defaultLogger } from "../../logging/logger.js";
 import { ValidationError } from "../../plans/errors.js";
 import type { VenueClaimsService } from "./claimsService.js";
-import type { VerificationStatus } from "./types.js";
+import type { BusinessManagedPlaceContentRecord } from "./types.js";
 
 const MAX_BODY_BYTES = 64 * 1024;
-const STATUS_VALUES: VerificationStatus[] = ["pending", "verified", "rejected"];
 
 function hashShort(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
@@ -17,44 +16,34 @@ function hashShort(value: string): string {
 export async function parseJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let total = 0;
-
   for await (const chunk of req) {
     const asBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += asBuffer.byteLength;
-    if (total > MAX_BODY_BYTES) {
-      throw new ValidationError(["request body must be <= 64KB"]);
-    }
+    if (total > MAX_BODY_BYTES) throw new ValidationError(["request body must be <= 64KB"]);
     chunks.push(asBuffer);
   }
-
-  if (chunks.length === 0) {
-    return {};
-  }
-
-  const raw = Buffer.concat(chunks).toString("utf8");
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new ValidationError(["request body must be valid JSON"]);
-  }
+  if (!chunks.length) return {};
+  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { throw new ValidationError(["request body must be valid JSON"]); }
 }
 
 export function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  const payload = JSON.stringify(body);
   res.statusCode = status;
   res.setHeader("content-type", "application/json; charset=utf-8");
-  res.end(payload);
+  res.end(JSON.stringify(body));
 }
 
 export function readHeader(req: IncomingMessage, name: string): string | undefined {
   const value = req.headers[name.toLowerCase()];
-  if (typeof value === "string") {
-    return value;
-  }
-  if (Array.isArray(value)) {
-    return value[0];
-  }
-  return undefined;
+  return typeof value === "string" ? value : Array.isArray(value) ? value[0] : undefined;
+}
+
+function actorFromRequest(req: IncomingMessage) {
+  const adminKey = process.env.ADMIN_API_KEY;
+  return {
+    userId: readHeader(req, "x-user-id"),
+    businessProfileId: readHeader(req, "x-business-profile-id"),
+    isAdmin: Boolean(adminKey && readHeader(req, "x-admin-key") === adminKey)
+  };
 }
 
 export function createVenueClaimsHttpHandlers(service: VenueClaimsService, deps?: { logger?: Logger }) {
@@ -62,56 +51,87 @@ export function createVenueClaimsHttpHandlers(service: VenueClaimsService, deps?
 
   async function handleCreate(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await parseJsonBody(req);
-    const userId = readHeader(req, "x-user-id");
-    const created = await service.createLead(body, { userId });
-
-    logger.info("venue_claim.created", {
-      claimId: created.claimId,
-      venueHash: hashShort(created.venueId),
-      emailHash: hashShort(created.contactEmail)
-    });
-
-    sendJson(res, 201, {
-      claimId: created.claimId,
-      verificationStatus: created.verificationStatus,
-      createdAtISO: created.createdAtISO
-    });
+    const actor = actorFromRequest(req);
+    const created = await service.createLead(body, { userId: actor.userId });
+    logger.info("venue_claim.created", { claimId: created.claimId, venueHash: hashShort(created.venueId), emailHash: hashShort(created.contactEmail) });
+    sendJson(res, 201, { claimId: created.claimId, verificationStatus: created.verificationStatus, createdAtISO: created.createdAtISO });
   }
 
   async function handleList(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const base = `http://${req.headers.host ?? "localhost"}`;
     const url = new URL(req.url ?? "/", base);
-    const statusParam = url.searchParams.get("status");
-    const status = statusParam && STATUS_VALUES.includes(statusParam as VerificationStatus)
-      ? (statusParam as VerificationStatus)
-      : statusParam;
-
+    const actor = actorFromRequest(req);
     const result = await service.listLeads({
-      venueId: url.searchParams.get("venueId") ?? undefined,
-      status: status ?? undefined,
+      placeId: url.searchParams.get("placeId") ?? undefined,
+      status: url.searchParams.get("status") ?? undefined,
       limit: url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : undefined,
-      cursor: url.searchParams.get("cursor")
-    });
-
-    // TODO: protect this endpoint (admin only) before production.
+      cursor: url.searchParams.get("cursor"),
+      reviewQueueOnly: url.searchParams.get("reviewQueueOnly") === "true"
+    }, actor);
     sendJson(res, 200, result);
   }
 
   async function handlePatchStatus(req: IncomingMessage, res: ServerResponse, claimId: string): Promise<void> {
-    const body = await parseJsonBody(req);
-    if (typeof body !== "object" || body === null || typeof (body as { status?: unknown }).status !== "string") {
-      throw new ValidationError(["status is required"]);
-    }
-
-    await service.setStatus(claimId, (body as { status: VerificationStatus }).status);
-
-    logger.info("venue_claim.status_updated", {
-      claimId,
-      status: (body as { status: VerificationStatus }).status
-    });
-
+    const body = (await parseJsonBody(req)) as { status?: "pending" | "verified" | "rejected" };
+    if (!body.status) throw new ValidationError(["status is required"]);
+    await service.setStatus(claimId, body.status);
     sendJson(res, 200, { ok: true });
   }
 
-  return { handleCreate, handleList, handlePatchStatus };
+  async function handleCreateBusinessClaimDraft(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const created = await service.createClaimDraft(await parseJsonBody(req), actorFromRequest(req));
+    sendJson(res, 201, created);
+  }
+
+  async function handleSubmitClaim(req: IncomingMessage, res: ServerResponse, claimId: string): Promise<void> {
+    sendJson(res, 200, await service.submitClaim(claimId, actorFromRequest(req)));
+  }
+
+  async function handleGetClaim(req: IncomingMessage, res: ServerResponse, claimId: string): Promise<void> {
+    sendJson(res, 200, await service.getClaim(claimId, actorFromRequest(req)));
+  }
+
+  async function handleAddEvidence(req: IncomingMessage, res: ServerResponse, claimId: string): Promise<void> {
+    sendJson(res, 201, await service.addEvidence(claimId, await parseJsonBody(req), actorFromRequest(req)));
+  }
+
+  async function handleListEvidence(req: IncomingMessage, res: ServerResponse, claimId: string): Promise<void> {
+    sendJson(res, 200, { evidence: await service.listEvidence(claimId, actorFromRequest(req)) });
+  }
+
+  async function handleReviewClaim(req: IncomingMessage, res: ServerResponse, claimId: string): Promise<void> {
+    const body = (await parseJsonBody(req)) as { decision: "approve" | "reject" | "request_more_info"; reasonCode: string; notes?: string };
+    sendJson(res, 200, await service.reviewClaim(claimId, body.decision, body.reasonCode, body.notes, actorFromRequest(req)));
+  }
+
+  async function handleRevokeOwnership(req: IncomingMessage, res: ServerResponse, ownershipId: string): Promise<void> {
+    const body = (await parseJsonBody(req)) as { reasonCode: string };
+    await service.revokeOwnership(ownershipId, body.reasonCode, actorFromRequest(req));
+    sendJson(res, 200, { ok: true });
+  }
+
+  async function handleUpsertOfficialContent(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    const body = (await parseJsonBody(req)) as { ownershipId: string; contentType: BusinessManagedPlaceContentRecord["contentType"]; value: Record<string, unknown> };
+    sendJson(res, 201, await service.upsertOfficialContent(placeId, body.ownershipId, body.contentType, body.value, actorFromRequest(req)));
+  }
+
+  async function handlePlaceManagementState(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    sendJson(res, 200, await service.getPlaceManagementState(placeId, actorFromRequest(req)));
+  }
+
+  return {
+    handleCreate,
+    handleList,
+    handlePatchStatus,
+    handleCreateBusinessClaimDraft,
+    handleSubmitClaim,
+    handleGetClaim,
+    handleAddEvidence,
+    handleListEvidence,
+    handleReviewClaim,
+    handleRevokeOwnership,
+    handleUpsertOfficialContent,
+    handlePlaceManagementState
+  };
 }
+

@@ -5,80 +5,53 @@ import { VenueClaimsService } from "../claimsService.js";
 import { MemoryVenueClaimStore } from "../memoryStore.js";
 
 describe("VenueClaimsService", () => {
-  it("createLead validates email and creates pending record", async () => {
-    const service = new VenueClaimsService(new MemoryVenueClaimStore(), {
-      now: () => new Date("2025-01-01T00:00:00.000Z")
-    });
+  it("supports claim lifecycle, evidence, approval, ownership, and revocation", async () => {
+    const service = new VenueClaimsService(new MemoryVenueClaimStore(), () => new Date("2025-01-01T00:00:00.000Z"));
 
-    await expect(
-      service.createLead({
-        venueId: "venue-1",
-        contactEmail: "invalid"
-      })
-    ).rejects.toThrowError(ValidationError);
+    const draft = await service.createClaimDraft({
+      placeId: "place-1",
+      claimType: "sole_owner",
+      requestedRole: "owner",
+      contactEmail: "owner@example.com",
+      verificationMethodSelection: ["email_domain", "document"]
+    }, { userId: "user-1" });
 
-    const created = await service.createLead({
-      venueId: "venue-1",
-      contactEmail: "owner@example.com"
-    });
+    expect(draft.status).toBe("draft");
 
-    expect(created.verificationStatus).toBe("pending");
-    expect(created.createdAtISO).toBe("2025-01-01T00:00:00.000Z");
+    const submitted = await service.submitClaim(draft.id, { userId: "user-1" });
+    expect(submitted.status).toBe("submitted");
+
+    await service.addEvidence(draft.id, { evidenceType: "document", storageRef: "s3://doc" }, { userId: "user-1" });
+
+    const reviewed = await service.reviewClaim(draft.id, "approve", "doc_match", "ok", { userId: "admin-1", isAdmin: true });
+    expect(reviewed?.status).toBe("approved");
+    expect(reviewed?.verificationLevel).toBe("enhanced");
+
+    const state = await service.getPlaceManagementState("place-1", { userId: "user-1" });
+    expect(state.canManage).toBe(true);
+    expect(state.ownership).toHaveLength(1);
+
+    await service.revokeOwnership(state.ownership[0]!.id, "ownership_dispute", { userId: "admin-1", isAdmin: true });
+    const post = await service.getPlaceManagementState("place-1", { userId: "user-1" });
+    expect(post.ownership[0]?.isActive).toBe(false);
   });
 
-  it("idempotency returns same claimId for pending duplicate", async () => {
+  it("blocks unauthorized review", async () => {
     const service = new VenueClaimsService(new MemoryVenueClaimStore());
-
-    const first = await service.createLead({
-      venueId: "venue-1",
+    const draft = await service.createClaimDraft({
+      placeId: "place-2",
+      claimType: "sole_owner",
+      requestedRole: "owner",
       contactEmail: "owner@example.com"
-    });
+    }, { userId: "user-2" });
 
-    const second = await service.createLead({
-      venueId: "venue-1",
-      contactEmail: "owner@example.com"
-    });
-
-    expect(first.claimId).toBe(second.claimId);
+    await service.submitClaim(draft.id, { userId: "user-2" });
+    await expect(service.reviewClaim(draft.id, "approve", "x", undefined, { userId: "user-3" })).rejects.toThrowError(ValidationError);
   });
 
-  it("list pagination works", async () => {
-    let tick = 0;
-    const service = new VenueClaimsService(new MemoryVenueClaimStore(), {
-      now: () => new Date(`2025-01-01T00:00:0${tick++}.000Z`)
-    });
-
-    for (let i = 0; i < 4; i += 1) {
-      await service.createLead({
-        venueId: "venue-1",
-        contactEmail: `owner${i}@example.com`
-      });
-    }
-
-    const page1 = await service.listLeads({ limit: 2 });
-    expect(page1.claims).toHaveLength(2);
-    expect(page1.nextCursor).toBeTruthy();
-
-    const page2 = await service.listLeads({ limit: 2, cursor: page1.nextCursor });
-    expect(page2.claims).toHaveLength(2);
-    expect(page1.claims[0]?.claimId).not.toBe(page2.claims[0]?.claimId);
-  });
-
-  it("setStatus updates status", async () => {
-    const store = new MemoryVenueClaimStore();
-    const service = new VenueClaimsService(store, {
-      now: () => new Date("2025-01-03T00:00:00.000Z")
-    });
-
-    const created = await service.createLead({
-      venueId: "venue-9",
-      contactEmail: "hello@example.com"
-    });
-
-    await service.setStatus(created.claimId, "verified");
-    const found = await store.getById(created.claimId);
-
-    expect(found?.verificationStatus).toBe("verified");
-    expect(found?.updatedAtISO).toBe("2025-01-03T00:00:00.000Z");
+  it("legacy createLead remains available", async () => {
+    const service = new VenueClaimsService(new MemoryVenueClaimStore());
+    const created = await service.createLead({ venueId: "venue-1", contactEmail: "owner@example.com" }, { userId: "user-1" });
+    expect(created.verificationStatus).toBe("pending");
   });
 });

@@ -1290,6 +1290,55 @@ export function createRoutes(
         return;
       }
 
+      if (req.method === "POST" && normalizedPath === "/v1/business-claims") {
+        await handlers.handleCreateBusinessClaimDraft(req, res);
+        return;
+      }
+
+      const businessClaimSubmitMatch = /^\/v1\/business-claims\/([^/]+)\/submit$/.exec(normalizedPath);
+      if (req.method === "POST" && businessClaimSubmitMatch) {
+        await handlers.handleSubmitClaim(req, res, decodeURIComponent(businessClaimSubmitMatch[1] ?? ""));
+        return;
+      }
+
+      const businessClaimMatch = /^\/v1\/business-claims\/([^/]+)$/.exec(normalizedPath);
+      if (req.method === "GET" && businessClaimMatch) {
+        await handlers.handleGetClaim(req, res, decodeURIComponent(businessClaimMatch[1] ?? ""));
+        return;
+      }
+
+      const businessClaimEvidenceMatch = /^\/v1\/business-claims\/([^/]+)\/evidence$/.exec(normalizedPath);
+      if (businessClaimEvidenceMatch && req.method === "POST") {
+        await handlers.handleAddEvidence(req, res, decodeURIComponent(businessClaimEvidenceMatch[1] ?? ""));
+        return;
+      }
+      if (businessClaimEvidenceMatch && req.method === "GET") {
+        await handlers.handleListEvidence(req, res, decodeURIComponent(businessClaimEvidenceMatch[1] ?? ""));
+        return;
+      }
+
+      const businessClaimReviewMatch = /^\/v1\/admin\/business-claims\/([^/]+)\/review$/.exec(normalizedPath);
+      if (req.method === "POST" && businessClaimReviewMatch) {
+        await handlers.handleReviewClaim(req, res, decodeURIComponent(businessClaimReviewMatch[1] ?? ""));
+        return;
+      }
+
+      const ownershipRevokeMatch = /^\/v1\/admin\/business-ownership\/([^/]+)\/revoke$/.exec(normalizedPath);
+      if (req.method === "POST" && ownershipRevokeMatch) {
+        await handlers.handleRevokeOwnership(req, res, decodeURIComponent(ownershipRevokeMatch[1] ?? ""));
+        return;
+      }
+
+      const managePlaceMatch = /^\/places\/([^/]+)\/business-management$/.exec(normalizedPath);
+      if (managePlaceMatch && req.method === "GET") {
+        await handlers.handlePlaceManagementState(req, res, decodeURIComponent(managePlaceMatch[1] ?? ""));
+        return;
+      }
+      if (managePlaceMatch && req.method === "POST") {
+        await handlers.handleUpsertOfficialContent(req, res, decodeURIComponent(managePlaceMatch[1] ?? ""));
+        return;
+      }
+
       if (normalizedPath.startsWith("/v1/admin/")) {
         if (!assertAdmin(req)) {
           sendJson(res, 401, { error: "Unauthorized" });
