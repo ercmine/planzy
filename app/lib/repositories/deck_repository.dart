@@ -260,6 +260,7 @@ Plan _planFromApi(Map<String, dynamic> json) {
           : json['address'])
       ?.toString();
 
+  final photo = json['photo']?.toString();
   final photoUrl = json['photoUrl']?.toString();
   final safePhotoUrl = isHttpUrl(photoUrl) ? photoUrl : null;
   final mapsUri = json['googleMapsUri']?.toString();
@@ -284,7 +285,8 @@ Plan _planFromApi(Map<String, dynamic> json) {
       'source': 'api.perbug.com',
       'placeId': json['placeId']?.toString(),
       'address': address,
+      'photo': photo,
+      'photoUrl': safePhotoUrl,
     },
   );
 }
-

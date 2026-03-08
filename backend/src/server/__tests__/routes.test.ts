@@ -130,7 +130,7 @@ describe("server diagnostic and alias routes", () => {
         id: "google:abc",
         title: "Coffee Place",
         photo: "places/abc/photos/def",
-        photoUrl: "https://api.perbug.com/photos?name=places%2Fabc%2Fphotos%2Fdef&maxWidthPx=800"
+        photoUrl: "https://api.perbug.com/photo?name=places%2Fabc%2Fphotos%2Fdef&maxWidthPx=800"
       }
     ]);
 
@@ -152,7 +152,7 @@ describe("server diagnostic and alias routes", () => {
   });
 
   it("proxies Google Places photos and returns cache headers", async () => {
-    const response = await fetch(`${baseUrl}/photos?name=places/abc/photos/def&maxWidthPx=800&maxHeightPx=800`);
+    const response = await fetch(`${baseUrl}/photo?name=places/abc/photos/def&maxWidthPx=800&maxHeightPx=800`);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("image/jpeg");
     expect(response.headers.get("cache-control")).toBe("public, max-age=86400");
@@ -160,10 +160,10 @@ describe("server diagnostic and alias routes", () => {
   });
 
   it("returns photo_not_available for invalid photos requests", async () => {
-    const response = await fetch(`${baseUrl}/photos?name=invalid-photo-name`);
-    expect(response.status).toBe(404);
+    const response = await fetch(`${baseUrl}/photo?name=invalid-photo-name`);
+    expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
-      error: "photo_not_available"
+      error: "invalid_photo_name"
     });
   });
 
