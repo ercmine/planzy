@@ -3,11 +3,19 @@ import { ValidationError } from "../../plans/errors.js";
 import type {
   BusinessClaimEvidenceRecord,
   BusinessManagedPlaceContentRecord,
+  BusinessManagedPlaceImage,
+  BusinessManagedPlaceProfile,
+  BusinessManagedHours,
+  BusinessManagedChangeAuditRecord,
+  BusinessPlaceCategorySuggestion,
   BusinessPlaceClaimRecord,
+  BusinessPlaceLink,
+  BusinessPlaceMenuServiceCatalog,
   ClaimAuditEvent,
   ClaimStatus,
   ListClaimsOptions,
   ListClaimsResult,
+  OfficialBusinessDescription,
   PlaceBusinessOwnershipRecord
 } from "./types.js";
 import type { VenueClaimStore } from "./store.js";
@@ -33,6 +41,14 @@ export class MemoryVenueClaimStore implements VenueClaimStore {
   private readonly ownership = new Map<string, PlaceBusinessOwnershipRecord>();
   private readonly content = new Map<string, BusinessManagedPlaceContentRecord>();
   private readonly auditEvents: ClaimAuditEvent[] = [];
+  private readonly managedProfiles = new Map<string, BusinessManagedPlaceProfile>();
+  private readonly officialDescriptions = new Map<string, OfficialBusinessDescription>();
+  private readonly categorySuggestions = new Map<string, BusinessPlaceCategorySuggestion>();
+  private readonly managedHours = new Map<string, BusinessManagedHours>();
+  private readonly businessLinks = new Map<string, BusinessPlaceLink>();
+  private readonly menuServiceCatalogs = new Map<string, BusinessPlaceMenuServiceCatalog>();
+  private readonly businessImages = new Map<string, BusinessManagedPlaceImage>();
+  private readonly businessManagedAuditEvents: BusinessManagedChangeAuditRecord[] = [];
   private readonly retentionPolicy: RetentionPolicy;
 
   constructor(retentionPolicy?: RetentionPolicy) {
@@ -100,6 +116,108 @@ export class MemoryVenueClaimStore implements VenueClaimStore {
 
   async appendAuditEvent(input: ClaimAuditEvent): Promise<void> { this.auditEvents.push(input); }
   async listAuditEvents(placeId: string): Promise<ClaimAuditEvent[]> { return this.auditEvents.filter((a) => a.placeId === placeId); }
+
+  async upsertBusinessManagedPlaceProfile(input: BusinessManagedPlaceProfile): Promise<void> {
+    this.managedProfiles.set(input.placeId, input);
+  }
+
+  async getBusinessManagedPlaceProfile(placeId: string): Promise<BusinessManagedPlaceProfile | null> {
+    return this.managedProfiles.get(placeId) ?? null;
+  }
+
+  async upsertOfficialDescription(input: OfficialBusinessDescription): Promise<void> {
+    this.officialDescriptions.set(input.placeId, input);
+  }
+
+  async getOfficialDescription(placeId: string): Promise<OfficialBusinessDescription | null> {
+    return this.officialDescriptions.get(placeId) ?? null;
+  }
+
+  async upsertCategorySuggestion(input: BusinessPlaceCategorySuggestion): Promise<void> {
+    this.categorySuggestions.set(input.id, input);
+  }
+
+  async listCategorySuggestions(placeId: string): Promise<BusinessPlaceCategorySuggestion[]> {
+    return [...this.categorySuggestions.values()].filter((entry) => entry.placeId === placeId);
+  }
+
+  async upsertManagedHours(input: BusinessManagedHours): Promise<void> {
+    this.managedHours.set(input.placeId, input);
+  }
+
+  async getManagedHours(placeId: string): Promise<BusinessManagedHours | null> {
+    return this.managedHours.get(placeId) ?? null;
+  }
+
+  async upsertBusinessLink(input: BusinessPlaceLink): Promise<void> {
+    this.businessLinks.set(input.id, input);
+  }
+
+  async listBusinessLinks(placeId: string): Promise<BusinessPlaceLink[]> {
+    return [...this.businessLinks.values()]
+      .filter((entry) => entry.placeId === placeId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  async upsertMenuServiceCatalog(input: BusinessPlaceMenuServiceCatalog): Promise<void> {
+    this.menuServiceCatalogs.set(input.id, input);
+  }
+
+  async listMenuServiceCatalogs(placeId: string): Promise<BusinessPlaceMenuServiceCatalog[]> {
+    return [...this.menuServiceCatalogs.values()].filter((entry) => entry.placeId === placeId);
+  }
+
+  async upsertBusinessImage(input: BusinessManagedPlaceImage): Promise<void> {
+    this.businessImages.set(input.id, input);
+  }
+
+  async listBusinessImages(placeId: string): Promise<BusinessManagedPlaceImage[]> {
+    return [...this.businessImages.values()]
+      .filter((entry) => entry.placeId === placeId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  async appendBusinessManagedAuditEvent(input: BusinessManagedChangeAuditRecord): Promise<void> {
+    this.businessManagedAuditEvents.push(input);
+  }
+
+  async listBusinessManagedAuditEvents(placeId: string): Promise<BusinessManagedChangeAuditRecord[]> {
+    return this.businessManagedAuditEvents.filter((entry) => entry.placeId === placeId);
+  }
+
+  // legacy compatibility
+  async create(input: { claimId: string; venueId: string; contactEmail: string; verificationStatus: "pending" | "verified" | "rejected"; createdAtISO: string }): Promise<void> {
+    const statusMap = { pending: "submitted", verified: "approved", rejected: "rejected" } as const;
+    const record: BusinessPlaceClaimRecord = {
+      id: input.claimId,
+      placeId: input.venueId,
+      claimantUserId: "legacy-user",
+      claimType: "sole_owner",
+      requestedRole: "owner",
+      status: statusMap[input.verificationStatus],
+      verificationLevel: "none",
+      verificationMethodSelection: [],
+      contactEmail: input.contactEmail,
+      createdAt: input.createdAtISO,
+      updatedAt: input.createdAtISO,
+      submittedAt: input.createdAtISO
+    };
+    await this.createClaim(record);
+  }
+
+  async list(): Promise<{ claims: Array<{ claimId: string; venueId: string; contactEmail: string; verificationStatus: "pending" | "verified" | "rejected"; createdAtISO: string; updatedAtISO: string }> }> {
+    const claims = [...this.claims.values()]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((claim) => ({
+        claimId: claim.id,
+        venueId: claim.placeId,
+        contactEmail: claim.contactEmail,
+        verificationStatus: (claim.status === "approved" ? "verified" : claim.status === "rejected" ? "rejected" : "pending") as "pending" | "verified" | "rejected",
+        createdAtISO: claim.createdAt,
+        updatedAtISO: claim.updatedAt
+      }));
+    return { claims };
+  }
 
   public prune(maxAgeMs = this.retentionPolicy.config.maxTtlByClass.venue_claims, now = new Date()): number {
     const thresholdMs = now.getTime() - maxAgeMs;

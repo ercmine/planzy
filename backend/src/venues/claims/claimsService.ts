@@ -1,12 +1,21 @@
 import { randomUUID } from "node:crypto";
 
 import { ValidationError } from "../../plans/errors.js";
+import { normalizePhone, normalizeUrl } from "../../places/normalization.js";
+import { sanitizeText } from "../../sanitize/text.js";
 import type {
+  BusinessManagedHours,
   BusinessManagedPlaceContentRecord,
+  BusinessManagedPlaceImage,
+  BusinessPlaceCategorySuggestion,
   BusinessPlaceClaimRecord,
+  BusinessPlaceLink,
+  BusinessPlaceLinkType,
+  BusinessPlaceMenuServiceCatalog,
   ClaimActor,
   ClaimStatus,
   ListClaimsResult,
+  OfficialBusinessDescription,
   OwnershipRole,
   PlaceBusinessOwnershipRecord,
   VerificationLevel
@@ -15,6 +24,21 @@ import type { VenueClaimStore } from "./store.js";
 import { validateBusinessClaimInput, validateEvidenceInput, validateListClaimsOptions } from "./validation.js";
 
 const TERMINAL: ClaimStatus[] = ["approved", "rejected", "withdrawn", "expired", "revoked", "suspended"];
+const URL_LINK_TYPES = new Set<BusinessPlaceLinkType>([
+  "website",
+  "instagram",
+  "tiktok",
+  "facebook",
+  "youtube",
+  "reservation",
+  "booking",
+  "order",
+  "waitlist",
+  "menu",
+  "services",
+  "tickets",
+  "contact_form"
+]);
 
 export class VenueClaimsService {
   constructor(private readonly store: VenueClaimStore, private readonly now: () => Date = () => new Date()) {}
@@ -26,6 +50,13 @@ export class VenueClaimsService {
 
   private assertCanReview(actor?: ClaimActor): void {
     if (!actor?.isAdmin) throw new ValidationError(["admin privileges required"]);
+  }
+
+  private async assertCanManageClaimedPlace(placeId: string, actor?: ClaimActor) {
+    const userId = this.requireUser(actor);
+    const ownership = (await this.store.listOwnershipByPlace(placeId)).find((entry) => entry.isActive && entry.primaryUserId === userId);
+    if (!ownership && !actor?.isAdmin) throw new ValidationError(["user cannot manage this place"]);
+    return ownership;
   }
 
   public async createClaimDraft(input: unknown, actor?: ClaimActor): Promise<BusinessPlaceClaimRecord> {
@@ -165,6 +196,138 @@ export class VenueClaimsService {
     await this.track(own.placeId, "business_ownership_revoked", actor?.userId, { ownershipId, reasonCode });
   }
 
+  public async updateOfficialDescription(placeId: string, content: unknown, actor?: ClaimActor): Promise<OfficialBusinessDescription> {
+    const ownership = await this.assertCanManageClaimedPlace(placeId, actor);
+    const safe = sanitizeText(content, { source: "user", maxLen: 2400, allowNewlines: true, profanityMode: "mask" });
+    if (!safe) throw new ValidationError(["description content is required"]);
+    const nowIso = this.now().toISOString();
+    const record: OfficialBusinessDescription = {
+      id: randomUUID(),
+      placeId,
+      content: safe,
+      moderationStatus: "approved",
+      visibilityStatus: "published",
+      authoredByUserId: this.requireUser(actor),
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      publishedAt: nowIso,
+      ...(ownership?.businessProfileId ? { businessProfileId: ownership.businessProfileId } : {})
+    };
+    await this.store.upsertOfficialDescription(record);
+    await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "description", entityId: record.id, action: "updated", actorUserId: actor?.userId, metadata: { moderationStatus: record.moderationStatus }, createdAt: nowIso });
+    await this.store.upsertBusinessManagedPlaceProfile({ id: randomUUID(), placeId, ownershipLinkId: ownership?.id ?? "admin", status: "active", createdAt: nowIso, updatedAt: nowIso, publishedAt: nowIso, ...(ownership?.businessProfileId ? { businessProfileId: ownership.businessProfileId } : {}) });
+    return record;
+  }
+
+  public async submitCategorySuggestion(placeId: string, input: { primaryCategoryId?: string; secondaryCategoryIds?: string[]; reason?: string }, actor?: ClaimActor): Promise<BusinessPlaceCategorySuggestion> {
+    const ownership = await this.assertCanManageClaimedPlace(placeId, actor);
+    if (!input.primaryCategoryId && (!input.secondaryCategoryIds || input.secondaryCategoryIds.length === 0)) throw new ValidationError(["at least one category suggestion is required"]);
+    const nowIso = this.now().toISOString();
+    const record: BusinessPlaceCategorySuggestion = {
+      id: randomUUID(),
+      placeId,
+      suggestedPrimaryCategoryId: input.primaryCategoryId,
+      suggestedSecondaryCategoryIds: (input.secondaryCategoryIds ?? []).slice(0, 12),
+      reason: sanitizeText(input.reason, { source: "user", maxLen: 280, allowNewlines: false, profanityMode: "mask" }),
+      status: "pending",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      ...(ownership?.businessProfileId ? { businessProfileId: ownership.businessProfileId } : {})
+    };
+    await this.store.upsertCategorySuggestion(record);
+    await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "category", entityId: record.id, action: "created", actorUserId: actor?.userId, metadata: { primary: input.primaryCategoryId }, createdAt: nowIso });
+    return record;
+  }
+
+  public async updateManagedHours(placeId: string, input: Omit<BusinessManagedHours, "id" | "placeId" | "createdAt" | "updatedAt" | "businessProfileId">, actor?: ClaimActor): Promise<BusinessManagedHours> {
+    const ownership = await this.assertCanManageClaimedPlace(placeId, actor);
+    if (!input.timezone || typeof input.timezone !== "string") throw new ValidationError(["timezone is required"]);
+    const nowIso = this.now().toISOString();
+    const record: BusinessManagedHours = {
+      id: randomUUID(),
+      placeId,
+      timezone: input.timezone,
+      weeklyHours: input.weeklyHours,
+      specialHours: input.specialHours,
+      temporaryClosureStatus: input.temporaryClosureStatus,
+      moderationStatus: "approved",
+      effectiveStatus: "active",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      ...(ownership?.businessProfileId ? { businessProfileId: ownership.businessProfileId } : {})
+    };
+    await this.store.upsertManagedHours(record);
+    await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "hours", entityId: record.id, action: "updated", actorUserId: actor?.userId, metadata: { timezone: record.timezone }, createdAt: nowIso });
+    return record;
+  }
+
+  public async upsertBusinessLink(placeId: string, input: { linkType: BusinessPlaceLinkType; value: string; label?: string; sortOrder?: number }, actor?: ClaimActor): Promise<BusinessPlaceLink> {
+    const ownership = await this.assertCanManageClaimedPlace(placeId, actor);
+    const nowIso = this.now().toISOString();
+    const normalized = this.normalizeLinkByType(input.linkType, input.value);
+    const record: BusinessPlaceLink = {
+      id: randomUUID(),
+      placeId,
+      linkType: input.linkType,
+      url: normalized,
+      label: sanitizeText(input.label, { source: "user", maxLen: 40, allowNewlines: false, profanityMode: "mask" }),
+      sortOrder: input.sortOrder ?? 0,
+      moderationStatus: input.linkType === "website" || input.linkType === "menu" || input.linkType === "services" ? "approved" : "pending",
+      isActive: true,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      ...(ownership?.businessProfileId ? { businessProfileId: ownership.businessProfileId } : {})
+    };
+    await this.store.upsertBusinessLink(record);
+    await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "link", entityId: record.id, action: "updated", actorUserId: actor?.userId, metadata: { linkType: record.linkType }, createdAt: nowIso });
+    return record;
+  }
+
+  public async upsertMenuServices(placeId: string, input: { contentType: "menu" | "services"; externalUrl?: string; structuredData?: Record<string, unknown> }, actor?: ClaimActor): Promise<BusinessPlaceMenuServiceCatalog> {
+    const ownership = await this.assertCanManageClaimedPlace(placeId, actor);
+    const nowIso = this.now().toISOString();
+    const externalUrl = input.externalUrl ? normalizeUrl(input.externalUrl) : undefined;
+    if (input.externalUrl && !externalUrl) throw new ValidationError(["externalUrl must be a valid http/https url"]);
+    const record: BusinessPlaceMenuServiceCatalog = {
+      id: randomUUID(),
+      placeId,
+      contentType: input.contentType,
+      externalUrl,
+      structuredData: input.structuredData ?? {},
+      moderationStatus: "approved",
+      visibility: "published",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      ...(ownership?.businessProfileId ? { businessProfileId: ownership.businessProfileId } : {})
+    };
+    await this.store.upsertMenuServiceCatalog(record);
+    await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "menu_services", entityId: record.id, action: "updated", actorUserId: actor?.userId, metadata: { contentType: record.contentType }, createdAt: nowIso });
+    return record;
+  }
+
+  public async upsertBusinessImage(placeId: string, input: Omit<BusinessManagedPlaceImage, "id" | "placeId" | "createdAt" | "updatedAt" | "businessProfileId" | "moderationStatus">, actor?: ClaimActor): Promise<BusinessManagedPlaceImage> {
+    const ownership = await this.assertCanManageClaimedPlace(placeId, actor);
+    const nowIso = this.now().toISOString();
+    const record: BusinessManagedPlaceImage = {
+      id: randomUUID(),
+      placeId,
+      mediaAssetId: input.mediaAssetId,
+      imageType: input.imageType,
+      caption: sanitizeText(input.caption, { source: "user", maxLen: 140, allowNewlines: false, profanityMode: "mask" }),
+      altText: sanitizeText(input.altText, { source: "user", maxLen: 140, allowNewlines: false, profanityMode: "mask" }),
+      sortOrder: input.sortOrder,
+      moderationStatus: "pending",
+      isCover: input.isCover,
+      isActive: input.isActive,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      ...(ownership?.businessProfileId ? { businessProfileId: ownership.businessProfileId } : {})
+    };
+    await this.store.upsertBusinessImage(record);
+    await this.store.appendBusinessManagedAuditEvent({ id: randomUUID(), placeId, entityType: "gallery", entityId: record.id, action: "created", actorUserId: actor?.userId, metadata: { imageType: record.imageType, isCover: record.isCover }, createdAt: nowIso });
+    return record;
+  }
+
   public async upsertOfficialContent(placeId: string, ownershipId: string, contentType: BusinessManagedPlaceContentRecord["contentType"], value: Record<string, unknown>, actor?: ClaimActor) {
     const userId = this.requireUser(actor);
     const ownership = await this.store.getOwnershipById(ownershipId);
@@ -194,27 +357,88 @@ export class VenueClaimsService {
   public async getPlaceManagementState(placeId: string, actor?: ClaimActor) {
     const ownership = await this.store.listOwnershipByPlace(placeId);
     const content = await this.store.listBusinessContent(placeId);
+    const description = await this.store.getOfficialDescription(placeId);
+    const hours = await this.store.getManagedHours(placeId);
+    const links = await this.store.listBusinessLinks(placeId);
+    const catalogs = await this.store.listMenuServiceCatalogs(placeId);
+    const images = await this.store.listBusinessImages(placeId);
+    const categories = await this.store.listCategorySuggestions(placeId);
     const canManage = Boolean(actor?.userId && ownership.some((o) => o.isActive && o.primaryUserId === actor.userId));
-    return { ownership, content, canManage };
+    return { ownership, content, description, hours, links, catalogs, images, categories, canManage };
   }
 
   public async buildPublicPlaceProjection(placeId: string, providerData: Record<string, unknown>) {
     const ownership = (await this.store.listOwnershipByPlace(placeId)).find((o) => o.isActive && o.isPrimary);
-    const officialContent = (await this.store.listBusinessContent(placeId)).filter((c) => c.visibility === "public" && c.moderationState !== "rejected");
-    const officialDescription = officialContent.find((c) => c.contentType === "description")?.value;
-    const officialLinks = officialContent.filter((c) => c.contentType === "links").map((c) => c.value);
+    const officialDescription = await this.store.getOfficialDescription(placeId);
+    const officialHours = await this.store.getManagedHours(placeId);
+    const officialLinks = (await this.store.listBusinessLinks(placeId)).filter((entry) => entry.isActive && entry.moderationStatus !== "rejected");
+    const officialImages = (await this.store.listBusinessImages(placeId)).filter((entry) => entry.isActive && entry.moderationStatus !== "rejected");
+    const menuServices = (await this.store.listMenuServiceCatalogs(placeId)).filter((entry) => entry.visibility === "published" && entry.moderationStatus !== "rejected");
+    const categorySuggestions = await this.store.listCategorySuggestions(placeId);
+    const approvedCategory = categorySuggestions.find((entry) => entry.status === "approved");
+
     return {
       provider: providerData,
+      merged: {
+        description: {
+          value: officialDescription?.visibilityStatus === "published" ? officialDescription.content : providerData["longDescription"],
+          source: officialDescription?.visibilityStatus === "published" ? "official_business" : "normalized_provider"
+        },
+        hours: {
+          value: officialHours?.effectiveStatus === "active" ? officialHours.weeklyHours : providerData["normalizedHours"],
+          source: officialHours?.effectiveStatus === "active" ? "official_business" : "normalized_provider"
+        },
+        website: {
+          value: officialLinks.find((entry) => entry.linkType === "website")?.url ?? providerData["websiteUrl"],
+          source: officialLinks.find((entry) => entry.linkType === "website") ? "official_business" : "normalized_provider"
+        },
+        categories: {
+          value: {
+            provider: providerData["providerCategories"],
+            businessSuggestion: approvedCategory
+              ? { primary: approvedCategory.suggestedPrimaryCategoryId, secondary: approvedCategory.suggestedSecondaryCategoryIds }
+              : null
+          },
+          source: approvedCategory ? "business_approved_suggestion" : "normalized_provider"
+        },
+        images: {
+          officialCover: officialImages.find((entry) => entry.isCover)?.mediaAssetId ?? null,
+          official: officialImages,
+          provider: providerData["photoGallery"]
+        },
+        links: officialLinks,
+        menuServices
+      },
       official: {
         isManaged: Boolean(ownership),
         verifiedBadge: ownership?.verificationStatus === "verified",
         verificationLevel: ownership?.verificationLevel,
-        description: officialDescription ?? null,
-        links: officialLinks,
         attribution: "official_business"
       },
-      sourcePrecedence: ["official_business", "moderated_override", "normalized_provider", "raw_provider"]
+      sourcePrecedence: ["official_business", "business_approved_suggestion", "moderated_override", "normalized_provider", "raw_provider"]
     };
+  }
+
+  private normalizeLinkByType(type: BusinessPlaceLinkType, value: string): string {
+    if (type === "phone") {
+      const normalizedPhone = normalizePhone(value);
+      if (!normalizedPhone) throw new ValidationError(["phone link must be a valid phone number"]);
+      return normalizedPhone;
+    }
+
+    if (type === "email") {
+      const email = value.trim().toLowerCase();
+      if (!/^[-a-z0-9._+]+@[-a-z0-9.]+\.[a-z]{2,}$/i.test(email)) throw new ValidationError(["email link must be a valid email"]);
+      return email;
+    }
+
+    if (URL_LINK_TYPES.has(type)) {
+      const normalizedUrl = normalizeUrl(value);
+      if (!normalizedUrl) throw new ValidationError([`${type} link must be a valid http/https url`]);
+      return normalizedUrl;
+    }
+
+    throw new ValidationError(["unsupported link type"]);
   }
 
   private inferVerificationLevel(evidence: Array<{ evidenceType: string }>): VerificationLevel {

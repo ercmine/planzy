@@ -144,6 +144,132 @@ export interface BusinessManagedPlaceContentRecord {
   updatedAt: string;
 }
 
+export type ModerationStatus = "pending" | "approved" | "rejected";
+export type VisibilityStatus = "draft" | "published" | "archived";
+
+export interface BusinessManagedPlaceProfile {
+  id: string;
+  placeId: string;
+  businessProfileId?: string;
+  ownershipLinkId: string;
+  status: "active" | "suspended";
+  createdAt: string;
+  updatedAt: string;
+  publishedAt?: string;
+}
+
+export interface OfficialBusinessDescription {
+  id: string;
+  placeId: string;
+  businessProfileId?: string;
+  content: string;
+  moderationStatus: ModerationStatus;
+  visibilityStatus: VisibilityStatus;
+  authoredByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt?: string;
+}
+
+export interface BusinessPlaceCategorySuggestion {
+  id: string;
+  placeId: string;
+  businessProfileId?: string;
+  suggestedPrimaryCategoryId?: string;
+  suggestedSecondaryCategoryIds: string[];
+  reason?: string;
+  status: "pending" | "approved" | "rejected";
+  reviewedByUserId?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessManagedHours {
+  id: string;
+  placeId: string;
+  businessProfileId?: string;
+  timezone: string;
+  weeklyHours: Record<string, Array<{ opens: string; closes: string }>>;
+  specialHours: Array<{ date: string; intervals: Array<{ opens: string; closes: string }> }>;
+  temporaryClosureStatus?: "none" | "temporary" | "permanent";
+  moderationStatus: ModerationStatus;
+  effectiveStatus: "active" | "archived";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type BusinessPlaceLinkType =
+  | "website"
+  | "phone"
+  | "email"
+  | "instagram"
+  | "tiktok"
+  | "facebook"
+  | "youtube"
+  | "reservation"
+  | "booking"
+  | "order"
+  | "waitlist"
+  | "menu"
+  | "services"
+  | "tickets"
+  | "contact_form";
+
+export interface BusinessPlaceLink {
+  id: string;
+  placeId: string;
+  businessProfileId?: string;
+  linkType: BusinessPlaceLinkType;
+  url: string;
+  label?: string;
+  sortOrder: number;
+  moderationStatus: ModerationStatus;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessPlaceMenuServiceCatalog {
+  id: string;
+  placeId: string;
+  businessProfileId?: string;
+  contentType: "menu" | "services";
+  externalUrl?: string;
+  structuredData: Record<string, unknown>;
+  moderationStatus: ModerationStatus;
+  visibility: VisibilityStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessManagedPlaceImage {
+  id: string;
+  placeId: string;
+  businessProfileId?: string;
+  mediaAssetId: string;
+  imageType: "exterior" | "interior" | "food_product" | "menu" | "team" | "services" | "ambiance" | "logo";
+  caption?: string;
+  altText?: string;
+  sortOrder: number;
+  moderationStatus: ModerationStatus;
+  isCover: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessManagedChangeAuditRecord {
+  id: string;
+  placeId: string;
+  entityType: "description" | "category" | "hours" | "link" | "gallery" | "menu_services";
+  entityId: string;
+  action: "created" | "updated" | "archived" | "approved" | "rejected";
+  actorUserId?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface ClaimAuditEvent {
   id: string;
   claimId?: string;

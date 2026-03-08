@@ -1329,6 +1329,42 @@ export function createRoutes(
         return;
       }
 
+      const manageDescriptionMatch = /^\/places\/([^/]+)\/business-management\/description$/.exec(normalizedPath);
+      if (manageDescriptionMatch && req.method === "PUT") {
+        await handlers.handleUpdateOfficialDescription(req, res, decodeURIComponent(manageDescriptionMatch[1] ?? ""));
+        return;
+      }
+
+      const manageCategoryMatch = /^\/places\/([^/]+)\/business-management\/categories$/.exec(normalizedPath);
+      if (manageCategoryMatch && req.method === "POST") {
+        await handlers.handleSubmitCategorySuggestion(req, res, decodeURIComponent(manageCategoryMatch[1] ?? ""));
+        return;
+      }
+
+      const manageHoursMatch = /^\/places\/([^/]+)\/business-management\/hours$/.exec(normalizedPath);
+      if (manageHoursMatch && req.method === "PUT") {
+        await handlers.handleUpdateManagedHours(req, res, decodeURIComponent(manageHoursMatch[1] ?? ""));
+        return;
+      }
+
+      const manageLinksMatch = /^\/places\/([^/]+)\/business-management\/links$/.exec(normalizedPath);
+      if (manageLinksMatch && req.method === "POST") {
+        await handlers.handleUpsertBusinessLink(req, res, decodeURIComponent(manageLinksMatch[1] ?? ""));
+        return;
+      }
+
+      const manageCatalogMatch = /^\/places\/([^/]+)\/business-management\/(menu|services)$/.exec(normalizedPath);
+      if (manageCatalogMatch && req.method === "PUT") {
+        await handlers.handleUpsertMenuServices(req, res, decodeURIComponent(manageCatalogMatch[1] ?? ""));
+        return;
+      }
+
+      const manageImageMatch = /^\/places\/([^/]+)\/business-management\/gallery$/.exec(normalizedPath);
+      if (manageImageMatch && req.method === "POST") {
+        await handlers.handleUpsertBusinessImage(req, res, decodeURIComponent(manageImageMatch[1] ?? ""));
+        return;
+      }
+
       const managePlaceMatch = /^\/places\/([^/]+)\/business-management$/.exec(normalizedPath);
       if (managePlaceMatch && req.method === "GET") {
         await handlers.handlePlaceManagementState(req, res, decodeURIComponent(managePlaceMatch[1] ?? ""));
