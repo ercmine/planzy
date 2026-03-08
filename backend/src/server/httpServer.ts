@@ -5,6 +5,7 @@ import type { AccountsService } from "../accounts/service.js";
 import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { MerchantService } from "../merchant/service.js";
 import type { EntitlementPolicyService } from "../subscriptions/policy.js";
+import type { FeatureQuotaEngine } from "../subscriptions/accessEngine.js";
 import type { SubscriptionService } from "../subscriptions/service.js";
 import type { TelemetryService } from "../telemetry/telemetryService.js";
 import type { ReviewsStore } from "../reviews/store.js";
@@ -51,6 +52,7 @@ export function createHttpServer(
     reviewsStore?: ReviewsStore;
     subscriptionService?: SubscriptionService;
     entitlementPolicy?: EntitlementPolicyService;
+    accessEngine?: FeatureQuotaEngine;
     accountsService?: AccountsService;
   }
 ): Server {

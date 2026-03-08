@@ -85,6 +85,7 @@ export * from "./subscriptions/usage.js";
 export * from "./subscriptions/service.js";
 export * from "./subscriptions/policy.js";
 export * from "./subscriptions/http.js";
+export * from "./subscriptions/accessEngine.js";
 export * from "./subscriptions/billing/provider.js";
 
 export * from "./accounts/store.js";
