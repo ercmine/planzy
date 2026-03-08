@@ -48,6 +48,7 @@ class DeckState {
     this.errorMessage,
     this.plans = const <Plan>[],
     this.items = const <DeckItem>[],
+    this.currentIndex = 0,
     this.nextCursor,
     this.hasMore = true,
     this.lastBatchMix,
@@ -60,6 +61,7 @@ class DeckState {
     this.usingOfflineCachedData = false,
     this.isLoadingNextBatch = false,
     this.nextBatchErrorMessage,
+    this.seenPlanIds = const <String>{},
   });
 
   factory DeckState.initial(String sessionId) =>
@@ -71,6 +73,7 @@ class DeckState {
   final String? errorMessage;
   final List<Plan> plans;
   final List<DeckItem> items;
+  final int currentIndex;
   final String? nextCursor;
   final bool hasMore;
   final DeckSourceMix? lastBatchMix;
@@ -83,6 +86,7 @@ class DeckState {
   final bool usingOfflineCachedData;
   final bool isLoadingNextBatch;
   final String? nextBatchErrorMessage;
+  final Set<String> seenPlanIds;
 
   DeckState copyWith({
     String? sessionId,
@@ -92,6 +96,7 @@ class DeckState {
     bool clearError = false,
     List<Plan>? plans,
     List<DeckItem>? items,
+    int? currentIndex,
     String? nextCursor,
     bool clearCursor = false,
     bool? hasMore,
@@ -106,6 +111,7 @@ class DeckState {
     bool? isLoadingNextBatch,
     String? nextBatchErrorMessage,
     bool clearNextBatchError = false,
+    Set<String>? seenPlanIds,
   }) {
     return DeckState(
       sessionId: sessionId ?? this.sessionId,
@@ -114,6 +120,7 @@ class DeckState {
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       plans: plans ?? this.plans,
       items: items ?? this.items,
+      currentIndex: currentIndex ?? this.currentIndex,
       nextCursor: clearCursor ? null : (nextCursor ?? this.nextCursor),
       hasMore: hasMore ?? this.hasMore,
       lastBatchMix: lastBatchMix ?? this.lastBatchMix,
@@ -130,6 +137,7 @@ class DeckState {
       nextBatchErrorMessage: clearNextBatchError
           ? null
           : (nextBatchErrorMessage ?? this.nextBatchErrorMessage),
+      seenPlanIds: seenPlanIds ?? this.seenPlanIds,
     );
   }
 }
