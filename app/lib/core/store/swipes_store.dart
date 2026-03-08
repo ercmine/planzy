@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/locked_plan.dart';
@@ -27,10 +28,19 @@ class SwipesStore {
       if (decoded is! List) {
         return const <SwipeRecord>[];
       }
-      return decoded
-          .whereType<Map<String, dynamic>>()
-          .map(SwipeRecord.fromJson)
-          .toList(growable: false);
+      final parsed = <SwipeRecord>[];
+      for (final entry in decoded.whereType<Map<String, dynamic>>()) {
+        try {
+          parsed.add(SwipeRecord.fromJson(entry));
+        } catch (error, stackTrace) {
+          debugPrint(
+            '[SwipesStore] Skipping malformed swipe entry for session=$sessionId '
+            'error=$error',
+          );
+          debugPrintStack(stackTrace: stackTrace, label: '[SwipesStore] decode failure');
+        }
+      }
+      return parsed;
     } catch (_) {
       return const <SwipeRecord>[];
     }

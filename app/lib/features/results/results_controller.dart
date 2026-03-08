@@ -36,6 +36,10 @@ class ResultsController extends StateNotifier<ResultsState> {
   static const double _debugDefaultLng = -93.5590;
 
   Future<void> refresh() async {
+    if (kDebugMode) {
+      debugPrint('[ResultsController] refresh start session=$_sessionId');
+    }
+
     state = state.copyWith(
       isLoading: true,
       clearError: true,
@@ -52,6 +56,15 @@ class ResultsController extends StateNotifier<ResultsState> {
         liveResults = await _loadLiveResults();
       } catch (error) {
         liveResultsError = _formatError(error);
+      }
+
+      if (kDebugMode) {
+        debugPrint(
+          '[ResultsController] refresh complete '
+          'session=$_sessionId topPicks=${topPicks.length} '
+          'liveResults=${liveResults?.results.length ?? 0} '
+          'liveResultsError=${liveResultsError ?? '-'}',
+        );
       }
 
       state = state.copyWith(
@@ -73,6 +86,9 @@ class ResultsController extends StateNotifier<ResultsState> {
         liveResultsErrorMessage: liveResultsError,
       );
     } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[ResultsController] refresh failed session=$_sessionId error=$error');
+      }
       state = state.copyWith(
         isLoading: false,
         errorMessage: _formatError(error),
@@ -97,14 +113,23 @@ class ResultsController extends StateNotifier<ResultsState> {
     }
 
     if (location == null) {
+      if (kDebugMode) {
+        debugPrint('[ResultsController] live results require location session=$_sessionId');
+      }
       state = state.copyWith(locationRequired: true, isLoading: false);
       return null;
     }
 
-    return _liveResultsRepository!.fetchLiveResults(
+    final response = await _liveResultsRepository!.fetchLiveResults(
       lat: location.lat,
       lng: location.lng,
     );
+    if (kDebugMode) {
+      debugPrint(
+        '[ResultsController] live results fetched session=$_sessionId count=${response.results.length}',
+      );
+    }
+    return response;
   }
 
   Future<void> lockIn(Plan plan) async {
