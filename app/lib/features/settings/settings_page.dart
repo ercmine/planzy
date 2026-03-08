@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -13,6 +15,7 @@ import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
 import '../../core/permissions/permission_state.dart';
 import '../../core/widgets/app_snackbar.dart';
+import '../../models/session.dart';
 import '../../providers/app_providers.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -27,7 +30,13 @@ class SettingsPage extends ConsumerWidget {
     final userIdAsync = ref.watch(userIdProvider);
 
     return AppScaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => _handleBackPressed(context, ref),
+        ),
+        title: const Text('Settings'),
+      ),
       body: ListView(
         children: [
           _Section(
@@ -190,6 +199,63 @@ class SettingsPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _handleBackPressed(BuildContext context, WidgetRef ref) async {
+    if (context.canPop()) {
+      if (kDebugMode) {
+        debugPrint('Settings back press: pop()');
+      }
+      context.pop();
+      return;
+    }
+
+    final activeSessionId = await _resolveActiveSessionId(ref);
+
+    if (!context.mounted) {
+      return;
+    }
+
+    if (activeSessionId != null && activeSessionId.isNotEmpty) {
+      if (kDebugMode) {
+        debugPrint('Settings back press: fallback go(/sessions/$activeSessionId)');
+      }
+      context.go('/sessions/$activeSessionId');
+      return;
+    }
+
+    if (kDebugMode) {
+      debugPrint('Settings back press: fallback go(/sessions)');
+    }
+    context.go('/sessions');
+  }
+
+  Future<String?> _resolveActiveSessionId(WidgetRef ref) async {
+    final inMemorySessionId = _pickMostRecentSessionId(ref.read(sessionsControllerProvider).sessions);
+    if (inMemorySessionId != null) {
+      return inMemorySessionId;
+    }
+
+    try {
+      final sessions = await ref.read(sessionsRepositoryProvider).listActive();
+      return _pickMostRecentSessionId(sessions);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _pickMostRecentSessionId(List<Session> sessions) {
+    if (sessions.isEmpty) {
+      return null;
+    }
+
+    final sortedSessions = [...sessions]
+      ..sort((a, b) => _parseIsoOrEpoch(b.updatedAtISO).compareTo(_parseIsoOrEpoch(a.updatedAtISO)));
+    return sortedSessions.first.sessionId;
+  }
+
+  DateTime _parseIsoOrEpoch(String value) {
+    return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   Future<void> _emailSupport(BuildContext context, String appVersion) async {
