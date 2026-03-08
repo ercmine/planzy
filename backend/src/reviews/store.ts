@@ -1,5 +1,7 @@
+import type { ReviewTrustDesignation, ReviewTrustSignals, ReviewerTrustProfile, ReviewerTrustStatus, TrustAuditLog, VerificationEvidence, VerificationEvidenceType, VerificationLevel } from "./trust.js";
+
 export type ModerationState = "pending" | "published" | "hidden" | "removed" | "flagged";
-export type ReviewSort = "newest" | "most_helpful" | "oldest";
+export type ReviewSort = "newest" | "most_helpful" | "oldest" | "trusted";
 export type ReviewMediaType = "photo" | "video";
 
 export interface ReviewMedia {
@@ -82,6 +84,14 @@ export interface BusinessReply {
   deletedAt?: string;
 }
 
+export interface ReviewPublicTrustSummary {
+  reviewerTrustStatus: ReviewerTrustStatus;
+  reviewTrustDesignation: ReviewTrustDesignation;
+  verificationLevel: VerificationLevel;
+  trustBadges: string[];
+  rankingBoostWeight: number;
+}
+
 export interface PlaceReview {
   id: string;
   placeId: string;
@@ -105,6 +115,7 @@ export interface PlaceReview {
   businessReply?: BusinessReply;
   viewerHasHelpfulVote?: boolean;
   canEdit?: boolean;
+  trust: ReviewPublicTrustSummary;
 }
 
 export interface CreateReviewInput {
@@ -170,6 +181,8 @@ export interface ListReviewsInput {
   viewerUserId?: string;
   includeHidden?: boolean;
   sort?: ReviewSort;
+  trustedOnly?: boolean;
+  verifiedOnly?: boolean;
   limit?: number;
   cursor?: string;
 }
@@ -207,4 +220,29 @@ export interface ReviewsStore {
   setReviewMediaModerationState(reviewId: string, mediaId: string, state: ModerationState, reason?: string, now?: Date): Promise<ReviewMedia>;
   createOrUpdateBusinessReply(input: { reviewId: string; businessProfileId: string; ownerUserId: string; body: string; now?: Date }): Promise<BusinessReply>;
   deleteBusinessReply(input: { reviewId: string; replyId: string; actorUserId: string; businessProfileId: string; now?: Date }): Promise<BusinessReply>;
+  getReviewerTrustProfile(userId: string): Promise<ReviewerTrustProfile>;
+  listTrustAuditLogs(userId: string): Promise<TrustAuditLog[]>;
+  applyTrustOverride(input: TrustOverrideInput): Promise<ReviewerTrustProfile>;
+  getReviewTrustSignals(reviewId: string): Promise<ReviewTrustSignals | null>;
+  upsertVerificationEvidence(input: UpsertVerificationEvidenceInput): Promise<VerificationEvidence>;
+}
+
+
+export interface TrustOverrideInput {
+  userId: string;
+  actorUserId: string;
+  status: ReviewerTrustStatus | "clear_override";
+  reason?: string;
+  notes?: string;
+}
+
+export interface UpsertVerificationEvidenceInput {
+  userId: string;
+  placeId: string;
+  evidenceType: VerificationEvidenceType;
+  evidenceStrength: number;
+  source?: VerificationEvidence["source"];
+  linkedReviewId?: string;
+  expiresAt?: string;
+  metadata?: Record<string, unknown>;
 }

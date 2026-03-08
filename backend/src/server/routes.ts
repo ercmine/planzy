@@ -351,12 +351,16 @@ export function createRoutes(
           const sort = String(url.searchParams.get("sort") ?? "most_helpful");
           const cursor = String(url.searchParams.get("cursor") ?? "").trim() || undefined;
           const limit = Number(url.searchParams.get("limit") ?? "20");
+          const trustedOnly = String(url.searchParams.get("trustedOnly") ?? "false") === "true";
+          const verifiedOnly = String(url.searchParams.get("verifiedOnly") ?? "false") === "true";
           const result = await deps.reviewsStore.listByPlace({
             placeId,
             viewerUserId: userIdHeader || undefined,
             sort: sort as never,
             cursor,
-            limit
+            limit,
+            trustedOnly,
+            verifiedOnly
           });
           sendJson(res, 200, result);
           return;
@@ -563,6 +567,68 @@ export function createRoutes(
           sendJson(res, 200, { review: deleted });
           return;
         }
+      }
+
+      const reviewTrustMatch = /^\/reviews\/([^/]+)\/trust$/.exec(normalizedPath);
+      if (reviewTrustMatch && req.method === "GET" && deps?.reviewsStore) {
+        const reviewId = decodeURIComponent(reviewTrustMatch[1] ?? "");
+        const trustSignals = await deps.reviewsStore.getReviewTrustSignals(reviewId);
+        sendJson(res, 200, { trustSignals });
+        return;
+      }
+
+      const trustProfileMatch = /^\/v1\/trust\/reviewers\/([^/]+)$/.exec(normalizedPath);
+      if (trustProfileMatch && req.method === "GET" && deps?.reviewsStore) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 403, { error: "admin key required" });
+          return;
+        }
+        const userId = decodeURIComponent(trustProfileMatch[1] ?? "");
+        const profile = await deps.reviewsStore.getReviewerTrustProfile(userId);
+        const audit = await deps.reviewsStore.listTrustAuditLogs(userId);
+        sendJson(res, 200, { profile, audit });
+        return;
+      }
+
+      const trustOverrideMatch = /^\/v1\/trust\/reviewers\/([^/]+)\/override$/.exec(normalizedPath);
+      if (trustOverrideMatch && req.method === "POST" && deps?.reviewsStore) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 403, { error: "admin key required" });
+          return;
+        }
+        const userId = decodeURIComponent(trustOverrideMatch[1] ?? "");
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const status = String(payload.status ?? "").trim();
+        const actorUserId = String(payload.actorUserId ?? "admin").trim();
+        const profile = await deps.reviewsStore.applyTrustOverride({
+          userId,
+          actorUserId,
+          status: status as never,
+          reason: payload.reason == null ? undefined : String(payload.reason),
+          notes: payload.notes == null ? undefined : String(payload.notes)
+        });
+        sendJson(res, 200, { profile });
+        return;
+      }
+
+      if (normalizedPath === "/v1/trust/evidence" && req.method === "POST" && deps?.reviewsStore) {
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const evidence = await deps.reviewsStore.upsertVerificationEvidence({
+          userId: payload.userId ? String(payload.userId) : userIdHeader,
+          placeId: String(payload.placeId ?? ""),
+          linkedReviewId: payload.linkedReviewId == null ? undefined : String(payload.linkedReviewId),
+          evidenceType: String(payload.evidenceType ?? "behavioral_heuristic") as never,
+          evidenceStrength: Number(payload.evidenceStrength ?? 10),
+          source: payload.source == null ? undefined : String(payload.source) as never,
+          expiresAt: payload.expiresAt == null ? undefined : String(payload.expiresAt),
+          metadata: payload.metadata && typeof payload.metadata === "object" ? payload.metadata as Record<string, unknown> : undefined
+        });
+        sendJson(res, 201, { evidence });
+        return;
       }
 
       const helpfulMatch = /^\/reviews\/([^/]+)\/helpful$/.exec(normalizedPath);

@@ -14,11 +14,24 @@ import type {
   ReviewMediaReport,
   ReviewMediaUpload,
   ReviewSort,
+  TrustOverrideInput,
+  UpsertVerificationEvidenceInput,
   ReviewsStore,
   UpdateReviewInput
 } from "./store.js";
+import {
+  aggregateVerificationLevel,
+  computeRankingBoost,
+  deriveReviewerTrustStatus,
+  evaluateReviewQuality,
+  type ReviewTrustSignals,
+  type ReviewerTrustProfile,
+  type ReviewerTrustStatus,
+  type TrustAuditLog,
+  type VerificationEvidence
+} from "./trust.js";
 
-type ReviewRow = PlaceReview & { moderationReason?: string };
+type ReviewRow = Omit<PlaceReview, "trust" | "viewerHasHelpfulVote" | "canEdit"> & { moderationReason?: string };
 
 const PUBLIC_STATES: ModerationState[] = ["published"];
 const PUBLIC_MEDIA_MIME = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime", "video/webm"]);
@@ -100,6 +113,10 @@ export class MemoryReviewsStore implements ReviewsStore {
   private readonly reports = new Map<string, Array<{ userId: string; reason: string; createdAt: string }>>();
   private readonly mediaUploadsById = new Map<string, ReviewMediaUpload>();
   private readonly mediaReports: ReviewMediaReport[] = [];
+  private readonly trustProfiles = new Map<string, ReviewerTrustProfile>();
+  private readonly reviewTrustSignals = new Map<string, ReviewTrustSignals>();
+  private readonly verificationEvidence = new Map<string, VerificationEvidence[]>();
+  private readonly trustAuditLogs = new Map<string, TrustAuditLog[]>();
 
   async listByPlace(input: ListReviewsInput): Promise<ListReviewsResult> {
     const sort = input.sort ?? "most_helpful";
@@ -113,10 +130,17 @@ export class MemoryReviewsStore implements ReviewsStore {
       return PUBLIC_STATES.includes(row.moderationState) && !row.deletedAt;
     });
 
-    rows.sort((a, b) => this.compareRows(a, b, sort));
+    const filteredRows = rows.filter((row) => {
+      const trust = this.reviewTrustSignals.get(row.id);
+      if (input.trustedOnly) return trust?.reviewTrustDesignation === "trusted" || trust?.reviewTrustDesignation === "trusted_verified";
+      if (input.verifiedOnly) return trust?.verificationLevel === "verified" || trust?.verificationLevel === "probable";
+      return true;
+    });
 
-    const startIndex = cursor ? rows.findIndex((row) => row.id === cursor.id) + 1 : 0;
-    const page = rows.slice(Math.max(0, startIndex), Math.max(0, startIndex) + limit);
+    filteredRows.sort((a, b) => this.compareRows(a, b, sort));
+
+    const startIndex = cursor ? filteredRows.findIndex((row) => row.id === cursor.id) + 1 : 0;
+    const page = filteredRows.slice(Math.max(0, startIndex), Math.max(0, startIndex) + limit);
 
     const reviews = page.map((row) => this.toView(row, input.viewerUserId));
     const tail = page.at(-1);
@@ -202,6 +226,8 @@ export class MemoryReviewsStore implements ReviewsStore {
     }
 
     this.byId.set(review.id, review);
+    this.recomputeTrustForReview(review.id, nowDate);
+    this.recomputeTrustForUser(review.authorUserId, nowDate);
     return this.toView(review, input.authorUserId);
   }
 
@@ -241,6 +267,8 @@ export class MemoryReviewsStore implements ReviewsStore {
     row.mediaCount = row.media.length;
     row.updatedAt = now;
     row.editedAt = now;
+    this.recomputeTrustForReview(row.id, nowDate);
+    this.recomputeTrustForUser(row.authorUserId, nowDate);
     return this.toView(row, input.actorUserId);
   }
 
@@ -253,6 +281,8 @@ export class MemoryReviewsStore implements ReviewsStore {
     row.updatedAt = row.deletedAt;
     row.media = row.media.map((item) => ({ ...item, moderationState: "removed", removedAt: row.deletedAt, updatedAt: row.deletedAt! }));
     row.mediaCount = 0;
+    this.recomputeTrustForReview(row.id, now);
+    this.recomputeTrustForUser(row.authorUserId, now);
     return this.toView(row, actorUserId);
   }
 
@@ -267,6 +297,8 @@ export class MemoryReviewsStore implements ReviewsStore {
       row.media = row.media.map((item) => ({ ...item, moderationState: "removed", removedAt: row.updatedAt, updatedAt: row.updatedAt }));
       row.mediaCount = 0;
     }
+    this.recomputeTrustForReview(row.id, now);
+    this.recomputeTrustForUser(row.authorUserId, now);
     return this.toView(row);
   }
 
@@ -278,6 +310,8 @@ export class MemoryReviewsStore implements ReviewsStore {
     votes.add(userId);
     this.helpfulVotes.set(reviewId, votes);
     row.helpfulCount = votes.size;
+    this.recomputeTrustForReview(row.id, new Date());
+    this.recomputeTrustForUser(row.authorUserId, new Date());
     return this.toView(row, userId);
   }
 
@@ -288,6 +322,8 @@ export class MemoryReviewsStore implements ReviewsStore {
     votes.delete(userId);
     this.helpfulVotes.set(reviewId, votes);
     row.helpfulCount = votes.size;
+    this.recomputeTrustForReview(row.id, new Date());
+    this.recomputeTrustForUser(row.authorUserId, new Date());
     return this.toView(row, userId);
   }
 
@@ -297,6 +333,82 @@ export class MemoryReviewsStore implements ReviewsStore {
     this.reports.set(reviewId, bucket);
     const review = this.byId.get(reviewId);
     if (review && review.moderationState === "published") review.moderationState = "flagged";
+    if (review) {
+      this.recomputeTrustForReview(review.id, new Date());
+      this.recomputeTrustForUser(review.authorUserId, new Date());
+    }
+  }
+
+  async getReviewerTrustProfile(userId: string): Promise<ReviewerTrustProfile> {
+    if (!this.trustProfiles.has(userId)) this.recomputeTrustForUser(userId, new Date());
+    return this.trustProfiles.get(userId)!;
+  }
+
+  async listTrustAuditLogs(userId: string): Promise<TrustAuditLog[]> {
+    return [...(this.trustAuditLogs.get(userId) ?? [])];
+  }
+
+  async applyTrustOverride(input: TrustOverrideInput): Promise<ReviewerTrustProfile> {
+    const profile = await this.getReviewerTrustProfile(input.userId);
+    const previousStatus = profile.trustStatus;
+    if (input.status === "clear_override") {
+      profile.manualOverrideStatus = undefined;
+      profile.manualNotes = input.notes;
+      this.recomputeTrustForUser(input.userId, new Date());
+    } else {
+      profile.manualOverrideStatus = input.status;
+      profile.trustStatus = input.status;
+      profile.manualNotes = input.notes;
+      profile.updatedAt = new Date().toISOString();
+      if (input.status === "revoked") {
+        profile.trustRevokedAt = profile.updatedAt;
+        profile.trustRevocationReason = input.reason ?? "manual_override";
+      }
+    }
+    const log: TrustAuditLog = {
+      id: randomUUID(),
+      actorUserId: input.actorUserId,
+      targetUserId: input.userId,
+      action: input.status === "clear_override" ? "clear_override" : input.status === "revoked" ? "revoke" : input.status === "suspended" ? "suspend" : "grant",
+      previousStatus,
+      newStatus: input.status === "clear_override" ? (this.trustProfiles.get(input.userId)?.trustStatus ?? "none") : input.status,
+      reason: input.reason,
+      notes: input.notes,
+      createdAt: new Date().toISOString()
+    };
+    const logs = this.trustAuditLogs.get(input.userId) ?? [];
+    logs.push(log);
+    this.trustAuditLogs.set(input.userId, logs);
+    return this.getReviewerTrustProfile(input.userId);
+  }
+
+  async getReviewTrustSignals(reviewId: string): Promise<ReviewTrustSignals | null> {
+    return this.reviewTrustSignals.get(reviewId) ?? null;
+  }
+
+  async upsertVerificationEvidence(input: UpsertVerificationEvidenceInput): Promise<VerificationEvidence> {
+    if (input.evidenceStrength <= 0 || input.evidenceStrength > 100) throw new ValidationError(["evidenceStrength must be between 1 and 100"]);
+    const item: VerificationEvidence = {
+      id: randomUUID(),
+      userId: input.userId,
+      placeId: input.placeId,
+      evidenceType: input.evidenceType,
+      evidenceStrength: input.evidenceStrength,
+      source: input.source ?? "system",
+      linkedReviewId: input.linkedReviewId,
+      expiresAt: input.expiresAt,
+      metadata: input.metadata,
+      createdAt: new Date().toISOString()
+    };
+    const key = `${input.userId}:${input.placeId}`;
+    const list = this.verificationEvidence.get(key) ?? [];
+    list.push(item);
+    this.verificationEvidence.set(key, list);
+    if (input.linkedReviewId) {
+      this.recomputeTrustForReview(input.linkedReviewId, new Date());
+      this.recomputeTrustForUser(input.userId, new Date());
+    }
+    return item;
   }
 
   async createMediaUpload(input: CreateReviewMediaUploadInput): Promise<ReviewMediaUpload> {
@@ -518,19 +630,164 @@ export class MemoryReviewsStore implements ReviewsStore {
         return item.moderationState === "published";
       });
     const media = normalizeMediaOrdering(mediaVisible);
+    const trustSignals = this.reviewTrustSignals.get(row.id);
+    const reviewerProfile = this.trustProfiles.get(row.authorUserId);
     return {
       ...row,
       media,
       mediaCount: media.length,
       viewerHasHelpfulVote: viewerUserId ? votes.has(viewerUserId) : false,
-      canEdit: viewerUserId === row.authorUserId && Date.parse(row.editWindowEndsAt) > Date.now()
+      canEdit: viewerUserId === row.authorUserId && Date.parse(row.editWindowEndsAt) > Date.now(),
+      trust: {
+        reviewerTrustStatus: reviewerProfile?.trustStatus ?? "none",
+        reviewTrustDesignation: trustSignals?.reviewTrustDesignation ?? "standard",
+        verificationLevel: trustSignals?.verificationLevel ?? "none",
+        trustBadges: trustSignals?.badgeIds ?? [],
+        rankingBoostWeight: trustSignals?.rankingBoostWeight ?? 0
+      }
     };
   }
 
   private compareRows(a: ReviewRow, b: ReviewRow, sort: ReviewSort): number {
+    const trustA = this.reviewTrustSignals.get(a.id);
+    const trustB = this.reviewTrustSignals.get(b.id);
+    if (sort === "trusted") {
+      const trustDiff = (trustB?.rankingBoostWeight ?? 0) - (trustA?.rankingBoostWeight ?? 0);
+      if (trustDiff !== 0) return trustDiff;
+      return b.createdAt.localeCompare(a.createdAt);
+    }
     if (sort === "newest") return b.createdAt.localeCompare(a.createdAt);
     if (sort === "oldest") return a.createdAt.localeCompare(b.createdAt);
+    const trustDiff = (trustB?.rankingBoostWeight ?? 0) - (trustA?.rankingBoostWeight ?? 0);
+    if (trustDiff !== 0) return trustDiff;
     if (b.helpfulCount !== a.helpfulCount) return b.helpfulCount - a.helpfulCount;
     return b.createdAt.localeCompare(a.createdAt);
+  }
+
+  private recomputeTrustForReview(reviewId: string, now: Date): void {
+    const review = this.byId.get(reviewId);
+    if (!review) return;
+    const reviewerProfile = this.trustProfiles.get(review.authorUserId) ?? this.createDefaultTrustProfile(review.authorUserId, now);
+    const evidence = this.verificationEvidence.get(`${review.authorUserId}:${review.placeId}`) ?? [];
+    const linkedEvidence = evidence.filter((item) => !item.linkedReviewId || item.linkedReviewId === reviewId);
+    const verification = aggregateVerificationLevel(linkedEvidence);
+    const quality = evaluateReviewQuality({ body: review.body, rating: review.rating, mediaCount: review.mediaCount });
+    const reviewerStatus: ReviewerTrustStatus = reviewerProfile.manualOverrideStatus ?? reviewerProfile.trustStatus;
+    const moderationEligible = review.moderationState === "published";
+    const isTrustedEligible = moderationEligible && quality.isTrustedEligible && reviewerStatus === "trusted";
+    const reviewTrustDesignation = isTrustedEligible
+      ? (verification.verificationLevel === "verified" || verification.verificationLevel === "probable" ? "trusted_verified" : "trusted")
+      : (verification.verificationLevel === "verified" || verification.verificationLevel === "probable" ? "verified" : "standard");
+    const badgeIds = [
+      ...(reviewerStatus === "trusted" ? ["trusted_reviewer", "perbug_limited"] as const : []),
+      ...(verification.verificationLevel !== "none" ? ["verified_visit"] as const : []),
+      ...(reviewTrustDesignation === "trusted" || reviewTrustDesignation === "trusted_verified" ? ["trusted_review"] as const : [])
+    ];
+    const rankingBoostWeight = computeRankingBoost({
+      qualityScore: quality.qualityScore,
+      helpfulCount: review.helpfulCount,
+      reviewerTrustScore: reviewerProfile.trustScore,
+      moderationState: review.moderationState,
+      verificationLevel: verification.verificationLevel,
+      mediaCount: review.mediaCount,
+      suspiciousPenalty: reviewerProfile.suspiciousPenaltyScore
+    });
+    const current = this.reviewTrustSignals.get(reviewId);
+    this.reviewTrustSignals.set(reviewId, {
+      reviewId,
+      reviewerUserId: review.authorUserId,
+      reviewerTrustStatusSnapshot: reviewerStatus,
+      reviewTrustDesignation,
+      verificationLevel: verification.verificationLevel,
+      qualityScore: quality.qualityScore,
+      originalityScore: quality.originalityScore,
+      completenessScore: quality.completenessScore,
+      evidenceScore: verification.evidenceScore,
+      helpfulnessScoreSnapshot: review.helpfulCount,
+      rankingBoostWeight,
+      isTrustedEligible,
+      trustReasons: quality.trustReasons,
+      moderationEligible,
+      badgeIds: [...badgeIds],
+      createdAt: current?.createdAt ?? now.toISOString(),
+      updatedAt: now.toISOString()
+    });
+  }
+
+  private recomputeTrustForUser(userId: string, now: Date): void {
+    const reviews = [...this.byId.values()].filter((row) => row.authorUserId === userId);
+    const approvedReviewCount = reviews.filter((row) => row.moderationState === "published").length;
+    const rejectedReviewCount = reviews.filter((row) => row.moderationState === "removed" || row.moderationState === "hidden").length;
+    const flaggedCount = reviews.filter((row) => row.moderationState === "flagged").length;
+    const helpfulTotal = reviews.reduce((sum, row) => sum + row.helpfulCount, 0);
+    const qualitySignals = reviews.map((row) => this.reviewTrustSignals.get(row.id)).filter(Boolean) as ReviewTrustSignals[];
+    const avgQuality = qualitySignals.length ? qualitySignals.reduce((sum, item) => sum + item.qualityScore, 0) / qualitySignals.length : 0;
+    const originality = qualitySignals.length ? qualitySignals.reduce((sum, item) => sum + item.originalityScore, 0) / qualitySignals.length : 0;
+    const verifiedRatio = qualitySignals.length ? qualitySignals.filter((item) => item.verificationLevel !== "none").length / qualitySignals.length : 0;
+    const moderationHealthScore = Math.max(0, 100 - (rejectedReviewCount * 14) - (flaggedCount * 8));
+    const consistencyScore = Math.min(100, reviews.length * 6);
+    const profileCompletenessScore = 55;
+    const suspiciousPenaltyScore = Math.min(100, flaggedCount * 18);
+    const trustScore = Math.round(
+      Math.min(100,
+        approvedReviewCount * 2.8
+        + avgQuality * 0.25
+        + originality * 0.15
+        + helpfulTotal * 0.6
+        + verifiedRatio * 20
+        + consistencyScore * 0.08
+        + profileCompletenessScore * 0.06
+        + moderationHealthScore * 0.15
+        - suspiciousPenaltyScore * 0.8
+      )
+    );
+    const derived = deriveReviewerTrustStatus(trustScore, moderationHealthScore, suspiciousPenaltyScore);
+    const existing = this.trustProfiles.get(userId) ?? this.createDefaultTrustProfile(userId, now);
+    const effectiveStatus = existing.manualOverrideStatus ?? derived.trustStatus;
+    this.trustProfiles.set(userId, {
+      ...existing,
+      trustStatus: effectiveStatus,
+      trustTier: derived.trustTier,
+      trustScore,
+      verifiedVisitStrengthAggregate: Math.round(verifiedRatio * 100),
+      helpfulnessScore: Math.min(100, helpfulTotal),
+      moderationHealthScore,
+      profileCompletenessScore,
+      originalityScore: Math.round(originality),
+      consistencyScore,
+      reviewQualityScore: Math.round(avgQuality),
+      approvedReviewCount,
+      rejectedReviewCount,
+      suspiciousPenaltyScore,
+      trustGrantedAt: effectiveStatus === "trusted" ? (existing.trustGrantedAt ?? now.toISOString()) : existing.trustGrantedAt,
+      trustRevokedAt: effectiveStatus === "revoked" || effectiveStatus === "suspended" ? now.toISOString() : existing.trustRevokedAt,
+      lastEvaluatedAt: now.toISOString(),
+      updatedAt: now.toISOString()
+    });
+    for (const review of reviews) this.recomputeTrustForReview(review.id, now);
+  }
+
+  private createDefaultTrustProfile(userId: string, now: Date): ReviewerTrustProfile {
+    const profile: ReviewerTrustProfile = {
+      userId,
+      trustStatus: "none",
+      trustTier: "none",
+      trustScore: 0,
+      verifiedVisitStrengthAggregate: 0,
+      helpfulnessScore: 0,
+      moderationHealthScore: 100,
+      profileCompletenessScore: 0,
+      originalityScore: 0,
+      consistencyScore: 0,
+      reviewQualityScore: 0,
+      approvedReviewCount: 0,
+      rejectedReviewCount: 0,
+      suspiciousPenaltyScore: 0,
+      lastEvaluatedAt: now.toISOString(),
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString()
+    };
+    this.trustProfiles.set(userId, profile);
+    return profile;
   }
 }
