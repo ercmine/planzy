@@ -52,6 +52,16 @@ export class VenueClaimsService {
     if (!actor?.isAdmin) throw new ValidationError(["admin privileges required"]);
   }
 
+  public async getActiveOwnershipForBusinessActor(input: { placeId: string; businessProfileId: string; userId: string }): Promise<PlaceBusinessOwnershipRecord> {
+    const ownership = (await this.store.listOwnershipByPlace(input.placeId)).find((entry) => (
+      entry.isActive
+      && entry.verificationStatus === "verified"
+      && entry.businessProfileId === input.businessProfileId
+    ));
+    if (!ownership) throw new ValidationError(["active verified business claim required for this place"]);
+    return ownership;
+  }
+
   private async assertCanManageClaimedPlace(placeId: string, actor?: ClaimActor) {
     const userId = this.requireUser(actor);
     const ownership = (await this.store.listOwnershipByPlace(placeId)).find((entry) => entry.isActive && entry.primaryUserId === userId);
