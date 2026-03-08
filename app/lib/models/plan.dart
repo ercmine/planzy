@@ -15,11 +15,32 @@ List<String>? parseOpeningHoursText(Object? value) {
   return parseStringList(value);
 }
 
+double? parseNullableDouble(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    return double.tryParse(value.trim());
+  }
+  return null;
+}
+
+double parseRequiredDouble(Object? value) {
+  final parsed = parseNullableDouble(value);
+  if (parsed == null) {
+    throw const FormatException('Expected a non-null double value.');
+  }
+  return parsed;
+}
+
 @freezed
 class PlanLocation with _$PlanLocation {
   const factory PlanLocation({
-    @JsonKey(fromJson: parseDouble) required double lat,
-    @JsonKey(fromJson: parseDouble) required double lng,
+    @JsonKey(fromJson: parseRequiredDouble) required double lat,
+    @JsonKey(fromJson: parseRequiredDouble) required double lng,
     String? address,
   }) = _PlanLocation;
 
@@ -61,14 +82,14 @@ class Plan with _$Plan {
     required String category,
     required PlanLocation location,
     String? description,
-    @JsonKey(fromJson: parseDouble) double? distanceMeters,
+    @JsonKey(fromJson: parseNullableDouble) double? distanceMeters,
     PlanHours? hours,
     @JsonKey(fromJson: parseOpeningHoursText) List<String>? openingHoursText,
     String? phone,
     DeepLinks? deepLinks,
     List<PlanPhoto>? photos,
     @JsonKey(fromJson: parseInt) int? priceLevel,
-    @JsonKey(fromJson: parseDouble) double? rating,
+    @JsonKey(fromJson: parseNullableDouble) double? rating,
     @JsonKey(fromJson: parseInt) int? reviewCount,
     Map<String, dynamic>? metadata,
   }) = _Plan;
