@@ -6,10 +6,12 @@ import { createDiscoveryHttpHandlers } from "../discovery/http.js";
 import { createCreatorHttpHandlers } from "../creator/http.js";
 import { createCreatorMonetizationHttpHandlers } from "../creatorMonetization/http.js";
 import { createBusinessAnalyticsHttpHandlers } from "../businessAnalytics/http.js";
+import { createCollaborationHttpHandlers } from "../collaboration/http.js";
 import type { AccountsService } from "../accounts/service.js";
 import type { CreatorService } from "../creator/service.js";
 import type { CreatorMonetizationService } from "../creatorMonetization/service.js";
 import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
+import type { CollaborationService } from "../collaboration/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
 import { PermissionAction, ProfileType } from "../accounts/types.js";
 import type { ActorContextResolved } from "../accounts/types.js";
@@ -74,6 +76,7 @@ export function createRoutes(
     creatorService?: CreatorService;
     creatorMonetizationService?: CreatorMonetizationService;
     businessAnalyticsService?: BusinessAnalyticsService;
+    collaborationService?: CollaborationService;
     discovery?: DiscoveryHttpHandlerDeps;
     savedHandlers?: SavedHttpHandlers;
   }
@@ -89,6 +92,7 @@ export function createRoutes(
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
   const creatorMonetizationHandlers = deps?.creatorMonetizationService ? createCreatorMonetizationHttpHandlers(deps.creatorMonetizationService) : null;
   const businessAnalyticsHandlers = deps?.businessAnalyticsService ? createBusinessAnalyticsHttpHandlers(deps.businessAnalyticsService) : null;
+  const collaborationHandlers = deps?.collaborationService && deps?.accountsService ? createCollaborationHttpHandlers(deps.collaborationService, deps.accountsService) : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -109,6 +113,51 @@ export function createRoutes(
           service: "perbug-api",
           version: "1.0.0"
         });
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/collaboration/invites" && collaborationHandlers) {
+        await collaborationHandlers.createInvite(req, res);
+        return;
+      }
+
+      const businessInvitesMatch = /^\/v1\/business\/([^/]+)\/collaboration\/invites$/.exec(normalizedPath);
+      if (businessInvitesMatch && req.method === "GET" && collaborationHandlers) {
+        await collaborationHandlers.listBusinessInvites(req, res, decodeURIComponent(businessInvitesMatch[1] ?? ""));
+        return;
+      }
+
+      const creatorInvitesMatch = /^\/v1\/creator\/profiles\/([^/]+)\/collaboration\/invites$/.exec(normalizedPath);
+      if (creatorInvitesMatch && req.method === "GET" && collaborationHandlers) {
+        await collaborationHandlers.listCreatorInvites(req, res, decodeURIComponent(creatorInvitesMatch[1] ?? ""));
+        return;
+      }
+
+      const inviteRespondMatch = /^\/v1\/collaboration\/invites\/([^/]+)\/respond$/.exec(normalizedPath);
+      if (inviteRespondMatch && req.method === "POST" && collaborationHandlers) {
+        await collaborationHandlers.respondToInvite(req, res, decodeURIComponent(inviteRespondMatch[1] ?? ""));
+        return;
+      }
+
+      const campaignStatusMatch = /^\/v1\/collaboration\/campaigns\/([^/]+)\/status$/.exec(normalizedPath);
+      if (campaignStatusMatch && req.method === "POST" && collaborationHandlers) {
+        await collaborationHandlers.transitionCampaign(req, res, decodeURIComponent(campaignStatusMatch[1] ?? ""));
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/collaboration/campaign-content-links" && collaborationHandlers) {
+        await collaborationHandlers.linkCampaignContent(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/collaboration/featured-content" && collaborationHandlers) {
+        await collaborationHandlers.addFeaturedPlacement(req, res);
+        return;
+      }
+
+      const featuredForPlaceMatch = /^\/places\/([^/]+)\/featured-creator-content$/.exec(normalizedPath);
+      if (featuredForPlaceMatch && req.method === "GET" && collaborationHandlers) {
+        await collaborationHandlers.listFeaturedForPlace(req, res, decodeURIComponent(featuredForPlaceMatch[1] ?? ""));
         return;
       }
 
