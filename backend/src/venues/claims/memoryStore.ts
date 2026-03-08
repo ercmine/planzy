@@ -2,6 +2,7 @@ import { RetentionPolicy } from "../../retention/policy.js";
 import { ValidationError } from "../../plans/errors.js";
 import type {
   BusinessClaimEvidenceRecord,
+  BusinessContactMethodRecord,
   BusinessManagedPlaceContentRecord,
   BusinessManagedPlaceImage,
   BusinessManagedPlaceProfile,
@@ -11,6 +12,8 @@ import type {
   BusinessPlaceClaimRecord,
   BusinessPlaceLink,
   BusinessPlaceMenuServiceCatalog,
+  BusinessTrustAuditEvent,
+  BusinessTrustProfile,
   ClaimAuditEvent,
   ClaimStatus,
   ListClaimsOptions,
@@ -49,6 +52,9 @@ export class MemoryVenueClaimStore implements VenueClaimStore {
   private readonly menuServiceCatalogs = new Map<string, BusinessPlaceMenuServiceCatalog>();
   private readonly businessImages = new Map<string, BusinessManagedPlaceImage>();
   private readonly businessManagedAuditEvents: BusinessManagedChangeAuditRecord[] = [];
+  private readonly businessContactMethods = new Map<string, BusinessContactMethodRecord>();
+  private readonly businessTrustProfiles = new Map<string, BusinessTrustProfile>();
+  private readonly businessTrustAuditEvents: BusinessTrustAuditEvent[] = [];
   private readonly retentionPolicy: RetentionPolicy;
 
   constructor(retentionPolicy?: RetentionPolicy) {
@@ -175,6 +181,35 @@ export class MemoryVenueClaimStore implements VenueClaimStore {
     return [...this.businessImages.values()]
       .filter((entry) => entry.placeId === placeId)
       .sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+
+  async upsertBusinessContactMethod(input: BusinessContactMethodRecord): Promise<void> {
+    this.businessContactMethods.set(input.id, input);
+  }
+
+  async listBusinessContactMethods(placeId: string): Promise<BusinessContactMethodRecord[]> {
+    return [...this.businessContactMethods.values()].filter((entry) => entry.placeId === placeId);
+  }
+
+  async getBusinessContactMethodById(contactMethodId: string): Promise<BusinessContactMethodRecord | null> {
+    return this.businessContactMethods.get(contactMethodId) ?? null;
+  }
+
+  async upsertBusinessTrustProfile(input: BusinessTrustProfile): Promise<void> {
+    this.businessTrustProfiles.set(input.placeId, input);
+  }
+
+  async getBusinessTrustProfile(placeId: string): Promise<BusinessTrustProfile | null> {
+    return this.businessTrustProfiles.get(placeId) ?? null;
+  }
+
+  async appendBusinessTrustAuditEvent(input: BusinessTrustAuditEvent): Promise<void> {
+    this.businessTrustAuditEvents.push(input);
+  }
+
+  async listBusinessTrustAuditEvents(placeId: string): Promise<BusinessTrustAuditEvent[]> {
+    return this.businessTrustAuditEvents.filter((entry) => entry.placeId === placeId);
   }
 
   async appendBusinessManagedAuditEvent(input: BusinessManagedChangeAuditRecord): Promise<void> {

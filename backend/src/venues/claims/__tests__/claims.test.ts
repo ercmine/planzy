@@ -30,6 +30,9 @@ describe("VenueClaimsService", () => {
     await service.revokeOwnership(state.ownership[0]!.id, "ownership_dispute", { userId: "admin-1", isAdmin: true });
     const post = await service.getPlaceManagementState("place-1", { userId: "user-1" });
     expect(post.ownership[0]?.isActive).toBe(false);
+
+    const trust = await service.getAdminBusinessTrustState("place-1", { userId: "admin-1", isAdmin: true });
+    expect(trust.publicView.claimedStatus).toBe("claim_disputed");
   });
 
   it("blocks unauthorized review", async () => {
@@ -67,6 +70,9 @@ describe("VenueClaimsService", () => {
     const website = await service.upsertBusinessLink("place-3", { linkType: "website", value: "https://example.com/" }, { userId: "owner-3" });
     expect(website.url).toBe("https://example.com/");
 
+    const contact = await service.upsertBusinessContactMethod("place-3", { type: "phone", value: "+1 415 555 1212" }, { userId: "owner-3" });
+    await service.verifyBusinessContactMethod("place-3", contact.id, { status: "verified", method: "admin_manual" }, { userId: "admin-1", isAdmin: true });
+
     await service.upsertBusinessImage("place-3", {
       mediaAssetId: "asset-1",
       imageType: "interior",
@@ -88,6 +94,8 @@ describe("VenueClaimsService", () => {
     expect(projection.merged.description.source).toBe("official_business");
     expect(projection.merged.website.source).toBe("official_business");
     expect(projection.merged.images.officialCover).toBe("asset-1");
+    expect(projection.trust.badges.some((entry: { key: string }) => entry.key === "claimed")).toBe(true);
+    expect(projection.trust.verifiedContactTypes).toContain("phone");
   });
 
   it("blocks unverified users from managing official profile", async () => {

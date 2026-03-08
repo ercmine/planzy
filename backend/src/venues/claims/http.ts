@@ -145,6 +145,31 @@ export function createVenueClaimsHttpHandlers(service: VenueClaimsService, deps?
     sendJson(res, 200, await service.upsertBusinessImage(placeId, await parseJsonBody(req) as never, actorFromRequest(req)));
   }
 
+  async function handleUpsertBusinessContactMethod(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    sendJson(res, 200, await service.upsertBusinessContactMethod(placeId, await parseJsonBody(req) as never, actorFromRequest(req)));
+  }
+
+  async function handleListBusinessContactMethods(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    sendJson(res, 200, { contacts: await service.listBusinessContactMethods(placeId, actorFromRequest(req)) });
+  }
+
+  async function handleVerifyBusinessContactMethod(req: IncomingMessage, res: ServerResponse, placeId: string, contactMethodId: string): Promise<void> {
+    sendJson(res, 200, await service.verifyBusinessContactMethod(placeId, contactMethodId, await parseJsonBody(req) as never, actorFromRequest(req)));
+  }
+
+  async function handleBusinessTrustStatus(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    sendJson(res, 200, await service.getBusinessTrustStatus(placeId, actorFromRequest(req)));
+  }
+
+  async function handlePublicBusinessTrust(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    const projection = await service.buildPublicPlaceProjection(placeId, {});
+    sendJson(res, 200, { trust: projection.trust });
+  }
+
+  async function handleAdminBusinessTrust(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+    sendJson(res, 200, await service.getAdminBusinessTrustState(placeId, actorFromRequest(req)));
+  }
+
   return {
     handleCreate,
     handleList,
@@ -163,7 +188,12 @@ export function createVenueClaimsHttpHandlers(service: VenueClaimsService, deps?
     handleUpdateManagedHours,
     handleUpsertBusinessLink,
     handleUpsertMenuServices,
-    handleUpsertBusinessImage
+    handleUpsertBusinessImage,
+    handleUpsertBusinessContactMethod,
+    handleListBusinessContactMethods,
+    handleVerifyBusinessContactMethod,
+    handleBusinessTrustStatus,
+    handlePublicBusinessTrust,
+    handleAdminBusinessTrust
   };
 }
-

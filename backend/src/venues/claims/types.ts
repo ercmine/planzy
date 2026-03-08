@@ -315,3 +315,87 @@ export interface ListClaimsOptionsNormalized {
 
 // Legacy compatibility type
 export type VerificationStatus = "pending" | "verified" | "rejected";
+
+export type BusinessClaimedStatus = "unclaimed" | "claimed_pending" | "claimed" | "claim_disputed" | "claim_revoked";
+
+export type BusinessContactMethodType = "phone" | "email" | "website" | "booking_url" | "contact_url" | "social";
+
+export type ContactVerificationStatus = "unverified" | "pending_verification" | "verified" | "failed" | "revoked";
+
+export type ContactVerificationMethod = "email_code" | "sms_code" | "admin_manual" | "domain_proof" | "import_trusted_source" | "unsupported";
+
+export type BusinessCompletenessTier = "low" | "partial" | "good" | "strong";
+
+export interface BusinessTrustProfile {
+  id: string;
+  placeId: string;
+  businessProfileId?: string;
+  claimedStatus: BusinessClaimedStatus;
+  completenessScore: number;
+  completenessTier: BusinessCompletenessTier;
+  trustTier: "none" | "developing" | "trusted";
+  trustFlags: string[];
+  passedChecks: string[];
+  missingFields: string[];
+  warnings: string[];
+  recomputedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessContactMethodRecord {
+  id: string;
+  placeId: string;
+  businessProfileId?: string;
+  type: BusinessContactMethodType;
+  value: string;
+  normalizedValue: string;
+  isPrimary: boolean;
+  verificationStatus: ContactVerificationStatus;
+  verificationMethod: ContactVerificationMethod;
+  verifiedAt?: string;
+  verifiedByActorId?: string;
+  lastVerificationAttemptAt?: string;
+  revokedAt?: string;
+  failureReasonCode?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessTrustAuditEvent {
+  id: string;
+  placeId: string;
+  businessProfileId?: string;
+  actorType: "system" | "user" | "admin";
+  actorId?: string;
+  eventType:
+    | "business_trust_recomputed"
+    | "business_contact_added"
+    | "business_contact_verification_started"
+    | "business_contact_verified"
+    | "business_contact_verification_failed"
+    | "business_contact_verification_revoked"
+    | "business_badge_suppressed"
+    | "business_badge_unsuppressed";
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface BusinessTrustBadge {
+  key: "claimed" | "verified_contact" | "complete_profile" | "trusted_business";
+  label: string;
+  description: string;
+  priority: number;
+}
+
+export interface BusinessTrustPublicView {
+  claimedStatus: BusinessClaimedStatus;
+  isClaimed: boolean;
+  verifiedContactTypes: BusinessContactMethodType[];
+  profileCompletenessTier: BusinessCompletenessTier;
+  profileCompletenessLabel: string;
+  trustTier: "none" | "developing" | "trusted";
+  trustSummary: string;
+  badges: BusinessTrustBadge[];
+}
