@@ -10,6 +10,8 @@ enum AdPlacement {
   creatorFeedInlineBanner,
   bookmarksInlineBanner,
   guidePageInlineBanner,
+  cityPageInlineBanner,
+  trendingInlineBanner,
 }
 
 enum AdFormat { native, banner }

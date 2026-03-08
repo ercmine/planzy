@@ -181,7 +181,8 @@ class ResultsController extends StateNotifier<ResultsState> {
     return _feedAdInserter.inject<PlanScoreView, ResultFeedItem>(
       items: picks,
       placement: AdPlacement.resultsInlineBanner,
-      adsEnabled: _adsVisibility.canShow(AdPlacement.resultsInlineBanner.name),
+      adsEnabled: _adsVisibility.decisionForPlacement(AdPlacement.resultsInlineBanner).shouldShowAd,
+      insertionPolicy: _adsVisibility.insertionPolicyFor(AdPlacement.resultsInlineBanner),
       adBuilder: (contentIndex, mixedIndex) => AdResultFeedItem(slotId: 'results-slot-$contentIndex-$mixedIndex'),
       contentBuilder: (pick) => PlaceResultFeedItem(
         card: mapPlanToCardViewModel(pick),

@@ -31,8 +31,10 @@ class SafeAdContainer extends StatelessWidget {
             if (state == NativeAdLoadState.hidden) {
               return const SizedBox.shrink();
             }
-            if (state == NativeAdLoadState.failed && !config.reserveSpaceOnFailure) {
-              return const SizedBox.shrink();
+            if (state == NativeAdLoadState.failed) {
+              return config.reserveSpaceOnFailure
+                  ? const SizedBox(height: 24)
+                  : const SizedBox.shrink();
             }
             return ConstrainedBox(
               constraints: BoxConstraints(minHeight: height, maxHeight: height),
@@ -54,15 +56,6 @@ class SafeAdContainer extends StatelessWidget {
     if (state == NativeAdLoadState.ready && controller.ad != null) {
       return SizedBox.expand(
         child: ClipRect(child: AdWidget(ad: controller.ad!)),
-      );
-    }
-    if (state == NativeAdLoadState.failed) {
-      return Center(
-        child: TextButton.icon(
-          onPressed: controller.retry,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Retry ad'),
-        ),
       );
     }
     return const Center(

@@ -1,17 +1,17 @@
 import '../../features/deck/deck_state.dart';
 import '../../models/plan.dart';
 import 'ad_placement.dart';
-import 'ads_config.dart';
+import 'ads_visibility.dart';
 import 'feed_ad_inserter.dart';
 
 class AdDeckInjector {
   const AdDeckInjector({
-    required AdsConfig config,
+    required AdsVisibility visibility,
     FeedAdInserter feedAdInserter = const FeedAdInserter(),
-  })  : _config = config,
+  })  : _visibility = visibility,
         _feedAdInserter = feedAdInserter;
 
-  final AdsConfig _config;
+  final AdsVisibility _visibility;
   final FeedAdInserter _feedAdInserter;
 
   List<DeckItem> inject({
@@ -20,7 +20,8 @@ class AdDeckInjector {
     return _feedAdInserter.inject<Plan, DeckItem>(
       items: plans,
       placement: AdPlacement.deckInlineNative,
-      adsEnabled: _config.isUsable,
+      adsEnabled: _visibility.decisionForPlacement(AdPlacement.deckInlineNative).shouldShowAd,
+      insertionPolicy: _visibility.insertionPolicyFor(AdPlacement.deckInlineNative),
       adBuilder: (_, mixedIndex) => DeckAdItem(
         AdSlot(
           slotId: 'deck-slot-$mixedIndex',

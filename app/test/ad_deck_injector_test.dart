@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:perbug/core/ads/ad_deck_injector.dart';
+import 'package:perbug/core/ads/ad_policy.dart';
 import 'package:perbug/core/ads/ads_config.dart';
+import 'package:perbug/core/ads/ads_visibility.dart';
 import 'package:perbug/features/deck/deck_state.dart';
 import 'package:perbug/models/plan.dart';
 
@@ -17,14 +19,19 @@ void main() {
     adsWindowSize: 50,
   );
 
+  const freeVisibility = AdsVisibility(
+    config: config,
+    entitlement: AdEntitlementSnapshot(planCode: 'free', isResolved: true),
+  );
+
   test('injects no ad if deck is empty', () {
-    final injector = AdDeckInjector(config: config);
+    final injector = AdDeckInjector(visibility: freeVisibility);
     final result = injector.inject(plans: const []);
     expect(result, isEmpty);
   });
 
   test('injects deterministic ad slots with gap constraints', () {
-    final injector = AdDeckInjector(config: config);
+    final injector = AdDeckInjector(visibility: freeVisibility);
     final plans = [for (var i = 0; i < 25; i++) _plan('p$i')];
     final result = injector.inject(plans: plans);
     final adIndexes = <int>[];
@@ -38,6 +45,19 @@ void main() {
     for (var i = 1; i < adIndexes.length; i++) {
       expect(adIndexes[i] - adIndexes[i - 1], greaterThanOrEqualTo(8));
     }
+  });
+
+  test('elite users receive no deck ad slots', () {
+    final injector = AdDeckInjector(
+      visibility: const AdsVisibility(
+        config: config,
+        entitlement: AdEntitlementSnapshot(planCode: 'elite', isAnonymous: false),
+      ),
+    );
+
+    final plans = [for (var i = 0; i < 25; i++) _plan('p$i')];
+    final result = injector.inject(plans: plans);
+    expect(result.whereType<DeckAdItem>(), isEmpty);
   });
 }
 
