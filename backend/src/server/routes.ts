@@ -15,6 +15,7 @@ import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import { handleMerchantHttpError, createMerchantHttpHandlers } from "../merchant/http.js";
 import type { MerchantService } from "../merchant/service.js";
 import { ValidationError } from "../plans/errors.js";
+import { sanitizeText } from "../sanitize/text.js";
 import { createSubscriptionHttpHandlers } from "../subscriptions/http.js";
 import type { EntitlementPolicyService } from "../subscriptions/policy.js";
 import type { SubscriptionService } from "../subscriptions/service.js";
@@ -744,12 +745,11 @@ export function createRoutes(
         return;
       }
 
-      const businessReplyMatch = /^\/reviews\/([^/]+)\/business-reply$/.exec(normalizedPath);
-      if (businessReplyMatch && req.method === "POST" && deps?.reviewsStore) {
-        const reviewId = decodeURIComponent(businessReplyMatch[1] ?? "");
+      const businessResponseMatch = /^\/v1\/reviews\/([^/]+)\/business-response$/.exec(normalizedPath);
+      if (businessResponseMatch && req.method === "POST" && deps?.reviewsStore) {
+        const reviewId = decodeURIComponent(businessResponseMatch[1] ?? "");
         const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
-        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
-        if (!deps.accountsService) throw new ValidationError(["accounts service required"]);
+        if (!userIdHeader || !deps.accountsService) throw new ValidationError(["x-user-id header is required"]);
         const actor = deps.accountsService.resolveActingContext(userIdHeader, {
           profileType: ProfileType.BUSINESS,
           profileId: String(readHeader(req, "x-acting-profile-id") ?? "").trim()
@@ -759,38 +759,164 @@ export function createRoutes(
           sendJson(res, 403, { decision });
           return;
         }
+        const review = await deps.reviewsStore.getById(reviewId, actor.userId, true);
+        if (!review) throw new ValidationError(["review not found"]);
+        const ownership = await service.getActiveOwnershipForBusinessActor({ placeId: review.placeId, businessProfileId: actor.profileId, userId: actor.userId });
+
+        if (deps.accessEngine) {
+          const target = { targetId: actor.profileId, targetType: SubscriptionTargetType.BUSINESS };
+          const feature = await deps.accessEngine.checkFeatureAccess(target, FEATURE_KEYS.REVIEWS_REPLY_AS_BUSINESS);
+          if (!feature.allowed) {
+            sendJson(res, 403, { access: { ...feature, denialReason: "business_plan_required" } });
+            return;
+          }
+        }
+
         const body = await parseJsonBody(req);
         const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
-        const replyBody = String(payload.body ?? "").trim();
-        if (replyBody.length < 2 || replyBody.length > 1000) throw new ValidationError(["body length must be between 2 and 1000"]);
-        const reply = await deps.reviewsStore.createOrUpdateBusinessReply({ reviewId, businessProfileId: actor.profileId, ownerUserId: actor.userId, body: replyBody });
-        sendJson(res, 201, { reply });
+        const clean = sanitizeText(payload.content ?? payload.body, {
+          source: "user",
+          maxLen: 1200,
+          allowNewlines: true,
+          profanityMode: "mask",
+          stripHtml: true
+        });
+        if (!clean || clean.length < 2) throw new ValidationError(["content length must be between 2 and 1200"]);
+
+        const moderationRequired = actor.businessMembershipRole === "EDITOR";
+        const response = await deps.reviewsStore.createOrUpdateBusinessReviewResponse({
+          reviewId,
+          placeId: review.placeId,
+          businessProfileId: actor.profileId,
+          ownershipLinkId: ownership.id,
+          authoredByUserId: actor.userId,
+          content: clean,
+          moderationRequired
+        });
+        sendJson(res, 201, { response });
         return;
       }
 
-      const businessReplyDetailMatch = /^\/reviews\/([^/]+)\/business-reply\/([^/]+)$/.exec(normalizedPath);
-      if (businessReplyDetailMatch && deps?.reviewsStore) {
-        const reviewId = decodeURIComponent(businessReplyDetailMatch[1] ?? "");
-        const replyId = decodeURIComponent(businessReplyDetailMatch[2] ?? "");
+      const businessResponseDetailMatch = /^\/v1\/reviews\/([^/]+)\/business-response\/([^/]+)$/.exec(normalizedPath);
+      if (businessResponseDetailMatch && deps?.reviewsStore) {
+        const reviewId = decodeURIComponent(businessResponseDetailMatch[1] ?? "");
+        const responseId = decodeURIComponent(businessResponseDetailMatch[2] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader || !deps.accountsService) throw new ValidationError(["x-user-id header is required"]);
+
+        if (req.method === "PATCH") {
+          const actor = deps.accountsService.resolveActingContext(userIdHeader, {
+            profileType: ProfileType.BUSINESS,
+            profileId: String(readHeader(req, "x-acting-profile-id") ?? "").trim()
+          });
+          const decision = deps.accountsService.authorizeAction(actor, PermissionAction.BUSINESS_REPLY);
+          if (!decision.allowed) {
+            sendJson(res, 403, { decision });
+            return;
+          }
+          const review = await deps.reviewsStore.getById(reviewId, actor.userId, true);
+          if (!review) throw new ValidationError(["review not found"]);
+          const ownership = await service.getActiveOwnershipForBusinessActor({ placeId: review.placeId, businessProfileId: actor.profileId, userId: actor.userId });
+          const body = await parseJsonBody(req);
+          const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+          const clean = sanitizeText(payload.content ?? payload.body, { source: "user", maxLen: 1200, allowNewlines: true, profanityMode: "mask", stripHtml: true });
+          if (!clean || clean.length < 2) throw new ValidationError(["content length must be between 2 and 1200"]);
+          const moderationRequired = true;
+          const response = await deps.reviewsStore.createOrUpdateBusinessReviewResponse({
+            reviewId,
+            placeId: review.placeId,
+            businessProfileId: actor.profileId,
+            ownershipLinkId: ownership.id,
+            authoredByUserId: actor.userId,
+            content: clean,
+            moderationRequired
+          });
+          if (response.id !== responseId) throw new ValidationError(["business response id mismatch"]);
+          sendJson(res, 200, { response });
+          return;
+        }
+
+        if (req.method === "DELETE") {
+          const actor = deps.accountsService.resolveActingContext(userIdHeader, {
+            profileType: ProfileType.BUSINESS,
+            profileId: String(readHeader(req, "x-acting-profile-id") ?? "").trim()
+          });
+          const response = await deps.reviewsStore.removeOwnBusinessReviewResponse({ responseId, actorUserId: actor.userId, businessProfileId: actor.profileId });
+          sendJson(res, 200, { response });
+          return;
+        }
+      }
+
+      const businessModerationQueueMatch = /^\/v1\/admin\/business-review-responses$/.exec(normalizedPath);
+      if (businessModerationQueueMatch && req.method === "GET" && deps?.reviewsStore) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 403, { error: "admin privileges required" });
+          return;
+        }
+        const statusesRaw = String(url.searchParams.get("statuses") ?? "").trim();
+        const statuses = statusesRaw ? statusesRaw.split(",").map((item) => item.trim()).filter(Boolean) as never[] : undefined;
+        const responses = await deps.reviewsStore.listBusinessReviewResponsesForModeration({
+          statuses,
+          placeId: String(url.searchParams.get("placeId") ?? "").trim() || undefined,
+          businessProfileId: String(url.searchParams.get("businessProfileId") ?? "").trim() || undefined,
+          limit: url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : undefined
+        });
+        sendJson(res, 200, { responses });
+        return;
+      }
+
+      const businessModerationActionMatch = /^\/v1\/admin\/business-review-responses\/([^/]+)\/moderation$/.exec(normalizedPath);
+      if (businessModerationActionMatch && req.method === "POST" && deps?.reviewsStore) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 403, { error: "admin privileges required" });
+          return;
+        }
+        const responseId = decodeURIComponent(businessModerationActionMatch[1] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim() || "admin";
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const action = String(payload.action ?? "").trim();
+        const response = await deps.reviewsStore.moderateBusinessReviewResponse({
+          responseId,
+          action: action as never,
+          actedByUserId: userIdHeader,
+          reasonCode: payload.reasonCode == null ? undefined : String(payload.reasonCode),
+          notes: payload.notes == null ? undefined : String(payload.notes)
+        });
+        sendJson(res, 200, { response });
+        return;
+      }
+
+      const businessResponseHistoryMatch = /^\/v1\/admin\/business-review-responses\/([^/]+)\/history$/.exec(normalizedPath);
+      if (businessResponseHistoryMatch && req.method === "GET" && deps?.reviewsStore) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 403, { error: "admin privileges required" });
+          return;
+        }
+        const responseId = decodeURIComponent(businessResponseHistoryMatch[1] ?? "");
+        const revisions = await deps.reviewsStore.listBusinessReviewResponseRevisions(responseId);
+        const moderationActions = await deps.reviewsStore.listBusinessReviewResponseModerationActions(responseId);
+        sendJson(res, 200, { revisions, moderationActions });
+        return;
+      }
+
+      const businessDashboardReviewsMatch = /^\/v1\/business\/places\/([^/]+)\/review-response-dashboard$/.exec(normalizedPath);
+      if (businessDashboardReviewsMatch && req.method === "GET" && deps?.reviewsStore) {
+        const placeId = decodeURIComponent(businessDashboardReviewsMatch[1] ?? "");
         const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
         if (!userIdHeader || !deps.accountsService) throw new ValidationError(["x-user-id header is required"]);
         const actor = deps.accountsService.resolveActingContext(userIdHeader, {
           profileType: ProfileType.BUSINESS,
           profileId: String(readHeader(req, "x-acting-profile-id") ?? "").trim()
         });
-        if (req.method === "PATCH") {
-          const body = await parseJsonBody(req);
-          const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
-          const replyBody = String(payload.body ?? "").trim();
-          const reply = await deps.reviewsStore.createOrUpdateBusinessReply({ reviewId, businessProfileId: actor.profileId, ownerUserId: actor.userId, body: replyBody });
-          sendJson(res, 200, { reply });
-          return;
-        }
-        if (req.method === "DELETE") {
-          const reply = await deps.reviewsStore.deleteBusinessReply({ reviewId, replyId, actorUserId: actor.userId, businessProfileId: actor.profileId });
-          sendJson(res, 200, { reply });
-          return;
-        }
+        await service.getActiveOwnershipForBusinessActor({ placeId, businessProfileId: actor.profileId, userId: actor.userId });
+        const reviews = await deps.reviewsStore.listReviewsForBusinessResponseDashboard({
+          placeIds: [placeId],
+          onlyUnanswered: String(url.searchParams.get("onlyUnanswered") ?? "false") === "true",
+          limit: url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : undefined
+        });
+        sendJson(res, 200, { reviews });
+        return;
       }
 
       if (deps?.accessEngine && req.method === "POST" && normalizedPath === "/v1/ai/place-summary") {

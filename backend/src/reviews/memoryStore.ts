@@ -3,6 +3,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { ValidationError } from "../plans/errors.js";
 import type {
   BusinessReply,
+  BusinessReviewResponse,
+  BusinessReviewResponseModerationAction,
+  BusinessReviewResponseModerationActionType,
+  BusinessReviewResponseRevision,
   CreateReviewInput,
   CreateReviewMediaUploadInput,
   ListReviewsByAuthorProfileInput,
@@ -11,6 +15,7 @@ import type {
   ModerationState,
   PlaceReview,
   ReviewMedia,
+  BusinessReviewResponseStatus,
   ReviewMediaReport,
   ReviewMediaUpload,
   ReviewSort,
@@ -123,6 +128,12 @@ export class MemoryReviewsStore implements ReviewsStore {
   private readonly visitSessions = new Map<string, Array<{ id: string; userId: string; placeId?: string; startedAt: string; endedAt?: string; confidenceScore: number; sourceType: string; sessionStatus: string; metadata?: Record<string, unknown> }>>();
   private readonly usedSourceIds = new Set<string>();
   private readonly trustAuditLogs = new Map<string, TrustAuditLog[]>();
+  private readonly businessResponsesById = new Map<string, BusinessReviewResponse>();
+  private readonly businessResponseByReviewId = new Map<string, string>();
+  private readonly businessResponseRevisions = new Map<string, BusinessReviewResponseRevision[]>();
+  private readonly businessResponseModerationActions = new Map<string, BusinessReviewResponseModerationAction[]>();
+  private readonly businessResponseEvents: Array<{ eventType: string; responseId: string; reviewId: string; placeId: string; actorUserId: string; createdAt: string }> = [];
+  private readonly businessResponseNotifications: Array<{ type: string; userId: string; responseId: string; createdAt: string }> = [];
 
   async listByPlace(input: ListReviewsInput): Promise<ListReviewsResult> {
     const sort = input.sort ?? "most_helpful";
@@ -615,6 +626,190 @@ export class MemoryReviewsStore implements ReviewsStore {
     return row.businessReply;
   }
 
+  async createOrUpdateBusinessReviewResponse(input: {
+    reviewId: string;
+    placeId: string;
+    businessProfileId: string;
+    ownershipLinkId: string;
+    authoredByUserId: string;
+    content: string;
+    moderationRequired: boolean;
+    now?: Date;
+  }): Promise<BusinessReviewResponse> {
+    const row = this.byId.get(input.reviewId);
+    if (!row) throw new ValidationError(["review not found"]);
+    if (row.placeId !== input.placeId && row.canonicalPlaceId !== input.placeId) throw new ValidationError(["review place mismatch"]);
+
+    const nowIso = (input.now ?? new Date()).toISOString();
+    const existingId = this.businessResponseByReviewId.get(input.reviewId);
+    const existing = existingId ? this.businessResponsesById.get(existingId) : undefined;
+
+    const nextStatus: BusinessReviewResponseStatus = input.moderationRequired ? "pending" : "published";
+    const nextModeration: BusinessReviewResponse["moderationStatus"] = input.moderationRequired ? "pending" : "approved";
+    const nextVisibility: BusinessReviewResponse["visibilityStatus"] = input.moderationRequired ? "draft" : "public";
+
+    if (existing && existing.status !== "removed") {
+      if (existing.businessProfileId !== input.businessProfileId) throw new ValidationError(["review already has active response from another business"]);
+      existing.content = input.content;
+      existing.updatedAt = nowIso;
+      existing.editedAt = nowIso;
+      existing.lastRevisionNumber += 1;
+      existing.status = nextStatus;
+      existing.moderationStatus = nextModeration;
+      existing.visibilityStatus = nextVisibility;
+      existing.hiddenAt = undefined;
+      existing.removedAt = undefined;
+      if (nextStatus === "published") {
+        existing.publishedAt = existing.publishedAt ?? nowIso;
+      }
+      this.pushRevision(existing.id, existing.content, existing.lastRevisionNumber, input.authoredByUserId, existing.moderationStatus, nowIso);
+      this.pushModerationAction(existing.id, input.moderationRequired ? "submitted_for_review" : "approved", input.authoredByUserId, undefined, undefined, nowIso);
+      this.pushEvent(input.moderationRequired ? "business_review_response_submitted_for_review" : "business_review_response_updated", existing, input.authoredByUserId, nowIso);
+      if (!input.moderationRequired) {
+        this.pushEvent("business_review_response_published", existing, input.authoredByUserId, nowIso);
+      }
+      return existing;
+    }
+
+    const created: BusinessReviewResponse = {
+      id: randomUUID(),
+      reviewId: input.reviewId,
+      placeId: input.placeId,
+      businessProfileId: input.businessProfileId,
+      ownershipLinkId: input.ownershipLinkId,
+      authoredByUserId: input.authoredByUserId,
+      content: input.content,
+      status: nextStatus,
+      moderationStatus: nextModeration,
+      visibilityStatus: nextVisibility,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      publishedAt: nextStatus === "published" ? nowIso : undefined,
+      lastRevisionNumber: 1
+    };
+    this.businessResponsesById.set(created.id, created);
+    this.businessResponseByReviewId.set(created.reviewId, created.id);
+    this.pushRevision(created.id, created.content, 1, input.authoredByUserId, created.moderationStatus, nowIso);
+    this.pushModerationAction(created.id, input.moderationRequired ? "submitted_for_review" : "approved", input.authoredByUserId, undefined, undefined, nowIso);
+    this.pushEvent("business_review_response_created", created, input.authoredByUserId, nowIso);
+    if (input.moderationRequired) {
+      this.pushEvent("business_review_response_submitted_for_review", created, input.authoredByUserId, nowIso);
+    } else {
+      this.pushEvent("business_review_response_published", created, input.authoredByUserId, nowIso);
+    }
+    return created;
+  }
+
+  async moderateBusinessReviewResponse(input: {
+    responseId: string;
+    action: BusinessReviewResponseModerationActionType;
+    actedByUserId: string;
+    reasonCode?: string;
+    notes?: string;
+    now?: Date;
+  }): Promise<BusinessReviewResponse> {
+    const response = this.businessResponsesById.get(input.responseId);
+    if (!response) throw new ValidationError(["business response not found"]);
+    const nowIso = (input.now ?? new Date()).toISOString();
+    if (input.action === "approved" || input.action === "restored") {
+      response.status = "published";
+      response.moderationStatus = "approved";
+      response.visibilityStatus = "public";
+      response.publishedAt = response.publishedAt ?? nowIso;
+      response.hiddenAt = undefined;
+      this.pushEvent("business_review_response_published", response, input.actedByUserId, nowIso);
+    } else if (input.action === "rejected") {
+      response.status = "rejected";
+      response.moderationStatus = "rejected";
+      response.visibilityStatus = "hidden";
+      response.hiddenAt = nowIso;
+      this.pushEvent("business_review_response_rejected", response, input.actedByUserId, nowIso);
+    } else if (input.action === "hidden") {
+      response.status = "hidden";
+      response.moderationStatus = "hidden";
+      response.visibilityStatus = "hidden";
+      response.hiddenAt = nowIso;
+      this.pushEvent("business_review_response_hidden", response, input.actedByUserId, nowIso);
+    } else if (input.action === "removed") {
+      response.status = "removed";
+      response.moderationStatus = "removed";
+      response.visibilityStatus = "removed";
+      response.removedAt = nowIso;
+      this.pushEvent("business_review_response_removed", response, input.actedByUserId, nowIso);
+    }
+    response.updatedAt = nowIso;
+    this.pushModerationAction(response.id, input.action, input.actedByUserId, input.reasonCode, input.notes, nowIso);
+    return response;
+  }
+
+  async removeOwnBusinessReviewResponse(input: { responseId: string; actorUserId: string; businessProfileId: string; now?: Date }): Promise<BusinessReviewResponse> {
+    const response = this.businessResponsesById.get(input.responseId);
+    if (!response) throw new ValidationError(["business response not found"]);
+    if (response.businessProfileId !== input.businessProfileId) throw new ValidationError(["cannot delete another business response"]);
+    const nowIso = (input.now ?? new Date()).toISOString();
+    response.status = "removed";
+    response.moderationStatus = "removed";
+    response.visibilityStatus = "removed";
+    response.removedAt = nowIso;
+    response.updatedAt = nowIso;
+    this.pushModerationAction(response.id, "removed", input.actorUserId, "removed_by_business", undefined, nowIso);
+    this.pushEvent("business_review_response_removed", response, input.actorUserId, nowIso);
+    return response;
+  }
+
+  async getBusinessReviewResponseByReview(reviewId: string, includeHidden = false): Promise<BusinessReviewResponse | null> {
+    const id = this.businessResponseByReviewId.get(reviewId);
+    if (!id) return null;
+    const response = this.businessResponsesById.get(id) ?? null;
+    if (!response) return null;
+    if (includeHidden) return response;
+    return response.visibilityStatus === "public" ? response : null;
+  }
+
+  async listBusinessReviewResponseRevisions(responseId: string): Promise<BusinessReviewResponseRevision[]> {
+    return [...(this.businessResponseRevisions.get(responseId) ?? [])].sort((a, b) => b.revisionNumber - a.revisionNumber);
+  }
+
+  async listBusinessReviewResponseModerationActions(responseId: string): Promise<BusinessReviewResponseModerationAction[]> {
+    return [...(this.businessResponseModerationActions.get(responseId) ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async listReviewsForBusinessResponseDashboard(input: { placeIds: string[]; onlyUnanswered?: boolean; limit?: number }): Promise<PlaceReview[]> {
+    const placeIds = new Set(input.placeIds);
+    const rows = [...this.byId.values()].filter((row) => placeIds.has(row.placeId) || placeIds.has(row.canonicalPlaceId));
+    const views = rows
+      .filter((row) => row.moderationState === "published" && !row.deletedAt)
+      .filter((row) => {
+        if (!input.onlyUnanswered) return true;
+        const responseId = this.businessResponseByReviewId.get(row.id);
+        if (!responseId) return true;
+        const response = this.businessResponsesById.get(responseId);
+        return !response || response.status === "removed";
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, Math.max(1, Math.min(input.limit ?? 50, 200)))
+      .map((row) => this.toView(row));
+    return views;
+  }
+
+  async listBusinessReviewResponsesForModeration(input: { statuses?: BusinessReviewResponseStatus[]; placeId?: string; businessProfileId?: string; limit?: number }): Promise<BusinessReviewResponse[]> {
+    const statuses = input.statuses ? new Set(input.statuses) : null;
+    return [...this.businessResponsesById.values()]
+      .filter((item) => !statuses || statuses.has(item.status))
+      .filter((item) => !input.placeId || item.placeId === input.placeId)
+      .filter((item) => !input.businessProfileId || item.businessProfileId === input.businessProfileId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, Math.max(1, Math.min(input.limit ?? 50, 200)));
+  }
+
+  async listBusinessResponseEvents(): Promise<Array<{ eventType: string; responseId: string; reviewId: string; placeId: string; actorUserId: string; createdAt: string }>> {
+    return [...this.businessResponseEvents];
+  }
+
+  async listBusinessResponseNotifications(): Promise<Array<{ type: string; userId: string; responseId: string; createdAt: string }>> {
+    return [...this.businessResponseNotifications];
+  }
+
   private attachUploadsToReview(review: ReviewRow, actorUserId: string, uploadIds: string[], now: Date, append = false): ReviewMedia[] {
     const nowIso = now.toISOString();
     const activeMedia = (append ? review.media : []).filter((item) => item.moderationState !== "removed");
@@ -677,6 +872,37 @@ export class MemoryReviewsStore implements ReviewsStore {
     return normalizeMediaOrdering(append ? [...review.media, ...attached] : attached);
   }
 
+  private pushRevision(responseId: string, content: string, revisionNumber: number, editedByUserId: string, moderationStatusSnapshot: BusinessReviewResponse["moderationStatus"], createdAt: string): void {
+    const rows = this.businessResponseRevisions.get(responseId) ?? [];
+    rows.push({
+      id: randomUUID(),
+      businessReviewResponseId: responseId,
+      content,
+      revisionNumber,
+      editedByUserId,
+      moderationStatusSnapshot,
+      createdAt
+    });
+    this.businessResponseRevisions.set(responseId, rows);
+  }
+
+  private pushModerationAction(responseId: string, actionType: BusinessReviewResponseModerationActionType, actedByUserId: string, reasonCode: string | undefined, notes: string | undefined, createdAt: string): void {
+    const rows = this.businessResponseModerationActions.get(responseId) ?? [];
+    rows.push({ id: randomUUID(), businessReviewResponseId: responseId, actionType, actedByUserId, reasonCode, notes, createdAt });
+    this.businessResponseModerationActions.set(responseId, rows);
+  }
+
+  private pushEvent(eventType: string, response: BusinessReviewResponse, actorUserId: string, createdAt: string): void {
+    this.businessResponseEvents.push({ eventType, responseId: response.id, reviewId: response.reviewId, placeId: response.placeId, actorUserId, createdAt });
+    if (eventType === "business_review_response_published") {
+      const review = this.byId.get(response.reviewId);
+      if (review) {
+        this.businessResponseNotifications.push({ type: "reviewer_notified_of_business_response", userId: review.authorUserId, responseId: response.id, createdAt });
+        this.businessResponseEvents.push({ eventType: "reviewer_notified_of_business_response", responseId: response.id, reviewId: response.reviewId, placeId: response.placeId, actorUserId, createdAt });
+      }
+    }
+  }
+
   private findMedia(mediaId: string): ReviewMedia | null {
     for (const review of this.byId.values()) {
       const media = review.media.find((item) => item.id === mediaId);
@@ -698,10 +924,26 @@ export class MemoryReviewsStore implements ReviewsStore {
     const media = normalizeMediaOrdering(mediaVisible);
     const trustSignals = this.reviewTrustSignals.get(row.id);
     const reviewerProfile = this.trustProfiles.get(row.authorUserId);
+    const responseId = this.businessResponseByReviewId.get(row.id);
+    const response = responseId ? this.businessResponsesById.get(responseId) : undefined;
+    const businessResponse = response && response.visibilityStatus === "public"
+      ? {
+        id: response.id,
+        businessProfileId: response.businessProfileId,
+        content: response.content,
+        createdAt: response.createdAt,
+        updatedAt: response.updatedAt,
+        editedAt: response.editedAt,
+        publishedAt: response.publishedAt,
+        attributionLabel: "Response from the business",
+        isVerifiedBusiness: true
+      }
+      : undefined;
     return {
       ...row,
       media,
       mediaCount: media.length,
+      businessResponse,
       viewerHasHelpfulVote: viewerUserId ? votes.has(viewerUserId) : false,
       canEdit: viewerUserId === row.authorUserId && Date.parse(row.editWindowEndsAt) > Date.now(),
       trust: {

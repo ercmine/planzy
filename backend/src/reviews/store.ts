@@ -84,6 +84,61 @@ export interface BusinessReply {
   deletedAt?: string;
 }
 
+export type BusinessReviewResponseStatus = "draft" | "pending" | "published" | "hidden" | "rejected" | "removed";
+export type BusinessReviewResponseModerationActionType = "submitted_for_review" | "approved" | "rejected" | "hidden" | "removed" | "restored";
+
+export interface BusinessReviewResponse {
+  id: string;
+  reviewId: string;
+  placeId: string;
+  businessProfileId: string;
+  ownershipLinkId: string;
+  authoredByUserId: string;
+  content: string;
+  status: BusinessReviewResponseStatus;
+  moderationStatus: "pending" | "approved" | "rejected" | "hidden" | "removed";
+  visibilityStatus: "draft" | "public" | "hidden" | "removed";
+  createdAt: string;
+  updatedAt: string;
+  publishedAt?: string;
+  hiddenAt?: string;
+  removedAt?: string;
+  editedAt?: string;
+  lastRevisionNumber: number;
+}
+
+export interface BusinessReviewResponseRevision {
+  id: string;
+  businessReviewResponseId: string;
+  content: string;
+  revisionNumber: number;
+  editedByUserId: string;
+  moderationStatusSnapshot: BusinessReviewResponse["moderationStatus"];
+  createdAt: string;
+}
+
+export interface BusinessReviewResponseModerationAction {
+  id: string;
+  businessReviewResponseId: string;
+  actionType: BusinessReviewResponseModerationActionType;
+  reasonCode?: string;
+  notes?: string;
+  actedByUserId: string;
+  createdAt: string;
+}
+
+export interface BusinessReviewResponsePublicView {
+  id: string;
+  businessProfileId: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  editedAt?: string;
+  publishedAt?: string;
+  attributionLabel: string;
+  isVerifiedBusiness: boolean;
+}
+
 export interface ReviewPublicTrustSummary {
   reviewerTrustStatus: ReviewerTrustStatus;
   reviewTrustDesignation: ReviewTrustDesignation;
@@ -115,6 +170,7 @@ export interface PlaceReview {
   media: ReviewMedia[];
   mediaCount: number;
   businessReply?: BusinessReply;
+  businessResponse?: BusinessReviewResponsePublicView;
   viewerHasHelpfulVote?: boolean;
   canEdit?: boolean;
   trust: ReviewPublicTrustSummary;
@@ -240,6 +296,32 @@ export interface ReviewsStore {
   setReviewMediaModerationState(reviewId: string, mediaId: string, state: ModerationState, reason?: string, now?: Date): Promise<ReviewMedia>;
   createOrUpdateBusinessReply(input: { reviewId: string; businessProfileId: string; ownerUserId: string; body: string; now?: Date }): Promise<BusinessReply>;
   deleteBusinessReply(input: { reviewId: string; replyId: string; actorUserId: string; businessProfileId: string; now?: Date }): Promise<BusinessReply>;
+  createOrUpdateBusinessReviewResponse(input: {
+    reviewId: string;
+    placeId: string;
+    businessProfileId: string;
+    ownershipLinkId: string;
+    authoredByUserId: string;
+    content: string;
+    moderationRequired: boolean;
+    now?: Date;
+  }): Promise<BusinessReviewResponse>;
+  moderateBusinessReviewResponse(input: {
+    responseId: string;
+    action: BusinessReviewResponseModerationActionType;
+    actedByUserId: string;
+    reasonCode?: string;
+    notes?: string;
+    now?: Date;
+  }): Promise<BusinessReviewResponse>;
+  removeOwnBusinessReviewResponse(input: { responseId: string; actorUserId: string; businessProfileId: string; now?: Date }): Promise<BusinessReviewResponse>;
+  getBusinessReviewResponseByReview(reviewId: string, includeHidden?: boolean): Promise<BusinessReviewResponse | null>;
+  listBusinessReviewResponseRevisions(responseId: string): Promise<BusinessReviewResponseRevision[]>;
+  listBusinessReviewResponseModerationActions(responseId: string): Promise<BusinessReviewResponseModerationAction[]>;
+  listReviewsForBusinessResponseDashboard(input: { placeIds: string[]; onlyUnanswered?: boolean; limit?: number }): Promise<PlaceReview[]>;
+  listBusinessReviewResponsesForModeration(input: { statuses?: BusinessReviewResponseStatus[]; placeId?: string; businessProfileId?: string; limit?: number }): Promise<BusinessReviewResponse[]>;
+  listBusinessResponseEvents(): Promise<Array<{ eventType: string; responseId: string; reviewId: string; placeId: string; actorUserId: string; createdAt: string }>>;
+  listBusinessResponseNotifications(): Promise<Array<{ type: string; userId: string; responseId: string; createdAt: string }>>;
   getReviewerTrustProfile(userId: string): Promise<ReviewerTrustProfile>;
   listTrustAuditLogs(userId: string): Promise<TrustAuditLog[]>;
   applyTrustOverride(input: TrustOverrideInput): Promise<ReviewerTrustProfile>;
