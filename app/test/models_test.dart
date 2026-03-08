@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:perbug/api/models.dart';
+import 'package:perbug/core/json_parsers.dart';
 import 'package:perbug/models/deck_batch.dart';
 import 'package:perbug/models/deep_links.dart';
 import 'package:perbug/models/plan.dart';
@@ -41,6 +42,26 @@ void main() {
       expect(plan.specials.first.title, 'Happy Hour');
       expect(plan.toJson()['id'], 'p1');
     });
+
+    test('parses plan location numeric strings', () {
+      final plan = Plan.fromJson({
+        'id': 'p2',
+        'source': 'google',
+        'sourceId': 'src-2',
+        'title': 'Tea Spot',
+        'category': 'tea',
+        'location': {'lat': '44.8600', 'lng': '-93.5500'},
+        'distanceMeters': '44.86',
+        'rating': '4.5',
+        'reviewCount': '2102',
+      });
+
+      expect(plan.location.lat, closeTo(44.86, 0.0001));
+      expect(plan.location.lng, closeTo(-93.55, 0.0001));
+      expect(plan.distanceMeters, closeTo(44.86, 0.0001));
+      expect(plan.rating, closeTo(4.5, 0.0001));
+      expect(plan.reviewCount, 2102);
+    });
   });
 
   group('DeckBatchResponse JSON', () {
@@ -78,7 +99,42 @@ void main() {
 
 
 
+
+  group('JSON parser helpers', () {
+    test('coerces num and string values', () {
+      expect(parseDouble(null), isNull);
+      expect(parseDouble(4), 4.0);
+      expect(parseDouble('4.5'), 4.5);
+      expect(parseDouble('bad'), isNull);
+
+      expect(parseInt(null), isNull);
+      expect(parseInt(2102), 2102);
+      expect(parseInt('2102'), 2102);
+      expect(parseInt('4.5'), isNull);
+      expect(parseInt('PRICE_LEVEL_INEXPENSIVE'), isNull);
+    });
+  });
+
   group('Backend API models', () {
+    test('parses plans array item shape with numeric strings', () {
+      final plan = PlanApiModel.fromJson({
+        'id': 'sample-plan-2',
+        'title': 'Stringy Coffee',
+        'category': 'coffee',
+        'lat': '44.86',
+        'lng': '-93.55',
+        'rating': '4.5',
+        'userRatingCount': '2102',
+        'priceLevel': 'PRICE_LEVEL_INEXPENSIVE',
+      });
+
+      expect(plan.lat, closeTo(44.86, 0.0001));
+      expect(plan.lng, closeTo(-93.55, 0.0001));
+      expect(plan.rating, closeTo(4.5, 0.0001));
+      expect(plan.userRatingCount, 2102);
+      expect(plan.priceLevel, isNull);
+    });
+
     test('parses plans array item shape', () {
       final plan = PlanApiModel.fromJson({
         'id': 'sample-plan-1',
