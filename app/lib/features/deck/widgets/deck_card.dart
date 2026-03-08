@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/spacing.dart';
@@ -78,34 +79,49 @@ class _DeckCardState extends State<DeckCard> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (plan.photos?.firstOrNull != null)
-                      CachedNetworkImage(
-                        imageUrl: plan.photos!.first.url,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 800,
-                        placeholder: (_, __) => ColoredBox(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (plan.photos?.firstOrNull != null)
+                          CachedNetworkImage(
+                            imageUrl: plan.photos!.first.url,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 800,
+                            placeholder: (_, __) => ColoredBox(
+                              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              child: const Icon(Icons.photo, size: 56),
+                            ),
+                            errorWidget: (_, __, error) {
+                              if (kDebugMode) {
+                                debugPrint('[PlanCard] image failed: ${plan.photos!.first.url} $error');
+                              }
+                              return ColoredBox(
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                child: const Icon(Icons.photo, size: 56),
+                              );
+                            },
+                          )
+                        else
+                          ColoredBox(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                            child: const Icon(Icons.photo, size: 56),
+                          ),
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.center,
+                              colors: [Color(0x7A000000), Colors.transparent],
+                            ),
+                          ),
                         ),
-                        errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                      )
-                    else
-                      Container(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        child: const Icon(Icons.photo, size: 56),
-                      ),
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.center,
-                          colors: [Color(0x7A000000), Colors.transparent],
-                        ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
               Padding(

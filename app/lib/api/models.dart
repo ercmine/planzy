@@ -36,6 +36,7 @@ class PlanApiModel {
     this.googleMapsUri,
     this.websiteUri,
     this.photo,
+    this.photoUrl,
   });
 
   final String id;
@@ -52,6 +53,7 @@ class PlanApiModel {
   final String? googleMapsUri;
   final String? websiteUri;
   final String? photo;
+  final String? photoUrl;
 
   factory PlanApiModel.fromJson(Map<String, dynamic> json) {
     return PlanApiModel(
@@ -69,6 +71,7 @@ class PlanApiModel {
       googleMapsUri: json['googleMapsUri']?.toString(),
       websiteUri: json['websiteUri']?.toString(),
       photo: json['photo']?.toString(),
+      photoUrl: json['photoUrl']?.toString(),
     );
   }
 }

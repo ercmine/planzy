@@ -11,6 +11,9 @@ import type { TelemetryService } from "../telemetry/telemetryService.js";
 import { createVenueClaimsHttpHandlers, readHeader, sendJson } from "../venues/claims/http.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 
+const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
+const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
+
 export function applyCors(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id, x-admin-key, x-request-id");
@@ -79,22 +82,28 @@ export function createRoutes(
           includedTypes: categoryToIncludedTypes(category)
         });
 
-        const plans = places.map((place) => ({
-          id: `google:${place.id}`,
-          title: place.displayName?.text ?? "Untitled place",
-          category,
-          source: "google",
-          placeId: place.id,
-          address: place.formattedAddress,
-          lat: place.location?.latitude,
-          lng: place.location?.longitude,
-          rating: place.rating,
-          userRatingCount: place.userRatingCount,
-          priceLevel: place.priceLevel,
-          googleMapsUri: place.googleMapsUri,
-          websiteUri: place.websiteUri,
-          photo: place.photos?.[0]?.name
-        }));
+        const publicApiBaseUrl = process.env.PUBLIC_API_BASE_URL ?? DEFAULT_PUBLIC_API_BASE_URL;
+
+        const plans = places.map((place) => {
+          const photoName = place.photos?.[0]?.name;
+          return {
+            id: `google:${place.id}`,
+            title: place.displayName?.text ?? "Untitled place",
+            category,
+            source: "google",
+            placeId: place.id,
+            address: place.formattedAddress,
+            lat: place.location?.latitude,
+            lng: place.location?.longitude,
+            rating: place.rating,
+            userRatingCount: place.userRatingCount,
+            priceLevel: place.priceLevel,
+            googleMapsUri: place.googleMapsUri,
+            websiteUri: place.websiteUri,
+            photo: photoName,
+            photoUrl: photoName ? `${publicApiBaseUrl}/photos?name=${encodeURIComponent(photoName)}&maxWidthPx=800` : undefined
+          };
+        });
 
         sendJson(res, 200, plans);
         return;
@@ -143,23 +152,42 @@ export function createRoutes(
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/places/photo") {
+      if (req.method === "GET" && (normalizedPath === "/photos" || normalizedPath === "/places/photo")) {
         const name = url.searchParams.get("name");
         const maxWidthPx = Number(url.searchParams.get("maxWidthPx") ?? "800");
-        const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+        const maxHeightPx = Number(url.searchParams.get("maxHeightPx") ?? "800");
+        const apiKey = process.env.GOOGLE_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
 
-        if (!apiKey) {
-          throw new GooglePlacesError("missing_api_key", "GOOGLE_MAPS_API_KEY is not configured", 503);
+        if (!apiKey || !name || !name.startsWith("places/") || !name.includes("/photos/")) {
+          sendJson(res, 404, { error: "photo_not_available" });
+          return;
         }
 
-        if (!name) {
-          throw new GooglePlacesError("invalid_input", "name query parameter is required", 400, { field: "name" });
-        }
+        const clampedWidth = Math.max(1, Math.min(1600, maxWidthPx));
+        const clampedHeight = Math.max(1, Math.min(1600, maxHeightPx));
+        const mediaPath = name
+          .split("/")
+          .map((segment) => encodeURIComponent(segment))
+          .join("/");
+        const photoMediaBaseUrl =
+          process.env.GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL ?? DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL;
+        const mediaUrl = `${photoMediaBaseUrl}/${mediaPath}/media?maxWidthPx=${clampedWidth}&maxHeightPx=${clampedHeight}&key=${encodeURIComponent(apiKey)}`;
 
-        const mediaUrl = `https://places.googleapis.com/v1/${encodeURI(name)}/media?key=${encodeURIComponent(apiKey)}&maxWidthPx=${Math.max(1, Math.min(1600, maxWidthPx))}`;
-        res.statusCode = 302;
-        res.setHeader("Location", mediaUrl);
-        res.end();
+        try {
+          const response = await fetch(mediaUrl, { redirect: "follow" });
+          if (!response.ok || !response.body) {
+            sendJson(res, 404, { error: "photo_not_available" });
+            return;
+          }
+
+          res.statusCode = 200;
+          res.setHeader("Content-Type", response.headers.get("content-type") ?? "image/jpeg");
+          res.setHeader("Cache-Control", "public, max-age=86400");
+          const arrayBuffer = await response.arrayBuffer();
+          res.end(Buffer.from(arrayBuffer));
+        } catch {
+          sendJson(res, 404, { error: "photo_not_available" });
+        }
         return;
       }
 
@@ -315,7 +343,7 @@ function normalizeAliasPath(pathname: string): string {
     return pathname.slice("/api".length);
   }
 
-  const v1AliasPaths = ["/plans", "/live-results", "/health", "/places/photo"];
+  const v1AliasPaths = ["/plans", "/live-results", "/health", "/photos", "/places/photo"];
   if (pathname.startsWith("/v1/")) {
     const withoutPrefix = pathname.slice("/v1".length);
     if (v1AliasPaths.some((aliasPath) => withoutPrefix === aliasPath || withoutPrefix.startsWith(`${aliasPath}/`))) {

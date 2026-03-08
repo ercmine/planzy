@@ -259,7 +259,7 @@ Plan _planFromApi(Map<String, dynamic> json) {
           : json['address'])
       ?.toString();
 
-  final photo = json['photo']?.toString();
+  final photoUrl = json['photoUrl']?.toString();
   final mapsUri = json['googleMapsUri']?.toString();
   final websiteUri = json['websiteUri']?.toString();
 
@@ -273,7 +273,7 @@ Plan _planFromApi(Map<String, dynamic> json) {
     priceLevel: parseInt(json['priceLevel']),
     rating: parseDouble(json['rating']),
     reviewCount: parseInt(json['userRatingCount']),
-    photos: photo == null || photo.isEmpty ? null : [PlanPhoto(url: photo)],
+    photos: photoUrl == null || photoUrl.isEmpty ? null : [PlanPhoto(url: photoUrl)],
     deepLinks: (mapsUri != null && mapsUri.isNotEmpty) ||
             (websiteUri != null && websiteUri.isNotEmpty)
         ? DeepLinks(mapsLink: mapsUri, websiteLink: websiteUri)
