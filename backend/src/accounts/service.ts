@@ -141,6 +141,14 @@ export class AccountsService {
     return business;
   }
 
+  getCreatorProfileById(profileId: string): CreatorProfile | undefined {
+    return this.store.getCreatorProfileById(profileId);
+  }
+
+  getBusinessProfileById(profileId: string): BusinessProfile | undefined {
+    return this.store.getBusinessProfile(profileId);
+  }
+
   listActingContexts(userId: string): ActingContext[] {
     const identity = this.getIdentitySummary(userId);
     const contexts: ActingContext[] = [{ profileType: ProfileType.PERSONAL, profileId: identity.personalProfile.id }];

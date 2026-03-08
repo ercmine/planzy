@@ -35,6 +35,7 @@ import type { ProviderRouter as ProviderRouterType } from "../plans/router/provi
 import { MemoryTelemetryStore } from "../telemetry/memoryStore.js";
 import { MemoryReviewsStore } from "../reviews/memoryStore.js";
 import { ModerationService, ReviewsModerationEnforcementAdapter } from "../moderation/index.js";
+import { MemoryNotificationStore, NotificationService } from "../notifications/index.js";
 import { DevBillingProvider } from "../subscriptions/billing/provider.js";
 import { EntitlementPolicyService } from "../subscriptions/policy.js";
 import { PremiumExperienceService } from "../subscriptions/premiumExperience.js";
@@ -83,6 +84,8 @@ export function createServer(options?: CreateServerOptions) {
   const telemetryStore = new MemoryTelemetryStore();
   const telemetryService = new TelemetryService(telemetryStore, { clickTracker });
   const reviewsStore = new MemoryReviewsStore();
+  const notificationStore = new MemoryNotificationStore();
+  const notificationService = new NotificationService(notificationStore);
   const moderationService = new ModerationService(new ReviewsModerationEnforcementAdapter(reviewsStore));
   const usageStore = new MemoryUsageStore();
   const subscriptionService = new SubscriptionService(usageStore, new DevBillingProvider());
@@ -98,14 +101,14 @@ export function createServer(options?: CreateServerOptions) {
     updateCreatorProfile: (profile) => creatorStore.saveProfile(profile),
     getUser: (userId) => accountsService.getIdentitySummary(userId).user
   });
-  const creatorService = new CreatorService(creatorStore, accountsService, reviewsStore, subscriptionService, accessEngine, monetizationService, creatorVerificationService);
+  const creatorService = new CreatorService(creatorStore, accountsService, reviewsStore, subscriptionService, accessEngine, monetizationService, creatorVerificationService, notificationService);
   const creatorPremiumService = new CreatorPremiumService(new MemoryCreatorPremiumStore(), subscriptionService, {
     getCreatorProfile: (creatorProfileId) => creatorStore.getProfileById(creatorProfileId)
   });
   const savedService = new SavedService(new MemorySavedStore(), subscriptionService, accessEngine);
   const businessPremiumService = new BusinessPremiumService(new MemoryBusinessPremiumStore());
   const businessAnalyticsService = new BusinessAnalyticsService(new MemoryBusinessAnalyticsStore(), claimsStore, accessEngine, businessPremiumService);
-  const collaborationService = new CollaborationService(new MemoryCollaborationStore(), accountsService, service, subscriptionService, accessEngine, businessAnalyticsService, businessPremiumService);
+  const collaborationService = new CollaborationService(new MemoryCollaborationStore(), accountsService, service, subscriptionService, accessEngine, businessAnalyticsService, businessPremiumService, notificationService);
 
   const discoveryRepository = new InMemoryDiscoveryRepository();
   const outingPlannerService = new OutingPlannerService({
@@ -147,6 +150,7 @@ export function createServer(options?: CreateServerOptions) {
     telemetryService,
     reviewsStore,
     moderationService,
+    notificationService,
     subscriptionService,
     entitlementPolicy,
     accessEngine,

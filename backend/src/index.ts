@@ -109,3 +109,4 @@ export * from "./outingPlanner/index.js";
 export * from "./moderation/index.js";
 
 export * from "./creatorVerification/index.js";
+export * from "./notifications/index.js";

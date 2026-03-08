@@ -17,6 +17,7 @@ export interface AccountsStore {
   savePersonalProfile(profile: PersonalProfile): void;
 
   getCreatorProfileByUserId(userId: string): CreatorProfile | undefined;
+  getCreatorProfileById(profileId: string): CreatorProfile | undefined;
   saveCreatorProfile(profile: CreatorProfile): void;
 
   getBusinessProfile(id: string): BusinessProfile | undefined;

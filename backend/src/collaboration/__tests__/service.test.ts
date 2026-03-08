@@ -14,6 +14,7 @@ import { ValidationError } from "../../plans/errors.js";
 import { MemoryCollaborationStore } from "../memoryStore.js";
 import { CollaborationService } from "../service.js";
 import { BusinessPremiumService, MemoryBusinessPremiumStore } from "../../businessPremium/index.js";
+import { MemoryNotificationStore, NotificationService } from "../../notifications/index.js";
 
 async function build() {
   const accounts = new AccountsService(new MemoryAccountsStore());
@@ -23,13 +24,14 @@ async function build() {
   const access = new FeatureQuotaEngine(subscriptions, new MemoryAccessUsageStore());
   const premium = new BusinessPremiumService(new MemoryBusinessPremiumStore());
   const analytics = new BusinessAnalyticsService(new MemoryBusinessAnalyticsStore(), claimStore, access, premium);
-  const service = new CollaborationService(new MemoryCollaborationStore(), accounts, claims, undefined, undefined, analytics, premium, () => new Date("2026-03-08T00:00:00.000Z"));
-  return { accounts, claimStore, service, premium };
+  const notifications = new NotificationService(new MemoryNotificationStore(), () => new Date("2026-03-08T00:00:00.000Z"));
+  const service = new CollaborationService(new MemoryCollaborationStore(), accounts, claims, undefined, undefined, analytics, premium, notifications, () => new Date("2026-03-08T00:00:00.000Z"));
+  return { accounts, claimStore, service, premium, notifications };
 }
 
 describe("collaboration service", () => {
   it("runs invite -> accept -> campaign lifecycle with permissions", async () => {
-    const { accounts, claimStore, service, premium } = await build();
+    const { accounts, claimStore, service, premium, notifications } = await build();
     const businessUser = "biz-1";
     const creatorUser = "creator-1";
     const business = accounts.createBusinessProfile(businessUser, { businessName: "Cafe", slug: "cafe" });
@@ -58,6 +60,8 @@ describe("collaboration service", () => {
 
     const list = await service.listBusinessInvites(bizActor, business.id);
     expect(list[0]?.campaignId).toBeTruthy();
+    const center = await notifications.list(businessUser);
+    expect(center.items.some((x) => x.type === "collaboration_invite_accepted")).toBe(true);
   });
 
   it("blocks featuring content without creator approval link", async () => {

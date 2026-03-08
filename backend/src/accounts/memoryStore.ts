@@ -48,6 +48,10 @@ export class MemoryAccountsStore implements AccountsStore {
     return this.creatorByUser.get(userId);
   }
 
+  getCreatorProfileById(profileId: string): CreatorProfile | undefined {
+    return [...this.creatorByUser.values()].find((row) => row.id === profileId);
+  }
+
   saveCreatorProfile(profile: CreatorProfile): void {
     this.creatorByUser.set(profile.userId, profile);
   }

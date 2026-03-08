@@ -8,6 +8,7 @@ import type { PlaceReview, ReviewsStore } from "../reviews/store.js";
 import { FEATURE_KEYS, QUOTA_KEYS, type FeatureQuotaEngine } from "../subscriptions/accessEngine.js";
 import type { SubscriptionService } from "../subscriptions/service.js";
 import { SubscriptionTargetType } from "../subscriptions/types.js";
+import type { NotificationService } from "../notifications/service.js";
 import type { CreatorStore } from "./store.js";
 import type { CreatorVerificationService } from "../creatorVerification/service.js";
 import type { CreatorAnalyticsSummary, CreatorFeedItem, CreatorFeedItemType, CreatorFeedResult, CreatorGuide, CreatorPlaceContentResult, FollowedCreatorSummary, GuidePlaceItem, GuideSection, PublicCreatorProfileView } from "./types.js";
@@ -141,7 +142,8 @@ export class CreatorService {
     private readonly subscriptions?: SubscriptionService,
     private readonly accessEngine?: FeatureQuotaEngine,
     private readonly monetizationGate?: GuideMonetizationGate,
-    private readonly verificationService?: CreatorVerificationService
+    private readonly verificationService?: CreatorVerificationService,
+    private readonly notifications?: NotificationService
   ) {}
 
   private async ensureCreatorFeature(userId: string, profileId: string, feature: keyof typeof FEATURE_KEYS): Promise<void> {
@@ -218,7 +220,18 @@ export class CreatorService {
     if (!profile || !profile.isPublic || profile.status !== CreatorProfileStatus.ACTIVE) throw new Error("CREATOR_NOT_FOLLOWABLE");
     if (profile.userId === userId) throw new ValidationError(["cannot follow yourself"]);
     if (this.store.getFollow(creatorProfileId, userId)) return { followerCount: this.store.countFollowers(creatorProfileId), isFollowing: true };
-    this.store.createFollow({ id: `cf_${randomUUID()}`, creatorProfileId, followerUserId: userId, createdAt: new Date().toISOString() });
+    const followedAt = new Date().toISOString();
+    const follow = { id: `cf_${randomUUID()}`, creatorProfileId, followerUserId: userId, createdAt: followedAt };
+    this.store.createFollow(follow);
+    const actor = this.accounts.getIdentitySummary(userId);
+    await this.notifications?.notify({
+      eventId: `follow:${follow.id}`,
+      type: "follow.created",
+      recipientUserId: profile.userId,
+      actor: { userId, displayName: actor.personalProfile.displayName, profileType: "user" },
+      objectId: follow.id,
+      occurredAt: followedAt
+    });
     return { followerCount: this.store.countFollowers(creatorProfileId), isFollowing: true };
   }
 

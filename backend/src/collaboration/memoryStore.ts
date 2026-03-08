@@ -1,4 +1,4 @@
-import type { CampaignContentLink, CampaignParticipant, CollaborationAuditEvent, CollaborationNotification, CreatorBusinessCampaign, CreatorBusinessInvite, FeaturedCreatorContentPlacement } from "./types.js";
+import type { CampaignContentLink, CampaignParticipant, CollaborationAuditEvent, CreatorBusinessCampaign, CreatorBusinessInvite, FeaturedCreatorContentPlacement } from "./types.js";
 import type { CollaborationStore } from "./store.js";
 
 export class MemoryCollaborationStore implements CollaborationStore {
@@ -8,7 +8,6 @@ export class MemoryCollaborationStore implements CollaborationStore {
   private contentLinks = new Map<string, CampaignContentLink>();
   private placements = new Map<string, FeaturedCreatorContentPlacement>();
   private auditEvents: CollaborationAuditEvent[] = [];
-  private notifications: CollaborationNotification[] = [];
 
   async createInvite(invite: CreatorBusinessInvite) { this.invites.set(invite.id, invite); }
   async updateInvite(inviteId: string, patch: Partial<CreatorBusinessInvite>) { const row = this.invites.get(inviteId); if (!row) return null; const next = { ...row, ...patch }; this.invites.set(inviteId, next); return next; }
@@ -34,7 +33,4 @@ export class MemoryCollaborationStore implements CollaborationStore {
 
   async appendAuditEvent(event: CollaborationAuditEvent) { this.auditEvents.push(event); }
   async listAuditEvents(entityType?: CollaborationAuditEvent["entityType"], entityId?: string) { return this.auditEvents.filter((x) => (!entityType || x.entityType === entityType) && (!entityId || x.entityId === entityId)); }
-
-  async createNotification(notification: CollaborationNotification) { this.notifications.push(notification); }
-  async listNotificationsByUser(userId: string) { return this.notifications.filter((x) => x.recipientUserId === userId); }
 }
