@@ -339,22 +339,21 @@ class ApiClient {
     required int statusCode,
     required String responseBody,
   }) {
-    if (!kDebugMode) {
+    if (kDebugMode) {
+      final snippet = _bodySnippet500(responseBody);
+      Log.warn('$method $uri failed: status=$statusCode body="$snippet"');
       return;
     }
-    final snippet = _bodySnippet500(responseBody);
-    print('[DEBUG] $method $uri status=$statusCode body="$snippet"');
-    Log.warn('$method $uri failed: status=$statusCode body="$snippet"');
+    Log.warn('$method ${uri.path} failed: status=$statusCode');
   }
 
   void _logDebugRequest({
     required String method,
     required Uri uri,
   }) {
-    if (!kDebugMode) {
-      return;
+    if (kDebugMode) {
+      Log.d('$method $uri');
     }
-    print('[DEBUG] $method $uri');
   }
 
   void _logResponse({
@@ -371,9 +370,6 @@ class ApiClient {
     if (uri.path.endsWith('/live-results')) {
       lastLiveResultsStatus = response.statusCode;
       lastLiveResultsBodySnippet = snippet;
-    }
-    if (kDebugMode) {
-      print('[DEBUG] $method $uri status=${response.statusCode}');
     }
     Log.d(
       '$method ${uri.path.isEmpty ? '/' : uri.path} url=$uri status=${response.statusCode} x-request-id=${requestId ?? '-'} body="$snippet"',
@@ -406,7 +402,11 @@ class ApiClient {
     required Uri uri,
     required Object error,
   }) {
-    Log.warn('$method $uri exception=${error.runtimeType} message=$error');
+    if (kDebugMode) {
+      Log.warn('$method $uri exception=${error.runtimeType} message=$error');
+      return;
+    }
+    Log.warn('$method ${uri.path} failed (${error.runtimeType})');
   }
 
   Object _decodeBody(String body) {

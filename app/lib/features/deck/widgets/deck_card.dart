@@ -18,6 +18,7 @@ class DeckCard extends StatefulWidget {
     required this.onTap,
     this.prefetchImageUrls = const <String>[],
     this.isTopCard = false,
+    this.heroTag,
     super.key,
   });
 
@@ -25,6 +26,7 @@ class DeckCard extends StatefulWidget {
   final VoidCallback onTap;
   final List<String> prefetchImageUrls;
   final bool isTopCard;
+  final Object? heroTag;
 
   @override
   State<DeckCard> createState() => _DeckCardState();
@@ -87,9 +89,11 @@ class _DeckCardState extends State<DeckCard> {
                       fit: StackFit.expand,
                       children: [
                         if (imageUrl != null)
-                          Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
+                          Hero(
+                            tag: widget.heroTag ?? 'plan-photo-${plan.id}',
+                            child: Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
                             errorBuilder: (_, __, error) {
                               if (kDebugMode) {
                                 debugPrint('[PlanCard] image failed: $imageUrl $error');
@@ -102,6 +106,7 @@ class _DeckCardState extends State<DeckCard> {
                               }
                               return _imagePlaceholder(context, loading: true);
                             },
+                          ),
                           )
                         else
                           _imagePlaceholder(context),

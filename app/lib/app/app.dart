@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_error.dart';
 import '../core/connectivity/offline_banner.dart';
+import '../core/debug_flags.dart';
 import '../core/identity/identity_provider.dart';
 import '../core/telemetry/telemetry_dispatcher.dart';
 import '../providers/app_providers.dart';
@@ -65,7 +66,7 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
           children: [
             if (child != null) child,
             const OfflineBanner(),
-            if (_startupHealthError != null)
+            if (kShowDebugUi && _startupHealthError != null)
               Positioned(
                 left: 12,
                 right: 12,
@@ -108,19 +109,19 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
       setState(() {
         _startupHealthError = null;
       });
-    } on ApiError catch (error) {
+    } on ApiError catch (_) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _startupHealthError = 'API health check failed: ${error.message}';
+        _startupHealthError = 'Startup health check failed.';
       });
-    } catch (error) {
+    } catch (_) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _startupHealthError = 'API health check failed: $error';
+        _startupHealthError = 'Startup health check failed.';
       });
     }
   }

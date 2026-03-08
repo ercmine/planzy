@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme/spacing.dart';
 
@@ -73,7 +74,10 @@ class _DecisionIconButton extends StatelessWidget {
       child: Tooltip(
         message: tooltip,
         child: FilledButton(
-          onPressed: onPressed,
+          onPressed: onPressed == null ? null : () {
+            HapticFeedback.lightImpact();
+            onPressed!.call();
+          },
           style: FilledButton.styleFrom(
             minimumSize: const Size(56, 56),
             maximumSize: const Size(56, 56),
@@ -85,7 +89,7 @@ class _DecisionIconButton extends StatelessWidget {
             padding: EdgeInsets.zero,
             shape: const CircleBorder(),
           ),
-          child: Icon(icon, size: 28),
+          child: Icon(icon, size: 24),
         ),
       ),
     );
