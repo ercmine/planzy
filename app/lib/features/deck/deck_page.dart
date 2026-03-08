@@ -15,7 +15,7 @@ import '../../core/validation/url.dart';
 import '../../providers/app_providers.dart';
 import 'deck_controller.dart';
 import 'deck_state.dart';
-import 'widgets/card_details_sheet.dart';
+import 'plan_detail_page.dart';
 import 'widgets/deck_actions_bar.dart';
 import 'widgets/deck_card.dart';
 import 'widgets/deck_card_skeleton.dart';
@@ -188,13 +188,14 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                       if (!context.mounted) {
                         return;
                       }
-                      await showModalBottomSheet<void>(
-                        context: context,
-                        isScrollControlled: true,
-                        useSafeArea: true,
-                        builder: (_) => CardDetailsSheet(
-                          plan: plan,
-                          onLinkTap: controller.onOutboundLinkTapped,
+                      await Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) => PlanDetailPage(
+                            plan: plan,
+                            sessionId: widget.sessionId,
+                            sessionLat: location?.lat,
+                            sessionLng: location?.lng,
+                          ),
                         ),
                       );
                     },

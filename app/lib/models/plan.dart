@@ -7,6 +7,14 @@ import 'special.dart';
 part 'plan.freezed.dart';
 part 'plan.g.dart';
 
+List<String>? parseOpeningHoursText(Object? value) {
+  if (value is String) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : <String>[trimmed];
+  }
+  return parseStringList(value);
+}
+
 @freezed
 class PlanLocation with _$PlanLocation {
   const factory PlanLocation({
@@ -25,6 +33,7 @@ class PlanPhoto with _$PlanPhoto {
     required String url,
     int? width,
     int? height,
+    String? token,
   }) = _PlanPhoto;
 
   factory PlanPhoto.fromJson(Map<String, dynamic> json) =>
@@ -58,6 +67,8 @@ class Plan with _$Plan {
     @JsonKey(fromJson: parseInt) int? reviewCount,
     List<PlanPhoto>? photos,
     PlanHours? hours,
+    String? phone,
+    @JsonKey(fromJson: parseOpeningHoursText) List<String>? openingHoursText,
     DeepLinks? deepLinks,
     Map<String, dynamic>? metadata,
   }) = _Plan;
