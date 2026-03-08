@@ -1,3 +1,5 @@
+import '../core/json_parsers.dart';
+
 class ClaimVenueResponse {
   final String claimId;
   final String verificationStatus;
@@ -59,11 +61,11 @@ class PlanApiModel {
       source: json['source']?.toString(),
       placeId: json['placeId']?.toString(),
       address: json['address']?.toString(),
-      lat: _toDouble(json['lat']),
-      lng: _toDouble(json['lng']),
-      rating: _toDouble(json['rating']),
-      userRatingCount: (json['userRatingCount'] as num?)?.toInt(),
-      priceLevel: (json['priceLevel'] as num?)?.toInt(),
+      lat: parseDouble(json['lat']),
+      lng: parseDouble(json['lng']),
+      rating: parseDouble(json['rating']),
+      userRatingCount: parseInt(json['userRatingCount']),
+      priceLevel: parseInt(json['priceLevel']),
       googleMapsUri: json['googleMapsUri']?.toString(),
       websiteUri: json['websiteUri']?.toString(),
       photo: json['photo']?.toString(),
@@ -89,7 +91,7 @@ class LiveResultItem {
       sessionId: (json['sessionId'] ?? '').toString(),
       topPlanId: (json['topPlanId'] ?? '').toString(),
       topPlanTitle: (json['topPlanTitle'] ?? '').toString(),
-      score: (json['score'] as num?)?.toDouble() ?? 0,
+      score: parseDouble(json['score']) ?? 0,
     );
   }
 }
@@ -105,7 +107,7 @@ class LiveResultsSummary {
 
   factory LiveResultsSummary.fromJson(Map<String, dynamic> json) {
     return LiveResultsSummary(
-      activeSessions: (json['activeSessions'] as num?)?.toInt() ?? 0,
+      activeSessions: parseInt(json['activeSessions']) ?? 0,
       generatedAt: (json['generatedAt'] ?? '').toString(),
     );
   }
@@ -140,12 +142,3 @@ class LiveResultsResponse {
   }
 }
 
-double? _toDouble(Object? value) {
-  if (value == null) {
-    return null;
-  }
-  if (value is num) {
-    return value.toDouble();
-  }
-  return double.tryParse(value.toString());
-}

@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
+
 import '../api/api_client.dart';
 import '../api/api_error.dart';
 import '../api/endpoints.dart';
+import '../core/json_parsers.dart';
 import '../core/logging/log.dart';
 import '../core/cache/local_store.dart';
 import '../core/cache/memory_cache.dart';
@@ -113,12 +116,13 @@ class DeckRepository {
       throw const FormatException('Missing required lat/lng query params for /plans');
     }
 
+    List<dynamic>? responseList;
     try {
       final response = await apiClient.getDecoded(
         ApiEndpoints.plans,
         queryParameters: params.toQueryMap(defaultLocale: 'en-US'),
       );
-      final responseList = _extractPlansList(response);
+      responseList = _extractPlansList(response);
       final plans = responseList
           .map((item) {
             if (item is! Map<String, dynamic>) {
@@ -154,53 +158,16 @@ class DeckRepository {
 
       return deck;
     } on ApiError catch (error) {
-      Log.warn('/plans status=${apiClient.lastPlansStatus ?? '-'} bodySnippet="${apiClient.lastPlansBodySnippet ?? '-'}" fallbackUsed=true reason=api-error kind=${error.kind}');
-      return _fallbackDeck(sessionId, cacheKey, params, reason: 'api-error:${error.kind}');
+      if (error.kind == ApiErrorKind.decoding) {
+        _logFirstPlanRuntimeTypes(responseList);
+      }
+      Log.warn('/plans status=${apiClient.lastPlansStatus ?? '-'} bodySnippet="${apiClient.lastPlansBodySnippet ?? '-'}" fallbackUsed=false reason=api-error kind=${error.kind}');
+      rethrow;
     } on FormatException catch (error) {
-      Log.warn('/plans status=${apiClient.lastPlansStatus ?? '-'} bodySnippet="${apiClient.lastPlansBodySnippet ?? '-'}" fallbackUsed=true reason=format-exception message=${error.message}');
-      return _fallbackDeck(sessionId, cacheKey, params, reason: 'format-exception');
+      _logFirstPlanRuntimeTypes(responseList);
+      Log.warn('/plans status=${apiClient.lastPlansStatus ?? '-'} bodySnippet="${apiClient.lastPlansBodySnippet ?? '-'}" fallbackUsed=false reason=format-exception message=${error.message}');
+      throw ApiError.decoding(error.message);
     }
-  }
-
-  Future<DeckBatchResponse> _fallbackDeck(
-    String sessionId,
-    String cacheKey,
-    DeckQueryParams params, {
-    required String reason,
-  }) async {
-    Log.warn('/plans fallbackUsed=true reason=$reason');
-    final lat = params.lat ?? 44.8620;
-    final lng = params.lng ?? -93.5590;
-    final plans = <Plan>[
-      Plan(
-        id: 'debug-fallback-1',
-        source: 'debug-fallback',
-        sourceId: 'debug-fallback-1',
-        title: 'Fallback coffee stop',
-        category: 'coffee',
-        location: PlanLocation(lat: lat, lng: lng, address: 'Debug fallback'),
-        metadata: const {'source': 'debug-fallback'},
-      ),
-    ];
-
-    final deck = DeckBatchResponse(
-      sessionId: sessionId,
-      plans: plans,
-      nextCursor: null,
-      mix: const DeckSourceMix(
-        providersUsed: ['debug-fallback'],
-        planSourceCounts: {'debug-fallback': 1},
-        categoryCounts: {'coffee': 1},
-        sponsoredCount: 0,
-      ),
-    );
-    _deckBatchCache.set(cacheKey, deck);
-
-    await localStore.saveLastSessionId(sessionId);
-    await localStore.saveLastCursor(sessionId, deck.nextCursor);
-    await localStore.saveLastSeenDeckKey(sessionId, cacheKey);
-
-    return deck;
   }
 
   String _cacheKey(String sessionId, DeckQueryParams params, String filtersHash) {
@@ -232,6 +199,24 @@ List<dynamic> _extractPlansList(Object decoded) {
   );
 }
 
+
+void _logFirstPlanRuntimeTypes(List<dynamic>? plans) {
+  if (!kDebugMode || plans == null || plans.isEmpty) {
+    return;
+  }
+
+  final first = plans.first;
+  if (first is! Map<String, dynamic>) {
+    Log.warn('/plans decode debug firstItemType=${first.runtimeType}');
+    return;
+  }
+
+  final fieldTypes = first.map(
+    (key, value) => MapEntry(key, value == null ? 'null' : value.runtimeType.toString()),
+  );
+  Log.warn('/plans decode debug firstItemFieldTypes=$fieldTypes');
+}
+
 Map<String, int> _sourceCounts(List<Plan> plans) {
   final out = <String, int>{};
   for (final plan in plans) {
@@ -258,10 +243,10 @@ Plan _planFromApi(Map<String, dynamic> json) {
   }
 
   final rawLocation = json['location'];
-  final double? lat = _toDouble(
+  final double? lat = parseDouble(
     rawLocation is Map<String, dynamic> ? rawLocation['lat'] : json['lat'],
   );
-  final double? lng = _toDouble(
+  final double? lng = parseDouble(
     rawLocation is Map<String, dynamic> ? rawLocation['lng'] : json['lng'],
   );
 
@@ -285,9 +270,9 @@ Plan _planFromApi(Map<String, dynamic> json) {
     title: title,
     category: category,
     location: PlanLocation(lat: lat, lng: lng, address: address),
-    priceLevel: (json['priceLevel'] as num?)?.toInt(),
-    rating: _toDouble(json['rating']),
-    reviewCount: (json['userRatingCount'] as num?)?.toInt(),
+    priceLevel: parseInt(json['priceLevel']),
+    rating: parseDouble(json['rating']),
+    reviewCount: parseInt(json['userRatingCount']),
     photos: photo == null || photo.isEmpty ? null : [PlanPhoto(url: photo)],
     deepLinks: (mapsUri != null && mapsUri.isNotEmpty) ||
             (websiteUri != null && websiteUri.isNotEmpty)
@@ -301,12 +286,3 @@ Plan _planFromApi(Map<String, dynamic> json) {
   );
 }
 
-double? _toDouble(Object? value) {
-  if (value == null) {
-    return null;
-  }
-  if (value is num) {
-    return value.toDouble();
-  }
-  return double.tryParse(value.toString());
-}

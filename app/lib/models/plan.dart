@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../core/json_parsers.dart';
 import 'deep_links.dart';
 import 'special.dart';
 
@@ -9,8 +10,8 @@ part 'plan.g.dart';
 @freezed
 class PlanLocation with _$PlanLocation {
   const factory PlanLocation({
-    required double lat,
-    required double lng,
+    @JsonKey(fromJson: parseDouble) required double lat,
+    @JsonKey(fromJson: parseDouble) required double lng,
     String? address,
   }) = _PlanLocation;
 
@@ -51,10 +52,10 @@ class Plan with _$Plan {
     required String category,
     String? description,
     required PlanLocation location,
-    double? distanceMeters,
-    int? priceLevel,
-    double? rating,
-    int? reviewCount,
+    @JsonKey(fromJson: parseDouble) double? distanceMeters,
+    @JsonKey(fromJson: parseInt) int? priceLevel,
+    @JsonKey(fromJson: parseDouble) double? rating,
+    @JsonKey(fromJson: parseInt) int? reviewCount,
     List<PlanPhoto>? photos,
     PlanHours? hours,
     DeepLinks? deepLinks,
