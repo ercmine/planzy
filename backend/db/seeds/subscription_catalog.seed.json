@@ -1,0 +1,4 @@
+{
+  "source": "backend/src/subscriptions/catalog.ts",
+  "notes": "Canonical seed references code catalog; use for DB backfill scripts"
+}

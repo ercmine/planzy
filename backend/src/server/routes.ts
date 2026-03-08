@@ -5,6 +5,9 @@ import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import { handleMerchantHttpError, createMerchantHttpHandlers } from "../merchant/http.js";
 import type { MerchantService } from "../merchant/service.js";
 import { ValidationError } from "../plans/errors.js";
+import { createSubscriptionHttpHandlers } from "../subscriptions/http.js";
+import type { EntitlementPolicyService } from "../subscriptions/policy.js";
+import type { SubscriptionService } from "../subscriptions/service.js";
 import {
   buildCategorySearchPlan,
   getCategoryDefinition,
@@ -36,11 +39,21 @@ function assertAdmin(req: IncomingMessage): boolean {
 export function createRoutes(
   service: VenueClaimsService,
   merchantService: MerchantService,
-  deps?: { deckHandler?: SessionDeckHandler; ideasHandlers?: SessionIdeasHandlers; telemetryService?: TelemetryService; reviewsStore?: ReviewsStore }
+  deps?: {
+    deckHandler?: SessionDeckHandler;
+    ideasHandlers?: SessionIdeasHandlers;
+    telemetryService?: TelemetryService;
+    reviewsStore?: ReviewsStore;
+    subscriptionService?: SubscriptionService;
+    entitlementPolicy?: EntitlementPolicyService;
+  }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
   const merchantHandlers = createMerchantHttpHandlers(merchantService);
   const telemetryHandlers = deps?.telemetryService ? createTelemetryHttpHandlers(deps.telemetryService) : null;
+  const subscriptionHandlers = deps?.subscriptionService && deps?.entitlementPolicy
+    ? createSubscriptionHttpHandlers(deps.subscriptionService, deps.entitlementPolicy)
+    : null;
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -200,6 +213,28 @@ export function createRoutes(
         }
 
         if (req.method === "POST") {
+          if (deps?.entitlementPolicy && deps?.subscriptionService) {
+            const accountId = String(readHeader(req, "x-user-id") ?? "").trim();
+            if (!accountId) {
+              throw new ValidationError(["x-user-id header is required"]);
+            }
+
+            const accountType = String(readHeader(req, "x-account-type") ?? "USER").trim();
+            deps.subscriptionService.ensureAccount(accountId, accountType as never);
+            const decision = await deps.entitlementPolicy.can(accountId, "create_review");
+            if (!decision.allowed) {
+              sendJson(res, 403, { error: decision.reasonCode, message: decision.message, requiredPlan: decision.requiredPlan });
+              return;
+            }
+
+            const resolved = deps.subscriptionService.getCurrentEntitlements(accountId).values;
+            const quotaDecision = await deps.entitlementPolicy.checkQuota(accountId, "text_reviews", Number(resolved.max_text_reviews_per_month));
+            if (!quotaDecision.allowed) {
+              sendJson(res, 403, { error: quotaDecision.reasonCode, message: quotaDecision.message, usage: quotaDecision.usage, limit: quotaDecision.limit });
+              return;
+            }
+          }
+
           const body = await parseJsonBody(req);
           if (!body || typeof body !== "object" || Array.isArray(body)) {
             throw new ValidationError(["body must be a JSON object"], "Invalid review payload");
@@ -229,7 +264,54 @@ export function createRoutes(
             anonymous
           });
 
+          if (subscriptionHandlers) {
+            await subscriptionHandlers.recordReviewUsage(userId);
+          }
+
           sendJson(res, 201, { review: created });
+          return;
+        }
+      }
+
+      if (subscriptionHandlers) {
+        if (req.method === "GET" && normalizedPath === "/v1/subscription") {
+          await subscriptionHandlers.getCurrentSubscription(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/subscription/entitlements") {
+          await subscriptionHandlers.getCurrentEntitlements(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/subscription/plans") {
+          await subscriptionHandlers.getAvailablePlans(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/subscription/preview-upgrade") {
+          await subscriptionHandlers.previewUpgrade(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/subscription/preview-downgrade") {
+          await subscriptionHandlers.previewDowngrade(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/subscription/change") {
+          await subscriptionHandlers.startSubscriptionChange(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/subscription/cancel") {
+          await subscriptionHandlers.cancelSubscription(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/subscription/resume") {
+          await subscriptionHandlers.resumeSubscription(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/subscription/usage") {
+          await subscriptionHandlers.getUsageSummary(req, res);
+          return;
+        }
+        if (req.method === "GET" && normalizedPath === "/v1/subscription/authorize") {
+          await subscriptionHandlers.authorizeAction(req, res);
           return;
         }
       }
@@ -443,6 +525,23 @@ export function createRoutes(
 
         if (req.method === "DELETE" && /^\/v1\/admin\/specials\/[^/]+$/.test(normalizedPath)) {
           await merchantHandlers.deleteSpecial(req, res);
+          return;
+        }
+
+        if (subscriptionHandlers && req.method === "POST" && normalizedPath === "/v1/admin/subscription/override") {
+          await subscriptionHandlers.adminOverrideEntitlement(req, res);
+          return;
+        }
+        if (subscriptionHandlers && req.method === "POST" && normalizedPath === "/v1/admin/subscription/grant-trial") {
+          await subscriptionHandlers.adminGrantTrial(req, res);
+          return;
+        }
+        if (subscriptionHandlers && req.method === "POST" && normalizedPath === "/v1/admin/subscription/comp") {
+          await subscriptionHandlers.adminCompPlan(req, res);
+          return;
+        }
+        if (subscriptionHandlers && req.method === "GET" && normalizedPath === "/v1/admin/subscription/state") {
+          await subscriptionHandlers.adminGetState(req, res);
           return;
         }
       }

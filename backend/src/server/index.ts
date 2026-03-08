@@ -14,6 +14,10 @@ import { ProviderRouter } from "../plans/router/providerRouter.js";
 import type { ProviderRouter as ProviderRouterType } from "../plans/router/providerRouter.js";
 import { MemoryTelemetryStore } from "../telemetry/memoryStore.js";
 import { MemoryReviewsStore } from "../reviews/memoryStore.js";
+import { DevBillingProvider } from "../subscriptions/billing/provider.js";
+import { EntitlementPolicyService } from "../subscriptions/policy.js";
+import { SubscriptionService } from "../subscriptions/service.js";
+import { MemoryUsageStore } from "../subscriptions/usage.js";
 import { TelemetryService } from "../telemetry/telemetryService.js";
 import { VenueClaimsService } from "../venues/claims/claimsService.js";
 import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
@@ -51,6 +55,9 @@ export function createServer(options?: CreateServerOptions) {
   const telemetryStore = new MemoryTelemetryStore();
   const telemetryService = new TelemetryService(telemetryStore, { clickTracker });
   const reviewsStore = new MemoryReviewsStore();
+  const usageStore = new MemoryUsageStore();
+  const subscriptionService = new SubscriptionService(usageStore, new DevBillingProvider());
+  const entitlementPolicy = new EntitlementPolicyService(subscriptionService);
 
   const deckHandler = createDeckHandler({
     router: deckRouter,
@@ -63,7 +70,14 @@ export function createServer(options?: CreateServerOptions) {
     logger: options?.logger
   });
 
-  return createHttpServer(service, merchantService, { deckHandler, ideasHandlers, telemetryService, reviewsStore });
+  return createHttpServer(service, merchantService, {
+    deckHandler,
+    ideasHandlers,
+    telemetryService,
+    reviewsStore,
+    subscriptionService,
+    entitlementPolicy
+  });
 }
 
 export function main(): void {

@@ -3,6 +3,8 @@ import { createServer as createNodeServer, type Server } from "node:http";
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { MerchantService } from "../merchant/service.js";
+import type { EntitlementPolicyService } from "../subscriptions/policy.js";
+import type { SubscriptionService } from "../subscriptions/service.js";
 import type { TelemetryService } from "../telemetry/telemetryService.js";
 import type { ReviewsStore } from "../reviews/store.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
@@ -41,7 +43,14 @@ export function matchPath(pattern: string, pathname: string): Record<string, str
 export function createHttpServer(
   service: VenueClaimsService,
   merchantService: MerchantService,
-  deps?: { deckHandler?: SessionDeckHandler; ideasHandlers?: SessionIdeasHandlers; telemetryService?: TelemetryService; reviewsStore?: ReviewsStore }
+  deps?: {
+    deckHandler?: SessionDeckHandler;
+    ideasHandlers?: SessionIdeasHandlers;
+    telemetryService?: TelemetryService;
+    reviewsStore?: ReviewsStore;
+    subscriptionService?: SubscriptionService;
+    entitlementPolicy?: EntitlementPolicyService;
+  }
 ): Server {
   const route = createRoutes(service, merchantService, deps);
   return createNodeServer((req, res) => {
