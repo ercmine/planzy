@@ -144,11 +144,14 @@ void main() {
     await tester.pump();
 
     expect(find.text('Plan plan-1'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Yes'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'No'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'Maybe'), findsOneWidget);
+    expect(find.text('Yes'), findsNothing);
+    expect(find.text('No'), findsNothing);
+    expect(find.text('Maybe'), findsNothing);
+    expect(find.byTooltip('Yes'), findsOneWidget);
+    expect(find.byTooltip('No'), findsOneWidget);
+    expect(find.byTooltip('Maybe'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Yes'));
+    await tester.tap(find.byIcon(Icons.check));
     await tester.pumpAndSettle();
 
     expect(find.text('No results nearby'), findsOneWidget);
