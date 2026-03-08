@@ -351,6 +351,61 @@ void main() {
     controller.dispose();
   });
 
+
+  test('append preserves current item identity during prefetch', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'Preserve identity',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    final delayedFetch = Completer<DeckBatchResponse>();
+    var callCount = 0;
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer((_) {
+      callCount++;
+      if (callCount == 1) {
+        return Future<DeckBatchResponse>.value(
+          _batch([
+            _plan('a0'),
+            _plan('a1'),
+          ], nextCursor: 'cursor-2', sessionId: created.sessionId),
+        );
+      }
+      return delayedFetch.future;
+    });
+
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+
+    expect(controller.state.currentItemKey, 'plan:a0');
+    await controller.swipeTop(SwipeAction.yes);
+    expect(controller.state.currentItemKey, 'plan:a1');
+
+    final prefetch = controller.maybePrefetchMore();
+    delayedFetch.complete(
+      _batch([
+        _plan('a2'),
+        _plan('a3'),
+      ], nextCursor: null, sessionId: created.sessionId),
+    );
+
+    await prefetch;
+
+    expect(controller.state.currentItemKey, 'plan:a1');
+    controller.dispose();
+  });
+
   test('fetch error sets error message', () async {
     final created = await sessionsRepository.createLocalSession(
       title: 'Test',
