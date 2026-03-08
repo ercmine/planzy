@@ -109,4 +109,88 @@ describe("creator profile routes", () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it("serves following feed and place creator content with pagination and filters", async () => {
+    const creatorHeaders = { "x-user-id": "creator-feed-1", "content-type": "application/json" };
+    await fetch(`${baseUrl}/v1/profiles/creator`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ creatorName: "Feed Creator" })
+    });
+    const identity = await fetch(`${baseUrl}/v1/identity`, { headers: { "x-user-id": "creator-feed-1" } });
+    const creatorProfile = await identity.json() as { creatorProfile: { id: string } };
+
+    await fetch(`${baseUrl}/v1/creator/profiles`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ displayName: "Feed Creator", slug: "feed-creator" })
+    });
+
+    const guideRes = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfile.creatorProfile.id)}/guides`, {
+      method: "POST",
+      headers: creatorHeaders,
+      body: JSON.stringify({ title: "Top pizza", summary: "Great spots", body: "Try these", placeIds: ["p-feed"], status: "published" })
+    });
+    expect(guideRes.status).toBe(201);
+
+    const reviewRes = await fetch(`${baseUrl}/places/p-feed/reviews`, {
+      method: "POST",
+      headers: {
+        "x-user-id": "creator-feed-1",
+        "x-acting-profile-type": "CREATOR",
+        "x-acting-profile-id": creatorProfile.creatorProfile.id,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ text: "Excellent", rating: 5, displayName: "Feed Creator" })
+    });
+    expect(reviewRes.status).toBe(201);
+
+    const viewerHeaders = { "x-user-id": "viewer-feed-1" };
+    const followRes = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfile.creatorProfile.id)}/follow`, {
+      method: "POST",
+      headers: viewerHeaders
+    });
+    expect(followRes.status).toBe(200);
+
+    const follows = await fetch(`${baseUrl}/v1/creator/follows`, { headers: viewerHeaders });
+    expect(follows.status).toBe(200);
+    await expect(follows.json()).resolves.toMatchObject({
+      creators: [expect.objectContaining({ creatorProfileId: creatorProfile.creatorProfile.id, slug: "feed-creator" })]
+    });
+
+    const feedRes = await fetch(`${baseUrl}/v1/creator/feed?limit=1`, { headers: viewerHeaders });
+    expect(feedRes.status).toBe(200);
+    const feed = await feedRes.json() as { items: Array<{ feedItemType: string; creatorProfileId: string }>; nextCursor?: string };
+    expect(feed.items.length).toBe(1);
+    expect(feed.items[0]?.creatorProfileId).toBe(creatorProfile.creatorProfile.id);
+    expect(feed.nextCursor).toBeTruthy();
+
+    const nextFeedRes = await fetch(`${baseUrl}/v1/creator/feed?limit=5&cursor=${encodeURIComponent(feed.nextCursor ?? "")}`, { headers: viewerHeaders });
+    expect(nextFeedRes.status).toBe(200);
+    const nextFeed = await nextFeedRes.json() as { items: Array<{ contentId: string }> };
+    expect(nextFeed.items.length).toBeGreaterThanOrEqual(0);
+
+    const videosOnly = await fetch(`${baseUrl}/v1/creator/feed?type=videos`, { headers: viewerHeaders });
+    expect(videosOnly.status).toBe(200);
+    await expect(videosOnly.json()).resolves.toMatchObject({ items: [] });
+
+    const placeContent = await fetch(`${baseUrl}/v1/places/${encodeURIComponent("p-feed")}/creator-content`, { headers: viewerHeaders });
+    expect(placeContent.status).toBe(200);
+    await expect(placeContent.json()).resolves.toMatchObject({
+      items: expect.arrayContaining([
+        expect.objectContaining({ creatorProfileId: creatorProfile.creatorProfile.id, placeId: "p-feed" })
+      ])
+    });
+
+    const unfollowRes = await fetch(`${baseUrl}/v1/creator/profiles/${encodeURIComponent(creatorProfile.creatorProfile.id)}/follow`, {
+      method: "DELETE",
+      headers: viewerHeaders
+    });
+    expect(unfollowRes.status).toBe(200);
+
+    const emptyFeed = await fetch(`${baseUrl}/v1/creator/feed`, { headers: viewerHeaders });
+    expect(emptyFeed.status).toBe(200);
+    await expect(emptyFeed.json()).resolves.toMatchObject({ items: [] });
+  });
+
 });

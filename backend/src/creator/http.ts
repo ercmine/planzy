@@ -13,6 +13,7 @@ function userId(req: IncomingMessage): string {
 function mapError(res: ServerResponse, error: unknown): void {
   const code = error instanceof Error ? error.message : "UNKNOWN";
   if (["CREATOR_NOT_FOUND", "GUIDE_NOT_FOUND"].includes(code)) return sendJson(res, 404, { error: code });
+  if (["CREATOR_NOT_FOLLOWABLE"].includes(code)) return sendJson(res, 400, { error: code });
   if (["CREATOR_CONTEXT_NOT_ALLOWED", "CREATOR_ROLE_REQUIRED"].includes(code)) return sendJson(res, 403, { error: code });
   if (["SLUG_TAKEN"].includes(code)) return sendJson(res, 409, { error: code });
   if (error instanceof ValidationError) return sendJson(res, 400, { error: error.message, details: error.details });
@@ -50,6 +51,48 @@ export function createCreatorHttpHandlers(service: CreatorService) {
         const reviewSort = String(new URL(req.url ?? "", "http://localhost").searchParams.get("reviewSort") ?? "latest") === "top" ? "top" : "latest";
         const profile = await service.getPublicProfile(slug, viewer, { reviewSort });
         sendJson(res, 200, { profile });
+      } catch (error) {
+        mapError(res, error);
+      }
+    },
+
+
+
+    async listFollows(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      try {
+        const search = new URL(req.url ?? "", "http://localhost").searchParams;
+        const limit = Number(search.get("limit") ?? "100");
+        const creators = service.listFollowedCreators(userId(req), limit);
+        sendJson(res, 200, { creators });
+      } catch (error) {
+        mapError(res, error);
+      }
+    },
+
+    async followingFeed(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      try {
+        const search = new URL(req.url ?? "", "http://localhost").searchParams;
+        const cursor = String(search.get("cursor") ?? "").trim() || undefined;
+        const limit = Number(search.get("limit") ?? "20");
+        const typeRaw = String(search.get("type") ?? "all").trim();
+        const type = (["all", "reviews", "videos", "guides"].includes(typeRaw) ? typeRaw : "all") as "all" | "reviews" | "videos" | "guides";
+        const feed = await service.getFollowingFeed(userId(req), { cursor, limit, type });
+        sendJson(res, 200, feed);
+      } catch (error) {
+        mapError(res, error);
+      }
+    },
+
+    async placeCreatorContent(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void> {
+      try {
+        const search = new URL(req.url ?? "", "http://localhost").searchParams;
+        const viewer = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
+        const cursor = String(search.get("cursor") ?? "").trim() || undefined;
+        const limit = Number(search.get("limit") ?? "20");
+        const typeRaw = String(search.get("type") ?? "all").trim();
+        const type = (["all", "reviews", "videos", "guides"].includes(typeRaw) ? typeRaw : "all") as "all" | "reviews" | "videos" | "guides";
+        const content = await service.getPlaceCreatorContent(placeId, viewer, { cursor, limit, type });
+        sendJson(res, 200, content);
       } catch (error) {
         mapError(res, error);
       }
