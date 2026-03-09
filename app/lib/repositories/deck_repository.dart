@@ -10,7 +10,6 @@ import '../core/cache/local_store.dart';
 import '../core/cache/memory_cache.dart';
 import '../core/utils/hashing.dart';
 import '../models/deck_batch.dart';
-import '../models/deep_links.dart';
 import '../models/plan.dart';
 import '../services/foursquare/foursquare_client.dart';
 
@@ -301,7 +300,7 @@ Plan _planFromApi(Map<String, dynamic> json, {required ApiClient apiClient}) {
     openingHoursText: parseOpeningHoursText(json['openingHoursText'] ?? json['openingHours']),
     deepLinks: (mapsUri != null && mapsUri.isNotEmpty) ||
             (websiteUri != null && websiteUri.isNotEmpty)
-        ? DeepLinks(mapsLink: mapsUri, websiteLink: websiteUri)
+        ? PlanDeepLinks(mapsLink: mapsUri, websiteLink: websiteUri)
         : null,
     metadata: {
       'source': 'api.perbug.com',

@@ -14,7 +14,6 @@ import '../../core/ads/native_ad_controller.dart';
 import '../../core/format/formatters.dart';
 import '../../core/json_parsers.dart';
 import '../../core/validation/url.dart';
-import '../../models/deep_links.dart';
 import '../../models/place_review.dart';
 import '../../models/place_review_video.dart';
 import '../../models/plan.dart';
@@ -1033,7 +1032,7 @@ Plan mergePlanWithDetails({
         parseOpeningHoursText(details['openingHoursText'] ?? details['openingHours']) ?? basePlan.openingHoursText,
     photos: mergedPhotos,
     deepLinks: (mapsLink?.isNotEmpty == true || websiteLink?.isNotEmpty == true)
-        ? DeepLinks(mapsLink: mapsLink, websiteLink: websiteLink)
+        ? PlanDeepLinks(mapsLink: mapsLink, websiteLink: websiteLink)
         : basePlan.deepLinks,
   );
 }

@@ -1,7 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../core/json_parsers.dart';
-import 'deep_links.dart';
 import 'special.dart';
 
 part 'plan.freezed.dart';
@@ -81,6 +80,20 @@ class PlanHours with _$PlanHours {
 }
 
 @freezed
+class PlanDeepLinks with _$PlanDeepLinks {
+  const factory PlanDeepLinks({
+    String? mapsLink,
+    String? websiteLink,
+    String? callLink,
+    String? bookingLink,
+    String? ticketLink,
+  }) = _PlanDeepLinks;
+
+  factory PlanDeepLinks.fromJson(Map<String, dynamic> json) =>
+      _$PlanDeepLinksFromJson(json);
+}
+
+@freezed
 class Plan with _$Plan {
   const factory Plan({
     required String id,
@@ -94,7 +107,7 @@ class Plan with _$Plan {
     PlanHours? hours,
     @JsonKey(fromJson: parseOpeningHoursText) List<String>? openingHoursText,
     String? phone,
-    DeepLinks? deepLinks,
+    PlanDeepLinks? deepLinks,
     List<PlanPhoto>? photos,
     @JsonKey(fromJson: parseInt) int? priceLevel,
     @JsonKey(fromJson: parseNullableDouble) double? rating,
@@ -109,6 +122,26 @@ class Plan with _$Plan {
     normalized['title'] = (json['title'] ?? json['name'])?.toString();
     normalized['openingHoursText'] =
         json['openingHoursText'] ?? json['openingHours'] ?? json['hours']?['weekdayText'];
+
+    final mapsLink = json['mapsLink'] ?? json['googleMapsUri'];
+    final websiteLink = json['websiteLink'] ?? json['websiteUri'] ?? json['website'];
+    final callLink = json['callLink'] ?? json['phoneUri'];
+
+    final deepLinks = json['deepLinks'];
+    if (deepLinks is Map<String, dynamic>) {
+      normalized['deepLinks'] = <String, dynamic>{
+        ...deepLinks,
+        if (mapsLink != null) 'mapsLink': mapsLink,
+        if (websiteLink != null) 'websiteLink': websiteLink,
+        if (callLink != null) 'callLink': callLink,
+      };
+    } else if (mapsLink != null || websiteLink != null || callLink != null) {
+      normalized['deepLinks'] = <String, dynamic>{
+        if (mapsLink != null) 'mapsLink': mapsLink,
+        if (websiteLink != null) 'websiteLink': websiteLink,
+        if (callLink != null) 'callLink': callLink,
+      };
+    }
 
     return _$PlanFromJson(normalized);
   }

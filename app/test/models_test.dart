@@ -2,12 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:perbug/api/models.dart';
 import 'package:perbug/core/json_parsers.dart';
 import 'package:perbug/models/deck_batch.dart';
-import 'package:perbug/models/deep_links.dart';
 import 'package:perbug/models/plan.dart';
 import 'package:perbug/models/telemetry.dart';
 
 void main() {
-  group('Plan and DeepLinks JSON', () {
+  group('Plan and PlanDeepLinks JSON', () {
     test('parses v2 deep links and metadata specials', () {
       final json = {
         'id': 'p1',
@@ -36,7 +35,7 @@ void main() {
       };
 
       final plan = Plan.fromJson(json);
-      expect(plan.deepLinks, isA<DeepLinks>());
+      expect(plan.deepLinks, isA<PlanDeepLinks>());
       expect(plan.deepLinks?.mapsLink, contains('maps.example.com'));
       expect(plan.specials, isNotEmpty);
       expect(plan.specials.first.title, 'Happy Hour');
