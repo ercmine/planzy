@@ -52,6 +52,9 @@ import type { ReportReasonCode } from "../moderation/types.js";
 import { createNotificationHttpHandlers } from "../notifications/http.js";
 import type { NotificationService } from "../notifications/service.js";
 import type { NotificationCategory } from "../notifications/types.js";
+import { createAnalyticsHttpHandlers } from "../analytics/http.js";
+import type { AnalyticsQueryService } from "../analytics/queryService.js";
+import type { AnalyticsService } from "../analytics/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -120,6 +123,8 @@ export function createRoutes(
     outingPlannerService?: OutingPlannerService;
     moderationService?: ModerationService;
     notificationService?: NotificationService;
+    analyticsService?: AnalyticsService;
+    analyticsQueryService?: AnalyticsQueryService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -139,6 +144,12 @@ export function createRoutes(
   const businessPremiumHandlers = deps?.businessPremiumService ? createBusinessPremiumHttpHandlers(deps.businessPremiumService) : null;
   const outingPlannerHandlers = deps?.outingPlannerService ? createOutingPlannerHandlers(deps.outingPlannerService) : null;
   const notificationHandlers = deps?.notificationService ? createNotificationHttpHandlers(deps.notificationService) : null;
+  const analyticsHandlers = deps?.analyticsService && deps?.analyticsQueryService ? createAnalyticsHttpHandlers(deps.analyticsService, deps.analyticsQueryService) : null;
+
+  const track = async (event: Record<string, unknown>, context: Record<string, unknown> = {}) => {
+    if (!deps?.analyticsService) return;
+    await deps.analyticsService.track(event as never, { platform: "backend", environment: process.env.NODE_ENV ?? "dev", ...context } as never);
+  };
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     applyCors(res);
@@ -302,7 +313,30 @@ export function createRoutes(
       }
 
 
-      const relatedPlacesMatch = /^\/v1\/discovery\/places\/([^/]+)\/related$/.exec(normalizedPath);
+
+      if (analyticsHandlers && req.method === "POST" && normalizedPath === "/v1/analytics/events") {
+        await analyticsHandlers.ingest(req, res);
+        return;
+      }
+
+      if (analyticsHandlers && req.method === "GET" && normalizedPath === "/v1/analytics/admin/overview") {
+        await analyticsHandlers.adminOverview(req, res);
+        return;
+      }
+
+      const creatorAnalyticsMatch = /^\/v1\/analytics\/creators\/([^/]+)\/overview$/.exec(normalizedPath);
+      if (analyticsHandlers && req.method === "GET" && creatorAnalyticsMatch) {
+        await analyticsHandlers.creatorOverview(req, res, decodeURIComponent(creatorAnalyticsMatch[1] ?? ""));
+        return;
+      }
+
+      const analyticsBusinessMatch = /^\/v1\/analytics\/businesses\/([^/]+)\/overview$/.exec(normalizedPath);
+      if (analyticsHandlers && req.method === "GET" && analyticsBusinessMatch) {
+        await analyticsHandlers.businessOverview(req, res, decodeURIComponent(analyticsBusinessMatch[1] ?? ""));
+        return;
+      }
+
+            const relatedPlacesMatch = /^\/v1\/discovery\/places\/([^/]+)\/related$/.exec(normalizedPath);
       if (discoveryHandlers && req.method === "GET" && relatedPlacesMatch) {
         await discoveryHandlers.relatedPlaces(req, res, decodeURIComponent(relatedPlacesMatch[1] ?? ""));
         return;
@@ -563,6 +597,7 @@ export function createRoutes(
           }
         }
 
+        await track({ eventName: "video_upload_started", mediaId: fileName, metadata: { mediaType, mimeType, fileSizeBytes } }, { actorUserId: userIdHeader, sourceRoute: "/v1/reviews/media/uploads" });
         const upload = await deps.reviewsStore.createMediaUpload({ ownerUserId: userIdHeader, mediaType, fileName, mimeType, base64Data, fileSizeBytes, durationMs, width, height });
         sendJson(res, 201, { upload });
         return;
@@ -584,6 +619,7 @@ export function createRoutes(
           height: payload.height == null ? undefined : Number(payload.height),
           checksum: payload.checksum == null ? undefined : String(payload.checksum)
         });
+        await track({ eventName: "video_upload_completed", mediaId: upload.id, success: true, metadata: { mediaType: upload.mediaType } }, { actorUserId: userIdHeader, sourceRoute: "/v1/reviews/media/uploads/:id/finalize" });
         sendJson(res, 200, { upload });
         return;
       }
@@ -608,6 +644,7 @@ export function createRoutes(
             trustedOnly,
             verifiedOnly
           });
+          await track({ eventName: "review_viewed", placeId, metadata: { count: result.reviews.length, sort } }, { actorUserId: userIdHeader || undefined, sourceRoute: "/places/:id/reviews" });
           sendJson(res, 200, result);
           return;
         }
@@ -794,6 +831,10 @@ export function createRoutes(
             await subscriptionHandlers.recordReviewUsage(usageAccountId);
           }
 
+          await track({ eventName: "review_submitted", placeId, reviewId: created.id, success: true, metadata: { rating: created.rating, mediaCount: created.media.length } }, { actorUserId: userId, actorProfileType: actor.profileType === ProfileType.BUSINESS ? "business" : actor.profileType === ProfileType.CREATOR ? "creator" : "user", actorProfileId: actor.profileId, sourceRoute: "/places/:id/reviews" });
+          if (created.media.some((m) => m.mediaType === "video")) {
+            await track({ eventName: "creator_media_engagement", placeId, reviewId: created.id, metadata: { mediaType: "video" } }, { actorUserId: userId, sourceRoute: "/places/:id/reviews" });
+          }
           sendJson(res, 201, { review: created, created: true });
           return;
         }
@@ -846,12 +887,14 @@ export function createRoutes(
             throw new ValidationError(["text length must be between 5 and 1000 characters"], "Invalid review payload");
           }
           const updated = await deps.reviewsStore.update({ reviewId, actorUserId: userIdHeader, body: text, rating, attachMediaUploadIds, removeMediaIds, mediaOrder, primaryMediaId });
+          await track({ eventName: "review_edited", reviewId: updated.id, placeId: updated.placeId }, { actorUserId: userIdHeader, sourceRoute: "/places/:placeId/reviews/:reviewId" });
           sendJson(res, 200, { review: updated });
           return;
         }
         if (req.method === "DELETE") {
           if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
           const deleted = await deps.reviewsStore.softDelete(reviewId, userIdHeader);
+          await track({ eventName: "review_deleted", reviewId: deleted.id, placeId: deleted.placeId }, { actorUserId: userIdHeader, sourceRoute: "/places/:placeId/reviews/:reviewId" });
           sendJson(res, 200, { review: deleted });
           return;
         }
@@ -992,6 +1035,7 @@ export function createRoutes(
         if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
         if (req.method === "POST") {
           const review = await deps.reviewsStore.voteHelpful(reviewId, userIdHeader);
+          await track({ eventName: "review_helpful_clicked", reviewId, placeId: review.placeId }, { actorUserId: userIdHeader, sourceRoute: "/reviews/:reviewId/helpful" });
           if (deps.notificationService && review.authorUserId !== userIdHeader && deps.accountsService) {
             const actor = deps.accountsService.getIdentitySummary(userIdHeader);
             await deps.notificationService.notify({
@@ -1022,6 +1066,7 @@ export function createRoutes(
         const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
         const reason = String(payload.reason ?? "").trim() || "unspecified";
         await deps.reviewsStore.reportReview(reviewId, userIdHeader, reason);
+        await track({ eventName: "review_report_submitted", reviewId, metadata: { reason } }, { actorUserId: userIdHeader, sourceRoute: "/reviews/:reviewId/report" });
         if (deps.moderationService) {
           await deps.moderationService.submitReport({
             target: { targetType: "review", targetId: reviewId, reviewId },
@@ -1123,6 +1168,7 @@ export function createRoutes(
           notes: payload.notes == null ? undefined : String(payload.notes),
           actorUserId: String(readHeader(req, "x-user-id") ?? "admin")
         });
+        await track({ eventName: decisionType === "approve" ? "review_approved" : "review_rejected", reviewId: payload.reviewId == null ? undefined : String(payload.reviewId), success: decisionType === "approve", metadata: { targetType, targetId, decisionType } }, { actorUserId: String(readHeader(req, "x-user-id") ?? "admin"), actorProfileType: "admin", sourceRoute: "/v1/admin/moderation/decision" });
         if (deps.notificationService && decisionType === "approve" && payload.subjectUserId) {
           await deps.notificationService.notify({
             eventId: `moderation.approve:${targetType}:${targetId}`,
@@ -1217,6 +1263,7 @@ export function createRoutes(
             snippet: response.content
           });
         }
+        await track({ eventName: "business_reply_created", reviewId, placeId: review.placeId, businessId: actor.profileId }, { actorUserId: actor.userId, actorProfileType: "business", actorProfileId: actor.profileId, sourceRoute: "/v1/reviews/:reviewId/business-response" });
         sendJson(res, 201, { response });
         return;
       }

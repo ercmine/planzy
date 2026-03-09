@@ -12,6 +12,7 @@ import {
   TrendingService
 } from "./services.js";
 import type { PremiumExperienceService } from "../subscriptions/premiumExperience.js";
+import type { AnalyticsService } from "../analytics/service.js";
 
 export interface DiscoveryHandlers {
   search(req: IncomingMessage, res: ServerResponse): Promise<void>;
@@ -37,6 +38,7 @@ export interface DiscoveryHttpHandlerDeps {
   cityPageService: CityPageService;
   feedService: DiscoveryFeedService;
   premiumExperience: PremiumExperienceService;
+  analyticsService?: AnalyticsService;
 }
 
 export function createDiscoveryHttpHandlers(deps: DiscoveryHttpHandlerDeps): DiscoveryHandlers {
@@ -51,33 +53,49 @@ export function createDiscoveryHttpHandlers(deps: DiscoveryHttpHandlerDeps): Dis
   return {
     async search(req, res) {
       const { context } = requestContext(req);
-      sendJson(res, 200, await deps.searchService.search(context));
+      const payload = await deps.searchService.search(context);
+      await deps.analyticsService?.track({ eventName: "search_submitted", metadata: { hasQuery: Boolean(context.query) } }, { actorUserId: String(readHeader(req, "x-user-id") ?? "").trim() || undefined, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, sourceRoute: "/v1/discovery/search", cityName: context.city, categoryName: context.categorySlug, platform: "backend" });
+      await deps.analyticsService?.track({ eventName: "search_results_viewed", metadata: { total: payload.items.length, zeroResults: payload.items.length === 0 } }, { actorUserId: String(readHeader(req, "x-user-id") ?? "").trim() || undefined, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, sourceRoute: "/v1/discovery/search", cityName: context.city, categoryName: context.categorySlug, platform: "backend" });
+      sendJson(res, 200, payload);
     },
     async browse(req, res) {
       const { context } = requestContext(req);
-      sendJson(res, 200, await deps.browseService.browse(context));
+      const payload = await deps.browseService.browse(context);
+      await deps.analyticsService?.track({ eventName: "category_page_viewed", metadata: { total: payload.items.length } }, { actorUserId: String(readHeader(req, "x-user-id") ?? "").trim() || undefined, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, categoryName: context.categorySlug, sourceRoute: "/v1/discovery/browse", platform: "backend" });
+      sendJson(res, 200, payload);
     },
     async cityPage(req, res, citySlug) {
       const userId = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
-      sendJson(res, 200, await deps.cityPageService.getCityPage(userId, citySlug.replace(/-/g, " ")));
+      const cityName = citySlug.replace(/-/g, " ");
+      const payload = await deps.cityPageService.getCityPage(userId, cityName);
+      await deps.analyticsService?.track({ eventName: "city_page_viewed", metadata: { trending: payload.sections.filter((section) => section.type === "trending").reduce((sum, section) => sum + section.items.length, 0), recommendations: payload.sections.filter((section) => section.type === "recommended").reduce((sum, section) => sum + section.items.length, 0) } }, { actorUserId: userId, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, cityName, sourceRoute: "/v1/discovery/cities", platform: "backend" });
+      sendJson(res, 200, payload);
     },
     async nearby(req, res) {
       const { context } = requestContext(req);
-      sendJson(res, 200, await deps.nearbyService.nearby(context));
+      const payload = await deps.nearbyService.nearby(context);
+      await deps.analyticsService?.track({ eventName: "nearby_results_viewed", metadata: { total: payload.items.length } }, { actorUserId: String(readHeader(req, "x-user-id") ?? "").trim() || undefined, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, cityName: context.city, sourceRoute: "/v1/discovery/nearby", platform: "backend" });
+      sendJson(res, 200, payload);
     },
     async trending(req, res) {
       const { context } = requestContext(req);
-      sendJson(res, 200, await deps.trendingService.list(context));
+      const payload = await deps.trendingService.list(context);
+      await deps.analyticsService?.track({ eventName: "trending_place_viewed", metadata: { total: payload.items.length } }, { actorUserId: String(readHeader(req, "x-user-id") ?? "").trim() || undefined, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, cityName: context.city, sourceRoute: "/v1/discovery/trending", platform: "backend" });
+      sendJson(res, 200, payload);
     },
     async recommendations(req, res) {
       const { context } = requestContext(req);
       const userId = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
-      sendJson(res, 200, await deps.recommendationService.getPersonalizedRecommendations(userId, context));
+      const payload = await deps.recommendationService.getPersonalizedRecommendations(userId, context);
+      await deps.analyticsService?.track({ eventName: "recommendation_impression", metadata: { total: payload.items.length } }, { actorUserId: userId, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, sourceRoute: "/v1/discovery/recommendations", cityName: context.city, platform: "backend" });
+      sendJson(res, 200, payload);
     },
     async relatedPlaces(req, res, placeId) {
       const { context } = requestContext(req);
       const userId = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
-      sendJson(res, 200, await deps.recommendationService.getRelatedPlacesForPlace(userId, placeId, context));
+      const payload = await deps.recommendationService.getRelatedPlacesForPlace(userId, placeId, context);
+      await deps.analyticsService?.track({ eventName: "recommendation_opened", placeId, metadata: { total: payload.items.length } }, { actorUserId: userId, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, sourceRoute: "/v1/discovery/places/:id/related", platform: "backend" });
+      sendJson(res, 200, payload);
     },
     async suggestedCreators(req, res) {
       const { context } = requestContext(req);

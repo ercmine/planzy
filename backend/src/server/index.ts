@@ -8,6 +8,7 @@ import { CreatorVerificationService, MemoryCreatorVerificationStore } from "../c
 import { CreatorPremiumService, MemoryCreatorPremiumStore } from "../creatorPremium/index.js";
 import { CreatorMonetizationService, MemoryCreatorMonetizationStore } from "../creatorMonetization/index.js";
 import { ClickTracker, MemoryClickStore } from "../analytics/clicks/index.js";
+import { AnalyticsQueryService, AnalyticsService, MemoryAnalyticsStore } from "../analytics/index.js";
 import { BusinessAnalyticsService, MemoryBusinessAnalyticsStore } from "../businessAnalytics/index.js";
 import { BusinessPremiumService, MemoryBusinessPremiumStore } from "../businessPremium/index.js";
 import { CollaborationService, MemoryCollaborationStore } from "../collaboration/index.js";
@@ -83,12 +84,37 @@ export function createServer(options?: CreateServerOptions) {
   const clickTracker = new ClickTracker(clickStore);
   const telemetryStore = new MemoryTelemetryStore();
   const telemetryService = new TelemetryService(telemetryStore, { clickTracker });
+  const analyticsService = new AnalyticsService(new MemoryAnalyticsStore());
+  const analyticsQueryService = new AnalyticsQueryService(analyticsService);
   const reviewsStore = new MemoryReviewsStore();
   const notificationStore = new MemoryNotificationStore();
   const notificationService = new NotificationService(notificationStore);
   const moderationService = new ModerationService(new ReviewsModerationEnforcementAdapter(reviewsStore));
   const usageStore = new MemoryUsageStore();
-  const subscriptionService = new SubscriptionService(usageStore, new DevBillingProvider());
+  const subscriptionService = new SubscriptionService(usageStore, new DevBillingProvider(), {
+    onEvent: async (event, subscription) => {
+      const mapping: Record<string, string> = {
+        trial_started: "trial_started",
+        plan_changed: "subscription_purchased",
+        payment_failed: "subscription_renewal_failed",
+        grace_started: "grace_period_entered",
+        canceled: "subscription_cancellation_requested",
+        activated: "subscription_renewed"
+      };
+      const eventName = mapping[event.type];
+      if (!eventName) return;
+      await analyticsService.track({
+        eventName: eventName as never,
+        subscriptionId: subscription.id,
+        metadata: { targetType: subscription.targetType, targetId: subscription.targetId, reasonCode: event.payload?.reasonCode }
+      }, {
+        actorUserId: event.targetId,
+        actorProfileType: "system",
+        platform: "backend",
+        environment: process.env.NODE_ENV ?? "dev"
+      });
+    }
+  });
   const entitlementPolicy = new EntitlementPolicyService(subscriptionService);
   const premiumExperience = new PremiumExperienceService(subscriptionService);
   const accessEngine = new FeatureQuotaEngine(subscriptionService, new MemoryAccessUsageStore());
@@ -172,8 +198,12 @@ export function createServer(options?: CreateServerOptions) {
       recommendationService,
       cityPageService,
       feedService: discoveryFeedService,
-      premiumExperience
+      premiumExperience,
+      analyticsService
     }
+    ,
+    analyticsService,
+    analyticsQueryService
   });
 }
 
