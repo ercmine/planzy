@@ -22,6 +22,7 @@ import '../../providers/app_providers.dart';
 import '../../services/foursquare/foursquare_plan_mapper.dart';
 import 'place_detail_models.dart';
 import 'widgets/category_pill.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class PlanDetailPage extends ConsumerStatefulWidget {
   const PlanDetailPage({
@@ -401,7 +402,9 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     final distance = _distanceLabel(plan);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Place details')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Place details')),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.m),
         children: [

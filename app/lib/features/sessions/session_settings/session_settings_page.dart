@@ -7,6 +7,7 @@ import '../../../../models/session_filters.dart';
 import '../../../../providers/app_providers.dart';
 import '../create_session/widgets/category_picker.dart';
 import '../create_session/widgets/radius_slider.dart';
+import '../../../core/widgets/app_back_button.dart';
 
 class SessionSettingsPage extends ConsumerStatefulWidget {
   const SessionSettingsPage({required this.sessionId, super.key});
@@ -21,18 +22,6 @@ class _SessionSettingsPageState extends ConsumerState<SessionSettingsPage> {
   late SessionFilters _draftFilters;
   bool _draftReady = false;
 
-  void _handleBackPress(BuildContext context) {
-    if (context.canPop()) {
-      context.pop();
-      return;
-    }
-    if (widget.sessionId.isNotEmpty) {
-      context.go('/sessions/${widget.sessionId}');
-      return;
-    }
-    Navigator.of(context).maybePop();
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(sessionSettingsControllerProvider(widget.sessionId));
@@ -45,12 +34,8 @@ class _SessionSettingsPageState extends ConsumerState<SessionSettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: AppBackButton(fallbackRoute: '/sessions/${widget.sessionId}'),
         title: const Text('Session Settings'),
-        automaticallyImplyLeading: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new),
-          onPressed: () => _handleBackPress(context),
-        ),
       ),
       body: state.isLoading
           ? const Center(child: CircularProgressIndicator())

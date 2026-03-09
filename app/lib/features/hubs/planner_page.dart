@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class PlannerPage extends StatelessWidget {
   const PlannerPage({super.key});
@@ -21,7 +22,9 @@ class PlannerPage extends StatelessWidget {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('AI Planner')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('AI Planner')),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.m),
         children: [

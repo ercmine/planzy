@@ -9,6 +9,7 @@ import '../../../providers/app_providers.dart';
 import 'widgets/category_picker.dart';
 import 'widgets/radius_slider.dart';
 import 'widgets/time_window_picker.dart';
+import '../../../core/widgets/app_back_button.dart';
 
 class CreateSessionPage extends ConsumerStatefulWidget {
   const CreateSessionPage({super.key});
@@ -37,7 +38,9 @@ class _CreateSessionPageState extends ConsumerState<CreateSessionPage> {
     final state = ref.watch(createSessionControllerProvider);
 
     return AppScaffold(
-      appBar: AppBar(title: const Text('Create Session')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Create Session')),
       body: ListView(
         children: [
           const AppSectionHeader(title: 'Session details', subtitle: 'Name your plan and tune preferences.'),

@@ -7,6 +7,7 @@ import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import '../../core/widgets/retry_view.dart';
 import '../../providers/app_providers.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class SessionsPage extends ConsumerWidget {
   const SessionsPage({super.key});
@@ -16,7 +17,9 @@ class SessionsPage extends ConsumerWidget {
     final state = ref.watch(sessionsControllerProvider);
 
     return AppScaffold(
-      appBar: AppBar(title: const Text('Sessions')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Sessions')),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

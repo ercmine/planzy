@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import 'invite_controller.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class InvitePage extends ConsumerWidget {
   const InvitePage({required this.code, super.key});
@@ -16,7 +17,9 @@ class InvitePage extends ConsumerWidget {
     final state = ref.watch(inviteControllerProvider(code));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Session Invite')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Session Invite')),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.m),
         child: AppCard(

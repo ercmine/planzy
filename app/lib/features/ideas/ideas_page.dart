@@ -8,6 +8,7 @@ import '../../providers/app_providers.dart';
 import 'ideas_controller.dart';
 import 'widgets/add_idea_sheet.dart';
 import 'widgets/idea_list_tile.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class IdeasPage extends ConsumerWidget {
   const IdeasPage({required this.sessionId, super.key});
@@ -20,7 +21,9 @@ class IdeasPage extends ConsumerWidget {
     final controller = ref.read(ideasControllerProvider(sessionId).notifier);
 
     return AppScaffold(
-      appBar: AppBar(title: const Text('Ideas')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Ideas')),
       body: RefreshIndicator(
         onRefresh: controller.refresh,
         child: Builder(

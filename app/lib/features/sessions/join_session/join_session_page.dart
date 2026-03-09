@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/spacing.dart';
 import '../../../providers/app_providers.dart';
+import '../../../core/widgets/app_back_button.dart';
 
 class JoinSessionPage extends ConsumerWidget {
   const JoinSessionPage({required this.sessionId, super.key});
@@ -15,7 +16,9 @@ class JoinSessionPage extends ConsumerWidget {
     final state = ref.watch(joinSessionControllerProvider(sessionId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Join Session')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Join Session')),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.m),
         child: Column(

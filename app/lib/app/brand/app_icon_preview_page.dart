@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/widgets/app_back_button.dart';
 import '../theme/spacing.dart';
 import '../theme/widgets.dart';
 import 'logo.dart';
@@ -10,7 +11,10 @@ class AppIconPreviewPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      appBar: AppBar(title: const Text('Perbug Logo QA')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Perbug Logo QA'),
+      ),
       body: ListView(
         children: const [
           AppSectionHeader(

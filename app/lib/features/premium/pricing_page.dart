@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_providers.dart';
 import 'premium_copy.dart';
 import 'premium_models.dart';
+import '../../core/widgets/app_back_button.dart';
 
 final premiumFamilyProvider = StateProvider<String>((_) => 'USER');
 
@@ -33,7 +34,9 @@ class _PricingPageState extends ConsumerState<PricingPage> {
     final entitlementsAsync = ref.watch(entitlementSummaryFamilyProvider(family));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Premium plans')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Premium plans')),
       body: Column(
         children: [
           SegmentedButton<String>(

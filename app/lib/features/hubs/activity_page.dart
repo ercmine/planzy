@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class ActivityPage extends StatelessWidget {
   const ActivityPage({super.key});
@@ -32,7 +33,9 @@ class ActivityPage extends StatelessWidget {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Activity & notifications')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Activity & notifications')),
       body: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.m),
         itemCount: items.length,
