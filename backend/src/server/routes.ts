@@ -58,6 +58,9 @@ import type { NotificationCategory } from "../notifications/types.js";
 import { createAnalyticsHttpHandlers } from "../analytics/http.js";
 import type { AnalyticsQueryService } from "../analytics/queryService.js";
 import type { AnalyticsService } from "../analytics/service.js";
+import { createAdminHttpHandlers } from "../admin/http.js";
+import { AdminService } from "../admin/service.js";
+import type { PlaceNormalizationService } from "../places/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -126,6 +129,7 @@ export function createRoutes(
     savedHandlers?: SavedHttpHandlers;
     outingPlannerService?: OutingPlannerService;
     moderationService?: ModerationService;
+    placeService?: PlaceNormalizationService;
     notificationService?: NotificationService;
     analyticsService?: AnalyticsService;
     analyticsQueryService?: AnalyticsQueryService;
@@ -150,6 +154,17 @@ export function createRoutes(
   const outingPlannerHandlers = deps?.outingPlannerService ? createOutingPlannerHandlers(deps.outingPlannerService) : null;
   const notificationHandlers = deps?.notificationService ? createNotificationHttpHandlers(deps.notificationService) : null;
   const analyticsHandlers = deps?.analyticsService && deps?.analyticsQueryService ? createAnalyticsHttpHandlers(deps.analyticsService, deps.analyticsQueryService) : null;
+  const adminHandlers = deps?.accountsService && deps?.moderationService
+    ? createAdminHttpHandlers(new AdminService({
+      accountsService: deps.accountsService,
+      moderationService: deps.moderationService,
+      creatorVerificationService: deps.creatorVerificationService,
+      venueClaimsService: service,
+      placeService: deps.placeService,
+      subscriptionService: deps.subscriptionService,
+      reviewsStore: deps.reviewsStore
+    }))
+    : null;
 
   const track = async (event: Record<string, unknown>, context: Record<string, unknown> = {}) => {
     if (!deps?.analyticsService) return;
@@ -178,6 +193,74 @@ export function createRoutes(
         return;
       }
 
+      if (req.method === "GET" && normalizedPath === "/v1/admin/overview" && adminHandlers) {
+        await adminHandlers.overview(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/users" && adminHandlers) {
+        await adminHandlers.listUsers(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/moderation/queue" && adminHandlers) {
+        await adminHandlers.listModerationQueue(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/admin/moderation/actions" && adminHandlers) {
+        await adminHandlers.moderationAction(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/places" && adminHandlers) {
+        await adminHandlers.listPlaces(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/ops/source-health" && adminHandlers) {
+        await adminHandlers.sourceHealth(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/ops/subscriptions" && adminHandlers) {
+        await adminHandlers.subscriptionsOps(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/ops/ads" && adminHandlers) {
+        await adminHandlers.adsOps(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/business/claims" && adminHandlers) {
+        await adminHandlers.businessClaims(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/audit" && adminHandlers) {
+        await adminHandlers.audit(req, res);
+        return;
+      }
+
+
+      const adminModerationTargetMatch = /^\/v1\/admin\/moderation\/targets\/([^/]+)\/([^/]+)$/.exec(normalizedPath);
+      if (adminModerationTargetMatch && req.method === "GET" && adminHandlers) {
+        await adminHandlers.moderationTarget(req, res, adminModerationTargetMatch[1] ?? "", adminModerationTargetMatch[2] ?? "");
+        return;
+      }
+
+      const suspendUserMatch = /^\/v1\/admin\/users\/([^/]+)\/suspend$/.exec(normalizedPath);
+      if (suspendUserMatch && req.method === "POST" && adminHandlers) {
+        await adminHandlers.suspendUser(req, res, suspendUserMatch[1] ?? "");
+        return;
+      }
+
+      const reinstateUserMatch = /^\/v1\/admin\/users\/([^/]+)\/reinstate$/.exec(normalizedPath);
+      if (reinstateUserMatch && req.method === "POST" && adminHandlers) {
+        await adminHandlers.reinstateUser(req, res, reinstateUserMatch[1] ?? "");
+        return;
+      }
       if (req.method === "GET" && normalizedPath === "/v1/notifications" && notificationHandlers) {
         await notificationHandlers.list(req, res);
         return;

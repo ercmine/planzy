@@ -23,6 +23,7 @@ import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 import type { SavedHttpHandlers } from "../saved/http.js";
 import type { OutingPlannerService } from "../outingPlanner/service.js";
 import type { ModerationService } from "../moderation/service.js";
+import type { PlaceNormalizationService } from "../places/service.js";
 import type { NotificationService } from "../notifications/service.js";
 import type { AnalyticsQueryService } from "../analytics/queryService.js";
 import type { AnalyticsService } from "../analytics/service.js";
@@ -82,6 +83,7 @@ export function createHttpServer(
     savedHandlers?: SavedHttpHandlers;
     outingPlannerService?: OutingPlannerService;
     moderationService?: ModerationService;
+    placeService?: PlaceNormalizationService;
     notificationService?: NotificationService;
     analyticsService?: AnalyticsService;
     analyticsQueryService?: AnalyticsQueryService;

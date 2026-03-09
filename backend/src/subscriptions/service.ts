@@ -70,6 +70,19 @@ export class SubscriptionService {
     return account;
   }
 
+
+  listSubscriptions(): Subscription[] {
+    return [...this.subscriptions.values()].map((sub) => this.reconcileTimeDrivenState(sub));
+  }
+
+  listAccounts(): Account[] {
+    return [...this.accounts.values()];
+  }
+
+  listEvents(accountId: string): SubscriptionEvent[] {
+    return [...(this.events.get(accountId) ?? [])];
+  }
+
   getSubscription(accountId: string): Subscription {
     const sub = this.subscriptions.get(accountId);
     if (!sub) {

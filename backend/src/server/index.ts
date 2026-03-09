@@ -49,6 +49,7 @@ import { createSavedHttpHandlers } from "../saved/http.js";
 import { SavedService } from "../saved/service.js";
 import { MemorySavedStore } from "../saved/store.js";
 import { MemoryOutingPlannerStore, OutingPlannerService } from "../outingPlanner/index.js";
+import { InMemoryPlaceStore, PlaceNormalizationService } from "../places/index.js";
 import { VenueClaimsService } from "../venues/claims/claimsService.js";
 import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
 import { createHttpServer } from "./httpServer.js";
@@ -138,6 +139,7 @@ export function createServer(options?: CreateServerOptions) {
   const collaborationService = new CollaborationService(new MemoryCollaborationStore(), accountsService, service, subscriptionService, accessEngine, businessAnalyticsService, businessPremiumService, notificationService);
 
   const discoveryRepository = new InMemoryDiscoveryRepository();
+  const placeService = new PlaceNormalizationService(new InMemoryPlaceStore());
   const rankingConfigService = new RankingConfigService();
   const rankingConfigResolver = new RankingConfigResolver(rankingConfigService);
   const outingPlannerService = new OutingPlannerService({
@@ -179,6 +181,7 @@ export function createServer(options?: CreateServerOptions) {
     telemetryService,
     reviewsStore,
     moderationService,
+    placeService,
     notificationService,
     subscriptionService,
     entitlementPolicy,
