@@ -40,6 +40,7 @@ import '../features/sessions/create_session/create_session_controller.dart';
 import '../features/sessions/join_session/join_session_controller.dart';
 import '../features/sessions/session_settings/session_settings_controller.dart';
 import '../features/sessions/sessions_controller.dart';
+import '../models/entitlement_summary.dart';
 import '../models/session.dart';
 import '../repositories/deck_repository.dart';
 import '../repositories/ideas_repository.dart';
@@ -68,9 +69,25 @@ final adsDiagnosticsProvider = Provider<AdsDiagnostics>((ref) {
   return const AdsDiagnostics();
 });
 
+final entitlementSummaryProvider = FutureProvider<EntitlementSummary>((ref) async {
+  final apiClient = await ref.watch(apiClientProvider.future);
+  return apiClient.fetchEntitlementSummary();
+});
+
 final adEntitlementSnapshotProvider = Provider<AdEntitlementSnapshot>((ref) {
-  // TODO: Wire to billing/subscription entitlement endpoint once available in app state.
-  return const AdEntitlementSnapshot(isAnonymous: true, planCode: 'free', isResolved: true);
+  final entitlementAsync = ref.watch(entitlementSummaryProvider);
+
+  return entitlementAsync.when(
+    data: (summary) => AdEntitlementSnapshot(
+      isAnonymous: false,
+      planCode: summary.planCode,
+      isSubscriptionActive: summary.planCode.toLowerCase() != 'free',
+      isResolved: true,
+      serverTierOverride: summary.adsEnabled ? null : AdEntitlementTier.elite,
+    ),
+    loading: () => const AdEntitlementSnapshot(isAnonymous: false, isResolved: false),
+    error: (_, __) => const AdEntitlementSnapshot(isAnonymous: false, isResolved: false),
+  );
 });
 
 final adsVisibilityProvider = Provider<AdsVisibility>((ref) {

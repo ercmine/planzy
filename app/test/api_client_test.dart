@@ -95,6 +95,25 @@ void main() {
     expect(response, isA<List<dynamic>>());
   });
 
+
+  test('fetchEntitlementSummary parses contract payload', () async {
+    final client = ApiClient(
+      httpClient: MockClient((request) async => http.Response(jsonEncode({
+        'context': {
+          'plan': {'code': 'user-pro'}
+        },
+        'ads': {'adsEnabled': false}
+      }), 200)),
+      envConfig: env,
+      userIdResolver: () async => 'user-1',
+      retryPolicy: const RetryPolicy(maxRetries: 0, baseDelay: Duration.zero),
+    );
+
+    final summary = await client.fetchEntitlementSummary();
+    expect(summary.planCode, 'user-pro');
+    expect(summary.adsEnabled, false);
+  });
+
   test('returns http error for 500 even if body is not JSON', () async {
     final client = ApiClient(
       httpClient: MockClient((request) async => http.Response('server exploded', 500)),
