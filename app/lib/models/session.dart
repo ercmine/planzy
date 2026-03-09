@@ -21,5 +21,12 @@ class Session with _$Session {
   }) = _Session;
 
   factory Session.fromJson(Map<String, dynamic> json) =>
-      _$SessionFromJson(json);
+      _$SessionFromJson(<String, dynamic>{
+        ...json,
+        'sessionId': json['sessionId'] ?? json['id'],
+      });
+}
+
+extension SessionCompatX on Session {
+  String get id => sessionId;
 }

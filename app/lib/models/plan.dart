@@ -55,6 +55,13 @@ class PlanPhoto with _$PlanPhoto {
     String? token,
     int? width,
     int? height,
+    String? thumbnailUrl,
+    String? mediumUrl,
+    String? largeUrl,
+    String? fullUrl,
+    String? provider,
+    String? sourceType,
+    String? attributionText,
   }) = _PlanPhoto;
 
   factory PlanPhoto.fromJson(Map<String, dynamic> json) =>
@@ -66,6 +73,7 @@ class PlanHours with _$PlanHours {
   const factory PlanHours({
     bool? openNow,
     List<String>? weekdayText,
+    List<String>? rows,
   }) = _PlanHours;
 
   factory PlanHours.fromJson(Map<String, dynamic> json) =>
@@ -94,7 +102,16 @@ class Plan with _$Plan {
     Map<String, dynamic>? metadata,
   }) = _Plan;
 
-  factory Plan.fromJson(Map<String, dynamic> json) => _$PlanFromJson(json);
+  factory Plan.fromJson(Map<String, dynamic> json) {
+    final normalized = Map<String, dynamic>.from(json);
+
+    normalized['sourceId'] = (json['sourceId'] ?? json['placeId'] ?? json['id'])?.toString();
+    normalized['title'] = (json['title'] ?? json['name'])?.toString();
+    normalized['openingHoursText'] =
+        json['openingHoursText'] ?? json['openingHours'] ?? json['hours']?['weekdayText'];
+
+    return _$PlanFromJson(normalized);
+  }
 }
 
 extension PlanVenueHooksX on Plan {
@@ -103,7 +120,7 @@ extension PlanVenueHooksX on Plan {
   bool get hasSpecials => specials.isNotEmpty;
 
   bool get isVenueLike {
-    const sources = <String>{'google', 'yelp', 'promoted', 'deduped'};
+    const sources = <String>{'google', 'yelp', 'promoted', 'deduped', 'foursquare'};
     final sourceNormalized = source.toLowerCase();
     final kind = metadata?['kind']?.toString().toLowerCase();
     final hasAddress = location.address?.trim().isNotEmpty == true;

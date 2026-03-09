@@ -33,6 +33,7 @@ class FoursquarePlanMapper {
       deepLinks: DeepLinks(
         mapsLink: 'https://www.google.com/maps/search/?api=1&query=${place.location.lat},${place.location.lng}',
         websiteLink: place.website,
+        callLink: place.tel,
       ),
       metadata: {
         'source': 'foursquare',
@@ -48,6 +49,12 @@ class FoursquarePlanMapper {
         token: photo.id,
         width: photo.width,
         height: photo.height,
+        thumbnailUrl: photo.originalUrl,
+        mediumUrl: photo.originalUrl,
+        largeUrl: photo.originalUrl,
+        fullUrl: photo.originalUrl,
+        provider: 'foursquare',
+        sourceType: 'provider',
       );
 
   static String _buildDescription(FoursquarePlace place) {

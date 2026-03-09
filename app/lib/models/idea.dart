@@ -44,7 +44,14 @@ class IdeaItem with _$IdeaItem {
   }) = _IdeaItem;
 
   factory IdeaItem.fromJson(Map<String, dynamic> json) =>
-      _$IdeaItemFromJson(json);
+      _$IdeaItemFromJson(<String, dynamic>{
+        ...json,
+        'ideaId': json['ideaId'] ?? json['id'],
+      });
+}
+
+extension IdeaItemCompatX on IdeaItem {
+  String get id => ideaId;
 }
 
 @freezed
