@@ -110,24 +110,30 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const backgroundGradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        Color(0xFF1E3A8A),
+        Color(0xFF020617),
+      ],
+    );
+
     return Scaffold(
       appBar: appBar,
       floatingActionButton: floatingActionButton,
       body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).colorScheme.surface,
-              Theme.of(context).colorScheme.surfaceContainerLowest,
-            ],
-          ),
-        ),
+        decoration: const BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(
-          child: Padding(
-            padding: padding,
-            child: body,
+          child: DefaultTextStyle.merge(
+            style: const TextStyle(color: Colors.white),
+            child: IconTheme.merge(
+              data: const IconThemeData(color: Colors.white),
+              child: Padding(
+                padding: padding,
+                child: body,
+              ),
+            ),
           ),
         ),
       ),
