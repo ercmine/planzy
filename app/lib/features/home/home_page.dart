@@ -138,9 +138,19 @@ class HomePage extends ConsumerWidget {
       );
     }
 
-    final ent = entitlement.value;
-    final sub = subscription.value;
-    final roll = rollout.value;
+    final ent = entitlement.valueOrNull;
+    final sub = subscription.valueOrNull;
+    final roll = rollout.valueOrNull;
+
+    if (ent == null || sub == null || roll == null) {
+      return const AppCard(
+        child: ListTile(
+          leading: Icon(Icons.sync_problem_outlined),
+          title: Text('Contract snapshot unavailable'),
+          subtitle: Text('Live contract data is temporarily unavailable. Pull to refresh and try again.'),
+        ),
+      );
+    }
     return Column(
       children: [
         AppCard(
