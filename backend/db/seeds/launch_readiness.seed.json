@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "environment": "non-production",
+  "description": "Deterministic launch-readiness fixtures for local/staging QA and demos.",
+  "users": [
+    { "id": "user_free_local", "email": "free+local@perbug.test", "roles": ["USER"], "plan": "user-free", "state": "active", "savedPlaces": 0 },
+    { "id": "user_plus_local", "email": "plus+local@perbug.test", "roles": ["USER"], "plan": "user-plus", "state": "active", "savedPlaces": 18 },
+    { "id": "user_trial_local", "email": "trial+local@perbug.test", "roles": ["USER"], "plan": "user-pro", "state": "trialing", "trialDaysRemaining": 9 },
+    { "id": "user_canceled_active", "email": "cancel+local@perbug.test", "roles": ["USER"], "plan": "user-plus", "state": "canceled_active", "graceUntil": "2026-06-30T00:00:00.000Z" },
+    { "id": "user_past_due", "email": "pastdue+local@perbug.test", "roles": ["USER"], "plan": "user-plus", "state": "past_due", "adsMode": "reduced" },
+    { "id": "creator_basic", "email": "creator.basic@perbug.test", "roles": ["USER", "CREATOR"], "plan": "creator-free", "state": "active" },
+    { "id": "creator_premium", "email": "creator.pro@perbug.test", "roles": ["USER", "CREATOR"], "plan": "creator-elite", "state": "active", "mediaCount": 15 },
+    { "id": "business_owner", "email": "owner@perbug.test", "roles": ["USER", "BUSINESS_OWNER"], "plan": "business-plus", "state": "active", "claimedPlaces": 2 },
+    { "id": "admin_mod", "email": "ops.admin@perbug.test", "roles": ["ADMIN", "MODERATOR"], "plan": "user-pro", "state": "active" }
+  ],
+  "places": [
+    { "id": "place_media_rich", "title": "Mission Garden Bistro", "category": "food", "reviewCount": 22, "photoCount": 34, "videoCount": 6 },
+    { "id": "place_sparse", "title": "Quiet Nook Tea", "category": "cafe", "reviewCount": 1, "photoCount": 1, "videoCount": 0 },
+    { "id": "place_flagged", "title": "Night Market Arcade", "category": "entertainment", "reviewCount": 9, "photoCount": 14, "videoCount": 3 }
+  ],
+  "moderationCases": [
+    { "targetType": "review", "targetId": "review_pending_1", "state": "pending_review", "reason": "spam" },
+    { "targetType": "review", "targetId": "review_hidden_1", "state": "hidden", "reason": "harassment_bullying" },
+    { "targetType": "review_media", "targetId": "media_removed_1", "reviewId": "review_flagged_media", "state": "removed", "reason": "unsafe_media" },
+    { "targetType": "business_review_response", "targetId": "response_pending_1", "state": "pending_review", "reason": "contains_pii" }
+  ],
+  "ads": {
+    "placements": ["results", "detail", "feed", "planner"],
+    "fixtureInventory": "deterministic",
+    "fallbackCreative": "house_ad_default"
+  },
+  "notes": [
+    "Use these IDs in launch e2e smoke tests for deterministic assertions.",
+    "Do not use seed emails or IDs in production environments."
+  ]
+}

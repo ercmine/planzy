@@ -34,4 +34,16 @@ describe("PremiumExperienceService", () => {
     expect(premium.getPremiumDiscoveryModules("free-user")).toHaveLength(0);
     expect(premium.getPremiumDiscoveryModules("plus-user")).toContain("premium_hidden_gems");
   });
+
+  it("enforces ad placement allowlist and safe fallback", async () => {
+    const { subscriptions, premium } = makeService();
+    await subscriptions.startSubscriptionChange("plus-user", "user-plus");
+    await subscriptions.startSubscriptionChange("elite-user", "user-pro");
+
+    expect(premium.shouldShowAdsForPlacement("free-user", "detail")).toBe(true);
+    expect(premium.shouldShowAdsForPlacement("plus-user", "detail")).toBe(false);
+    expect(premium.shouldShowAdsForPlacement("elite-user", "results")).toBe(false);
+    expect(premium.shouldShowAdsForPlacement("free-user", "unknown-surface")).toBe(false);
+  });
+
 });
