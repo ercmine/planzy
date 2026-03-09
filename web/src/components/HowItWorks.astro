@@ -3,16 +3,28 @@ import Container from './Container.astro';
 
 const steps = [
   {
-    title: 'Pick your vibe',
-    description: 'Choose categories like coffee, food, bars, and activities so Perbug understands your mood.'
+    title: 'Discover',
+    description: 'Explore nearby places with smart ranking that adapts to your mood, timing, and distance.'
   },
   {
-    title: 'Swipe yes / no / maybe',
-    description: 'Quickly decide what looks good now, then let Perbug rank what best fits your group or solo plan.'
+    title: 'Save',
+    description: 'Build lists for date nights, quick lunches, coffee runs, and weekend plans.'
   },
   {
-    title: 'Go with live confidence',
-    description: 'See what is hot nearby right now, save winning plans, and share with friends instantly.'
+    title: 'Review',
+    description: 'Leave trusted ratings with photos and videos so others see what it is really like.'
+  },
+  {
+    title: 'Share',
+    description: 'Send top picks to friends instantly and decide faster without opening five apps.'
+  },
+  {
+    title: 'Follow creators',
+    description: 'Find local voices with consistent taste and follow their guides, spots, and updates.'
+  },
+  {
+    title: 'Plan outings',
+    description: 'Use the AI planner to map a full outing and interact directly with businesses before you go.'
   }
 ];
 ---
@@ -20,8 +32,8 @@ const steps = [
 <section id="how-it-works" class="py-[var(--space-section)]">
   <Container>
     <h2 class="text-3xl font-semibold">How Perbug works</h2>
-    <p class="mt-3 max-w-2xl text-slate-300">Built for right-now decisions, not endless tabs. From filters to final choice in under a minute.</p>
-    <div class="mt-8 grid gap-4 md:grid-cols-3">
+    <p class="mt-3 max-w-3xl text-slate-300">From first idea to final plan in minutes. Perbug turns local discovery into a clean, social, decision-ready experience.</p>
+    <div class="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {steps.map((step, idx) => (
         <article class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
           <p class="text-sm font-semibold text-neon-purple">Step {idx + 1}</p>

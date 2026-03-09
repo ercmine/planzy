@@ -1,24 +1,29 @@
 ---
 import Container from './Container.astro';
 
+const credibility = ['Trusted local reviews', 'Photo + video proof', 'Smart recommendations', 'Creator-first content'];
 const socialProof = [
-  { label: 'Plans surfaced today', value: '12,480' },
-  { label: 'Loved in', value: 'Austin, TX' },
-  { label: 'Avg. match time', value: 'under 30 sec' }
+  { label: 'Active local guides', value: '4,200+' },
+  { label: 'Cities in rollout', value: '18' },
+  { label: 'Weekly place saves', value: '150k+' }
 ];
 ---
 
 <section class="bg-hero-glow py-16 sm:py-20">
   <Container class="grid items-center gap-10 lg:grid-cols-2">
     <div class="space-y-6">
-      <p class="text-sm font-semibold uppercase tracking-[0.2em] text-brand-400">Live plans near you</p>
-      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Plans that match your moment.</h1>
+      <p class="text-sm font-semibold uppercase tracking-[0.2em] text-brand-400">Launching local discovery, reimagined</p>
+      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Discover where to go next with reviews you can actually trust.</h1>
       <p class="max-w-xl text-lg text-slate-300">
-        Perbug finds the best nearby coffee, food, bars, and activities—live, location-based, and always up to date.
+        Perbug helps you find the right places faster with smart recommendations, creator-led guides, real review photos and videos, and tools for businesses to stay connected.
       </p>
       <div class="flex flex-wrap gap-3">
-        <a href="/downloads/" class="rounded-lg bg-brand-500 px-5 py-3 font-semibold text-slate-950 shadow-soft hover:bg-brand-400">Get the App</a>
-        <a href="/demo/" class="rounded-lg border border-slate-600 px-5 py-3 font-semibold text-slate-100 hover:border-neon-purple">Try the Demo</a>
+        <a href="/downloads/" class="rounded-lg bg-brand-500 px-5 py-3 font-semibold text-slate-950 shadow-soft hover:bg-brand-400">Start Exploring</a>
+        <a href="/demo/" class="rounded-lg border border-slate-600 px-5 py-3 font-semibold text-slate-100 hover:border-neon-purple">View Product Preview</a>
+      </div>
+      <div class="flex flex-wrap gap-4 text-sm">
+        <a href="#creators" class="font-semibold text-brand-300 hover:text-brand-200">Join as a creator →</a>
+        <a href="#business" class="font-semibold text-brand-300 hover:text-brand-200">Claim your business →</a>
       </div>
       <div class="grid gap-3 sm:grid-cols-3">
         {socialProof.map((stat) => (
@@ -30,24 +35,22 @@ const socialProof = [
       </div>
     </div>
     <div class="rounded-3xl border border-slate-700 bg-slate-900/70 p-4 shadow-glow">
-      <div class="mx-auto max-w-xs rounded-[2rem] border border-slate-700 bg-slate-950 p-4">
-        <div class="mb-4 h-2 w-20 rounded-full bg-slate-700"></div>
-        <div class="space-y-3">
+      <div class="mx-auto max-w-sm rounded-3xl border border-slate-700 bg-slate-950 p-5">
+        <p class="text-sm font-semibold text-brand-300">Tonight near you</p>
+        <div class="mt-4 space-y-3">
           <div class="rounded-2xl border border-slate-800 bg-slate-900 p-3">
             <p class="text-xs text-slate-400">Trending now • 0.4 mi</p>
             <p class="font-semibold">Moonshot Coffee</p>
-            <p class="text-xs text-slate-300">Open mic starts in 20 min</p>
+            <p class="text-xs text-slate-300">Creator tip: Try the orange cardamom latte before 7pm.</p>
           </div>
           <div class="rounded-2xl border border-slate-800 bg-slate-900 p-3">
-            <p class="text-xs text-slate-400">Popular tonight • 0.9 mi</p>
+            <p class="text-xs text-slate-400">Smart match • 0.9 mi</p>
             <p class="font-semibold">Nori Alley</p>
-            <p class="text-xs text-slate-300">2-for-1 ramen until 8pm</p>
+            <p class="text-xs text-slate-300">92% match for date-night + budget under $40.</p>
           </div>
-          <div class="grid grid-cols-3 gap-2 text-center text-xs font-semibold">
-            <div class="rounded-lg border border-rose-500/40 px-2 py-1 text-rose-300">No</div>
-            <div class="rounded-lg border border-amber-500/40 px-2 py-1 text-amber-300">Maybe</div>
-            <div class="rounded-lg border border-brand-400/40 px-2 py-1 text-brand-300">Yes</div>
-          </div>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-2 text-xs font-semibold">
+          {credibility.map((item) => <p class="rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-2 text-center text-slate-300">{item}</p>)}
         </div>
       </div>
     </div>
