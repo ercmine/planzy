@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/app_providers.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class SubscriptionPage extends ConsumerWidget {
   const SubscriptionPage({super.key});
@@ -12,7 +13,9 @@ class SubscriptionPage extends ConsumerWidget {
     final entitlementsAsync = ref.watch(entitlementSummaryProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Subscription & billing')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Subscription & billing')),
       body: subscriptionAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Unable to load subscription: $error')),

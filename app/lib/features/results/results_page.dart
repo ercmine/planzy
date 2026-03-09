@@ -11,6 +11,7 @@ import 'results_controller.dart';
 import 'results_models.dart';
 import 'results_state.dart';
 import 'widgets/results_plan_tile.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class ResultsPage extends ConsumerStatefulWidget {
   const ResultsPage({required this.sessionId, super.key});
@@ -54,7 +55,9 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
     final controller = ref.read(resultsControllerProvider(widget.sessionId).notifier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Results')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Results')),
       body: RefreshIndicator(
         onRefresh: controller.refresh,
         child: state.isLoading

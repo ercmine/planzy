@@ -20,6 +20,7 @@ import 'plan_detail_page.dart';
 import 'widgets/deck_actions_bar.dart';
 import 'widgets/deck_card.dart';
 import 'widgets/deck_card_skeleton.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class DeckPage extends ConsumerStatefulWidget {
   const DeckPage({required this.sessionId, super.key});
@@ -146,6 +147,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
 
     return AppScaffold(
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: const Text('Deck'),
         actions: [
           IconButton(
@@ -418,6 +420,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
 
     return AppScaffold(
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: const Text('Deck'),
         actions: [
           IconButton(

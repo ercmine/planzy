@@ -5,6 +5,7 @@ import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import '../../models/entitlement_summary.dart';
 import '../../providers/app_providers.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class RoleHubPage extends ConsumerWidget {
   const RoleHubPage({required this.family, this.entitlementFamily, super.key});
@@ -18,7 +19,9 @@ class RoleHubPage extends ConsumerWidget {
     final entitlements = ref.watch(entitlementSummaryFamilyProvider(resolvedFamily));
 
     return Scaffold(
-      appBar: AppBar(title: Text('$family Hub')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: Text('$family Hub')),
       body: entitlements.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Failed to load entitlement contract: $error')),

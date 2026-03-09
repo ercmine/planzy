@@ -9,6 +9,7 @@ import '../../models/entitlement_summary.dart';
 import '../../providers/app_providers.dart';
 import 'home_controller.dart';
 import 'widgets/launch_widgets.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -22,6 +23,7 @@ class HomePage extends ConsumerWidget {
 
     return AppScaffold(
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: const PerbugLogo(size: 28, variant: PerbugLogoVariant.withWordmark),
         actions: [
           Padding(

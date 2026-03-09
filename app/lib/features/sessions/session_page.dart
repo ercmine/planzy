@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../providers/app_providers.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class SessionPage extends ConsumerWidget {
   const SessionPage({required this.sessionId, super.key});
@@ -16,7 +17,9 @@ class SessionPage extends ConsumerWidget {
     final swipeCountAsync = ref.watch(swipeCountProvider(sessionId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Session')),
+      appBar: AppBar(
+        leading: const AppBackButton(),
+        title: const Text('Session')),
       body: sessionAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text(error.toString())),

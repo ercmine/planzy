@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../core/widgets/app_back_button.dart';
 
 class OnboardingScaffold extends StatelessWidget {
   const OnboardingScaffold({
     required this.child,
+    this.showBackButton = true,
     super.key,
   });
 
   final Widget child;
+  final bool showBackButton;
 
   @override
   Widget build(BuildContext context) {
@@ -31,12 +34,21 @@ class OnboardingScaffold extends StatelessWidget {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 520),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.l),
-                child: child,
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.l),
+                  child: Column(
+                    children: [
+                      if (showBackButton)
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: AppBackButton(),
+                        ),
+                      Expanded(child: child),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
         ),
       ),
     );
