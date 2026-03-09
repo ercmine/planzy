@@ -52,6 +52,8 @@ import { MemoryOutingPlannerStore, OutingPlannerService } from "../outingPlanner
 import { InMemoryPlaceStore, PlaceNormalizationService } from "../places/index.js";
 import { VenueClaimsService } from "../venues/claims/claimsService.js";
 import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
+import { MemoryRolloutStore } from "../rollouts/store.js";
+import { rolloutSeedForLocalDev, RolloutService } from "../rollouts/service.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -174,6 +176,7 @@ export function createServer(options?: CreateServerOptions) {
     ideasStore,
     logger: options?.logger
   });
+  const rolloutService = new RolloutService(new MemoryRolloutStore(rolloutSeedForLocalDev()), accountsService, subscriptionService);
 
   return createHttpServer(service, merchantService, {
     deckHandler,
@@ -210,7 +213,8 @@ export function createServer(options?: CreateServerOptions) {
     rankingTuning: { service: rankingConfigService, resolver: rankingConfigResolver, repo: discoveryRepository }
     ,
     analyticsService,
-    analyticsQueryService
+    analyticsQueryService,
+    rolloutService
   });
 }
 
