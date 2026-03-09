@@ -9,7 +9,6 @@ import '../../core/ads/ad_deck_injector.dart';
 import '../../core/location/location_controller.dart';
 import '../../core/telemetry/telemetry_dispatcher.dart';
 import '../../models/deck_batch.dart';
-import '../../models/deep_links.dart';
 import '../../models/plan.dart';
 import '../../models/swipe.dart';
 import '../../models/telemetry.dart';
@@ -284,7 +283,7 @@ class DeckController extends StateNotifier<DeckState> {
     );
   }
 
-  List<MapEntry<String, Uri>> availableLinks(DeepLinks? links) {
+  List<MapEntry<String, Uri>> availableLinks(PlanDeepLinks? links) {
     if (links == null) {
       return const <MapEntry<String, Uri>>[];
     }

@@ -1,4 +1,3 @@
-import '../../models/deep_links.dart';
 import '../../models/plan.dart';
 import 'foursquare_models.dart';
 
@@ -30,7 +29,7 @@ class FoursquarePlanMapper {
       priceLevel: place.price,
       phone: place.tel,
       photos: dedupedPhotos.isEmpty ? null : dedupedPhotos,
-      deepLinks: DeepLinks(
+      deepLinks: PlanDeepLinks(
         mapsLink: 'https://www.google.com/maps/search/?api=1&query=${place.location.lat},${place.location.lng}',
         websiteLink: place.website,
         callLink: place.tel,
