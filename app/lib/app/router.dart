@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../core/identity/identity_provider.dart';
 import '../features/deck/deck_page.dart';
 import '../features/home/home_page.dart';
+import '../features/hubs/activity_page.dart';
+import '../features/hubs/planner_page.dart';
+import '../features/hubs/role_hub_page.dart';
 import '../features/ideas/ideas_page.dart';
 import '../features/invite/invite_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
@@ -99,6 +102,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/sessions',
         name: 'sessions',
         builder: (context, state) => const SessionsPage(),
+      ),
+      GoRoute(
+        path: '/activity',
+        name: 'activity',
+        builder: (context, state) => const ActivityPage(),
+      ),
+      GoRoute(
+        path: '/planner',
+        name: 'planner',
+        builder: (context, state) => const PlannerPage(),
+      ),
+      GoRoute(
+        path: '/hub/:family',
+        name: 'role-hub',
+        builder: (context, state) {
+          final family = (state.pathParameters['family'] ?? 'user').toUpperCase();
+          if (family == 'CREATOR' || family == 'BUSINESS') {
+            return RoleHubPage(family: family);
+          }
+          if (family == 'ADMIN') {
+            return const RoleHubPage(family: 'ADMIN', entitlementFamily: 'USER');
+          }
+          return const RoleHubPage(family: 'USER');
+        },
       ),
       GoRoute(
         path: '/settings',

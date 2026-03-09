@@ -2,23 +2,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class HomeState {
   const HomeState({
-    required this.counter,
+    required this.activePulse,
     required this.statusMessage,
   });
 
   factory HomeState.initial() {
-    return const HomeState(counter: 0, statusMessage: 'Welcome to Perbug');
+    return const HomeState(
+      activePulse: 0,
+      statusMessage: 'Your launch dashboard is live',
+    );
   }
 
-  final int counter;
+  final int activePulse;
   final String statusMessage;
 
   HomeState copyWith({
-    int? counter,
+    int? activePulse,
     String? statusMessage,
   }) {
     return HomeState(
-      counter: counter ?? this.counter,
+      activePulse: activePulse ?? this.activePulse,
       statusMessage: statusMessage ?? this.statusMessage,
     );
   }
@@ -27,11 +30,11 @@ class HomeState {
 class HomeController extends StateNotifier<HomeState> {
   HomeController() : super(HomeState.initial());
 
-  void increment() {
-    final nextCounter = state.counter + 1;
+  void refreshPulse() {
+    final nextPulse = state.activePulse + 1;
     state = state.copyWith(
-      counter: nextCounter,
-      statusMessage: 'Counter is now $nextCounter',
+      activePulse: nextPulse,
+      statusMessage: 'Updated just now · pulse #$nextPulse',
     );
   }
 }
