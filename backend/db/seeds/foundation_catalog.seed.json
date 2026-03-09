@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "plans": [
+    { "id": "plan:user-free:v1", "code": "user-free", "audienceType": "USER", "familyKey": "user", "tierKey": "FREE" },
+    { "id": "plan:user-plus:v1", "code": "user-plus", "audienceType": "USER", "familyKey": "user", "tierKey": "PLUS" },
+    { "id": "plan:user-pro:v1", "code": "user-pro", "audienceType": "USER", "familyKey": "user", "tierKey": "PRO" },
+    { "id": "plan:creator-free:v1", "code": "creator-free", "audienceType": "CREATOR", "familyKey": "creator", "tierKey": "FREE" },
+    { "id": "plan:creator-pro:v1", "code": "creator-pro", "audienceType": "CREATOR", "familyKey": "creator", "tierKey": "PRO" },
+    { "id": "plan:creator-elite:v1", "code": "creator-elite", "audienceType": "CREATOR", "familyKey": "creator", "tierKey": "ELITE" },
+    { "id": "plan:business-free:v1", "code": "business-free", "audienceType": "BUSINESS", "familyKey": "business", "tierKey": "FREE" },
+    { "id": "plan:business-plus:v1", "code": "business-plus", "audienceType": "BUSINESS", "familyKey": "business", "tierKey": "PLUS" },
+    { "id": "plan:business-elite:v1", "code": "business-elite", "audienceType": "BUSINESS", "familyKey": "business", "tierKey": "ELITE" }
+  ],
+  "roles": [
+    { "id": "role:user", "roleKey": "USER" },
+    { "id": "role:creator", "roleKey": "CREATOR" },
+    { "id": "role:business_owner", "roleKey": "BUSINESS_OWNER" },
+    { "id": "role:admin", "roleKey": "ADMIN" },
+    { "id": "role:moderator", "roleKey": "MODERATOR" }
+  ],
+  "entitlements": [
+    "ads_enabled",
+    "advanced_search",
+    "ai_recommendations",
+    "ai_itinerary_generation",
+    "max_saved_places",
+    "max_video_reviews_per_month",
+    "business_claiming_enabled",
+    "business_reply_to_reviews",
+    "creator_profile_enabled",
+    "creator_monetization_tools"
+  ]
+}
