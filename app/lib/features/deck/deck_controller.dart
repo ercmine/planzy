@@ -110,7 +110,7 @@ class DeckController extends StateNotifier<DeckState> {
   }
 
   Future<void> maybePrefetchMore() async {
-    final remaining = state.items.length - _resolveCurrentIndex();
+    final remaining = state.items.length - _resolveCurrentIndex() - 1;
     if (remaining <= _prefetchThreshold && !state.isLoadingMore && !state.isLoadingNextBatch) {
       await _loadBatch();
     }
@@ -123,6 +123,9 @@ class DeckController extends StateNotifier<DeckState> {
 
     final currentIndex = _resolveCurrentIndex();
     if (currentIndex < 0 || currentIndex >= state.items.length) {
+      if (state.hasMore) {
+        await loadNextBatch();
+      }
       return;
     }
 
@@ -136,6 +139,9 @@ class DeckController extends StateNotifier<DeckState> {
     if (topItem is DeckAdItem) {
       _advanceAcrossDeck(source: 'ad-${action.name}');
       await maybePrefetchMore();
+      if (state.currentIndex >= state.items.length && state.hasMore) {
+        await loadNextBatch();
+      }
       return;
     }
 
@@ -144,22 +150,17 @@ class DeckController extends StateNotifier<DeckState> {
 
     await _emitCardViewedIfNeeded(plan);
 
-    final nextPlans = state.plans.where((candidate) => candidate.id != plan.id).toList(growable: false);
     final shownIds = {...state.shownPlanIds, plan.id}.toList(growable: false);
     final answeredPlanIds = {...state.answeredPlanIds, plan.id};
     final undo = [
       DeckSwipeRecord(plan: plan, action: action, position: position),
       ...state.undoStack,
     ];
-
-    final nextItems = _adDeckInjector.inject(plans: nextPlans);
-    final nextIndex = _firstDisplayableIndex(nextItems);
+    final nextIndex = _nextIndex(currentIndex, state.items);
 
     state = state.copyWith(
-      plans: nextPlans,
-      items: nextItems,
       currentIndex: nextIndex,
-      currentItemKey: nextItems.isEmpty ? null : nextItems[nextIndex].itemKey,
+      currentItemKey: nextIndex >= state.items.length ? null : state.items[nextIndex].itemKey,
       undoStack: undo,
       shownPlanIds: shownIds,
       answeredPlanIds: answeredPlanIds,
@@ -188,7 +189,7 @@ class DeckController extends StateNotifier<DeckState> {
       ),
     ));
 
-    if (state.plans.isEmpty) {
+    if (state.currentIndex >= state.items.length && state.hasMore) {
       await loadNextBatch();
     }
   }
@@ -240,16 +241,18 @@ class DeckController extends StateNotifier<DeckState> {
       return;
     }
 
+    if (state.currentIndex <= 0) {
+      return;
+    }
+
     final record = state.undoStack.first;
     final remainingUndo = [...state.undoStack]..removeAt(0);
-    final nextPlans = [record.plan, ...state.plans];
-    final nextItems = _adDeckInjector.inject(plans: nextPlans);
-    final nextIndex = _firstDisplayableIndex(nextItems);
+    final restoredAnswers = {...state.answeredPlanIds}..remove(record.plan.id);
+    final nextIndex = math.max(0, state.currentIndex - 1);
     state = state.copyWith(
-      plans: nextPlans,
-      items: nextItems,
       currentIndex: nextIndex,
-      currentItemKey: nextItems.isEmpty ? null : nextItems[nextIndex].itemKey,
+      currentItemKey: state.items[nextIndex].itemKey,
+      answeredPlanIds: restoredAnswers,
       undoStack: remainingUndo,
     );
     _startViewingTopCard();
@@ -501,7 +504,7 @@ class DeckController extends StateNotifier<DeckState> {
         return byKey;
       }
     }
-    return math.min(state.currentIndex, state.items.length - 1);
+    return math.min(state.currentIndex, state.items.length);
   }
 
   int _firstDisplayableIndex(List<DeckItem> items) {
@@ -528,13 +531,20 @@ class DeckController extends StateNotifier<DeckState> {
     return _firstDisplayableIndex(items);
   }
 
+  int _nextIndex(int currentIndex, List<DeckItem> items) {
+    if (items.isEmpty) {
+      return 0;
+    }
+    return math.min(currentIndex + 1, items.length);
+  }
+
   void _advanceAcrossDeck({required String source}) {
     final currentIndex = _resolveCurrentIndex();
-    final nextIndex = math.min(currentIndex + 1, math.max(0, state.items.length - 1));
+    final nextIndex = _nextIndex(currentIndex, state.items);
     if (nextIndex == currentIndex) {
       return;
     }
-    final nextKey = state.items[nextIndex].itemKey;
+    final nextKey = nextIndex >= state.items.length ? null : state.items[nextIndex].itemKey;
     if (nextKey == state.currentItemKey) {
       return;
     }
@@ -544,7 +554,7 @@ class DeckController extends StateNotifier<DeckState> {
       clearError: true,
     );
     if (kDebugMode) {
-      debugPrint('[Deck] advanced source=$source -> idx=$nextIndex key=$nextKey');
+      debugPrint('[Deck] advanced source=$source -> idx=$nextIndex key=${nextKey ?? 'none'}');
     }
     _startViewingTopCard();
   }
