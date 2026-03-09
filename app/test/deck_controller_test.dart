@@ -178,7 +178,8 @@ void main() {
           SwipeAction.yes,
           0,
         )).called(1);
-    expect(controller.state.plans.first.id, 'p1');
+    expect(controller.state.currentIndex, 1);
+    expect(controller.state.currentItemKey, 'plan:p1');
     expect(controller.state.plans.any((p) => p.id == 'p10'), true);
     controller.dispose();
   });
@@ -213,8 +214,8 @@ void main() {
 
     await controller.swipeTop(SwipeAction.yes);
 
-    expect(controller.state.plans.first.id, 'p1');
-    expect(controller.state.currentIndex, 0);
+    expect(controller.state.currentIndex, 1);
+    expect(controller.state.currentItemKey, 'plan:p1');
     controller.dispose();
   });
 
@@ -248,10 +249,10 @@ void main() {
     await Future<void>.microtask(() {});
 
     await controller.swipeTop(SwipeAction.yes);
-    expect(controller.state.plans.first.id, 'p1');
+    expect(controller.state.currentItemKey, 'plan:p1');
     await controller.swipeTop(SwipeAction.no);
-    expect(controller.state.plans.first.id, 'p2');
-    expect(controller.state.plans.length, 1);
+    expect(controller.state.currentItemKey, 'plan:p2');
+    expect(controller.state.currentIndex, 2);
     controller.dispose();
   });
 
@@ -295,7 +296,7 @@ void main() {
     await Future<void>.microtask(() {});
 
     await controller.swipeTop(SwipeAction.yes);
-    expect(controller.state.plans.first.id, 'p1');
+    expect(controller.state.currentItemKey, 'plan:p1');
 
     delayedFetch.complete(
       _batch([
@@ -305,8 +306,8 @@ void main() {
     );
     await prefetchFuture;
 
-    expect(controller.state.plans.first.id, 'p1');
-    expect(controller.state.plans.map((p) => p.id), containsAll(<String>['p1', 'p2', 'p3']));
+    expect(controller.state.currentItemKey, 'plan:p1');
+    expect(controller.state.plans.map((p) => p.id), containsAll(<String>['p0', 'p1', 'p2', 'p3']));
     controller.dispose();
   });
 
@@ -346,8 +347,8 @@ void main() {
 
     await controller.swipeTop(SwipeAction.yes);
 
-    expect(controller.state.plans.first.id, 'p1');
-    expect(controller.state.currentIndex, 0);
+    expect(controller.state.currentItemKey, 'plan:p1');
+    expect(controller.state.currentIndex, 1);
     controller.dispose();
   });
 
@@ -403,6 +404,83 @@ void main() {
     await prefetch;
 
     expect(controller.state.currentItemKey, 'plan:a1');
+    controller.dispose();
+  });
+
+
+  test('swipe advances index without refreshing current batch', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'No refresh on swipe',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer(
+      (_) async => _batch(
+        [for (var i = 0; i < 12; i++) _plan('stable-$i')],
+        nextCursor: 'cursor-2',
+        sessionId: created.sessionId,
+      ),
+    );
+
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+
+    await controller.swipeTop(SwipeAction.yes);
+
+    verify(() => deckRepository.fetchDeckBatch(created.sessionId, any())).called(1);
+    expect(controller.state.currentIndex, 1);
+    expect(controller.state.currentItemKey, 'plan:stable-1');
+    controller.dispose();
+  });
+
+  test('explicit refresh resets deck position to first card', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'Refresh reset',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer(
+      (_) async => _batch(
+        [for (var i = 0; i < 3; i++) _plan('reset-$i')],
+        nextCursor: 'cursor-r',
+        sessionId: created.sessionId,
+      ),
+    );
+
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+
+    await controller.swipeTop(SwipeAction.yes);
+    expect(controller.state.currentIndex, 1);
+
+    await controller.refresh();
+
+    expect(controller.state.currentIndex, 0);
+    expect(controller.state.currentItemKey, 'plan:reset-0');
     controller.dispose();
   });
 
