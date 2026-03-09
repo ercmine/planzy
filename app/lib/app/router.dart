@@ -10,6 +10,8 @@ import '../features/invite/invite_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
 import '../features/onboarding/onboarding_permissions_page.dart';
 import '../features/onboarding/onboarding_signin_page.dart';
+import '../features/premium/pricing_page.dart';
+import '../features/premium/subscription_page.dart';
 import '../features/results/results_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/sessions/create_session/create_session_page.dart';
@@ -102,6 +104,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (context, state) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: '/pricing',
+        name: 'pricing',
+        builder: (context, state) {
+          final family = state.uri.queryParameters['family'];
+          return PricingPage(initialFamily: family);
+        },
+      ),
+      GoRoute(
+        path: '/account/subscription',
+        name: 'subscription',
+        builder: (context, state) => const SubscriptionPage(),
       ),
       GoRoute(
         path: '/sessions/create',

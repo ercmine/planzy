@@ -32,6 +32,8 @@ import '../features/deck/deck_controller.dart';
 import '../features/deck/deck_state.dart';
 import '../features/ideas/ideas_controller.dart';
 import '../features/ideas/ideas_state.dart';
+import '../features/premium/premium_models.dart';
+import '../features/premium/premium_repository.dart';
 import '../features/results/results_controller.dart';
 import '../features/results/results_state.dart';
 import '../features/settings/settings_controller.dart';
@@ -72,6 +74,26 @@ final adsDiagnosticsProvider = Provider<AdsDiagnostics>((ref) {
 final entitlementSummaryProvider = FutureProvider<EntitlementSummary>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);
   return apiClient.fetchEntitlementSummary();
+});
+
+final entitlementSummaryFamilyProvider = FutureProvider.family<EntitlementSummary, String>((ref, family) async {
+  final apiClient = await ref.watch(apiClientProvider.future);
+  return apiClient.fetchEntitlementSummary(targetType: family);
+});
+
+final premiumRepositoryProvider = FutureProvider<PremiumRepository>((ref) async {
+  final client = await ref.watch(apiClientProvider.future);
+  return PremiumRepository(apiClient: client);
+});
+
+final premiumPlansProvider = FutureProvider.family<List<PremiumPlan>, String>((ref, family) async {
+  final repository = await ref.watch(premiumRepositoryProvider.future);
+  return repository.fetchPlans(family: family);
+});
+
+final subscriptionOverviewProvider = FutureProvider<SubscriptionOverview>((ref) async {
+  final repository = await ref.watch(premiumRepositoryProvider.future);
+  return repository.fetchSubscriptionOverview();
 });
 
 final adEntitlementSnapshotProvider = Provider<AdEntitlementSnapshot>((ref) {
