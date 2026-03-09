@@ -54,6 +54,34 @@ describe("subscription routes", () => {
     });
   });
 
+
+  it("returns entitlement summary contract with features and quotas", async () => {
+    const headers = {
+      "x-user-id": "summary-user-1",
+      "x-account-type": "USER"
+    };
+
+    const response = await fetch(`${baseUrl}/v1/entitlements/summary?targetType=USER`, { headers });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      context: {
+        userId: "summary-user-1",
+        targetType: "USER",
+        plan: expect.objectContaining({ code: expect.any(String) })
+      },
+      ads: {
+        adsEnabled: expect.any(Boolean),
+        adsLevel: expect.any(String)
+      },
+      features: expect.arrayContaining([
+        expect.objectContaining({ key: "reviews.write", allowed: expect.any(Boolean) })
+      ]),
+      quotas: expect.arrayContaining([
+        expect.objectContaining({ key: "quota.lists.saved_lists", used: expect.any(Number), remaining: expect.any(Number) })
+      ])
+    });
+  });
+
   it("blocks paid AI itinerary feature for free user with structured reason", async () => {
     const response = await fetch(`${baseUrl}/v1/subscription/authorize?action=generate_ai_itinerary`, {
       headers: {

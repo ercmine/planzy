@@ -30,6 +30,7 @@ import type { MerchantService } from "../merchant/service.js";
 import { ValidationError } from "../plans/errors.js";
 import { sanitizeText } from "../sanitize/text.js";
 import { createSubscriptionHttpHandlers } from "../subscriptions/http.js";
+import { getPlan } from "../subscriptions/catalog.js";
 import type { EntitlementPolicyService } from "../subscriptions/policy.js";
 import type { SubscriptionService } from "../subscriptions/service.js";
 import { SubscriptionTargetType } from "../subscriptions/types.js";
@@ -1638,6 +1639,58 @@ export function createRoutes(
         const features = await deps.accessEngine.getFeatureAccessSummary(target);
         const quotas = await deps.accessEngine.getQuotaSummary(target);
         sendJson(res, 200, { features, quotas });
+        return;
+      }
+
+      if (deps?.accessEngine && deps?.subscriptionService && req.method === "GET" && normalizedPath === "/v1/entitlements/summary") {
+        const userId = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userId) throw new ValidationError(["x-user-id header is required"]);
+        const requestedType = String(url.searchParams.get("targetType") ?? "USER").toUpperCase();
+        const targetType = requestedType === SubscriptionTargetType.CREATOR || requestedType === SubscriptionTargetType.BUSINESS
+          ? requestedType as SubscriptionTargetType
+          : SubscriptionTargetType.USER;
+        const target = { targetType, targetId: userId };
+        const featureSummary = await deps.accessEngine.getFeatureAccessSummary(target);
+        const quotaSummary = await deps.accessEngine.getQuotaSummary(target);
+        const subscription = deps.subscriptionService.getSubscription(userId);
+        const plan = getPlan(subscription.planId);
+        const currentPlanId = plan?.id ?? subscription.planId;
+        const upgradePlanId = plan?.upgradePlanIds[0];
+
+        sendJson(res, 200, {
+          context: {
+            userId,
+            targetType,
+            evaluatedAt: new Date().toISOString(),
+            plan: {
+              id: currentPlanId,
+              code: plan?.code ?? "unknown",
+              tier: plan?.tier ?? "FREE",
+              status: subscription.status
+            }
+          },
+          ads: {
+            adsEnabled: !featureSummary.features.find((item) => item.key === FEATURE_KEYS.ADS_AD_FREE)?.enabled,
+            adsLevel: featureSummary.features.find((item) => item.key === FEATURE_KEYS.ADS_AD_FREE)?.enabled ? "suppressed" : "full"
+          },
+          features: featureSummary.features.map((item) => ({
+            key: item.key,
+            allowed: item.enabled,
+            source: item.source,
+            reasonCode: item.enabled ? "ALLOWED" : "FEATURE_NOT_IN_PLAN",
+            upgradeable: !item.enabled && Boolean(upgradePlanId),
+            suggestedPlanId: !item.enabled ? upgradePlanId : undefined
+          })),
+          quotas: quotaSummary.quotas.map((item) => ({
+            key: item.key,
+            limit: item.limit,
+            used: item.used,
+            remaining: item.remaining,
+            unlimited: item.limit < 0,
+            resetAt: item.resetAt,
+            source: item.source
+          }))
+        });
         return;
       }
 
