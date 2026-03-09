@@ -5,11 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../app/brand/logo.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../core/widgets/app_back_button.dart';
 import '../../models/entitlement_summary.dart';
 import '../../providers/app_providers.dart';
 import 'home_controller.dart';
 import 'widgets/launch_widgets.dart';
-import '../../core/widgets/app_back_button.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -39,84 +39,77 @@ class HomePage extends ConsumerWidget {
       body: ListView(
         children: [
           GradientHeroCard(
-            title: 'Launch-ready command center',
-            subtitle: state.statusMessage,
+            title: 'Find your next great plan',
+            subtitle: 'Discover places, build itineraries, and keep your group in sync.',
             pills: const [
               AppPill(label: 'Discover', icon: Icons.travel_explore_outlined),
-              AppPill(label: 'Creator', icon: Icons.campaign_outlined),
-              AppPill(label: 'Business', icon: Icons.storefront_outlined),
+              AppPill(label: 'Saved', icon: Icons.bookmark_border_rounded),
+              AppPill(label: 'Planner', icon: Icons.auto_awesome),
             ],
             onTap: () => context.go('/sessions'),
           ),
           const SizedBox(height: AppSpacing.m),
-          _contractSnapshot(entitlement, subscription, rollout),
+          _membershipSnapshot(entitlement, subscription, rollout),
           const SizedBox(height: AppSpacing.m),
           const AppSectionHeader(
-            title: 'Product surfaces',
-            subtitle: 'Each major backend capability has a discoverable frontend entry point.',
+            title: 'Explore',
+            subtitle: 'Everything important is one tap away.',
           ),
           const SizedBox(height: AppSpacing.s),
           SurfaceNavCard(
             icon: Icons.style_outlined,
-            title: 'Discovery sessions',
-            description: 'Search, deck swipes, next-card flow, and results UX.',
+            title: 'Discover',
+            description: 'Swipe nearby places, save favorites, and compare top picks.',
             onTap: () => context.go('/sessions'),
           ),
           const SizedBox(height: AppSpacing.s),
           SurfaceNavCard(
-            icon: Icons.workspace_premium_outlined,
-            title: 'Premium & subscription',
-            description: 'Plan states, billing lifecycle, quotas, and upgrades.',
-            onTap: () => context.go('/account/subscription'),
-            badge: 'Entitlements',
-          ),
-          const SizedBox(height: AppSpacing.s),
-          SurfaceNavCard(
             icon: Icons.auto_awesome,
-            title: 'AI planner & itineraries',
-            description: 'Structured planning flow with premium-aware gating.',
+            title: 'Planner',
+            description: 'Generate itinerary ideas with personalized recommendations.',
             onTap: () => context.go('/planner'),
           ),
           const SizedBox(height: AppSpacing.s),
           SurfaceNavCard(
             icon: Icons.notifications_active_outlined,
-            title: 'Activity inbox',
-            description: 'Follows, replies, moderation updates, collaboration invites.',
+            title: 'Activity',
+            description: 'Track follows, replies, moderation updates, and invites.',
             onTap: () => context.go('/activity'),
+          ),
+          const SizedBox(height: AppSpacing.s),
+          SurfaceNavCard(
+            icon: Icons.workspace_premium_outlined,
+            title: 'Premium',
+            description: 'View plan benefits, billing, and upgrade options.',
+            onTap: () => context.go('/account/subscription'),
+            badge: 'Membership',
           ),
           const SizedBox(height: AppSpacing.s),
           SurfaceNavCard(
             icon: Icons.person_outline,
             title: 'Creator Hub',
-            description: 'Creator profile, verification, analytics, and monetization surfaces.',
+            description: 'Manage creator tools, verification, and growth surfaces.',
             onTap: () => context.go('/hub/creator'),
           ),
           const SizedBox(height: AppSpacing.s),
           SurfaceNavCard(
             icon: Icons.business_outlined,
             title: 'Business Hub',
-            description: 'Claim, verification, responses, analytics, and collaboration.',
+            description: 'Handle claims, reputation, analytics, and collaborations.',
             onTap: () => context.go('/hub/business'),
-          ),
-          const SizedBox(height: AppSpacing.s),
-          SurfaceNavCard(
-            icon: Icons.shield_outlined,
-            title: 'Trust, moderation, and ops',
-            description: 'Moderation states, rollout visibility, quality-aware messaging.',
-            onTap: () => context.go('/hub/admin'),
           ),
           const SizedBox(height: AppSpacing.xl),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => ref.read(homeControllerProvider.notifier).refreshPulse(),
-        icon: const Icon(Icons.refresh),
-        label: const Text('Refresh pulse'),
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('Refresh'),
       ),
     );
   }
 
-  Widget _contractSnapshot(
+  Widget _membershipSnapshot(
     AsyncValue<EntitlementSummary> entitlement,
     AsyncValue<dynamic> subscription,
     AsyncValue<dynamic> rollout,
@@ -133,51 +126,41 @@ class HomePage extends ConsumerWidget {
     if (entitlement.hasError || subscription.hasError || rollout.hasError) {
       return const AppCard(
         child: ListTile(
-          leading: Icon(Icons.error_outline),
-          title: Text('Contract snapshot unavailable'),
-          subtitle: Text('Some backend capability probes failed. Open settings or retry later.'),
+          leading: Icon(Icons.info_outline),
+          title: Text('Membership details are temporarily unavailable'),
+          subtitle: Text('You can continue browsing while we reconnect in the background.'),
         ),
       );
     }
 
     final ent = entitlement.valueOrNull;
-    final sub = subscription.valueOrNull;
-    final roll = rollout.valueOrNull;
-
-    if (ent == null || sub == null || roll == null) {
-      return const AppCard(
-        child: ListTile(
-          leading: Icon(Icons.sync_problem_outlined),
-          title: Text('Contract snapshot unavailable'),
-          subtitle: Text('Live contract data is temporarily unavailable. Pull to refresh and try again.'),
-        ),
-      );
+    if (ent == null) {
+      return const SizedBox.shrink();
     }
-    return Column(
-      children: [
-        AppCard(
-          child: ListTile(
-            leading: const Icon(Icons.credit_card_outlined),
-            title: Text('Plan ${ent.planCode} · ${ent.planTier}'),
-            subtitle: Text('Subscription ${sub.status} · Ads ${ent.adsEnabled ? 'enabled' : 'reduced'}'),
-            trailing: const Icon(Icons.check_circle, color: Colors.green),
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Current plan', style: TextStyle(color: Colors.white.withOpacity(0.8))),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '${ent.planTier} · ${ent.planStatus}',
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
           ),
-        ),
-        const SizedBox(height: AppSpacing.s),
-        QuotaProgressTile(
-          label: ent.quotas.isEmpty ? 'No active quota' : ent.quotas.first.key,
-          used: ent.quotas.isEmpty ? 0 : ent.quotas.first.used,
-          limit: ent.quotas.isEmpty ? 1 : ent.quotas.first.limit,
-        ),
-        const SizedBox(height: AppSpacing.s),
-        AppCard(
-          child: ListTile(
-            leading: const Icon(Icons.flag_outlined),
-            title: const Text('Rollout visibility'),
-            subtitle: Text('${roll.features.length} feature decisions currently available.'),
+          const SizedBox(height: AppSpacing.s),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: ent.features.take(3).map((f) {
+              return AppPill(
+                label: f.key,
+                icon: f.enabled ? Icons.check_circle_outline : Icons.lock_outline,
+              );
+            }).toList(growable: false),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

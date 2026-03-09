@@ -10,6 +10,7 @@ import '../features/hubs/planner_page.dart';
 import '../features/hubs/role_hub_page.dart';
 import '../features/ideas/ideas_page.dart';
 import '../features/invite/invite_page.dart';
+import '../features/onboarding/bootstrap_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
 import '../features/onboarding/onboarding_permissions_page.dart';
 import '../features/onboarding/onboarding_signin_page.dart';
@@ -43,10 +44,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final path = state.uri.path;
       final isOnboardingRoute = path == '/onboarding' || path.startsWith('/onboarding/');
+      final isBootstrapRoute = path == '/bootstrap';
       final onboardingState = ref.read(onboardingCompletedProvider);
 
-      if (onboardingState.isLoading) {
-        return isOnboardingRoute ? null : '/onboarding';
+      if (onboardingState.isLoading || onboardingState.hasError) {
+        return isBootstrapRoute ? null : '/bootstrap';
       }
 
       final hasCompleted = onboardingState.valueOrNull ?? false;
@@ -55,13 +57,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/onboarding';
       }
 
-      if (hasCompleted && path == '/onboarding') {
+      if (hasCompleted && (path == '/onboarding' || isBootstrapRoute)) {
         return '/';
+      }
+
+      if (!hasCompleted && isBootstrapRoute) {
+        return '/onboarding';
       }
 
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/bootstrap',
+        name: 'bootstrap',
+        builder: (context, state) => const BootstrapPage(),
+      ),
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',

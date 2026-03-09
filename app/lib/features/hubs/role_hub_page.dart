@@ -24,7 +24,7 @@ class RoleHubPage extends ConsumerWidget {
         title: Text('$family Hub')),
       body: entitlements.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load entitlement contract: $error')),
+        error: (_, __) => const Center(child: Text('We could not load this hub right now. Please try again shortly.')),
         data: (summary) => ListView(
           padding: const EdgeInsets.all(AppSpacing.m),
           children: [
@@ -65,7 +65,7 @@ class RoleHubPage extends ConsumerWidget {
                 (feature) => ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(feature.enabled ? Icons.check_circle : Icons.lock_outline),
-                  title: Text(feature.key),
+                  title: Text(feature.key.replaceAll('_', ' ')),
                   subtitle: Text(feature.enabled
                       ? 'Enabled'
                       : feature.lockReason ?? 'Locked by entitlement policy'),
@@ -112,7 +112,7 @@ class RoleHubPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Operational surfaces'),
+          const Text('Operations'),
           const SizedBox(height: AppSpacing.s),
           ListTile(
             contentPadding: EdgeInsets.zero,
