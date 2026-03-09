@@ -117,7 +117,7 @@ export class CreatorVerificationService {
     if ((current.reapplyEligibleAt ?? "") > new Date().toISOString()) throw new Error("REAPPLY_COOLDOWN_ACTIVE");
 
     const eligibility = this.getEligibilityForUser(userId);
-    if (!eligibility.eligible) throw new ValidationError(["creator not eligible"], eligibility.failedChecks.map((check) => `${check.code}:${check.message}`));
+    if (!eligibility.eligible) throw new ValidationError(["creator not eligible"], eligibility.failedChecks.map((check) => `${check.code}:${check.message}`).join("; "));
 
     const now = new Date().toISOString();
     const next: CreatorVerificationApplication = {

@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { ValidationError } from "../plans/errors.js";
 import { parseJsonBody, readHeader, sendJson } from "../venues/claims/http.js";
+import type { CreatorVerificationApplicationDraft } from "./types.js";
 import type { CreatorVerificationService } from "./service.js";
 
 function userId(req: IncomingMessage): string {
@@ -18,6 +19,46 @@ function mapError(res: ServerResponse, error: unknown): void {
   if (["REAPPLY_COOLDOWN_ACTIVE", "DRAFT_REQUIRED"].includes(code)) return sendJson(res, 400, { error: code });
   if (error instanceof ValidationError) return sendJson(res, 400, { error: error.message, details: error.details });
   throw error;
+}
+
+function parseDraftUpdateBody(payload: unknown): Partial<CreatorVerificationApplicationDraft> {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new ValidationError(["request body must be a JSON object"]);
+  }
+
+  const source = payload as Record<string, unknown>;
+  const draft: Partial<CreatorVerificationApplicationDraft> = {};
+
+  if ("reason" in source) {
+    if (typeof source.reason !== "string") throw new ValidationError(["reason must be a string"]);
+    draft.reason = source.reason;
+  }
+  if ("niche" in source) {
+    if (source.niche !== undefined && typeof source.niche !== "string") throw new ValidationError(["niche must be a string"]);
+    draft.niche = source.niche;
+  }
+  if ("cityRegion" in source) {
+    if (source.cityRegion !== undefined && typeof source.cityRegion !== "string") throw new ValidationError(["cityRegion must be a string"]);
+    draft.cityRegion = source.cityRegion;
+  }
+  if ("portfolioLinks" in source) {
+    if (!Array.isArray(source.portfolioLinks) || source.portfolioLinks.some((item) => typeof item !== "string")) {
+      throw new ValidationError(["portfolioLinks must be an array of strings"]);
+    }
+    draft.portfolioLinks = source.portfolioLinks;
+  }
+  if ("socialLinks" in source) {
+    if (!Array.isArray(source.socialLinks) || source.socialLinks.some((item) => typeof item !== "string")) {
+      throw new ValidationError(["socialLinks must be an array of strings"]);
+    }
+    draft.socialLinks = source.socialLinks;
+  }
+  if ("evidence" in source) {
+    if (source.evidence !== undefined && typeof source.evidence !== "string") throw new ValidationError(["evidence must be a string"]);
+    draft.evidence = source.evidence;
+  }
+
+  return draft;
 }
 
 export function createCreatorVerificationHttpHandlers(service: CreatorVerificationService) {
@@ -40,7 +81,8 @@ export function createCreatorVerificationHttpHandlers(service: CreatorVerificati
 
     async saveDraft(req: IncomingMessage, res: ServerResponse): Promise<void> {
       try {
-        const application = service.saveDraft(userId(req), await parseJsonBody(req));
+        const draft = parseDraftUpdateBody(await parseJsonBody(req));
+        const application = service.saveDraft(userId(req), draft);
         sendJson(res, 200, { application });
       } catch (error) {
         mapError(res, error);

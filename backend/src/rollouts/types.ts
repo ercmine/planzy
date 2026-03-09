@@ -21,19 +21,19 @@ export interface RolloutContext {
 export interface RolloutDefinition {
   featureKey: string;
   status: "off" | "on" | "conditional";
-  environments?: RolloutEnvironment[];
-  allowCohorts?: string[];
-  denyCohorts?: string[];
-  allowMarkets?: string[];
-  denyMarkets?: string[];
-  allowAccountTypes?: AccountTypeRollout[];
-  allowPlanFamilies?: string[];
-  allowRoles?: UserRole[];
-  allowUserIds?: string[];
-  denyUserIds?: string[];
+  environments?: readonly RolloutEnvironment[];
+  allowCohorts?: readonly string[];
+  denyCohorts?: readonly string[];
+  allowMarkets?: readonly string[];
+  denyMarkets?: readonly string[];
+  allowAccountTypes?: readonly AccountTypeRollout[];
+  allowPlanFamilies?: readonly string[];
+  allowRoles?: readonly UserRole[];
+  allowUserIds?: readonly string[];
+  denyUserIds?: readonly string[];
   percentage?: number;
   salt?: string;
-  internalOverride?: { allowRoles?: UserRole[]; allowCohorts?: string[] };
+  internalOverride?: { allowRoles?: readonly UserRole[]; allowCohorts?: readonly string[] };
   updatedAt: string;
   updatedBy: string;
 }

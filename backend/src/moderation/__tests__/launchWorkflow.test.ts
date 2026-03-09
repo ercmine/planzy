@@ -60,14 +60,14 @@ describe("launch moderation workflows", () => {
     await reviews.setReviewMediaModerationState(review.id, mediaId, "published");
 
     const mediaTarget = { targetType: "review_media" as const, targetId: mediaId, reviewId: review.id, mediaId };
-    await moderation.submitReport({ target: mediaTarget, reporterUserId: "r1", reasonCode: "unsafe_media" });
-    await moderation.submitReport({ target: mediaTarget, reporterUserId: "r2", reasonCode: "unsafe_media" });
-    await moderation.submitReport({ target: mediaTarget, reporterUserId: "r3", reasonCode: "unsafe_media" });
+    await moderation.submitReport({ target: mediaTarget, reporterUserId: "r1", reasonCode: "sexual_explicit" });
+    await moderation.submitReport({ target: mediaTarget, reporterUserId: "r2", reasonCode: "sexual_explicit" });
+    await moderation.submitReport({ target: mediaTarget, reporterUserId: "r3", reasonCode: "sexual_explicit" });
 
     const queue = moderation.listQueue({ targetType: "review_media", unresolvedOnly: true });
     expect(queue.length).toBeGreaterThan(0);
 
-    await moderation.adminDecision({ target: mediaTarget, actorUserId: "mod-2", decisionType: "remove", reasonCode: "unsafe_media" });
+    await moderation.adminDecision({ target: mediaTarget, actorUserId: "mod-2", decisionType: "remove", reasonCode: "sexual_explicit" });
 
     const after = await reviews.getById(review.id, undefined, true);
     expect(after?.media.some((item) => item.id === mediaId)).toBe(false);

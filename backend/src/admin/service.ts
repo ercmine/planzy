@@ -63,7 +63,7 @@ export class AdminService {
         businesses: {
           total: businesses.length,
           verified: businesses.filter((row) => row.verificationStatus === VerificationStatus.VERIFIED).length,
-          pendingClaims: claims?.claims?.length ?? 0
+          pendingClaims: "claims" in claims ? claims.claims.length : claims.total
         },
         moderation: {
           queueItems: moderationQueue.length,
