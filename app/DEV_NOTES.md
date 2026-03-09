@@ -30,3 +30,9 @@
    - if no cache exists, UI must show an error with retry.
 5. Re-enable network and retry:
    - deck should recover to live backend results.
+
+## Premium UX architecture
+- Pricing and subscription UI is in `lib/features/premium/`.
+- Plan and entitlement data is backend-driven from `/v1/subscription/plans`, `/v1/subscription`, and `/v1/entitlements/summary` via `PremiumRepository`.
+- Locked prompts use entitlement feature keys + suggested plan ids (`LockedFeaturePrompt`) to generate contextual CTAs.
+- Add new premium feature copy in `premium_copy.dart`, and ensure the backend entitlement key is present in plan entitlements for comparison tables.
