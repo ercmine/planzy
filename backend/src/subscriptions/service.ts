@@ -28,6 +28,10 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+export interface SubscriptionServiceHooks {
+  onEvent?: (event: SubscriptionEvent, subscription: Subscription) => Promise<void> | void;
+}
+
 export class SubscriptionService {
   private readonly accounts = new Map<string, Account>();
   private readonly subscriptions = new Map<string, Subscription>();
@@ -35,7 +39,7 @@ export class SubscriptionService {
   private readonly events = new Map<string, SubscriptionEvent[]>();
   private readonly usedTrialByTargetPlan = new Set<string>();
 
-  constructor(private readonly usageStore: UsageStore, private readonly billingProvider: BillingProvider) {}
+  constructor(private readonly usageStore: UsageStore, private readonly billingProvider: BillingProvider, private readonly hooks: SubscriptionServiceHooks = {}) {}
 
   ensureAccount(accountId: string, accountType: AccountType): Account {
     const current = this.accounts.get(accountId);
@@ -425,8 +429,10 @@ export class SubscriptionService {
 
   private appendEvent(subscription: Subscription, type: SubscriptionEvent["type"], actor: SubscriptionEvent["actor"], payload: Record<string, unknown>, previousState?: SubscriptionStatus, nextState?: SubscriptionStatus): void {
     const rows = this.events.get(subscription.targetId) ?? [];
-    rows.unshift({ id: randomUUID(), subscriptionId: subscription.id, targetId: subscription.targetId, targetType: subscription.targetType, type, previousState, nextState, occurredAt: new Date().toISOString(), actor, payload });
+    const event: SubscriptionEvent = { id: randomUUID(), subscriptionId: subscription.id, targetId: subscription.targetId, targetType: subscription.targetType, type, previousState, nextState, occurredAt: new Date().toISOString(), actor, payload };
+    rows.unshift(event);
     this.events.set(subscription.targetId, rows);
+    void this.hooks.onEvent?.(event, subscription);
   }
 }
 
