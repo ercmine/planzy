@@ -10,6 +10,8 @@ import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
 import type { CollaborationService } from "../collaboration/service.js";
 import type { BusinessPremiumService } from "../businessPremium/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
+import type { RankingConfigResolver, RankingConfigService } from "../discovery/tuning.js";
+import type { PlaceDiscoveryRepository } from "../discovery/types.js";
 import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { MerchantService } from "../merchant/service.js";
 import type { EntitlementPolicyService } from "../subscriptions/policy.js";
@@ -76,6 +78,7 @@ export function createHttpServer(
     collaborationService?: CollaborationService;
     businessPremiumService?: BusinessPremiumService;
     discovery?: DiscoveryHttpHandlerDeps;
+    rankingTuning?: { service: RankingConfigService; resolver: RankingConfigResolver; repo: PlaceDiscoveryRepository };
     savedHandlers?: SavedHttpHandlers;
     outingPlannerService?: OutingPlannerService;
     moderationService?: ModerationService;

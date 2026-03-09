@@ -100,6 +100,8 @@ export * from "./reviews/placeMediaRanking.js";
 
 export * from "./places/index.js";
 export * from "./discovery/index.js";
+export * from "./discovery/tuning.js";
+export * from "./discovery/tuningHttp.js";
 
 export * from "./creatorMonetization/index.js";
 
