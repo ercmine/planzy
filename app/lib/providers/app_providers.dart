@@ -43,6 +43,7 @@ import '../features/sessions/join_session/join_session_controller.dart';
 import '../features/sessions/session_settings/session_settings_controller.dart';
 import '../features/sessions/sessions_controller.dart';
 import '../models/entitlement_summary.dart';
+import '../models/rollout_summary.dart';
 import '../models/session.dart';
 import '../repositories/deck_repository.dart';
 import '../repositories/ideas_repository.dart';
@@ -79,6 +80,16 @@ final entitlementSummaryProvider = FutureProvider<EntitlementSummary>((ref) asyn
 final entitlementSummaryFamilyProvider = FutureProvider.family<EntitlementSummary, String>((ref, family) async {
   final apiClient = await ref.watch(apiClientProvider.future);
   return apiClient.fetchEntitlementSummary(targetType: family);
+});
+
+final rolloutSummaryProvider = FutureProvider<RolloutSummary>((ref) async {
+  final apiClient = await ref.watch(apiClientProvider.future);
+  return apiClient.fetchRolloutSummary();
+});
+
+final featureRolloutProvider = Provider.family<AsyncValue<RolloutDecision>, String>((ref, featureKey) {
+  final summary = ref.watch(rolloutSummaryProvider);
+  return summary.whenData((value) => value.feature(featureKey));
 });
 
 final premiumRepositoryProvider = FutureProvider<PremiumRepository>((ref) async {

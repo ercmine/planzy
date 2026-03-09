@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { ValidationError } from "../plans/errors.js";
+import { ROLLOUT_FEATURE_KEYS } from "../rollouts/featureKeys.js";
+import type { RolloutService } from "../rollouts/service.js";
 import { parseJsonBody, readHeader, sendJson } from "../venues/claims/http.js";
 import type { OutingPlannerService } from "./service.js";
 import type { ItineraryRegenerationRequest, OutingPlannerRequest } from "./types.js";
@@ -11,9 +13,23 @@ function requireUserId(req: IncomingMessage): string {
   return userId;
 }
 
-export function createOutingPlannerHandlers(service: OutingPlannerService) {
+export function createOutingPlannerHandlers(service: OutingPlannerService, rolloutService?: RolloutService) {
+  const assertRollout = (req: IncomingMessage) => {
+    if (!rolloutService) return;
+    const userId = requireUserId(req);
+    const cohorts = String(readHeader(req, "x-cohorts") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+    const context = rolloutService.resolveContext({
+      featureKey: ROLLOUT_FEATURE_KEYS.AI_ITINERARY,
+      userId,
+      market: String(readHeader(req, "x-market") ?? "").trim() || undefined,
+      cohorts
+    });
+    rolloutService.assertFeatureRolledOut(ROLLOUT_FEATURE_KEYS.AI_ITINERARY, context);
+  };
+
   return {
     createPlan: async (req: IncomingMessage, res: ServerResponse) => {
+      assertRollout(req);
       const body = await parseJsonBody(req) as OutingPlannerRequest;
       sendJson(res, 200, await service.createOutingPlan(requireUserId(req), body));
     },
@@ -34,6 +50,7 @@ export function createOutingPlannerHandlers(service: OutingPlannerService) {
       sendJson(res, 200, await service.updateSavedItinerary(requireUserId(req), itineraryId, body));
     },
     regenerate: async (req: IncomingMessage, res: ServerResponse) => {
+      assertRollout(req);
       const body = await parseJsonBody(req) as ItineraryRegenerationRequest;
       const result = await service.regenerateItinerary(requireUserId(req), body);
       sendJson(res, "error" in result ? 403 : 200, result);

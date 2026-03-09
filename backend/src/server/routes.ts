@@ -62,6 +62,8 @@ import type { AnalyticsService } from "../analytics/service.js";
 import { createAdminHttpHandlers } from "../admin/http.js";
 import { AdminService } from "../admin/service.js";
 import type { PlaceNormalizationService } from "../places/service.js";
+import { createRolloutHttpHandlers } from "../rollouts/http.js";
+import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -75,7 +77,7 @@ const PREMIUM_CONTENT: Record<string, PremiumContentDescriptor> = {
 
 export function applyCors(res: ServerResponse): void {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id, x-admin-key, x-request-id, x-acting-profile-type, x-acting-profile-id");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id, x-admin-key, x-request-id, x-acting-profile-type, x-acting-profile-id, x-market, x-region, x-cohorts, x-account-type, x-admin-id");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
 }
 
@@ -134,6 +136,7 @@ export function createRoutes(
     notificationService?: NotificationService;
     analyticsService?: AnalyticsService;
     analyticsQueryService?: AnalyticsQueryService;
+    rolloutService?: RolloutService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -152,7 +155,8 @@ export function createRoutes(
   const businessAnalyticsHandlers = deps?.businessAnalyticsService ? createBusinessAnalyticsHttpHandlers(deps.businessAnalyticsService) : null;
   const collaborationHandlers = deps?.collaborationService && deps?.accountsService ? createCollaborationHttpHandlers(deps.collaborationService, deps.accountsService) : null;
   const businessPremiumHandlers = deps?.businessPremiumService ? createBusinessPremiumHttpHandlers(deps.businessPremiumService) : null;
-  const outingPlannerHandlers = deps?.outingPlannerService ? createOutingPlannerHandlers(deps.outingPlannerService) : null;
+  const outingPlannerHandlers = deps?.outingPlannerService ? createOutingPlannerHandlers(deps.outingPlannerService, deps.rolloutService) : null;
+  const rolloutHandlers = deps?.rolloutService ? createRolloutHttpHandlers(deps.rolloutService) : null;
   const notificationHandlers = deps?.notificationService ? createNotificationHttpHandlers(deps.notificationService) : null;
   const analyticsHandlers = deps?.analyticsService && deps?.analyticsQueryService ? createAnalyticsHttpHandlers(deps.analyticsService, deps.analyticsQueryService) : null;
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -196,6 +200,28 @@ export function createRoutes(
 
       if (req.method === "GET" && normalizedPath === "/v1/admin/overview" && adminHandlers) {
         await adminHandlers.overview(req, res);
+        return;
+      }
+
+      if (rolloutHandlers && req.method === "GET" && normalizedPath === "/v1/rollouts/summary") {
+        await rolloutHandlers.summary(req, res);
+        return;
+      }
+      const rolloutEvalMatch = /^\/v1\/rollouts\/features\/([^/]+)$/.exec(normalizedPath);
+      if (rolloutHandlers && req.method === "GET" && rolloutEvalMatch) {
+        await rolloutHandlers.evaluate(req, res, decodeURIComponent(rolloutEvalMatch[1] ?? ""));
+        return;
+      }
+      if (rolloutHandlers && req.method === "GET" && normalizedPath === "/v1/admin/rollouts") {
+        await rolloutHandlers.adminList(req, res);
+        return;
+      }
+      if (rolloutHandlers && req.method === "POST" && normalizedPath === "/v1/admin/rollouts") {
+        await rolloutHandlers.adminUpsert(req, res);
+        return;
+      }
+      if (rolloutHandlers && req.method === "GET" && normalizedPath === "/v1/admin/rollouts/audit") {
+        await rolloutHandlers.adminAudit(req, res);
         return;
       }
 
@@ -2435,6 +2461,11 @@ export function createRoutes(
 
       if (error instanceof ValidationError) {
         sendJson(res, 400, { error: error.message, details: error.details });
+        return;
+      }
+
+      if (error instanceof RolloutAccessError) {
+        sendJson(res, 423, rolloutErrorPayload(error));
         return;
       }
 

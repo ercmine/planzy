@@ -11,6 +11,7 @@ import '../core/utils/json.dart';
 import '../core/utils/uuid.dart';
 import '../models/entitlement_summary.dart';
 import '../models/error_payload.dart';
+import '../models/rollout_summary.dart';
 import 'api_error.dart';
 import 'retry.dart';
 
@@ -144,6 +145,11 @@ class ApiClient {
   Future<EntitlementSummary> fetchEntitlementSummary({String targetType = 'USER'}) async {
     final response = await getJson('/v1/entitlements/summary', queryParameters: {'targetType': targetType});
     return EntitlementSummary.fromJson(response);
+  }
+
+  Future<RolloutSummary> fetchRolloutSummary() async {
+    final response = await getJson('/v1/rollouts/summary');
+    return RolloutSummary.fromJson(response);
   }
 
   String? buildPhotoUrl(String? token) {
