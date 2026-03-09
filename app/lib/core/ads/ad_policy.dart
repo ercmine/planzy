@@ -250,81 +250,81 @@ const _singleRetryThenCollapse = AdInventoryFailurePolicy(
   maxRetryAttempts: 1,
 );
 
-final Map<AdPlacement, AdPlacementRule> _defaultRules = <AdPlacement, AdPlacementRule>{
+const Map<AdPlacement, AdPlacementRule> _defaultRules = <AdPlacement, AdPlacementRule>{
   AdPlacement.resultsInlineBanner: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free, AdEntitlementTier.plus},
-    insertionByTier: {
-      AdEntitlementTier.free: const AdInsertionPolicy(firstAdAfterItem: 3, frequency: 8, maxAdsPerWindow: 3, adsWindowSize: 50),
-      AdEntitlementTier.plus: const AdInsertionPolicy(firstAdAfterItem: 8, frequency: 16, maxAdsPerWindow: 1, adsWindowSize: 50),
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free, AdEntitlementTier.plus},
+    insertionByTier: <AdEntitlementTier, AdInsertionPolicy>{
+      AdEntitlementTier.free: AdInsertionPolicy(firstAdAfterItem: 3, frequency: 8, maxAdsPerWindow: 3, adsWindowSize: 50),
+      AdEntitlementTier.plus: AdInsertionPolicy(firstAdAfterItem: 8, frequency: 16, maxAdsPerWindow: 1, adsWindowSize: 50),
     },
     failurePolicy: _singleRetryThenCollapse,
   ),
   AdPlacement.deckInlineNative: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free, AdEntitlementTier.plus},
-    insertionByTier: {
-      AdEntitlementTier.free: const AdInsertionPolicy(firstAdAfterItem: 3, frequency: 8, maxAdsPerWindow: 3, adsWindowSize: 50),
-      AdEntitlementTier.plus: const AdInsertionPolicy(firstAdAfterItem: 9, frequency: 18, maxAdsPerWindow: 1, adsWindowSize: 50),
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free, AdEntitlementTier.plus},
+    insertionByTier: <AdEntitlementTier, AdInsertionPolicy>{
+      AdEntitlementTier.free: AdInsertionPolicy(firstAdAfterItem: 3, frequency: 8, maxAdsPerWindow: 3, adsWindowSize: 50),
+      AdEntitlementTier.plus: AdInsertionPolicy(firstAdAfterItem: 9, frequency: 18, maxAdsPerWindow: 1, adsWindowSize: 50),
     },
     failurePolicy: _singleRetryThenCollapse,
   ),
   AdPlacement.placeDetailInlineBanner: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free},
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free},
     insertionByTier: const {},
     failurePolicy: _collapseNoRetry,
   ),
   AdPlacement.placeDetailFooterBanner: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free, AdEntitlementTier.plus},
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free, AdEntitlementTier.plus},
     insertionByTier: const {},
     failurePolicy: _collapseNoRetry,
   ),
   AdPlacement.resultsFooterBanner: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free, AdEntitlementTier.plus},
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free, AdEntitlementTier.plus},
     insertionByTier: const {},
     failurePolicy: _collapseNoRetry,
   ),
   AdPlacement.homeFeedInlineBanner: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free, AdEntitlementTier.plus},
-    insertionByTier: {
-      AdEntitlementTier.free: const AdInsertionPolicy(firstAdAfterItem: 3, frequency: 10, maxAdsPerWindow: 3, adsWindowSize: 50),
-      AdEntitlementTier.plus: const AdInsertionPolicy(firstAdAfterItem: 10, frequency: 20, maxAdsPerWindow: 1, adsWindowSize: 50),
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free, AdEntitlementTier.plus},
+    insertionByTier: <AdEntitlementTier, AdInsertionPolicy>{
+      AdEntitlementTier.free: AdInsertionPolicy(firstAdAfterItem: 3, frequency: 10, maxAdsPerWindow: 3, adsWindowSize: 50),
+      AdEntitlementTier.plus: AdInsertionPolicy(firstAdAfterItem: 10, frequency: 20, maxAdsPerWindow: 1, adsWindowSize: 50),
     },
     failurePolicy: _singleRetryThenCollapse,
   ),
   AdPlacement.creatorFeedInlineBanner: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free},
-    insertionByTier: {
-      AdEntitlementTier.free: const AdInsertionPolicy(firstAdAfterItem: 4, frequency: 12, maxAdsPerWindow: 2, adsWindowSize: 50),
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free},
+    insertionByTier: <AdEntitlementTier, AdInsertionPolicy>{
+      AdEntitlementTier.free: AdInsertionPolicy(firstAdAfterItem: 4, frequency: 12, maxAdsPerWindow: 2, adsWindowSize: 50),
     },
     failurePolicy: _singleRetryThenCollapse,
   ),
   AdPlacement.bookmarksInlineBanner: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free},
-    insertionByTier: {
-      AdEntitlementTier.free: const AdInsertionPolicy(firstAdAfterItem: 4, frequency: 12, maxAdsPerWindow: 2, adsWindowSize: 50),
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free},
+    insertionByTier: <AdEntitlementTier, AdInsertionPolicy>{
+      AdEntitlementTier.free: AdInsertionPolicy(firstAdAfterItem: 4, frequency: 12, maxAdsPerWindow: 2, adsWindowSize: 50),
     },
     failurePolicy: _singleRetryThenCollapse,
   ),
   AdPlacement.guidePageInlineBanner: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free, AdEntitlementTier.plus},
-    insertionByTier: {
-      AdEntitlementTier.free: const AdInsertionPolicy(firstAdAfterItem: 4, frequency: 12, maxAdsPerWindow: 2, adsWindowSize: 50),
-      AdEntitlementTier.plus: const AdInsertionPolicy(firstAdAfterItem: 12, frequency: 24, maxAdsPerWindow: 1, adsWindowSize: 50),
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free, AdEntitlementTier.plus},
+    insertionByTier: <AdEntitlementTier, AdInsertionPolicy>{
+      AdEntitlementTier.free: AdInsertionPolicy(firstAdAfterItem: 4, frequency: 12, maxAdsPerWindow: 2, adsWindowSize: 50),
+      AdEntitlementTier.plus: AdInsertionPolicy(firstAdAfterItem: 12, frequency: 24, maxAdsPerWindow: 1, adsWindowSize: 50),
     },
     failurePolicy: _singleRetryThenCollapse,
   ),
   AdPlacement.cityPageInlineBanner: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free, AdEntitlementTier.plus},
-    insertionByTier: {
-      AdEntitlementTier.free: const AdInsertionPolicy(firstAdAfterItem: 4, frequency: 10, maxAdsPerWindow: 3, adsWindowSize: 50),
-      AdEntitlementTier.plus: const AdInsertionPolicy(firstAdAfterItem: 12, frequency: 24, maxAdsPerWindow: 1, adsWindowSize: 50),
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free, AdEntitlementTier.plus},
+    insertionByTier: <AdEntitlementTier, AdInsertionPolicy>{
+      AdEntitlementTier.free: AdInsertionPolicy(firstAdAfterItem: 4, frequency: 10, maxAdsPerWindow: 3, adsWindowSize: 50),
+      AdEntitlementTier.plus: AdInsertionPolicy(firstAdAfterItem: 12, frequency: 24, maxAdsPerWindow: 1, adsWindowSize: 50),
     },
     failurePolicy: _singleRetryThenCollapse,
   ),
   AdPlacement.trendingInlineBanner: AdPlacementRule(
-    allowedTiers: {AdEntitlementTier.free, AdEntitlementTier.plus},
-    insertionByTier: {
-      AdEntitlementTier.free: const AdInsertionPolicy(firstAdAfterItem: 3, frequency: 8, maxAdsPerWindow: 3, adsWindowSize: 50),
-      AdEntitlementTier.plus: const AdInsertionPolicy(firstAdAfterItem: 10, frequency: 20, maxAdsPerWindow: 1, adsWindowSize: 50),
+    allowedTiers: <AdEntitlementTier>{AdEntitlementTier.free, AdEntitlementTier.plus},
+    insertionByTier: <AdEntitlementTier, AdInsertionPolicy>{
+      AdEntitlementTier.free: AdInsertionPolicy(firstAdAfterItem: 3, frequency: 8, maxAdsPerWindow: 3, adsWindowSize: 50),
+      AdEntitlementTier.plus: AdInsertionPolicy(firstAdAfterItem: 10, frequency: 20, maxAdsPerWindow: 1, adsWindowSize: 50),
     },
     failurePolicy: _singleRetryThenCollapse,
   ),

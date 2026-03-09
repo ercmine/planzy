@@ -40,7 +40,7 @@ class AdMobConfig {
 
   static String get nativeUnitId {
     if (kDebugMode) {
-      return TestAdUnitId.native;
+      return TestIds.native;
     }
     if (kIsWeb) {
       return '';
