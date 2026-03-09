@@ -61,6 +61,59 @@ describe("admin operations routes", () => {
     expect(auditJson.items.length).toBeGreaterThan(0);
   });
 
+
+  it("exposes place quality monitoring endpoints and audits status actions", async () => {
+    const ingest = await fetch(`${baseUrl}/v1/admin/places/import-source`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret" },
+      body: JSON.stringify({
+        provider: "foursquare",
+        rawPayload: {
+          fsq_id: "missing-media-1",
+          name: "No Media Cafe",
+          geocodes: { main: { latitude: 37.77, longitude: -122.41 } },
+          categories: [{ name: "Coffee Shop" }],
+          description: "No description available"
+        },
+        fetchedAt: "2025-01-01T00:00:00.000Z"
+      })
+    });
+    expect(ingest.status).toBe(201);
+
+    const overview = await fetch(`${baseUrl}/v1/admin/place-quality/overview`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(overview.status).toBe(200);
+    const overviewJson = await overview.json();
+    expect(overviewJson.totalOpen).toBeGreaterThan(0);
+
+    const issues = await fetch(`${baseUrl}/v1/admin/place-quality/issues?issueType=missing_photos`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(issues.status).toBe(200);
+    const issuesJson = await issues.json();
+    expect(issuesJson.total).toBeGreaterThan(0);
+    const issueId = issuesJson.items[0].id as string;
+
+    const detail = await fetch(`${baseUrl}/v1/admin/place-quality/issues/${encodeURIComponent(issueId)}`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(detail.status).toBe(200);
+
+    const patch = await fetch(`${baseUrl}/v1/admin/place-quality/issues/${encodeURIComponent(issueId)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-3" },
+      body: JSON.stringify({ status: "resolved", note: "fixed through resync" })
+    });
+    expect(patch.status).toBe(200);
+    const patchJson = await patch.json();
+    expect(patchJson.status).toBe("resolved");
+
+    const placeSummary = await fetch(`${baseUrl}/v1/admin/places/${encodeURIComponent(issuesJson.items[0].placeId)}/quality`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(placeSummary.status).toBe(200);
+
+    const providerSummary = await fetch(`${baseUrl}/v1/admin/place-quality/providers`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(providerSummary.status).toBe(200);
+
+    const audit = await fetch(`${baseUrl}/v1/admin/audit`, { headers: { "x-admin-key": "admin-secret" } });
+    const auditJson = await audit.json();
+    expect(auditJson.items.some((item: { actionType: string }) => item.actionType === "place_quality.resolved")).toBe(true);
+  });
+
   it("supports user suspension workflow", async () => {
     const suspend = await fetch(`${baseUrl}/v1/admin/users/user-to-suspend/suspend`, {
       method: "POST",

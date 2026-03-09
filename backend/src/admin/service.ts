@@ -5,6 +5,7 @@ import { CreatorProfileStatus, UserRole, UserStatus, VerificationStatus } from "
 import type { CreatorVerificationService } from "../creatorVerification/service.js";
 import type { ModerationService } from "../moderation/service.js";
 import type { ModerationDecisionType, ModerationTargetRef } from "../moderation/types.js";
+import { PlaceDataQualityService, createPlaceDataQualityConfigFromEnv, type PlaceDataQualityIssueStatus } from "../places/dataQuality.js";
 import type { PlaceNormalizationService } from "../places/service.js";
 import type { PlaceStatus } from "../places/types.js";
 import type { ReviewsStore } from "../reviews/store.js";
@@ -25,6 +26,7 @@ export interface AdminServiceDeps {
 
 export class AdminService {
   private readonly audit: AdminActionAudit[] = [];
+  private readonly qualityService = new PlaceDataQualityService(createPlaceDataQualityConfigFromEnv());
   constructor(private readonly deps: AdminServiceDeps) {}
 
   getRolesForUser(userId: string) {
@@ -44,6 +46,7 @@ export class AdminService {
       : Promise.resolve({ total: 0 });
     return Promise.resolve(pendingBusinessClaims).then((claims) => {
       const sourceHealth = this.getSourceHealth();
+      const placeQuality = this.getPlaceQualityOverview();
       const subscriptionOps = this.getSubscriptionOps();
       const adsOps = this.getAdsOps();
       return {
@@ -68,6 +71,7 @@ export class AdminService {
           urgentReports
         },
         sourceHealth,
+        placeQuality,
         subscriptions: subscriptionOps.summary,
         ads: adsOps.summary,
         recentAdminActions: this.audit.slice(-20).reverse()
@@ -149,9 +153,74 @@ export class AdminService {
     };
   }
 
+
+  refreshPlaceQualityIssues() {
+    const places = this.deps.placeService?.listCanonicalPlaces() ?? [];
+    const sourceRecords = this.deps.placeService?.listSourceRecords() ?? [];
+    return this.qualityService.evaluate(places, sourceRecords);
+  }
+
+  getPlaceQualityOverview() {
+    this.refreshPlaceQualityIssues();
+    return this.qualityService.summarize();
+  }
+
+  listPlaceQualityIssues(filter: { issueType?: string; severity?: string; status?: string; provider?: string; city?: string; category?: string; placeId?: string; page?: number; pageSize?: number }) {
+    this.refreshPlaceQualityIssues();
+    return this.qualityService.listIssues({
+      issueType: filter.issueType as never,
+      severity: filter.severity as never,
+      status: filter.status as never,
+      provider: filter.provider,
+      city: filter.city,
+      category: filter.category,
+      placeId: filter.placeId
+    }, filter.page ?? 0, filter.pageSize ?? 50);
+  }
+
+  getPlaceQualityIssue(issueId: string) {
+    this.refreshPlaceQualityIssues();
+    return this.qualityService.getIssue(issueId);
+  }
+
+  getPlaceQualitySummary(placeId: string) {
+    this.refreshPlaceQualityIssues();
+    return this.qualityService.getPlaceSummary(placeId);
+  }
+
+  getProviderQualitySummary() {
+    this.refreshPlaceQualityIssues();
+    return this.qualityService.getProviderSummary();
+  }
+
+  updatePlaceQualityIssueStatus(input: { actorUserId: string; issueId: string; status: PlaceDataQualityIssueStatus; note?: string }) {
+    this.refreshPlaceQualityIssues();
+    const change = this.qualityService.updateIssueStatus(input.issueId, input.status, input.actorUserId, input.note);
+    if (!change) return undefined;
+    this.recordAudit({
+      actorUserId: input.actorUserId,
+      actionType: `place_quality.${input.status}`,
+      targetType: "place_quality_issue",
+      targetId: input.issueId,
+      reason: "admin_status_transition",
+      note: input.note,
+      before: change.before as never,
+      after: change.after as never
+    });
+    return change.after;
+  }
+
   async listBusinessClaims(filter: { status?: string; limit?: number }) {
     if (!this.deps.venueClaimsService) return { total: 0, items: [] };
     return this.deps.venueClaimsService.listLeads({ statuses: filter.status ? [filter.status as never] : undefined, limit: filter.limit ?? 50 }, { isAdmin: true, userId: "admin" });
+  }
+
+
+  importProviderPlaceForQuality(input: { provider: string; rawPayload: unknown; sourceUrl?: string; fetchedAt?: string; importBatchId?: string; syncRunId?: string }) {
+    if (!this.deps.placeService) return undefined;
+    const result = this.deps.placeService.importProviderPlace(input);
+    this.refreshPlaceQualityIssues();
+    return result;
   }
 
   listPlaces(filter: { status?: PlaceStatus; minCategoryConfidence?: number; limit?: number; offset?: number }) {

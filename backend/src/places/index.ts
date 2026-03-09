@@ -9,3 +9,5 @@ export { normalizePhone, normalizeUrl } from "./normalization.js";
 export * from "./ingestion.js";
 
 export * from "./photoGallery.js";
+
+export * from "./dataQuality.js";

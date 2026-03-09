@@ -79,6 +79,79 @@ export function createAdminHttpHandlers(service: AdminService) {
       const body = await parseJsonBody(req) as { target: unknown; decisionType: unknown; reasonCode: unknown; notes?: unknown };
       sendJson(res, 200, await service.applyModerationAction({ actorUserId: actor.userId, target: body.target as never, decisionType: body.decisionType as never, reasonCode: String(body.reasonCode ?? "admin_action"), notes: typeof body.notes === "string" ? body.notes : undefined }));
     },
+
+    async placeQualityOverview(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.places.manage")) return;
+      sendJson(res, 200, service.getPlaceQualityOverview());
+    },
+    async listPlaceQualityIssues(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.places.manage")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, service.listPlaceQualityIssues({
+        issueType: url.searchParams.get("issueType") ?? undefined,
+        severity: url.searchParams.get("severity") ?? undefined,
+        status: url.searchParams.get("status") ?? undefined,
+        provider: url.searchParams.get("provider") ?? undefined,
+        city: url.searchParams.get("city") ?? undefined,
+        category: url.searchParams.get("category") ?? undefined,
+        placeId: url.searchParams.get("placeId") ?? undefined,
+        page: Number(url.searchParams.get("page") ?? 0),
+        pageSize: Number(url.searchParams.get("pageSize") ?? 50)
+      }));
+    },
+    async placeQualityIssueDetail(req: IncomingMessage, res: ServerResponse, issueId: string) {
+      if (!ensurePermission(service, req, res, "admin.places.manage")) return;
+      const issue = service.getPlaceQualityIssue(decodeURIComponent(issueId));
+      if (!issue) {
+        sendJson(res, 404, { error: "not_found" });
+        return;
+      }
+      sendJson(res, 200, issue);
+    },
+    async placeQualitySummary(req: IncomingMessage, res: ServerResponse, placeId: string) {
+      if (!ensurePermission(service, req, res, "admin.places.manage")) return;
+      sendJson(res, 200, service.getPlaceQualitySummary(decodeURIComponent(placeId)));
+    },
+    async providerQualitySummary(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.source_health.read")) return;
+      sendJson(res, 200, { providers: service.getProviderQualitySummary() });
+    },
+    async updatePlaceQualityIssueStatus(req: IncomingMessage, res: ServerResponse, issueId: string) {
+      const actor = ensurePermission(service, req, res, "admin.places.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as { status?: unknown; note?: unknown };
+      const updated = service.updatePlaceQualityIssueStatus({
+        actorUserId: actor.userId,
+        issueId: decodeURIComponent(issueId),
+        status: String(body.status ?? "acknowledged") as never,
+        note: typeof body.note === "string" ? body.note : undefined
+      });
+      if (!updated) {
+        sendJson(res, 404, { error: "not_found" });
+        return;
+      }
+      sendJson(res, 200, updated);
+    },
+
+
+    async importPlaceSource(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.places.manage")) return;
+      const body = await parseJsonBody(req) as { provider?: unknown; rawPayload?: unknown; sourceUrl?: unknown; fetchedAt?: unknown; importBatchId?: unknown; syncRunId?: unknown };
+      const created = service.importProviderPlaceForQuality({
+        provider: String(body.provider ?? ""),
+        rawPayload: body.rawPayload,
+        sourceUrl: typeof body.sourceUrl === "string" ? body.sourceUrl : undefined,
+        fetchedAt: typeof body.fetchedAt === "string" ? body.fetchedAt : undefined,
+        importBatchId: typeof body.importBatchId === "string" ? body.importBatchId : undefined,
+        syncRunId: typeof body.syncRunId === "string" ? body.syncRunId : undefined
+      });
+      if (!created) {
+        sendJson(res, 503, { error: "place_service_unavailable" });
+        return;
+      }
+      sendJson(res, 201, created);
+    },
+
     async listPlaces(req: IncomingMessage, res: ServerResponse) {
       if (!ensurePermission(service, req, res, "admin.places.manage")) return;
       const url = new URL(req.url ?? "/", "http://localhost");

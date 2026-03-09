@@ -218,6 +218,28 @@ export function createRoutes(
         return;
       }
 
+      if (req.method === "POST" && normalizedPath === "/v1/admin/places/import-source" && adminHandlers) {
+        await adminHandlers.importPlaceSource(req, res);
+        return;
+      }
+
+
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/place-quality/overview" && adminHandlers) {
+        await adminHandlers.placeQualityOverview(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/place-quality/issues" && adminHandlers) {
+        await adminHandlers.listPlaceQualityIssues(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/place-quality/providers" && adminHandlers) {
+        await adminHandlers.providerQualitySummary(req, res);
+        return;
+      }
+
       if (req.method === "GET" && normalizedPath === "/v1/admin/ops/source-health" && adminHandlers) {
         await adminHandlers.sourceHealth(req, res);
         return;
@@ -247,6 +269,23 @@ export function createRoutes(
       const adminModerationTargetMatch = /^\/v1\/admin\/moderation\/targets\/([^/]+)\/([^/]+)$/.exec(normalizedPath);
       if (adminModerationTargetMatch && req.method === "GET" && adminHandlers) {
         await adminHandlers.moderationTarget(req, res, adminModerationTargetMatch[1] ?? "", adminModerationTargetMatch[2] ?? "");
+        return;
+      }
+
+
+      const placeQualityIssueMatch = /^\/v1\/admin\/place-quality\/issues\/([^/]+)$/.exec(normalizedPath);
+      if (placeQualityIssueMatch && req.method === "GET" && adminHandlers) {
+        await adminHandlers.placeQualityIssueDetail(req, res, placeQualityIssueMatch[1] ?? "");
+        return;
+      }
+      if (placeQualityIssueMatch && req.method === "PATCH" && adminHandlers) {
+        await adminHandlers.updatePlaceQualityIssueStatus(req, res, placeQualityIssueMatch[1] ?? "");
+        return;
+      }
+
+      const placeQualitySummaryMatch = /^\/v1\/admin\/places\/([^/]+)\/quality$/.exec(normalizedPath);
+      if (placeQualitySummaryMatch && req.method === "GET" && adminHandlers) {
+        await adminHandlers.placeQualitySummary(req, res, placeQualitySummaryMatch[1] ?? "");
         return;
       }
 
