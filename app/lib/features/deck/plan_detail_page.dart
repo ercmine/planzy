@@ -778,9 +778,8 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   }
 
   Widget _buildReviewsSection(BuildContext context) {
-    final average = _reviews.isEmpty
-        ? null
-        : _reviews.map((review) => review.rating).reduce((a, b) => a + b) / _reviews.length;
+    final ratings = _reviews.map((review) => review.rating).whereType<int>().toList(growable: false);
+    final average = ratings.isEmpty ? null : ratings.reduce((a, b) => a + b) / ratings.length;
 
     return _Section(
       title: 'Perbug Reviews',
@@ -791,7 +790,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
           if (_reviewsError != null)
             Text(_reviewsError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
           if (average != null) ...[
-            Text('Average ${average.toStringAsFixed(1)} (${_reviews.length})'),
+            Text('Average ${average.toStringAsFixed(1)} (${ratings.length})'),
             const SizedBox(height: AppSpacing.s),
           ],
           if (!_isLoadingReviews && _reviews.isEmpty && _reviewsError == null)
