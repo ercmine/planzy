@@ -57,7 +57,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
 
     if (deckRepositoryAsync.hasError || telemetryRepositoryAsync.hasError) {
       return _scaffoldWithBody(
-        const Center(child: Text('Could not initialize deck dependencies.')),
+        const Center(child: Text('We are preparing discovery. Please try again.')),
       );
     }
 
@@ -83,8 +83,8 @@ class _DeckPageState extends ConsumerState<DeckPage> {
     if (state.locationRequired) {
       return _scaffoldWithBody(
         RetryView(
-          title: 'Location required',
-          message: state.errorMessage ?? 'Location required',
+          title: 'Location needed',
+          message: state.errorMessage ?? 'Enable location to discover nearby places.',
           retryLabel: 'Enable location',
           onRetry: () => _onEnableLocationPressed(controller),
         ),
@@ -109,7 +109,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
     if (state.errorMessage != null && state.items.isEmpty) {
       return _scaffoldWithBody(
         RetryView(
-          title: 'Could not load plans',
+          title: 'Could not load places',
           message: state.errorMessage!,
           onRetry: controller.refresh,
         ),
@@ -128,7 +128,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
                 child: CircularProgressIndicator(strokeWidth: 3),
               ),
               SizedBox(height: AppSpacing.m),
-              Text('Finding more plans for you...'),
+              Text('Finding more places for you...'),
             ],
           ),
         ),
@@ -148,7 +148,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
     return AppScaffold(
       appBar: AppBar(
         leading: const AppBackButton(),
-        title: const Text('Deck'),
+        title: const Text('Discover'),
         actions: [
           IconButton(
             onPressed: controller.refresh,
@@ -254,7 +254,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
             if (state.usingOfflineCachedData) ...[
               const SizedBox(height: AppSpacing.s),
               Text(
-                'Offline / Using cached data',
+                'Showing recently cached places while you reconnect.',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.error,
                   fontWeight: FontWeight.w600,
@@ -421,7 +421,7 @@ class _DeckPageState extends ConsumerState<DeckPage> {
     return AppScaffold(
       appBar: AppBar(
         leading: const AppBackButton(),
-        title: const Text('Deck'),
+        title: const Text('Discover'),
         actions: [
           IconButton(
             onPressed: controller.refresh,

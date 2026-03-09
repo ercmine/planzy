@@ -324,7 +324,7 @@ class DeckController extends StateNotifier<DeckState> {
       state = state.copyWith(
         isLoadingInitial: false,
         locationRequired: true,
-        errorMessage: 'Location required',
+        errorMessage: 'Enable location to discover nearby places.',
       );
       return;
     }
@@ -347,7 +347,7 @@ class DeckController extends StateNotifier<DeckState> {
         state = state.copyWith(
           isLoadingInitial: false,
           isLoadingMore: false,
-          errorMessage: 'Session not found',
+          errorMessage: 'This planning session is no longer available.',
         );
         return;
       }
@@ -562,20 +562,20 @@ class DeckController extends StateNotifier<DeckState> {
   String _formatLoadError(Object error) {
     if (error is ApiError) {
       if (error.kind == ApiErrorKind.http && error.statusCode != null) {
-        return 'Could not load plans (HTTP ${error.statusCode})';
+        return 'We could not refresh places right now. Please try again in a moment.';
       }
       if (error.kind == ApiErrorKind.decoding) {
-        return 'Parse error: ${error.details ?? error.message}';
+        return 'We hit a temporary data issue while loading places. Please try again.';
       }
       if (error.kind == ApiErrorKind.network) {
-        return 'Could not load plans (network unavailable)';
+        return 'You appear to be offline. Reconnect to load more places.';
       }
-      return 'Could not load plans (${error.message})';
+      return 'We could not load places right now. Please try again.';
     }
     if (error is FormatException) {
-      return error.message;
+      return 'Something went wrong while loading places.';
     }
-    return 'Could not load plans (${error.toString()})';
+    return 'We could not load places right now. Please try again.';
   }
 
   Future<void> _ensureLocation() async {
@@ -596,7 +596,7 @@ class DeckController extends StateNotifier<DeckState> {
       state = state.copyWith(
         isLoadingInitial: false,
         locationRequired: true,
-        errorMessage: 'Location required',
+        errorMessage: 'Enable location to discover nearby places.',
       );
     }
   }

@@ -179,7 +179,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
       if (kDebugMode) {
         debugPrint('Plan detail load failed: $error');
       }
-      setState(() => _detailsError = 'Could not load extra details.');
+      setState(() => _detailsError = 'Some place details are unavailable right now.');
     } finally {
       if (mounted) {
         setState(() => _isLoadingDetails = false);
@@ -206,7 +206,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
       setState(() => _reviews = reviews);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _reviewsError = 'Could not load reviews.');
+      setState(() => _reviewsError = 'Reviews are temporarily unavailable.');
     } finally {
       if (mounted) {
         setState(() => _isLoadingReviews = false);
@@ -245,7 +245,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _videosError = 'Could not load videos.');
+      setState(() => _videosError = 'Videos are temporarily unavailable.');
     } finally {
       if (!mounted) return;
       setState(() {
@@ -524,7 +524,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: viewData.attribution
-                    .map((item) => Text(item.label ?? 'Data from ${item.provider}'))
+                    .map((item) => Text(item.label ?? 'Information provided by trusted partners'))
                     .toList(growable: false),
               ),
             ),
@@ -579,8 +579,8 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
           ),
           const SizedBox(height: AppSpacing.m),
           _Section(
-            title: 'Perbug creator and business tools',
-            child: const Text('Creator videos, venue claims, and premium insights will appear here as features roll out.'),
+            title: 'Creator and business insights',
+            child: const Text('Follow creator coverage, business updates, and reputation signals for this place.'),
           ),
           const SizedBox(height: AppSpacing.m),
           Wrap(
