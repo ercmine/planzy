@@ -91,6 +91,18 @@ export class PlaceNormalizationService {
     };
   }
 
+  listCanonicalPlaces() {
+    return this.store.listCanonicalPlaces();
+  }
+
+  listSourceRecords() {
+    return this.store.listSourceRecords();
+  }
+
+  listSourceRecordsForPlace(placeId: string) {
+    return this.store.listSourceRecordsForPlace(placeId);
+  }
+
   rebuildCanonicalPlace(placeId: string) {
     const sourceRecords = this.store.listSourceRecordsForPlace(placeId);
     if (sourceRecords.length === 0) {

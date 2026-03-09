@@ -8,6 +8,7 @@ import type {
 } from "./types.js";
 
 export interface AccountsStore {
+  listUsers(): UserIdentity[];
   getUser(userId: string): UserIdentity | undefined;
   upsertUser(user: UserIdentity): void;
   listRoles(userId: string): UserRoleAssignment[];
@@ -18,9 +19,11 @@ export interface AccountsStore {
 
   getCreatorProfileByUserId(userId: string): CreatorProfile | undefined;
   getCreatorProfileById(profileId: string): CreatorProfile | undefined;
+  listCreatorProfiles(): CreatorProfile[];
   saveCreatorProfile(profile: CreatorProfile): void;
 
   getBusinessProfile(id: string): BusinessProfile | undefined;
+  listBusinessProfiles(): BusinessProfile[];
   listBusinessProfilesByUserId(userId: string): BusinessProfile[];
   saveBusinessProfile(profile: BusinessProfile): void;
 

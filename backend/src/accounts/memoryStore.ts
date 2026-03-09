@@ -16,6 +16,11 @@ export class MemoryAccountsStore implements AccountsStore {
   private readonly businesses = new Map<string, BusinessProfile>();
   private readonly memberships = new Map<string, BusinessMembership>();
 
+
+  listUsers(): UserIdentity[] {
+    return [...this.users.values()];
+  }
+
   getUser(userId: string): UserIdentity | undefined {
     return this.users.get(userId);
   }
@@ -52,12 +57,20 @@ export class MemoryAccountsStore implements AccountsStore {
     return [...this.creatorByUser.values()].find((row) => row.id === profileId);
   }
 
+  listCreatorProfiles(): CreatorProfile[] {
+    return [...this.creatorByUser.values()];
+  }
+
   saveCreatorProfile(profile: CreatorProfile): void {
     this.creatorByUser.set(profile.userId, profile);
   }
 
   getBusinessProfile(id: string): BusinessProfile | undefined {
     return this.businesses.get(id);
+  }
+
+  listBusinessProfiles(): BusinessProfile[] {
+    return [...this.businesses.values()];
   }
 
   listBusinessProfilesByUserId(userId: string): BusinessProfile[] {

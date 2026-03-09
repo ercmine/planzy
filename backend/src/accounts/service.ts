@@ -57,6 +57,18 @@ export class AccountsService {
     return user;
   }
 
+  listUsers(): UserIdentity[] {
+    return this.store.listUsers();
+  }
+
+  listCreatorProfiles(): CreatorProfile[] {
+    return this.store.listCreatorProfiles();
+  }
+
+  listBusinessProfiles(): BusinessProfile[] {
+    return this.store.listBusinessProfiles();
+  }
+
   getIdentitySummary(userId: string): IdentitySummary {
     const user = this.ensureUserIdentity(userId);
     const personalProfile = this.store.getPersonalProfileByUserId(userId);
@@ -236,6 +248,52 @@ export class AccountsService {
     }
 
     return { allowed: true, reasonCode: "ALLOWED", message: "ok", actingProfileType: actor.profileType };
+  }
+
+
+  updateUserStatus(userId: string, status: UserStatus): UserIdentity {
+    const user = this.ensureUserIdentity(userId);
+    const next = { ...user, status, updatedAt: new Date().toISOString() };
+    this.store.upsertUser(next);
+    return next;
+  }
+
+  addUserModerationFlag(userId: string, flag: string): UserIdentity {
+    const user = this.ensureUserIdentity(userId);
+    const next = { ...user, moderationFlags: [...new Set([...(user.moderationFlags ?? []), flag])], updatedAt: new Date().toISOString() };
+    this.store.upsertUser(next);
+    return next;
+  }
+
+  removeUserModerationFlag(userId: string, flag: string): UserIdentity {
+    const user = this.ensureUserIdentity(userId);
+    const next = { ...user, moderationFlags: (user.moderationFlags ?? []).filter((item) => item !== flag), updatedAt: new Date().toISOString() };
+    this.store.upsertUser(next);
+    return next;
+  }
+
+  updateCreatorProfileStatus(profileId: string, status: CreatorProfileStatus): CreatorProfile {
+    const profile = this.store.getCreatorProfileById(profileId);
+    if (!profile) throw new Error("CREATOR_PROFILE_NOT_FOUND");
+    const next = { ...profile, status, updatedAt: new Date().toISOString() };
+    this.store.saveCreatorProfile(next);
+    return next;
+  }
+
+  updateCreatorVerificationStatus(profileId: string, verificationStatus: VerificationStatus): CreatorProfile {
+    const profile = this.store.getCreatorProfileById(profileId);
+    if (!profile) throw new Error("CREATOR_PROFILE_NOT_FOUND");
+    const next = { ...profile, verificationStatus, updatedAt: new Date().toISOString() };
+    this.store.saveCreatorProfile(next);
+    return next;
+  }
+
+  updateBusinessVerificationStatus(profileId: string, verificationStatus: VerificationStatus): BusinessProfile {
+    const profile = this.store.getBusinessProfile(profileId);
+    if (!profile) throw new Error("BUSINESS_PROFILE_NOT_FOUND");
+    const next = { ...profile, verificationStatus, updatedAt: new Date().toISOString() };
+    this.store.saveBusinessProfile(next);
+    return next;
   }
 
   inviteBusinessMember(
