@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import 'admob_test_ids.dart';
+
 class AdMobConfig {
   const AdMobConfig._();
 
@@ -40,7 +42,7 @@ class AdMobConfig {
 
   static String get nativeUnitId {
     if (kDebugMode) {
-      return TestIds.native;
+      return AdMobTestIds.native;
     }
     if (kIsWeb) {
       return '';
