@@ -24,11 +24,20 @@ class AppTheme {
       textTheme: AppTypography.textTheme(colorScheme),
       scaffoldBackgroundColor: colorScheme.surface,
       appBarTheme: AppBarTheme(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: colorScheme.surface.withOpacity(0.92),
         foregroundColor: colorScheme.onSurface,
-        centerTitle: true,
+        centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 0,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.sm),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+          ),
+        ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
@@ -47,12 +56,12 @@ class AppTheme {
         showDragHandle: true,
       ),
       cardTheme: CardThemeData(
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainerLow,
         surfaceTintColor: colorScheme.surfaceTint,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusL),
-          side: BorderSide(color: colorScheme.outlineVariant),
+          side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
