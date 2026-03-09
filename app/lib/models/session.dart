@@ -1,30 +1,75 @@
-// Run: flutter pub run build_runner build --delete-conflicting-outputs
-import 'package:freezed_annotation/freezed_annotation.dart';
-
 import 'session_filters.dart';
 import 'session_member.dart';
 
-part 'session.freezed.dart';
-part 'session.g.dart';
+class Session {
+  const Session({
+    required this.sessionId,
+    required this.title,
+    required this.createdAtISO,
+    required this.updatedAtISO,
+    required this.filters,
+    this.members = const <SessionMember>[],
+    this.status = 'active',
+    this.lastCursor,
+  });
 
-@freezed
-class Session with _$Session {
-  const factory Session({
-    required String sessionId,
-    required String title,
-    required String createdAtISO,
-    required String updatedAtISO,
-    required SessionFilters filters,
-    @Default(<SessionMember>[]) List<SessionMember> members,
-    @Default('active') String status,
+  final String sessionId;
+  final String title;
+  final String createdAtISO;
+  final String updatedAtISO;
+  final SessionFilters filters;
+  final List<SessionMember> members;
+  final String status;
+  final String? lastCursor;
+
+
+  Session copyWith({
+    String? sessionId,
+    String? title,
+    String? createdAtISO,
+    String? updatedAtISO,
+    SessionFilters? filters,
+    List<SessionMember>? members,
+    String? status,
     String? lastCursor,
-  }) = _Session;
+  }) =>
+      Session(
+        sessionId: sessionId ?? this.sessionId,
+        title: title ?? this.title,
+        createdAtISO: createdAtISO ?? this.createdAtISO,
+        updatedAtISO: updatedAtISO ?? this.updatedAtISO,
+        filters: filters ?? this.filters,
+        members: members ?? this.members,
+        status: status ?? this.status,
+        lastCursor: lastCursor ?? this.lastCursor,
+      );
+  factory Session.fromJson(Map<String, dynamic> json) => Session(
+        sessionId: (json['sessionId'] ?? json['id'] ?? '').toString(),
+        title: (json['title'] ?? '').toString(),
+        createdAtISO: (json['createdAtISO'] ?? json['createdAt'] ?? '').toString(),
+        updatedAtISO: (json['updatedAtISO'] ?? json['updatedAt'] ?? '').toString(),
+        filters: SessionFilters.fromJson(
+          (json['filters'] is Map ? (json['filters'] as Map).map((k, v) => MapEntry(k.toString(), v)) :
+          <String, dynamic>{}),
+        ),
+        members: (json['members'] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => SessionMember.fromJson(item.map((k, v) => MapEntry(k.toString(), v))))
+            .toList(growable: false),
+        status: (json['status'] ?? 'active').toString(),
+        lastCursor: json['lastCursor']?.toString(),
+      );
 
-  factory Session.fromJson(Map<String, dynamic> json) =>
-      _$SessionFromJson(<String, dynamic>{
-        ...json,
-        'sessionId': json['sessionId'] ?? json['id'],
-      });
+  Map<String, dynamic> toJson() => {
+        'sessionId': sessionId,
+        'title': title,
+        'createdAtISO': createdAtISO,
+        'updatedAtISO': updatedAtISO,
+        'filters': filters.toJson(),
+        'members': members.map((member) => member.toJson()).toList(growable: false),
+        'status': status,
+        'lastCursor': lastCursor,
+      };
 }
 
 extension SessionCompatX on Session {

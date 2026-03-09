@@ -1,67 +1,116 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+class CreateIdeaRequest {
+  const CreateIdeaRequest({
+    required this.title,
+    this.description,
+    this.category,
+    this.priceLevel,
+    this.websiteLink,
+    this.callLink,
+  });
 
-part 'idea.freezed.dart';
-part 'idea.g.dart';
+  final String title;
+  final String? description;
+  final String? category;
+  final int? priceLevel;
+  final String? websiteLink;
+  final String? callLink;
 
-@freezed
-class CreateIdeaRequest with _$CreateIdeaRequest {
-  const factory CreateIdeaRequest({
-    required String title,
-    String? description,
-    String? category,
-    int? priceLevel,
-    String? websiteLink,
-    String? callLink,
-  }) = _CreateIdeaRequest;
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'description': description,
+        'category': category,
+        'priceLevel': priceLevel,
+        'websiteLink': websiteLink,
+        'callLink': callLink,
+      };
 
-  factory CreateIdeaRequest.fromJson(Map<String, dynamic> json) =>
-      _$CreateIdeaRequestFromJson(json);
+  factory CreateIdeaRequest.fromJson(Map<String, dynamic> json) => CreateIdeaRequest(
+        title: (json['title'] ?? '').toString(),
+        description: json['description']?.toString(),
+        category: json['category']?.toString(),
+        priceLevel: json['priceLevel'] is num ? (json['priceLevel'] as num).toInt() : null,
+        websiteLink: json['websiteLink']?.toString(),
+        callLink: json['callLink']?.toString(),
+      );
 }
 
-@freezed
-class CreateIdeaResponse with _$CreateIdeaResponse {
-  const factory CreateIdeaResponse({
-    required String ideaId,
-    required String createdAtISO,
-  }) = _CreateIdeaResponse;
+class CreateIdeaResponse {
+  const CreateIdeaResponse({required this.ideaId, required this.createdAtISO});
 
-  factory CreateIdeaResponse.fromJson(Map<String, dynamic> json) =>
-      _$CreateIdeaResponseFromJson(json);
+  final String ideaId;
+  final String createdAtISO;
+
+  factory CreateIdeaResponse.fromJson(Map<String, dynamic> json) => CreateIdeaResponse(
+        ideaId: (json['ideaId'] ?? json['id'] ?? '').toString(),
+        createdAtISO: (json['createdAtISO'] ?? json['createdAt'] ?? '').toString(),
+      );
 }
 
-@freezed
-class IdeaItem with _$IdeaItem {
-  const factory IdeaItem({
-    required String ideaId,
-    required String title,
-    String? description,
-    String? category,
-    int? priceLevel,
-    String? websiteLink,
-    String? callLink,
-    required String createdAtISO,
-    String? createdByUserId,
-  }) = _IdeaItem;
+class IdeaItem {
+  const IdeaItem({
+    required this.ideaId,
+    required this.title,
+    required this.createdAtISO,
+    this.description,
+    this.category,
+    this.priceLevel,
+    this.websiteLink,
+    this.callLink,
+    this.createdByUserId,
+  });
 
-  factory IdeaItem.fromJson(Map<String, dynamic> json) =>
-      _$IdeaItemFromJson(<String, dynamic>{
-        ...json,
-        'ideaId': json['ideaId'] ?? json['id'],
-      });
+  final String ideaId;
+  final String title;
+  final String? description;
+  final String? category;
+  final int? priceLevel;
+  final String? websiteLink;
+  final String? callLink;
+  final String createdAtISO;
+  final String? createdByUserId;
+
+  factory IdeaItem.fromJson(Map<String, dynamic> json) => IdeaItem(
+        ideaId: (json['ideaId'] ?? json['id'] ?? '').toString(),
+        title: (json['title'] ?? json['name'] ?? '').toString(),
+        description: json['description']?.toString(),
+        category: json['category']?.toString(),
+        priceLevel: json['priceLevel'] is num ? (json['priceLevel'] as num).toInt() : null,
+        websiteLink: json['websiteLink']?.toString(),
+        callLink: json['callLink']?.toString(),
+        createdAtISO: (json['createdAtISO'] ?? json['createdAt'] ?? '').toString(),
+        createdByUserId: json['createdByUserId']?.toString(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'ideaId': ideaId,
+        'title': title,
+        'description': description,
+        'category': category,
+        'priceLevel': priceLevel,
+        'websiteLink': websiteLink,
+        'callLink': callLink,
+        'createdAtISO': createdAtISO,
+        'createdByUserId': createdByUserId,
+      };
 }
 
 extension IdeaItemCompatX on IdeaItem {
   String get id => ideaId;
 }
 
-@freezed
-class ListIdeasResponse with _$ListIdeasResponse {
-  const factory ListIdeasResponse({
-    required String sessionId,
-    @Default(<IdeaItem>[]) List<IdeaItem> ideas,
-    String? nextCursor,
-  }) = _ListIdeasResponse;
+class ListIdeasResponse {
+  const ListIdeasResponse({required this.sessionId, this.ideas = const <IdeaItem>[], this.nextCursor});
 
-  factory ListIdeasResponse.fromJson(Map<String, dynamic> json) =>
-      _$ListIdeasResponseFromJson(json);
+  final String sessionId;
+  final List<IdeaItem> ideas;
+  final String? nextCursor;
+
+  factory ListIdeasResponse.fromJson(Map<String, dynamic> json) => ListIdeasResponse(
+        sessionId: (json['sessionId'] ?? '').toString(),
+        ideas: (json['ideas'] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => IdeaItem.fromJson(item.map((k, v) => MapEntry(k.toString(), v))))
+            .toList(growable: false),
+        nextCursor: json['nextCursor']?.toString(),
+      );
 }
