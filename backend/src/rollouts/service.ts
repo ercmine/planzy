@@ -57,8 +57,8 @@ export class RolloutService {
     const identity = input.userId && this.accounts ? this.accounts.getIdentitySummary(input.userId) : undefined;
     const roles = identity?.roles ?? [];
     const inferredAccountType = input.accountType ?? this.deriveAccountType(identity?.user, input.activeProfileType);
-    const planFamily = input.targetType && input.targetId && this.subscriptions
-      ? this.subscriptions.getSubscription(input.targetType, input.targetId)?.planId
+    const planFamily = input.targetId && this.subscriptions
+      ? this.subscriptions.getSubscription(input.targetId)?.planId
       : undefined;
     const inferredCohorts = new Set([...(input.cohorts ?? [])]);
     if (roles.includes(UserRole.ADMIN) || roles.includes(UserRole.MODERATOR)) inferredCohorts.add("internal");
