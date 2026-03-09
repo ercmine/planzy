@@ -2,21 +2,27 @@
 import Container from './Container.astro';
 
 const features = [
-  { title: 'Live Results', desc: 'See what is trending nearby right now, from packed coffee spots to tonight-only specials.' },
-  { title: 'Swipe Decisions', desc: 'Use yes/no/maybe cards to quickly narrow options without decision fatigue.' },
-  { title: 'Category Filters', desc: 'Dial in the plan with categories like coffee, food, bars, activities, and more.' },
-  { title: 'Save & Share Plans', desc: 'Keep favorites for later and send your final pick to friends in one tap.' },
-  { title: 'Privacy-first Location', desc: 'Location is used only to rank relevant nearby options, never sold as ad data.' }
+  { title: 'Smarter local discovery', desc: 'Find better places faster with ranking tuned to context, quality, and live local momentum.' },
+  { title: 'Rich place detail pages', desc: 'See menus, hours, vibe, accessibility context, and what to expect before you arrive.' },
+  { title: 'Photo + video reviews', desc: 'Go beyond text reviews with visual proof from people who were actually there.' },
+  { title: 'Creator guides & collections', desc: 'Browse curated lists from trusted creators and save them directly to your plans.' },
+  { title: 'Saved places and lists', desc: 'Organize favorites by moment, neighborhood, or budget and keep plans ready to go.' },
+  { title: 'AI outing planner', desc: 'Generate a full route for meals, activities, and stops with one smart planning flow.' },
+  { title: 'Trusted review system', desc: 'Quality-focused moderation and reputation signals help surface reviews worth trusting.' },
+  { title: 'Business profile tools', desc: 'Claim your profile, update details, reply to reviews, and track engagement performance.' }
 ];
 ---
 
 <section id="features" class="py-[var(--space-section)]">
   <Container>
     <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <h2 class="text-3xl font-semibold">Everything you need in 10 seconds</h2>
-      <a href="/demo/" class="text-sm font-semibold text-brand-400 hover:text-brand-300">See demo preview →</a>
+      <div>
+        <h2 class="text-3xl font-semibold">Built for discovery, creators, and local businesses</h2>
+        <p class="mt-2 max-w-3xl text-slate-300">Perbug combines recommendations, social trust, and business tooling in one modern local platform.</p>
+      </div>
+      <a href="/demo/" class="text-sm font-semibold text-brand-400 hover:text-brand-300">See product preview →</a>
     </div>
-    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-2">
       {features.map((feature) => (
         <article class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
           <h3 class="text-lg font-semibold">{feature.title}</h3>
