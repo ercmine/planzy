@@ -8,7 +8,10 @@ class ReviewsRepository {
   final ApiClient apiClient;
 
   Future<List<PlaceReview>> fetchForPlace(String placeId, {String sort = 'most_helpful'}) async {
-    final response = await apiClient.getJson('/places/$placeId/reviews?sort=$sort');
+    final response = await apiClient.getJson(
+      '/places/$placeId/reviews',
+      queryParameters: <String, String>{'sort': sort},
+    );
     final items = response['reviews'];
     if (items is! List) {
       return const <PlaceReview>[];
