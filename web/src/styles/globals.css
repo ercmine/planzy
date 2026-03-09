@@ -8,15 +8,19 @@
 }
 
 html {
-  @apply bg-slate-950 text-slate-50 antialiased;
+  @apply bg-black text-white antialiased;
 }
 
 body {
   @apply min-h-screen font-sans;
   background:
-    radial-gradient(circle at 15% 5%, rgba(54, 244, 160, 0.09), transparent 35%),
-    radial-gradient(circle at 90% 0%, rgba(155, 123, 255, 0.1), transparent 42%),
-    var(--color-bg);
+    radial-gradient(circle at 20% 15%, rgba(56, 189, 248, 0.2), transparent 42%),
+    linear-gradient(165deg, #1e40af 0%, #000000 70%);
+  color: #ffffff;
+}
+
+body * {
+  color: inherit;
 }
 
 a {
