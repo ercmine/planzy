@@ -16,6 +16,7 @@ import { createDeckHandler } from "../api/sessions/deckHandler.js";
 import { createIdeasHandlers } from "../api/sessions/ideasHandler.js";
 import type { AppConfig } from "../config/schema.js";
 import { InMemoryDiscoveryRepository } from "../discovery/memoryRepository.js";
+import { RankingConfigResolver, RankingConfigService } from "../discovery/tuning.js";
 import {
   CategoryBrowseService,
   CityPageService,
@@ -137,6 +138,8 @@ export function createServer(options?: CreateServerOptions) {
   const collaborationService = new CollaborationService(new MemoryCollaborationStore(), accountsService, service, subscriptionService, accessEngine, businessAnalyticsService, businessPremiumService, notificationService);
 
   const discoveryRepository = new InMemoryDiscoveryRepository();
+  const rankingConfigService = new RankingConfigService();
+  const rankingConfigResolver = new RankingConfigResolver(rankingConfigService);
   const outingPlannerService = new OutingPlannerService({
     listPlaces: () => discoveryRepository.listPlaces(),
     creatorStore,
@@ -144,11 +147,11 @@ export function createServer(options?: CreateServerOptions) {
     subscriptions: subscriptionService,
     access: accessEngine
   });
-  const placeSearchService = new PlaceSearchService(discoveryRepository);
-  const categoryBrowseService = new CategoryBrowseService(discoveryRepository);
-  const nearbyService = new NearbyDiscoveryService(discoveryRepository);
-  const trendingService = new TrendingService(discoveryRepository);
-  const recommendationService = new RecommendationService(discoveryRepository, premiumExperience);
+  const placeSearchService = new PlaceSearchService(discoveryRepository, rankingConfigResolver);
+  const categoryBrowseService = new CategoryBrowseService(discoveryRepository, rankingConfigResolver);
+  const nearbyService = new NearbyDiscoveryService(discoveryRepository, rankingConfigResolver);
+  const trendingService = new TrendingService(discoveryRepository, rankingConfigResolver);
+  const recommendationService = new RecommendationService(discoveryRepository, premiumExperience, rankingConfigResolver);
   const cityPageService = new CityPageService(trendingService, recommendationService, categoryBrowseService);
   const discoveryFeedService = new DiscoveryFeedService(
     recommendationService,
@@ -200,7 +203,8 @@ export function createServer(options?: CreateServerOptions) {
       feedService: discoveryFeedService,
       premiumExperience,
       analyticsService
-    }
+    },
+    rankingTuning: { service: rankingConfigService, resolver: rankingConfigResolver, repo: discoveryRepository }
     ,
     analyticsService,
     analyticsQueryService

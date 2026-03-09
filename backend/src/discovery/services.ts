@@ -27,6 +27,7 @@ import type {
 } from "./types.js";
 import { PlanTier } from "../subscriptions/types.js";
 import type { PremiumExperienceService } from "../subscriptions/premiumExperience.js";
+import { evaluateRankingAdjustments, RankingConfigResolver } from "./tuning.js";
 
 interface RankedCandidate {
   place: PlaceDocument;
@@ -193,7 +194,7 @@ function applyBaseFilters(place: PlaceDocument, context: DiscoveryQueryContext):
 }
 
 class CandidateGenerator {
-  constructor(private readonly repo: PlaceDiscoveryRepository, private readonly premiumExperience?: PremiumExperienceService) {}
+  constructor(private readonly repo: PlaceDiscoveryRepository, private readonly premiumExperience?: PremiumExperienceService, private readonly resolver?: RankingConfigResolver) {}
 
   async generate(profile: UserRecommendationProfile | undefined, context: RecommendationContext): Promise<PlaceDocument[]> {
     const all = (await this.repo.listPlaces()).filter((place) => applyBaseEligibility(place) && place.qualityScore >= DEFAULT_RECOMMENDATION_CONFIG.limits.qualityFloor);
@@ -311,11 +312,12 @@ class DiversityBalancer {
   }
 }
 
-async function rankPlaces(repo: PlaceDiscoveryRepository, context: DiscoveryQueryContext): Promise<RankedCandidate[]> {
+async function rankPlaces(repo: PlaceDiscoveryRepository, context: DiscoveryQueryContext, resolver?: RankingConfigResolver): Promise<RankedCandidate[]> {
   const places = (await repo.listPlaces()).filter((place) => applyBaseFilters(place, context));
   const terms = tokenize(context.query);
   const cityToken = String(context.city ?? "").toLowerCase();
   const radius = Math.max(100, Math.min(50_000, Number(context.radiusMeters ?? 4_000)));
+  const resolved = resolver?.resolve({ city: context.city, categoryId: context.categoryId ?? context.categorySlug, surface: context.surface });
 
   return places
     .map((place): RankedCandidate => {
@@ -330,24 +332,26 @@ async function rankPlaces(repo: PlaceDiscoveryRepository, context: DiscoveryQuer
         : undefined;
       const distanceFit = distance === undefined ? 0.5 : Math.max(0, 1 - Math.min(distance, radius) / radius);
       const score = (textMatch * 0.5) + (cityFit * 0.2) + (distanceFit * 0.1) + (place.qualityScore * 0.15) + (place.trendingScore * 0.05);
+      const tuned = resolved ? evaluateRankingAdjustments(place, score, resolved, { city: context.city, categoryId: context.categoryId, surface: context.surface, provider: place.sourceAttribution[0] }) : { score, reasons: [], excluded: false };
       return {
         place,
-        score,
+        score: tuned.score,
         distanceMeters: distance,
-        reasons: [textMatch > 0.7 ? "query_match" : "broad_match"],
+        reasons: [textMatch > 0.7 ? "query_match" : "broad_match", ...tuned.reasons],
         diversityBucket: `${place.primaryCategory}:${place.city ?? "global"}`,
         explain: { score, contributions: { textMatch, cityFit, distanceFit }, reasonCodes: ["search"] }
       };
     })
+    .filter((candidate) => !resolved || !evaluateRankingAdjustments(candidate.place, candidate.score, resolved, { city: context.city, categoryId: context.categoryId, surface: context.surface, provider: candidate.place.sourceAttribution[0] }).excluded)
     .filter((candidate) => candidate.distanceMeters === undefined || candidate.distanceMeters <= radius)
     .sort((a, b) => b.score - a.score || a.place.canonicalPlaceId.localeCompare(b.place.canonicalPlaceId));
 }
 
 export class PlaceSearchService {
-  constructor(private readonly repo: PlaceDiscoveryRepository) {}
+  constructor(private readonly repo: PlaceDiscoveryRepository, private readonly resolver?: RankingConfigResolver) {}
 
   async search(context: DiscoveryQueryContext): Promise<SearchResponse> {
-    const ranked = await rankPlaces(this.repo, context);
+    const ranked = await rankPlaces(this.repo, context, this.resolver);
     const page = paginate(ranked, clampPageSize(context.pageSize), context.cursor);
     return {
       query: { q: context.query, normalizedQ: tokenize(context.query).join(" "), sort: context.sort ?? "relevance" },
@@ -361,10 +365,10 @@ export class PlaceSearchService {
 }
 
 export class CategoryBrowseService {
-  constructor(private readonly repo: PlaceDiscoveryRepository) {}
+  constructor(private readonly repo: PlaceDiscoveryRepository, private readonly resolver?: RankingConfigResolver) {}
 
   async browse(context: DiscoveryQueryContext): Promise<BrowseResponse> {
-    const ranked = await rankPlaces(this.repo, context);
+    const ranked = await rankPlaces(this.repo, context, this.resolver);
     const page = paginate(ranked, clampPageSize(context.pageSize), context.cursor);
     return {
       category: { id: context.categoryId ?? context.categorySlug ?? "all", slug: context.categorySlug ?? context.categoryId ?? "all" },
@@ -378,12 +382,12 @@ export class CategoryBrowseService {
 }
 
 export class NearbyDiscoveryService {
-  constructor(private readonly repo: PlaceDiscoveryRepository) {}
+  constructor(private readonly repo: PlaceDiscoveryRepository, private readonly resolver?: RankingConfigResolver) {}
 
   async nearby(context: DiscoveryQueryContext): Promise<NearbyResponse> {
     const requested = Math.max(200, Math.min(50_000, Number(context.radiusMeters ?? 2_500)));
-    const ranked = await rankPlaces(this.repo, { ...context, radiusMeters: requested });
-    const expanded = ranked.length >= 3 ? ranked : await rankPlaces(this.repo, { ...context, radiusMeters: Math.min(requested * 2, 50_000) });
+    const ranked = await rankPlaces(this.repo, { ...context, radiusMeters: requested }, this.resolver);
+    const expanded = ranked.length >= 3 ? ranked : await rankPlaces(this.repo, { ...context, radiusMeters: Math.min(requested * 2, 50_000) }, this.resolver);
     const page = paginate(expanded, clampPageSize(context.pageSize), context.cursor);
     return {
       origin: { lat: context.lat ?? 0, lng: context.lng ?? 0 },
@@ -396,12 +400,17 @@ export class NearbyDiscoveryService {
 }
 
 export class TrendingService {
-  constructor(private readonly repo: PlaceDiscoveryRepository) {}
+  constructor(private readonly repo: PlaceDiscoveryRepository, private readonly resolver?: RankingConfigResolver) {}
 
   async list(context: DiscoveryQueryContext): Promise<TrendingResponse> {
+    const resolved = this.resolver?.resolve({ city: context.city, categoryId: context.categoryId ?? context.categorySlug, surface: context.surface });
     const places = (await this.repo.listPlaces()).filter((place) => applyBaseFilters(place, context));
     const scoped = places.filter((place) => (!context.city || place.city === context.city) && (!context.categoryId || place.primaryCategory.includes(context.categoryId)));
-    const sorted = [...scoped].sort((a, b) => b.trendingScore - a.trendingScore || b.popularityScore - a.popularityScore);
+    const sorted = [...scoped].sort((a, b) => {
+      const left = resolved ? evaluateRankingAdjustments(a, a.trendingScore, resolved, { city: context.city, categoryId: context.categoryId, provider: a.sourceAttribution[0] }).score : a.trendingScore;
+      const right = resolved ? evaluateRankingAdjustments(b, b.trendingScore, resolved, { city: context.city, categoryId: context.categoryId, provider: b.sourceAttribution[0] }).score : b.trendingScore;
+      return right - left || b.popularityScore - a.popularityScore;
+    });
     const page = paginate(sorted, clampPageSize(context.pageSize), context.cursor);
     return {
       scope: { type: context.city ? "city" : context.categoryId ? "category" : "global", city: context.city, categoryId: context.categoryId },
@@ -417,7 +426,7 @@ export class RecommendationService {
   private readonly scorer = new RecommendationScorer();
   private readonly balancer = new DiversityBalancer();
 
-  constructor(private readonly repo: PlaceDiscoveryRepository, private readonly premiumExperience?: PremiumExperienceService) {
+  constructor(private readonly repo: PlaceDiscoveryRepository, private readonly premiumExperience?: PremiumExperienceService, private readonly resolver?: RankingConfigResolver) {
     this.generator = new CandidateGenerator(repo, premiumExperience);
   }
 
@@ -440,6 +449,12 @@ export class RecommendationService {
       .filter((place) => applyBaseFilters(place, context))
       .map((place) => {
         const base = this.scorer.score(place, recommendationContext, profile);
+        const resolved = this.resolver?.resolve({ city: recommendationContext.city, categoryId: recommendationContext.categoryFilter, surface: recommendationContext.surface });
+        if (resolved) {
+          const tuned = evaluateRankingAdjustments(place, base.score, resolved, { city: recommendationContext.city, categoryId: recommendationContext.categoryFilter, surface: recommendationContext.surface, provider: place.sourceAttribution[0] });
+          base.score = tuned.score;
+          base.reasons = [...base.reasons, ...tuned.reasons];
+        }
         if (premiumTier === "standard") return base;
         const qualityLift = 1 + ((place.qualityScore + (place.creatorTrustScore ?? 0.4)) / 2) * 0.08;
         const personalizedLift = base.reasons.some((reason) => reason.includes("you")) ? rerankBoost : 1;

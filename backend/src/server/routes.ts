@@ -3,6 +3,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import { createAccountsHttpHandlers } from "../accounts/http.js";
 import { createDiscoveryHttpHandlers } from "../discovery/http.js";
+import { createRankingTuningHandlers } from "../discovery/tuningHttp.js";
+import type { RankingConfigResolver, RankingConfigService } from "../discovery/tuning.js";
+import type { PlaceDiscoveryRepository } from "../discovery/types.js";
 import { createCreatorHttpHandlers } from "../creator/http.js";
 import { createCreatorVerificationHttpHandlers } from "../creatorVerification/http.js";
 import { createCreatorMonetizationHttpHandlers } from "../creatorMonetization/http.js";
@@ -119,6 +122,7 @@ export function createRoutes(
     collaborationService?: CollaborationService;
     businessPremiumService?: BusinessPremiumService;
     discovery?: DiscoveryHttpHandlerDeps;
+    rankingTuning?: { service: RankingConfigService; resolver: RankingConfigResolver; repo: PlaceDiscoveryRepository };
     savedHandlers?: SavedHttpHandlers;
     outingPlannerService?: OutingPlannerService;
     moderationService?: ModerationService;
@@ -135,6 +139,7 @@ export function createRoutes(
     : null;
   const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
+  const rankingTuningHandlers = deps?.rankingTuning ? createRankingTuningHandlers(deps.rankingTuning.service, deps.rankingTuning.resolver, deps.rankingTuning.repo) : null;
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
   const creatorVerificationHandlers = deps?.creatorVerificationService ? createCreatorVerificationHttpHandlers(deps.creatorVerificationService) : null;
   const creatorMonetizationHandlers = deps?.creatorMonetizationService ? createCreatorMonetizationHttpHandlers(deps.creatorMonetizationService) : null;
@@ -258,6 +263,58 @@ export function createRoutes(
       const businessAnalyticsMatch = /^\/v1\/business\/profiles\/([^/]+)\/analytics\/dashboard$/.exec(normalizedPath);
       if (businessAnalyticsHandlers && req.method === "GET" && businessAnalyticsMatch) {
         await businessAnalyticsHandlers.dashboard(req, res, decodeURIComponent(businessAnalyticsMatch[1] ?? ""));
+        return;
+      }
+
+
+      if (rankingTuningHandlers && normalizedPath === "/v1/admin/ranking/configs" && req.method === "GET") {
+        if (!rankingTuningHandlers.ensureAdmin(req, res)) return;
+        await rankingTuningHandlers.list(req, res);
+        return;
+      }
+
+      if (rankingTuningHandlers && normalizedPath === "/v1/admin/ranking/configs" && req.method === "POST") {
+        if (!rankingTuningHandlers.ensureAdmin(req, res)) return;
+        await rankingTuningHandlers.createDraft(req, res);
+        return;
+      }
+
+      const rankingConfigMatch = /^\/v1\/admin\/ranking\/configs\/([^/]+)$/.exec(normalizedPath);
+      if (rankingTuningHandlers && rankingConfigMatch && req.method === "PATCH") {
+        if (!rankingTuningHandlers.ensureAdmin(req, res)) return;
+        await rankingTuningHandlers.updateDraft(req, res, decodeURIComponent(rankingConfigMatch[1] ?? ""));
+        return;
+      }
+
+      const rankingValidateMatch = /^\/v1\/admin\/ranking\/configs\/([^/]+)\/validate$/.exec(normalizedPath);
+      if (rankingTuningHandlers && rankingValidateMatch && req.method === "POST") {
+        if (!rankingTuningHandlers.ensureAdmin(req, res)) return;
+        await rankingTuningHandlers.validate(req, res, decodeURIComponent(rankingValidateMatch[1] ?? ""));
+        return;
+      }
+
+      const rankingPublishMatch = /^\/v1\/admin\/ranking\/configs\/([^/]+)\/publish$/.exec(normalizedPath);
+      if (rankingTuningHandlers && rankingPublishMatch && req.method === "POST") {
+        if (!rankingTuningHandlers.ensureAdmin(req, res)) return;
+        await rankingTuningHandlers.publish(req, res, decodeURIComponent(rankingPublishMatch[1] ?? ""));
+        return;
+      }
+
+      if (rankingTuningHandlers && normalizedPath === "/v1/admin/ranking/rollback" && req.method === "POST") {
+        if (!rankingTuningHandlers.ensureAdmin(req, res)) return;
+        await rankingTuningHandlers.rollback(req, res);
+        return;
+      }
+
+      if (rankingTuningHandlers && normalizedPath === "/v1/admin/ranking/audit" && req.method === "GET") {
+        if (!rankingTuningHandlers.ensureAdmin(req, res)) return;
+        await rankingTuningHandlers.audit(req, res);
+        return;
+      }
+
+      if (rankingTuningHandlers && normalizedPath === "/v1/admin/ranking/preview" && req.method === "POST") {
+        if (!rankingTuningHandlers.ensureAdmin(req, res)) return;
+        await rankingTuningHandlers.preview(req, res);
         return;
       }
 
