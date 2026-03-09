@@ -35,3 +35,43 @@ List<String>? parseStringList(Object? value) {
   final out = value.map((item) => item.toString()).where((item) => item.isNotEmpty).toList();
   return out.isEmpty ? null : out;
 }
+
+bool? parseBool(Object? value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (value is bool) {
+    return value;
+  }
+
+  if (value is num) {
+    if (value == 1) return true;
+    if (value == 0) return false;
+    return null;
+  }
+
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    switch (normalized) {
+      case 'true':
+      case 'yes':
+      case 'on':
+      case '1':
+        return true;
+      case 'false':
+      case 'no':
+      case 'off':
+      case '0':
+        return false;
+      default:
+        return null;
+    }
+  }
+
+  return null;
+}
