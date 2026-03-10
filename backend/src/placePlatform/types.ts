@@ -20,6 +20,7 @@ export interface CanonicalPlace {
   qualityScore?: number;
   status: "ACTIVE" | "HIDDEN" | "MERGED" | "DUPLICATE";
   visibilityStatus: "PUBLIC" | "PRIVATE" | "SUPPRESSED";
+  sourceFreshnessAt?: string;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -40,6 +41,9 @@ export interface PlaceSourceRecord {
   sourceCategoryKeys: string[];
   sourceRecordUpdatedAt?: string;
   importBatchId?: string;
+  lastSeenAt?: string;
+  lastSyncedAt?: string;
+  staleAt?: string;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -88,6 +92,7 @@ export interface SourceCategoryMappingRule {
 
 export interface OsmPlaceInput {
   sourceRecordId: string;
+  sourceType?: "node" | "way" | "relation";
   name: string;
   lat: number;
   lng: number;
@@ -123,4 +128,55 @@ export interface ImportResult {
 
 export interface PlacePlatformLogger {
   info(message: string, meta?: Record<string, unknown>): void;
+  warn?(message: string, meta?: Record<string, unknown>): void;
+  error?(message: string, meta?: Record<string, unknown>): void;
+}
+
+export type ImportRunMode = "bootstrap" | "incremental";
+export type ImportRunStatus = "RUNNING" | "SUCCEEDED" | "FAILED";
+
+export interface ImportRunStats {
+  processed: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  skipped: number;
+  deduped: number;
+  failed: number;
+  staleMarked: number;
+}
+
+export interface PlaceImportRun {
+  id: string;
+  sourceName: SourceName;
+  mode: ImportRunMode;
+  regionSlug: string;
+  regionLabel?: string;
+  importVersion?: string;
+  sourceChecksum?: string;
+  status: ImportRunStatus;
+  cursor?: string;
+  startedAt: string;
+  completedAt?: string;
+  stats: ImportRunStats;
+  errorMessage?: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ImportBatchResult {
+  run: PlaceImportRun;
+  stats: ImportRunStats;
+}
+
+export interface OsmImportRunInput {
+  mode: ImportRunMode;
+  regionSlug: string;
+  regionLabel?: string;
+  importVersion?: string;
+  sourceChecksum?: string;
+  runId?: string;
+  records: OsmPlaceInput[];
+  batchSize?: number;
+  markMissingAsStale?: boolean;
+  staleAfterMs?: number;
 }
