@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/brand/logo.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../providers/app_providers.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_widgets.dart';
 
@@ -14,11 +15,14 @@ class OnboardingPermissionsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     Future<void> finishOnboarding() async {
+      await ref.read(locationControllerProvider.notifier).requestPermissionAndLoad();
       await ref.read(onboardingControllerProvider.notifier).finish();
       if (context.mounted) {
         context.go('/');
       }
     }
+
+    final locationState = ref.watch(locationControllerProvider);
 
     return OnboardingScaffold(
       child: Column(
@@ -44,6 +48,14 @@ class OnboardingPermissionsPage extends ConsumerWidget {
             title: 'Location',
             description: 'Find places that are close enough for everyone.',
           ),
+          if (locationState.errorMessage != null) ...[
+            const SizedBox(height: AppSpacing.s),
+            Text(
+              locationState.errorMessage!,
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+          ],
           const SizedBox(height: AppSpacing.s),
           const PermissionInfoCard(
             icon: Icons.contacts_outlined,

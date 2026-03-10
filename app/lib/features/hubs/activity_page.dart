@@ -1,53 +1,67 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../core/identity/identity_provider.dart';
 import '../../core/widgets/app_back_button.dart';
+import '../../models/session.dart';
+import '../../providers/app_providers.dart';
 
-class ActivityPage extends StatelessWidget {
+final _activitySessionsProvider = FutureProvider<List<Session>>((ref) {
+  return ref.read(sessionsRepositoryProvider).listActive();
+});
+
+final _activityCategoriesProvider = FutureProvider<List<String>>((ref) async {
+  final store = await ref.watch(identityStoreProvider.future);
+  return store.getOnboardingCategories();
+});
+
+class ActivityPage extends ConsumerWidget {
   const ActivityPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    const items = <Map<String, dynamic>>[
-      {
-        'title': 'New follower',
-        'desc': 'Alex followed your creator profile',
-        'icon': Icons.person_add_alt_1
-      },
-      {
-        'title': 'New comment',
-        'desc': 'Bluebird Cafe lovers reacted to your review',
-        'icon': Icons.chat_bubble_outline
-      },
-      {
-        'title': 'Moderation update',
-        'desc': 'Your video review is approved',
-        'icon': Icons.verified_outlined
-      },
-      {
-        'title': 'Guide saved',
-        'desc': '12 people saved your weekend brunch guide',
-        'icon': Icons.bookmark_added_outlined
-      },
-    ];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessions = ref.watch(_activitySessionsProvider);
+    final categories = ref.watch(_activityCategoriesProvider);
 
     return AppScaffold(
       appBar: AppBar(leading: const AppBackButton(), title: const Text('Following & activity')),
-      body: ListView.separated(
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return AppCard(
-            child: ListTile(
-              leading: Icon(item['icon'] as IconData),
-              title: Text(item['title'] as String),
-              subtitle: Text(item['desc'] as String),
-              trailing: const AppPill(label: 'New'),
-            ),
+      body: sessions.when(
+        data: (sessionData) {
+          final categoryData = categories.valueOrNull ?? const <String>[];
+          final items = <Map<String, dynamic>>[
+            {
+              'title': 'Active sessions',
+              'desc': '${sessionData.length} active sessions are currently saved on this device.',
+              'icon': Icons.groups_2_outlined,
+            },
+            {
+              'title': 'Discovery interests',
+              'desc': categoryData.isEmpty
+                  ? 'No interests selected yet. Update onboarding preferences to personalize discovery.'
+                  : 'Personalized for: ${categoryData.join(', ')}',
+              'icon': Icons.tune_rounded,
+            },
+          ];
+
+          return ListView.separated(
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return AppCard(
+                child: ListTile(
+                  leading: Icon(item['icon'] as IconData),
+                  title: Text(item['title'] as String),
+                  subtitle: Text(item['desc'] as String),
+                ),
+              );
+            },
           );
         },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const Center(child: Text('Activity is unavailable right now.')),
       ),
     );
   }

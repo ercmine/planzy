@@ -22,19 +22,19 @@ class OnboardingSignInPage extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.m),
           Text(
-            'Sign-in is coming soon',
+            'Continue with local profile',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: AppSpacing.s),
           Text(
-            'We are preparing Apple and phone sign-in. For now, continue without an account.',
+            'You can start with a local profile now. You can connect a full account when authentication is enabled on your environment.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: AppSpacing.l),
           PrimaryButton(
-            label: 'Continue without sign-in',
+            label: 'Continue with local profile',
             onPressed: () => context.go('/'),
           ),
         ],

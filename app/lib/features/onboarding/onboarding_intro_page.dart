@@ -43,7 +43,7 @@ class OnboardingIntroPage extends StatelessWidget {
           const SizedBox(height: AppSpacing.l),
           PrimaryButton(
             label: 'Get Started',
-            onPressed: () => context.go('/onboarding/permissions'),
+            onPressed: () => context.go('/onboarding/interests'),
             icon: const Icon(Icons.arrow_forward_rounded),
           ),
         ],
