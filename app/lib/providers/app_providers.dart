@@ -111,12 +111,10 @@ final adEntitlementSnapshotProvider = Provider<AdEntitlementSnapshot>((ref) {
   final entitlementAsync = ref.watch(entitlementSummaryProvider);
 
   return entitlementAsync.when(
-    data: (summary) => AdEntitlementSnapshot(
+    data: (_) => const AdEntitlementSnapshot(
       isAnonymous: false,
-      planCode: summary.planCode,
-      isSubscriptionActive: summary.planCode.toLowerCase() != 'free',
       isResolved: true,
-      serverTierOverride: summary.adsEnabled ? null : AdEntitlementTier.elite,
+      serverTierOverride: AdEntitlementTier.free,
     ),
     loading: () => const AdEntitlementSnapshot(isAnonymous: false, isResolved: false),
     error: (_, __) => const AdEntitlementSnapshot(isAnonymous: false, isResolved: false),

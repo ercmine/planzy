@@ -9,10 +9,10 @@ import Container from '@/components/Container.astro';
 import { createSeo } from '@/lib/seo';
 
 const pageDescription =
-  'Perbug is a smart local discovery platform for users, creators, and businesses—trusted reviews, creator content, and AI-powered outing planning in one app.';
+  'Perbug is a free creator-first local discovery app where anyone can browse places, post reviews and videos, build guides, and follow creators.';
 
 const seo = createSeo({
-  title: 'Smarter local discovery for users, creators, and businesses',
+  title: 'Free local discovery and creator reviews for everyone',
   description: pageDescription,
   path: '/'
 });
@@ -26,37 +26,37 @@ const faqSchema = {
       name: 'What is Perbug?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Perbug is a local discovery platform where people discover places, trust creator and community reviews, and plan outings with smart recommendations.'
+        text: 'Perbug is a free local discovery platform where people discover places, trust creator and community reviews, and plan outings with smart recommendations.'
       }
     },
     {
       '@type': 'Question',
-      name: 'Who is Perbug built for?',
+      name: 'Who can create content on Perbug?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Perbug supports everyday users, creators who publish local review content, and businesses that manage their profiles and customer engagement.'
+        text: 'Any signed-in user can post text, photo, and video reviews, publish guides, and build a creator profile.'
       }
     },
     {
       '@type': 'Question',
-      name: 'Does Perbug support creators and businesses?',
+      name: 'Does Perbug have paid plans?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Yes. Creators can publish guides and build followers, while businesses can claim profiles, respond to reviews, and improve visibility.'
+        text: 'No. Perbug is free for everyone and supported by ads in discovery.'
       }
     },
     {
       '@type': 'Question',
-      name: 'Is there a premium experience?',
+      name: 'How are ads shown?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Perbug includes free core features with premium enhancements for deeper recommendations, cleaner browsing, and advanced tools for creators and businesses.'
+        text: 'Perbug uses an ad-supported discovery model with sponsored cards shown in-feed at a consistent cadence.'
       }
     }
   ]
 };
 
-const credibilityPills = ['Trusted reviews', 'Local discovery', 'Creator content', 'Smart recommendations', 'Business tools'];
+const credibilityPills = ['Free for everyone', 'Creator content', 'Trusted reviews', 'AI planner', 'Ad-supported discovery'];
 ---
 
 <BaseLayout {...seo} structuredData={faqSchema}>
@@ -72,29 +72,14 @@ const credibilityPills = ['Trusted reviews', 'Local discovery', 'Creator content
   <FeatureCards />
   <LiveResultsPreview />
 
-  <section id="premium" class="py-[var(--space-section)]">
-    <Container class="rounded-3xl border border-slate-800 bg-slate-900/60 p-8">
-      <h2 class="text-3xl font-semibold">Perbug Premium</h2>
-      <p class="mt-3 max-w-3xl text-slate-300">Upgrade for cleaner browsing, sharper recommendations, and extra power for creator and business workflows as Perbug launches city by city.</p>
-      <div class="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <p class="rounded-xl border border-slate-700 p-4">Reduced ads and cleaner discovery flows</p>
-        <p class="rounded-xl border border-slate-700 p-4">Smarter personalized recommendations</p>
-        <p class="rounded-xl border border-slate-700 p-4">Advanced creator visibility tools</p>
-        <p class="rounded-xl border border-slate-700 p-4">Business profile and engagement enhancements</p>
-      </div>
-      <a href="/support/" class="mt-6 inline-block text-sm font-semibold text-brand-300 hover:text-brand-200">Get premium updates →</a>
-    </Container>
-  </section>
-
   <FAQAccordion />
 
   <Container class="pb-16 text-center">
-    <h2 class="text-3xl font-semibold">Ready to launch your Perbug presence?</h2>
-    <p class="mx-auto mt-3 max-w-2xl text-slate-300">Start exploring local recommendations, join as a creator, or claim your business profile to connect with more customers.</p>
+    <h2 class="text-3xl font-semibold">Ready to explore and share your local favorites?</h2>
+    <p class="mx-auto mt-3 max-w-2xl text-slate-300">Start discovering places, follow creators, and post your own reviews and guides for free.</p>
     <div class="mt-6 flex flex-wrap justify-center gap-3">
       <a href="/downloads/" class="rounded-lg bg-brand-500 px-5 py-3 font-semibold text-slate-950 hover:bg-brand-400">Start exploring</a>
-      <a href="#creators" class="rounded-lg border border-slate-600 px-5 py-3 font-semibold text-slate-100 hover:border-neon-purple">Join as creator</a>
-      <a href="#business" class="rounded-lg border border-slate-600 px-5 py-3 font-semibold text-slate-100 hover:border-neon-purple">Claim your business</a>
+      <a href="#creators" class="rounded-lg border border-slate-600 px-5 py-3 font-semibold text-slate-100 hover:border-neon-purple">Create your profile</a>
     </div>
   </Container>
 </BaseLayout>

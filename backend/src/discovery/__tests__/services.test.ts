@@ -5,6 +5,7 @@ import {
   CategoryBrowseService,
   CityPageService,
   DiscoveryFeedService,
+  AdInsertionService,
   NearbyDiscoveryService,
   PlaceSearchService,
   RecommendationService,
@@ -160,18 +161,36 @@ describe("discovery services", () => {
   });
 
 
-  it("adjusts ad density by premium tier", async () => {
-    const freeFeed = await feed.feed("u1", "for_you", { city: "austin", pageSize: 12 });
-    const plusFeed = await feed.feed("plus-user", "for_you", { city: "austin", pageSize: 12 });
-    const eliteFeed = await feed.feed("elite-user", "for_you", { city: "austin", pageSize: 12 });
+  it("injects one ad after every 10 organic cards with stable ordering", async () => {
+    const adService = new AdInsertionService();
+    const organicCards = Array.from({ length: 25 }, (_, idx) => ({
+      type: "place" as const,
+      id: `p${idx}`,
+      place: {
+        placeId: `p${idx}`,
+        title: `Place ${idx}`,
+        primaryCategory: "food",
+        secondaryCategories: ["food"],
+        city: "austin",
+        rating: { score: 4.5, reviewCount: 10 },
+        sourceAttribution: ["google"],
+        metadata: { rankingScore: 0.9, trendingScore: 0.8 }
+      }
+    }));
 
-    const freeAds = freeFeed.items.filter((item) => item.type === "ad").length;
-    const plusAds = plusFeed.items.filter((item) => item.type === "ad").length;
-    const eliteAds = eliteFeed.items.filter((item) => item.type === "ad").length;
+    const mixed = adService.insertEveryTen(organicCards);
+    const adIndexes = mixed
+      .map((item, index) => ({ item, index }))
+      .filter((entry) => entry.item.type === "ad")
+      .map((entry) => entry.index);
 
-    expect(freeAds).toBeGreaterThanOrEqual(plusAds);
-    expect(plusAds).toBeGreaterThanOrEqual(eliteAds);
-    expect(eliteAds).toBe(0);
+    expect(adIndexes).toEqual([10, 21]);
+
+    const organicIdsFromMixed = mixed
+      .filter((item) => item.type === "place")
+      .map((item) => item.id);
+
+    expect(organicIdsFromMixed).toEqual(organicCards.map((item) => item.id));
   });
   it("composes city page sections", async () => {
     const page = await cityPage.getCityPage("u1", "austin");
