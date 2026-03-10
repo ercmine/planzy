@@ -245,8 +245,10 @@ class ApiClient {
     Object? body,
   }) async {
     final uri = buildUri(path, queryParameters);
-    final resolvedUserId = await userIdResolver();
-    final userId = kDebugMode ? 'dev-sim' : resolvedUserId;
+    final userId = (await userIdResolver()).trim();
+    if (userId.isEmpty) {
+      throw ApiError.unknown('Missing user identity for API request');
+    }
 
     var attempt = 0;
     while (true) {
