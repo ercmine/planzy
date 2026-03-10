@@ -90,7 +90,28 @@ class Env {
   }
 
   static String _resolveApiBaseUrl() {
+    const fromDartDefine = String.fromEnvironment(EnvKeys.apiBaseUrl);
+    if (fromDartDefine.trim().isNotEmpty) {
+      return _validateApiBaseUrl(fromDartDefine.trim());
+    }
+
+    final fromDotEnv = dotenv.maybeGet(EnvKeys.apiBaseUrl)?.trim();
+    if (fromDotEnv != null && fromDotEnv.isNotEmpty) {
+      return _validateApiBaseUrl(fromDotEnv);
+    }
+
     return _defaultApiBaseUrl;
+  }
+
+  static String _validateApiBaseUrl(String raw) {
+    final parsed = Uri.tryParse(raw);
+    if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
+      throw StateError('Invalid API base URL configured: "$raw"');
+    }
+    if (parsed.scheme != 'https') {
+      throw StateError('API base URL must use https: "$raw"');
+    }
+    return raw;
   }
 
 

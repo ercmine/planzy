@@ -147,4 +147,36 @@ void main() {
       ),
     );
   });
+  test('propagates resolved user id header to backend requests', () async {
+    String? capturedUserId;
+    final client = ApiClient(
+      httpClient: MockClient((request) async {
+        capturedUserId = request.headers['x-user-id'];
+        return http.Response(jsonEncode({'ok': true}), 200);
+      }),
+      envConfig: env,
+      userIdResolver: () async => 'user-from-store',
+      retryPolicy: const RetryPolicy(maxRetries: 0, baseDelay: Duration.zero),
+    );
+
+    await client.getJson('/plans');
+    expect(capturedUserId, 'user-from-store');
+  });
+
+  test('throws when resolved user id is empty', () async {
+    final client = ApiClient(
+      httpClient: MockClient((request) async => http.Response(jsonEncode({'ok': true}), 200)),
+      envConfig: env,
+      userIdResolver: () async => '   ',
+      retryPolicy: const RetryPolicy(maxRetries: 0, baseDelay: Duration.zero),
+    );
+
+    expect(
+      () => client.getJson('/plans'),
+      throwsA(
+        isA<ApiError>().having((e) => e.kind, 'kind', ApiErrorKind.unknown),
+      ),
+    );
+  });
+
 }
