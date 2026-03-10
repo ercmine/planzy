@@ -1,25 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildNearbyPlacesSqlQuery, InMemoryPlacePlatformRepository } from "../repositories.js";
 import { CategoryNormalizationService, NearbyPlacesService, OsmImportRunnerService, PlaceImportService } from "../services.js";
+import { OSM_CATEGORY_RULES, PERBUG_CATEGORIES } from "../categoryIntelligence.js";
 
 function makeDeps() {
   const repo = new InMemoryPlacePlatformRepository({
-    categories: [
-      { id: "cat_food", slug: "food", displayName: "Food", status: "ACTIVE" },
-      { id: "cat_cafe", slug: "cafe", displayName: "Cafe", status: "ACTIVE", parentCategoryId: "cat_food" }
-    ],
-    rules: [
-      {
-        id: "rule_amenity_cafe",
-        sourceName: "osm",
-        sourceKey: "amenity",
-        sourceValue: "cafe",
-        categoryId: "cat_cafe",
-        confidence: 0.92,
-        priority: 1,
-        status: "ACTIVE"
-      }
-    ]
+    categories: PERBUG_CATEGORIES,
+    rules: OSM_CATEGORY_RULES
   });
   const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const categoryNormalization = new CategoryNormalizationService(repo);
@@ -35,7 +22,7 @@ describe("place platform foundations", () => {
     const mapped = categoryNormalization.mapOsmTagsToCategories({ amenity: "cafe", cuisine: "coffee_shop" });
 
     expect(mapped).toHaveLength(1);
-    expect(mapped[0]?.categoryId).toBe("cat_cafe");
+    expect(mapped[0]?.categoryId).toBe("cat_coffee");
   });
 
   it("creates canonical place and source records on first OSM ingest", () => {
@@ -57,7 +44,7 @@ describe("place platform foundations", () => {
     expect(place?.primaryName).toBe("Sunrise Cafe");
     expect(repo.getSourceRecordBySourceRef("osm", "node/123")?.canonicalPlaceId).toBe(result.canonicalPlaceId);
     expect(repo.listSourceRecordsByCanonicalPlaceId(result.canonicalPlaceId)).toHaveLength(1);
-    expect(repo.listCanonicalPlaceCategories(result.canonicalPlaceId).map((item) => item.categoryId)).toContain("cat_cafe");
+    expect(repo.listCanonicalPlaceCategories(result.canonicalPlaceId).map((item) => item.categoryId)).toContain("cat_coffee");
   });
 
   it("dedupes by source identity and updates existing canonical place", () => {
@@ -180,7 +167,7 @@ describe("place platform foundations", () => {
       lat: 40.7127,
       lng: -74.0059,
       radiusMeters: 1000,
-      categoryIds: ["cat_cafe"]
+      categoryIds: ["cat_coffee"]
     });
 
     expect(nearbyResults).toHaveLength(1);
@@ -208,4 +195,34 @@ describe("place platform foundations", () => {
     expect(logger.info).toHaveBeenCalledWith("place.import.osm", expect.any(Object));
     expect(logger.info).toHaveBeenCalledWith("place.nearby.query", expect.any(Object));
   });
+
+
+  it("applies cuisine precedence over generic restaurant", () => {
+    const { categoryNormalization } = makeDeps();
+    const mapped = categoryNormalization.mapOsmTagsToCategories({ amenity: "restaurant", cuisine: "pizza" });
+    expect(mapped[0]?.categoryId).toBe("cat_pizza");
+    expect(mapped.some((item) => item.categoryId === "cat_restaurants")).toBe(true);
+  });
+
+  it("supports unknown tags with unmapped fallback", () => {
+    const { categoryNormalization } = makeDeps();
+    const mapped = categoryNormalization.mapOsmTagsToCategories({ highway: "bus_stop" });
+    expect(mapped).toHaveLength(0);
+  });
+
+  it("stores completeness score and normalization metadata", () => {
+    const { importer, repo } = makeDeps();
+    const result = importer.ingestOsmPlace({
+      sourceRecordId: "node/qual",
+      name: "Quality Cafe",
+      lat: 1,
+      lng: 1,
+      tags: { amenity: "cafe", website: "https://example.com" },
+      payload: { city: "Austin", country_code: "US" }
+    });
+    const place = repo.getById(result.canonicalPlaceId);
+    expect(place?.qualityScore).toBeGreaterThan(0.5);
+    expect(place?.metadata["normalizationVersion"]).toBe("v1");
+  });
+
 });
