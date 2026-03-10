@@ -14,8 +14,6 @@ import '../features/onboarding/bootstrap_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
 import '../features/onboarding/onboarding_permissions_page.dart';
 import '../features/onboarding/onboarding_signin_page.dart';
-import '../features/premium/pricing_page.dart';
-import '../features/premium/subscription_page.dart';
 import '../features/results/results_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/sessions/create_session/create_session_page.dart';
@@ -129,11 +127,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'role-hub',
         builder: (context, state) {
           final family = (state.pathParameters['family'] ?? 'user').toUpperCase();
-          if (family == 'CREATOR' || family == 'BUSINESS') {
-            return RoleHubPage(family: family);
-          }
-          if (family == 'ADMIN') {
-            return const RoleHubPage(family: 'ADMIN', entitlementFamily: 'USER');
+          if (family == 'CREATOR') {
+            return const RoleHubPage(family: 'CREATOR');
           }
           return const RoleHubPage(family: 'USER');
         },
@@ -142,19 +137,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (context, state) => const SettingsPage(),
-      ),
-      GoRoute(
-        path: '/pricing',
-        name: 'pricing',
-        builder: (context, state) {
-          final family = state.uri.queryParameters['family'];
-          return PricingPage(initialFamily: family);
-        },
-      ),
-      GoRoute(
-        path: '/account/subscription',
-        name: 'subscription',
-        builder: (context, state) => const SubscriptionPage(),
       ),
       GoRoute(
         path: '/sessions/create',

@@ -97,15 +97,17 @@ describe("billing domain", () => {
     expect(denied.reasonCode).toBe(ReasonCode.USAGE_LIMIT_REACHED);
   });
 
-  it("creator plan entitlements do not unlock business action", async () => {
+  it("allows creator actions for regular users and disables business actions", async () => {
     const service = new SubscriptionService(new MemoryUsageStore(), new DevBillingProvider());
-    service.ensureAccount("creator-1", SubscriptionTargetType.CREATOR);
-    await service.startSubscriptionChange("creator-1", "creator-elite");
+    service.ensureAccount("user-1", SubscriptionTargetType.USER);
 
     const policy = new EntitlementPolicyService(service);
-    const decision = await policy.can("creator-1", "reply_business_review");
-    expect(decision.allowed).toBe(false);
-    expect(decision.reasonCode).toBe(ReasonCode.FEATURE_NOT_IN_PLAN);
+    const creatorDecision = await policy.can("user-1", "generate_ai_itinerary");
+    expect(creatorDecision.allowed).toBe(true);
+
+    const businessDecision = await policy.can("user-1", "reply_business_review");
+    expect(businessDecision.allowed).toBe(false);
+    expect(businessDecision.reasonCode).toBe(ReasonCode.NOT_AVAILABLE);
   });
 
   it("legacy target without rows still resolves to free", () => {

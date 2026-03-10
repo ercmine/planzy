@@ -1,7 +1,7 @@
 ---
 import Container from './Container.astro';
 
-const credibility = ['Trusted local reviews', 'Photo + video proof', 'Smart recommendations', 'Creator-first content'];
+const credibility = ['Free for everyone', 'Photo + video reviews', 'Creator guides', 'AI planner', 'Ad-supported discovery'];
 const socialProof = [
   { label: 'Active local guides', value: '4,200+' },
   { label: 'Cities in rollout', value: '18' },
@@ -12,18 +12,17 @@ const socialProof = [
 <section class="bg-hero-glow py-16 sm:py-20">
   <Container class="grid items-center gap-10 lg:grid-cols-2">
     <div class="space-y-6">
-      <p class="text-sm font-semibold uppercase tracking-[0.2em] text-brand-400">Launching local discovery, reimagined</p>
-      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Discover where to go next with reviews you can actually trust.</h1>
+      <p class="text-sm font-semibold uppercase tracking-[0.2em] text-brand-400">Free creator-first local discovery</p>
+      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Discover where to go next with reviews you can trust.</h1>
       <p class="max-w-xl text-lg text-slate-300">
-        Perbug helps you find the right places faster with smart recommendations, creator-led guides, real review photos and videos, and tools for businesses to stay connected.
+        Perbug helps you find great places faster with community and creator reviews, visual proof, and social recommendations. Post your own reviews and guides from day one—no subscription required.
       </p>
       <div class="flex flex-wrap gap-3">
         <a href="/downloads/" class="rounded-lg bg-brand-500 px-5 py-3 font-semibold text-slate-950 shadow-soft hover:bg-brand-400">Start Exploring</a>
         <a href="/demo/" class="rounded-lg border border-slate-600 px-5 py-3 font-semibold text-slate-100 hover:border-neon-purple">View Product Preview</a>
       </div>
       <div class="flex flex-wrap gap-4 text-sm">
-        <a href="#creators" class="font-semibold text-brand-300 hover:text-brand-200">Join as a creator →</a>
-        <a href="#business" class="font-semibold text-brand-300 hover:text-brand-200">Claim your business →</a>
+        <a href="#creators" class="font-semibold text-brand-300 hover:text-brand-200">Create your profile →</a>
       </div>
       <div class="grid gap-3 sm:grid-cols-3">
         {socialProof.map((stat) => (

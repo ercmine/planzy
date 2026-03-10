@@ -82,7 +82,7 @@ describe("subscription routes", () => {
     });
   });
 
-  it("blocks paid AI itinerary feature for free user with structured reason", async () => {
+  it("allows AI itinerary for signed-in users in free model", async () => {
     const response = await fetch(`${baseUrl}/v1/subscription/authorize?action=generate_ai_itinerary`, {
       headers: {
         "x-user-id": "sub-user-2",
@@ -93,8 +93,8 @@ describe("subscription routes", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       decision: {
-        allowed: false,
-        reasonCode: "FEATURE_NOT_IN_PLAN"
+        allowed: true,
+        reasonCode: "ALLOWED"
       }
     });
   });

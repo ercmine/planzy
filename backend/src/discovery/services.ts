@@ -544,18 +544,18 @@ export class RecommendationService {
 }
 
 export class AdInsertionService {
-  insert(organic: DiscoveryFeedCard[], spacing: number, maxAds: number): DiscoveryFeedCard[] {
+  insertEveryTen(organic: DiscoveryFeedCard[]): DiscoveryFeedCard[] {
     const mixed: DiscoveryFeedCard[] = [];
     let shown = 0;
-    let inserted = 0;
+
     for (const card of organic) {
-      if (shown > 0 && shown % spacing === 0 && inserted < maxAds) {
+      if (shown > 0 && shown % 10 === 0) {
         mixed.push({ type: "ad", id: `ad-${shown}`, placementKey: "feed-inline" });
-        inserted += 1;
       }
       mixed.push(card);
       shown += 1;
     }
+
     return mixed;
   }
 }
@@ -587,10 +587,7 @@ export class DiscoveryFeedService {
     }
 
     const organicCards: DiscoveryFeedCard[] = organicItems.map((item) => ({ type: "place", id: item.placeId, place: item }));
-    const adTier = userId ? this.premiumExperience?.adTierForUser(userId) ?? "standard" : "standard";
-    const adSpacing = adTier === "reduced" ? 12 : 4;
-    const maxAds = adTier === "none" ? 0 : (adTier === "reduced" ? 1 : 3);
-    const cards = this.adService.insert(organicCards, adSpacing, maxAds).filter((item) => adTier === "none" ? item.type !== "ad" : true);
+    const cards = this.adService.insertEveryTen(organicCards);
     return {
       mode,
       items: cards,

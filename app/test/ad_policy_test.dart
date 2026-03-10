@@ -6,55 +6,45 @@ void main() {
   const resolver = AdEntitlementResolver();
   const policy = AdPlacementPolicy();
 
-  test('resolver maps grace and canceled-but-active plus users correctly', () {
+  test('resolved users map to free ad-supported tier', () {
     expect(
-      resolver.resolve(const AdEntitlementSnapshot(planCode: 'plus', isInGracePeriod: true, isAnonymous: false)),
-      AdEntitlementTier.plus,
-    );
-    expect(
-      resolver.resolve(const AdEntitlementSnapshot(planCode: 'plus', isCanceledButActive: true, isAnonymous: false)),
-      AdEntitlementTier.plus,
-    );
-  });
-
-  test('resolver maps expired plus user to free', () {
-    expect(
-      resolver.resolve(const AdEntitlementSnapshot(planCode: 'plus', isAnonymous: false)),
+      resolver.resolve(const AdEntitlementSnapshot(planCode: 'elite', isAnonymous: false, isResolved: true)),
       AdEntitlementTier.free,
     );
   });
 
-  test('elite suppresses all placements', () {
-    final decision = policy.evaluatePlacement(
-      placement: AdPlacement.resultsInlineBanner,
-      tier: AdEntitlementTier.elite,
+  test('unknown entitlement still suppresses until resolved', () {
+    expect(
+      resolver.resolve(const AdEntitlementSnapshot(isResolved: false)),
+      AdEntitlementTier.unknown,
     );
-    expect(decision.action, AdRenderAction.skipDueToPlan);
   });
 
-  test('plus has reduced placement compared to free for detail inline', () {
+  test('all resolved tiers show results ads in free model', () {
     final free = policy.evaluatePlacement(
-      placement: AdPlacement.placeDetailInlineBanner,
+      placement: AdPlacement.resultsInlineBanner,
       tier: AdEntitlementTier.free,
     );
     final plus = policy.evaluatePlacement(
-      placement: AdPlacement.placeDetailInlineBanner,
+      placement: AdPlacement.resultsInlineBanner,
       tier: AdEntitlementTier.plus,
     );
+    final elite = policy.evaluatePlacement(
+      placement: AdPlacement.resultsInlineBanner,
+      tier: AdEntitlementTier.elite,
+    );
     expect(free.shouldShowAd, isTrue);
-    expect(plus.shouldShowAd, isFalse);
+    expect(plus.shouldShowAd, isTrue);
+    expect(elite.shouldShowAd, isTrue);
   });
 
-  test('no-fill allows one retry then collapses', () {
-    final retry = policy.onInventoryFailure(
-      placement: AdPlacement.resultsInlineBanner,
-      attempt: 0,
+  test('inline insertion policy is every 10 cards', () {
+    final insertion = policy.insertionPolicyFor(
+      placement: AdPlacement.deckInlineNative,
+      tier: AdEntitlementTier.free,
     );
-    final collapse = policy.onInventoryFailure(
-      placement: AdPlacement.resultsInlineBanner,
-      attempt: 1,
-    );
-    expect(retry.action, AdRenderAction.allowRetryLater);
-    expect(collapse.action, AdRenderAction.collapseSlot);
+    expect(insertion, isNotNull);
+    expect(insertion!.firstAdAfterItem, 10);
+    expect(insertion.frequency, 10);
   });
 }

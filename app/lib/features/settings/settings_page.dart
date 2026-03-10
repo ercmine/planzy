@@ -15,7 +15,6 @@ import '../../core/location/location_models.dart';
 import '../../core/permissions/permission_state.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/debug_flags.dart';
-import '../premium/locked_feature_prompt.dart';
 import '../../models/session.dart';
 import '../../providers/app_providers.dart';
 
@@ -29,7 +28,6 @@ class SettingsPage extends ConsumerWidget {
     final locationState = ref.watch(locationControllerProvider);
     final locationController = ref.read(locationControllerProvider.notifier);
     final userIdAsync = ref.watch(userIdProvider);
-    final entitlementsAsync = ref.watch(entitlementSummaryProvider);
 
     return AppScaffold(
       appBar: AppBar(
@@ -156,38 +154,6 @@ class SettingsPage extends ConsumerWidget {
                 onChanged: controller.setDiagnosticsLoggingEnabled,
               ),
             ),
-          _Section(
-            title: 'Premium',
-            icon: Icons.workspace_premium_outlined,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Plan: ${entitlementsAsync.valueOrNull?.planCode ?? 'Loading...'}'),
-                const SizedBox(height: AppSpacing.s),
-                Wrap(
-                  spacing: AppSpacing.s,
-                  runSpacing: AppSpacing.s,
-                  children: [
-                    FilledButton.tonal(
-                      onPressed: () => context.push('/pricing?family=USER'),
-                      child: const Text('View pricing'),
-                    ),
-                    FilledButton.tonal(
-                      onPressed: () => context.push('/account/subscription'),
-                      child: const Text('Manage subscription'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.s),
-                if (entitlementsAsync.valueOrNull != null)
-                  LockedFeaturePrompt(
-                    featureKey: 'feature.ai_itinerary_generation',
-                    entitlements: entitlementsAsync.valueOrNull!,
-                    source: 'settings-premium-section',
-                  ),
-              ],
-            ),
-          ),
           _Section(
             title: 'Support',
             icon: Icons.support_agent,

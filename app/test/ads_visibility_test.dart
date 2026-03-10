@@ -11,22 +11,22 @@ void main() {
     admobAppIdAndroid: 'android',
     nativeUnitIdIos: 'ios-native',
     nativeUnitIdAndroid: 'android-native',
-    frequencyN: 8,
-    placeFirstAfter: 3,
-    maxAdsPerWindow: 3,
-    adsWindowSize: 50,
+    frequencyN: 10,
+    placeFirstAfter: 10,
+    maxAdsPerWindow: 20,
+    adsWindowSize: 200,
   );
 
-  test('elite users never see ads', () {
+  test('resolved users can see ads regardless of historical plan code', () {
     final visibility = AdsVisibility(
       config: enabledConfig,
       entitlement: const AdEntitlementSnapshot(planCode: 'elite', isAnonymous: false),
     );
 
-    expect(visibility.decisionForPlacement(AdPlacement.resultsInlineBanner).shouldShowAd, isFalse);
+    expect(visibility.decisionForPlacement(AdPlacement.resultsInlineBanner).shouldShowAd, isTrue);
   });
 
-  test('plus users get reduced insertion policy', () {
+  test('insertion policy is the same for all resolved tiers', () {
     final visibility = AdsVisibility(
       config: enabledConfig,
       entitlement: const AdEntitlementSnapshot(
@@ -38,8 +38,8 @@ void main() {
 
     final insertion = visibility.insertionPolicyFor(AdPlacement.resultsInlineBanner);
     expect(insertion, isNotNull);
-    expect(insertion!.frequency, greaterThan(8));
-    expect(insertion.maxAdsPerWindow, 1);
+    expect(insertion!.frequency, 10);
+    expect(insertion.firstAdAfterItem, 10);
   });
 
   test('unknown entitlement suppresses ads to avoid flicker', () {
