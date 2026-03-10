@@ -5,3 +5,5 @@ export * from "./categoryIntelligence.js";
 export * from "./qualityScoring.js";
 
 export * from "./enrichment.js";
+
+export * from "./operations.js";
