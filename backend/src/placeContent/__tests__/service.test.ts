@@ -1,0 +1,52 @@
+import { describe, expect, it } from "vitest";
+
+import { computeFirstPartyRankingSignals } from "../ranking.js";
+import { PlaceContentService } from "../service.js";
+import { MemoryPlaceContentStore } from "../store.js";
+
+describe("place content service", () => {
+  it("anchors reviews/videos/saves/guides to canonical places and computes aggregates", async () => {
+    const service = new PlaceContentService(new MemoryPlaceContentStore());
+
+    await service.createReview({ canonicalPlaceId: "cp_1", authorUserId: "u1", body: "Great place", trustedReview: true, qualityScore: 0.9, verifiedVisitScore: 0.8 });
+    await service.createReview({ canonicalPlaceId: "cp_1", authorUserId: "u2", body: "Pending", status: "hidden", qualityScore: 0.1 });
+    await service.createCreatorVideo({ canonicalPlaceId: "cp_1", authorUserId: "u1", mediaAssetId: "asset-1", title: "tour" });
+    await service.savePlace({ userId: "u1", canonicalPlaceId: "cp_1", sourceContext: "place_detail" });
+    await service.savePlace({ userId: "u1", canonicalPlaceId: "cp_1", sourceContext: "search" });
+
+    const guide = await service.createGuide({ ownerUserId: "u9", title: "Austin food", visibility: "public" });
+    await service.addGuidePlace({ guideId: guide.id, canonicalPlaceId: "cp_1" });
+
+    await service.recordEngagement({ canonicalPlaceId: "cp_1", contentType: "review", contentId: "r1", eventType: "helpful_vote", value: 3, createdAt: new Date().toISOString() });
+
+    const detail = await service.getPlaceDetailContent("cp_1");
+    expect(detail.reviews).toHaveLength(1);
+    expect(detail.videos).toHaveLength(1);
+    expect(detail.saveCount).toBe(1);
+    expect(detail.guides).toHaveLength(1);
+
+    const metrics = await service.getPlaceMetrics("cp_1");
+    expect(metrics).toBeDefined();
+    expect(metrics?.reviewCount).toBe(1);
+    expect(metrics?.creatorVideoCount).toBe(1);
+    expect(metrics?.saveCount).toBe(1);
+    expect(metrics?.publicGuideCount).toBe(1);
+    expect(metrics?.trustedReviewCount).toBe(1);
+    expect(metrics?.helpfulVoteCount).toBe(3);
+
+    const boost = computeFirstPartyRankingSignals(metrics!);
+    expect(boost.cappedTotalBoost).toBeGreaterThan(0);
+    expect(boost.cappedTotalBoost).toBeLessThanOrEqual(0.35);
+  });
+
+  it("separates canonical place metrics and preserves place-id stability", async () => {
+    const service = new PlaceContentService(new MemoryPlaceContentStore());
+    await service.createReview({ canonicalPlaceId: "cp_A", authorUserId: "u1", body: "A" });
+    await service.createReview({ canonicalPlaceId: "cp_B", authorUserId: "u1", body: "B" });
+
+    const a = await service.getPlaceMetrics("cp_A");
+    const b = await service.getPlaceMetrics("cp_B");
+    expect(a?.canonicalPlaceId).toBe("cp_A");
+    expect(b?.canonicalPlaceId).toBe("cp_B");
+  });
+});

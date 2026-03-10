@@ -123,3 +123,5 @@ export * from "./rollouts/service.js";
 
 
 export * from "./geocoding/index.js";
+
+export * from "./placeContent/index.js";

@@ -69,6 +69,16 @@ export interface PlaceDocument {
   chainId?: string;
   moderationState?: "active" | "suppressed";
   isClosed?: boolean;
+  firstPartySignals?: {
+    reviewCount: number;
+    creatorVideoCount: number;
+    saveCount: number;
+    publicGuideCount: number;
+    trustedReviewCount: number;
+    helpfulVoteCount: number;
+    engagementVelocity30d: number;
+    qualityBoost: number;
+  };
 }
 
 export interface CreatorDocument {

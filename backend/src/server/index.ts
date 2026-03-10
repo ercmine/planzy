@@ -49,6 +49,7 @@ import { createSavedHttpHandlers } from "../saved/http.js";
 import { createGeocodingServiceFromEnv } from "../geocoding/index.js";
 import { SavedService } from "../saved/service.js";
 import { MemorySavedStore } from "../saved/store.js";
+import { createPlaceContentHttpHandlers, MemoryPlaceContentStore, PlaceContentService } from "../placeContent/index.js";
 import { MemoryOutingPlannerStore, OutingPlannerService } from "../outingPlanner/index.js";
 import { InMemoryPlaceStore, PlaceNormalizationService } from "../places/index.js";
 import { VenueClaimsService } from "../venues/claims/claimsService.js";
@@ -137,6 +138,7 @@ export function createServer(options?: CreateServerOptions) {
     getCreatorProfile: (creatorProfileId) => creatorStore.getProfileById(creatorProfileId)
   });
   const savedService = new SavedService(new MemorySavedStore(), subscriptionService, accessEngine);
+  const placeContentService = new PlaceContentService(new MemoryPlaceContentStore(), options?.logger);
   const businessPremiumService = new BusinessPremiumService(new MemoryBusinessPremiumStore());
   const businessAnalyticsService = new BusinessAnalyticsService(new MemoryBusinessAnalyticsStore(), claimsStore, accessEngine, businessPremiumService);
   const collaborationService = new CollaborationService(new MemoryCollaborationStore(), accountsService, service, subscriptionService, accessEngine, businessAnalyticsService, businessPremiumService, notificationService);
@@ -200,6 +202,7 @@ export function createServer(options?: CreateServerOptions) {
     collaborationService,
     businessPremiumService,
     savedHandlers: createSavedHttpHandlers(savedService),
+    placeContentHandlers: createPlaceContentHttpHandlers(placeContentService),
     outingPlannerService,
     discovery: {
       searchService: placeSearchService,

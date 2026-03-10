@@ -81,14 +81,20 @@ function contentRichnessScore(place: PlaceDocument): number {
   const photos = clamp01(Math.log10(1 + place.imageUrls.length) / 1.2);
   const reviews = clamp01(Math.log10(1 + (place.reviewCount ?? 0)) / 3);
   const description = place.description ? 0.2 : 0;
-  return clamp01((photos * 0.4) + (reviews * 0.4) + description);
+  const firstParty = place.firstPartySignals
+    ? clamp01(Math.log10(1 + place.firstPartySignals.reviewCount + place.firstPartySignals.creatorVideoCount + place.firstPartySignals.saveCount + place.firstPartySignals.publicGuideCount) / 3)
+    : 0;
+  return clamp01((photos * 0.3) + (reviews * 0.25) + (firstParty * 0.3) + description);
 }
 
 function engagementScore(place: PlaceDocument): number {
   const reviews = clamp01(Math.log10(1 + (place.reviewCount ?? 0)) / 3);
   const trend = clamp01(place.trendingScore);
   const popularity = clamp01(place.popularityScore);
-  return clamp01((reviews * 0.45) + (trend * 0.3) + (popularity * 0.25));
+  const firstPartyEngagement = place.firstPartySignals
+    ? clamp01((Math.log10(1 + place.firstPartySignals.helpfulVoteCount) / 2.5) * 0.45 + (place.firstPartySignals.engagementVelocity30d * 0.35) + (place.firstPartySignals.qualityBoost * 0.2))
+    : 0;
+  return clamp01((reviews * 0.25) + (trend * 0.25) + (popularity * 0.2) + (firstPartyEngagement * 0.3));
 }
 
 function freshnessScore(updatedAt: string): number {
