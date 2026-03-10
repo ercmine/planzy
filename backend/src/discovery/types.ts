@@ -8,6 +8,7 @@ export interface DiscoveryFilterSet {
   hasPhotos?: boolean;
   hasReviews?: boolean;
   priceLevels?: number[];
+  priceLevelMax?: number;
 }
 
 export interface DiscoveryQueryContext {
@@ -15,6 +16,8 @@ export interface DiscoveryQueryContext {
   categoryId?: string;
   categorySlug?: string;
   city?: string;
+  region?: string;
+  country?: string;
   lat?: number;
   lng?: number;
   radiusMeters?: number;
@@ -156,7 +159,7 @@ export interface CursorPage<T> {
 
 export interface SearchResponse {
   query: { q?: string; normalizedQ?: string; sort: DiscoverySortMode };
-  constraints: { categoryId?: string; city?: string; lat?: number; lng?: number; radiusMeters?: number };
+  constraints: { categoryId?: string; city?: string; region?: string; country?: string; lat?: number; lng?: number; radiusMeters?: number };
   appliedFilters: DiscoveryFilterSet;
   items: PlaceResultItem[];
   nextCursor?: string;
@@ -165,7 +168,7 @@ export interface SearchResponse {
 
 export interface BrowseResponse {
   category: { id: string; slug: string };
-  scope: { city?: string; lat?: number; lng?: number; radiusMeters?: number };
+  scope: { city?: string; region?: string; country?: string; lat?: number; lng?: number; radiusMeters?: number };
   appliedFilters: DiscoveryFilterSet;
   items: PlaceResultItem[];
   nextCursor?: string;

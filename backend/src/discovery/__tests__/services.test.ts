@@ -115,6 +115,28 @@ describe("discovery services", () => {
     expect(nearbyRes.items.length).toBeGreaterThan(0);
   });
 
+  it("supports location bias and price/open filters", async () => {
+    const res = await search.search({
+      query: "coffee",
+      city: "austin",
+      lat: 30.2672,
+      lng: -97.7431,
+      radiusMeters: 3000,
+      filters: { openNow: true, priceLevelMax: 2 },
+      explain: true
+    });
+
+    expect(res.items.length).toBeGreaterThan(0);
+    expect(res.items.every((item) => (item.openNow ?? false))).toBe(true);
+    expect(res.debug).toMatchObject({ rankingMode: "text" });
+  });
+
+  it("rejects malformed search inputs", async () => {
+    await expect(nearby.nearby({ lat: 200, lng: -97.7, radiusMeters: 500 })).rejects.toThrow("invalid_lat");
+    await expect(search.search({ query: "", city: "austin" })).rejects.toThrow("text_search_requires_q");
+    await expect(browse.browse({ city: "austin" })).rejects.toThrow("category_search_requires_category");
+  });
+
   it("returns personalized recommendations with explainability and suppression", async () => {
     const rec = await recommendations.recommend("u1", { city: "austin", explain: true, pageSize: 10 });
     expect(rec.mode).toBe("user");

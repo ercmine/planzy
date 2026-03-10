@@ -16,6 +16,8 @@ export class QueryNormalizationService {
       categoryId: params.get("categoryId") ?? undefined,
       categorySlug: params.get("categorySlug") ?? undefined,
       city: params.get("city")?.trim() || undefined,
+      region: params.get("region")?.trim() || undefined,
+      country: params.get("country")?.trim() || undefined,
       lat: parseNumber(params.get("lat")),
       lng: parseNumber(params.get("lng")),
       radiusMeters: Math.max(100, Math.min(50_000, parseNumber(params.get("radius")) ?? 4_000)),
@@ -30,7 +32,8 @@ export class QueryNormalizationService {
         openNow: params.get("openNow") === "1",
         minRating: parseNumber(params.get("minRating")),
         hasPhotos: params.get("hasPhotos") === "1",
-        hasReviews: params.get("hasReviews") === "1"
+        hasReviews: params.get("hasReviews") === "1",
+        priceLevelMax: parseNumber(params.get("priceLevelMax"))
       }
     };
   }
