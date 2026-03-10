@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildNearbyPlacesSqlQuery, InMemoryPlacePlatformRepository } from "../repositories.js";
-import { CategoryNormalizationService, NearbyPlacesService, PlaceImportService } from "../services.js";
+import { CategoryNormalizationService, NearbyPlacesService, OsmImportRunnerService, PlaceImportService } from "../services.js";
 
 function makeDeps() {
   const repo = new InMemoryPlacePlatformRepository({
@@ -21,11 +21,12 @@ function makeDeps() {
       }
     ]
   });
-  const logger = { info: vi.fn() };
+  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const categoryNormalization = new CategoryNormalizationService(repo);
   const importer = new PlaceImportService(repo, repo, repo, repo, categoryNormalization, logger);
   const nearby = new NearbyPlacesService(repo, logger);
-  return { repo, importer, categoryNormalization, nearby, logger };
+  const runner = new OsmImportRunnerService(importer, repo, repo, logger);
+  return { repo, importer, categoryNormalization, nearby, runner, logger };
 }
 
 describe("place platform foundations", () => {
@@ -83,6 +84,59 @@ describe("place platform foundations", () => {
     expect(second.canonicalPlaceId).toBe(first.canonicalPlaceId);
     expect(repo.listSourceRecordsByCanonicalPlaceId(first.canonicalPlaceId)).toHaveLength(1);
     expect(repo.getById(first.canonicalPlaceId)?.primaryName).toBe("New Name");
+  });
+
+  it("tracks import run stats, incremental update, and stale marking", () => {
+    const { runner, repo } = makeDeps();
+    const first = runner.runImport({
+      mode: "bootstrap",
+      regionSlug: "nyc",
+      importVersion: "v1",
+      records: [
+        { sourceRecordId: "node/1", name: "One", lat: 40, lng: -73, tags: { amenity: "cafe" }, payload: { city: "NYC" } },
+        { sourceRecordId: "node/2", name: "Two", lat: 40.1, lng: -73.1, tags: { amenity: "cafe" }, payload: { city: "NYC" } }
+      ]
+    });
+
+    const second = runner.runImport({
+      mode: "incremental",
+      regionSlug: "nyc",
+      importVersion: "v2",
+      markMissingAsStale: true,
+      records: [{ sourceRecordId: "node/1", name: "One Updated", lat: 40, lng: -73, tags: { amenity: "cafe" }, payload: { city: "NYC" } }]
+    });
+
+    expect(first.stats.created).toBe(2);
+    expect(second.stats.updated).toBe(1);
+    expect(second.stats.staleMarked).toBe(1);
+    expect(repo.getSourceRecordBySourceRef("osm", "node/2")?.staleAt).toBeTruthy();
+    expect(repo.getImportRunById(second.run.id)?.status).toBe("SUCCEEDED");
+  });
+
+  it("is idempotent across reruns and preserves canonical id", () => {
+    const { runner, repo } = makeDeps();
+    const input = { sourceRecordId: "way/99", name: "Stable", lat: 12, lng: 13, tags: { amenity: "cafe" }, payload: { city: "X" } };
+    const first = runner.runImport({ mode: "bootstrap", regionSlug: "test", records: [input] });
+    const second = runner.runImport({ mode: "bootstrap", regionSlug: "test", records: [input] });
+
+    const source = repo.getSourceRecordBySourceRef("osm", "way/99");
+    expect(first.stats.created).toBe(1);
+    expect(second.stats.unchanged).toBe(1);
+    expect(source?.canonicalPlaceId).toBe(repo.findBySource("osm", "way/99")?.id);
+  });
+
+  it("skips malformed records without failing whole import", () => {
+    const { runner } = makeDeps();
+    const run = runner.runImport({
+      mode: "bootstrap",
+      regionSlug: "malformed",
+      records: [
+        { sourceRecordId: "node/valid", name: "Valid", lat: 1, lng: 1, tags: {}, payload: {} },
+        { sourceRecordId: "", name: "Bad", lat: 0, lng: 0, tags: {}, payload: {} }
+      ]
+    });
+    expect(run.stats.created).toBe(1);
+    expect(run.stats.skipped).toBe(1);
   });
 
   it("persists source attribution for canonical place", () => {

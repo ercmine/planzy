@@ -16,4 +16,15 @@ describe("places postgis migration", () => {
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS place_source_attributions");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS source_category_mappings");
   });
+
+  it("declares OSM sync runs and freshness tracking columns", () => {
+    const file = resolve(process.cwd(), "db/migrations/202603100002_osm_ingestion_sync_foundation.sql");
+    const sql = readFileSync(file, "utf8");
+
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS place_import_runs");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMPTZ");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS stale_at TIMESTAMPTZ");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS last_refreshed_at TIMESTAMPTZ");
+  });
 });
