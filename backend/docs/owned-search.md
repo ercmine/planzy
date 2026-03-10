@@ -6,6 +6,9 @@ Perbug discovery now supports first-party search modes backed by canonical place
 - `GET /v1/discovery/search`: text-first search over canonical place attributes with optional geo bias.
 - `GET /v1/discovery/browse`: normalized-category browse with city/region/radius scoping.
 
+
+See also `docs/place-category-ranking.md` for taxonomy, OSM normalization precedence, completeness scoring, and mode-specific ranking profiles.
+
 ## Ranking strategy
 
 Ranking is mode-aware and test-covered:

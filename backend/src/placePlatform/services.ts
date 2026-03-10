@@ -5,6 +5,8 @@ import {
   type ImportRunRepository,
   type SourceRecordRepository
 } from "./repositories.js";
+import { CATEGORY_NORMALIZATION_VERSION, OsmCategoryNormalizationEngine } from "./categoryIntelligence.js";
+import { computeCanonicalPlaceCompleteness } from "./qualityScoring.js";
 import type {
   CanonicalPlace,
   CanonicalPlaceCategory,
@@ -44,15 +46,19 @@ export class CategoryNormalizationService {
 
   mapOsmTagsToCategories(tags: Record<string, string>): Array<{ categoryId: string; confidence: number; rule: SourceCategoryMappingRule }> {
     const rules = this.categories.listRules("osm");
-    const matches = rules.filter((rule) => {
-      const value = tags[rule.sourceKey];
-      if (!value) {
-        return false;
-      }
-      return rule.sourceValue ? value === rule.sourceValue : true;
+    const engine = new OsmCategoryNormalizationEngine(rules);
+    return engine.normalize(tags).matches.map((match) => {
+      const rule = rules.find((item) => item.id === match.ruleId) ?? {
+        id: match.ruleId,
+        sourceName: "osm",
+        sourceKey: "cuisine",
+        categoryId: match.categoryId,
+        confidence: match.confidence,
+        priority: match.priority,
+        status: "ACTIVE"
+      };
+      return { categoryId: match.categoryId, confidence: match.confidence, rule };
     });
-
-    return matches.map((rule) => ({ categoryId: rule.categoryId, confidence: rule.confidence, rule }));
   }
 }
 
@@ -86,6 +92,7 @@ export class PlaceImportService {
       countryCode: typeof input.payload.country_code === "string" ? String(input.payload.country_code) : existingPlace?.countryCode,
       websiteUrl: input.tags.website ?? existingPlace?.websiteUrl,
       phoneE164: input.tags.phone ?? existingPlace?.phoneE164,
+      qualityScore: existingPlace?.qualityScore,
       status: existingPlace?.status ?? "ACTIVE",
       visibilityStatus: existingPlace?.visibilityStatus ?? "PUBLIC",
       sourceFreshnessAt: timestamp,
@@ -118,6 +125,17 @@ export class PlaceImportService {
       updatedAt: timestamp
     };
     this.sourceRecords.upsertSourceRecord(sourceRecord);
+
+    const completeness = computeCanonicalPlaceCompleteness(place, sourceRecord);
+    this.places.upsertPlace({
+      ...place,
+      qualityScore: completeness.score,
+      metadata: {
+        ...place.metadata,
+        completeness,
+        normalizationVersion: CATEGORY_NORMALIZATION_VERSION
+      }
+    });
 
     const attribution: PlaceSourceAttribution = {
       id: stableId("attr", canonicalPlaceId, "osm"),

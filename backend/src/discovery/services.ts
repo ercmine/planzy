@@ -28,6 +28,7 @@ import type {
 import { PlanTier } from "../subscriptions/types.js";
 import type { PremiumExperienceService } from "../subscriptions/premiumExperience.js";
 import { evaluateRankingAdjustments, RankingConfigResolver } from "./tuning.js";
+import { scorePlaceForMode } from "./rankingEngine.js";
 
 interface RankedCandidate {
   place: PlaceDocument;
@@ -403,38 +404,23 @@ async function rankPlaces(repo: PlaceDiscoveryRepository, context: DiscoveryQuer
   }
 
   const places = (await repo.listPlaces()).filter((place) => applyBaseFilters(place, context));
-  const terms = tokenize(context.query);
-  const cityToken = String(context.city ?? "").toLowerCase();
   const radius = Math.max(100, Math.min(50_000, Number(context.radiusMeters ?? 4_000)));
   const resolved = resolver?.resolve({ city: context.city, categoryId: context.categoryId ?? context.categorySlug, surface: context.surface });
 
   const ranked = places
     .map((place): RankedCandidate => {
-      const textCorpus = [place.name, place.shortDescription, place.longDescription, place.description, ...place.keywords, place.primaryCategory, ...place.secondaryCategories, place.city, place.neighborhood]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const textMatch = terms.length === 0 ? 0.45 : terms.filter((term) => textCorpus.includes(term)).length / terms.length;
-      const categoryToken = String(context.categoryId ?? context.categorySlug ?? "").toLowerCase();
-      const categoryCorpus = [place.primaryCategory, ...place.secondaryCategories].join(" ").toLowerCase();
-      const categoryMatch = !categoryToken ? 0.5 : (categoryCorpus.includes(categoryToken) ? 1 : 0);
-      const cityFit = !cityToken ? 0.5 : String(place.city ?? "").toLowerCase().includes(cityToken) ? 1 : 0;
       const distance = context.lat !== undefined && context.lng !== undefined
         ? distanceMeters(context.lat, context.lng, place.lat, place.lng)
         : undefined;
-      const distanceFit = distance === undefined ? 0.5 : Math.max(0, 1 - Math.min(distance, radius) / radius);
-      const nearbyScore = (distanceFit * 0.55) + (categoryMatch * 0.1) + (textMatch * 0.08) + (place.qualityScore * 0.2) + (place.popularityScore * 0.07);
-      const textScore = (textMatch * 0.56) + (distanceFit * 0.15) + (categoryMatch * 0.09) + (cityFit * 0.08) + (place.qualityScore * 0.12);
-      const categoryScore = (categoryMatch * 0.54) + (distanceFit * 0.16) + (cityFit * 0.1) + (place.qualityScore * 0.15) + (place.trendingScore * 0.05);
-      const score = mode === "nearby" ? nearbyScore : mode === "text" ? textScore : categoryScore;
-      const tuned = resolved ? evaluateRankingAdjustments(place, score, resolved, { city: context.city, categoryId: context.categoryId, surface: context.surface, provider: place.sourceAttribution[0] }) : { score, reasons: [], excluded: false };
+      const ranking = scorePlaceForMode({ place, mode, context, distanceMeters: distance });
+      const tuned = resolved ? evaluateRankingAdjustments(place, ranking.score, resolved, { city: context.city, categoryId: context.categoryId, surface: context.surface, provider: place.sourceAttribution[0] }) : { score: ranking.score, reasons: [], excluded: false };
       return {
         place,
         score: tuned.score,
         distanceMeters: distance,
-        reasons: [mode === "text" && textMatch > 0.7 ? "strong_text_match" : `${mode}_match`, ...tuned.reasons],
+        reasons: [mode === "text" && ranking.components.text > 0.7 ? "strong_text_match" : `${mode}_match`, ...tuned.reasons],
         diversityBucket: `${place.primaryCategory}:${place.city ?? "global"}`,
-        explain: { score, contributions: { textMatch, cityFit, distanceFit, categoryMatch }, reasonCodes: [mode] }
+        explain: { score: ranking.score, contributions: ranking.components, reasonCodes: [mode] }
       };
     })
     .filter((candidate) => !resolved || !evaluateRankingAdjustments(candidate.place, candidate.score, resolved, { city: context.city, categoryId: context.categoryId, surface: context.surface, provider: candidate.place.sourceAttribution[0] }).excluded)
