@@ -128,7 +128,7 @@ class _SearchTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ListView(
+    return ListView(
       children: [
         SearchLaunchCard(),
         SizedBox(height: AppSpacing.m),
@@ -173,7 +173,7 @@ class _FollowingTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ListView(
+    return ListView(
       children: [
         AppSectionHeader(
           title: 'Following feed',
