@@ -1,45 +1,53 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class HomeState {
-  const HomeState({
-    required this.activePulse,
-    required this.statusMessage,
+import '../../api/models.dart';
+import '../../core/identity/identity_provider.dart';
+import '../../core/location/location_controller.dart';
+import '../../models/session.dart';
+import '../../providers/app_providers.dart';
+
+class HomeSnapshot {
+  const HomeSnapshot({
+    required this.sessions,
+    required this.userId,
+    required this.onboardingCategories,
+    this.liveResults,
   });
 
-  factory HomeState.initial() {
-    return const HomeState(
-      activePulse: 0,
-      statusMessage: 'Your launch dashboard is live',
-    );
-  }
+  final List<Session> sessions;
+  final String userId;
+  final List<String> onboardingCategories;
+  final LiveResultsResponse? liveResults;
 
-  final int activePulse;
-  final String statusMessage;
-
-  HomeState copyWith({
-    int? activePulse,
-    String? statusMessage,
-  }) {
-    return HomeState(
-      activePulse: activePulse ?? this.activePulse,
-      statusMessage: statusMessage ?? this.statusMessage,
-    );
-  }
+  int get activeSessionCount => sessions.where((session) => session.status == 'active').length;
 }
 
-class HomeController extends StateNotifier<HomeState> {
-  HomeController() : super(HomeState.initial());
+final homeSnapshotProvider = FutureProvider<HomeSnapshot>((ref) async {
+  final sessions = await ref.watch(sessionsRepositoryProvider).listActive();
+  final userId = await ref.watch(userIdProvider.future);
+  final identityStore = await ref.watch(identityStoreProvider.future);
+  final onboardingCategories = await identityStore.getOnboardingCategories();
 
-  void refreshPulse() {
-    final nextPulse = state.activePulse + 1;
-    state = state.copyWith(
-      activePulse: nextPulse,
-      statusMessage: 'Updated just now · pulse #$nextPulse',
-    );
+  LiveResultsResponse? liveResults;
+  final locationState = ref.watch(locationControllerProvider);
+  final effectiveLocation = locationState.effectiveLocation;
+  final liveResultsRepository = await ref.watch(liveResultsRepositoryProvider.future);
+
+  if (effectiveLocation != null) {
+    try {
+      liveResults = await liveResultsRepository.fetchLiveResults(
+        lat: effectiveLocation.lat,
+        lng: effectiveLocation.lng,
+      );
+    } catch (_) {
+      liveResults = null;
+    }
   }
-}
 
-final homeControllerProvider =
-    StateNotifierProvider<HomeController, HomeState>((ref) {
-  return HomeController();
+  return HomeSnapshot(
+    sessions: sessions,
+    userId: userId,
+    onboardingCategories: onboardingCategories,
+    liveResults: liveResults,
+  );
 });

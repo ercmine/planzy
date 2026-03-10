@@ -3,12 +3,32 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:perbug/app/theme/theme.dart';
+import 'package:perbug/api/models.dart';
+import 'package:perbug/features/home/home_controller.dart';
 import 'package:perbug/features/home/home_page.dart';
 
 void main() {
   testWidgets('Home page exposes simplified creator-first navigation', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          homeSnapshotProvider.overrideWith((ref) async => HomeSnapshot(
+                sessions: const [],
+                userId: 'user-12345678',
+                onboardingCategories: const ['coffee'],
+                liveResults: LiveResultsResponse(
+                  results: [
+                    LiveResultItem(
+                      sessionId: 's1',
+                      topPlanId: 'p1',
+                      topPlanTitle: 'Cafe Orbit',
+                      score: 0.91,
+                    ),
+                  ],
+                  summary: LiveResultsSummary(activeSessions: 1, generatedAt: '2026-01-01T00:00:00Z'),
+                ),
+              )),
+        ],
         child: MaterialApp.router(
           theme: buildAppTheme(Brightness.light),
           routerConfig: GoRouter(routes: [GoRoute(path: '/', builder: (_, __) => const HomePage())]),

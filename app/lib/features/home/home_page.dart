@@ -21,14 +21,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final sections = <Widget>[
-      _DiscoverTab(onOpenDiscovery: () => context.go('/sessions')),
-      const _SearchTab(),
-      const _SavedTab(),
-      const _FollowingTab(),
-      _CreateTab(onOpenCreatorHub: () => context.go('/hub/creator')),
-      _ProfileTab(onOpenSettings: () => context.go('/settings')),
-    ];
+    final snapshot = ref.watch(homeSnapshotProvider);
 
     return AppScaffold(
       appBar: AppBar(
@@ -45,22 +38,34 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ],
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 280),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        child: KeyedSubtree(
-          key: ValueKey(_index),
-          child: sections[_index],
+      body: snapshot.when(
+        data: (data) {
+          final sections = <Widget>[
+            _DiscoverTab(snapshot: data, onOpenDiscovery: () => context.go('/sessions')),
+            const _SearchTab(),
+            _SavedTab(snapshot: data),
+            _FollowingTab(snapshot: data),
+            _CreateTab(onOpenCreatorHub: () => context.go('/hub/creator')),
+            _ProfileTab(snapshot: data, onOpenSettings: () => context.go('/settings')),
+          ];
+
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            child: KeyedSubtree(key: ValueKey(_index), child: sections[_index]),
+          );
+        },
+        error: (_, __) => ListView(
+          children: const [
+            EmptyStateCard(
+              icon: Icons.cloud_off_rounded,
+              title: 'Home is unavailable right now',
+              description: 'We could not load your latest data. Check connection and retry.',
+              cta: 'Retry',
+            ),
+          ],
         ),
+        loading: () => const Center(child: CircularProgressIndicator()),
       ),
-      floatingActionButton: _index == 4
-          ? FloatingActionButton.extended(
-              onPressed: () => ref.read(homeControllerProvider.notifier).refreshPulse(),
-              icon: const Icon(Icons.auto_awesome_rounded),
-              label: const Text('Publish something'),
-            )
-          : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
@@ -78,46 +83,50 @@ class _HomePageState extends ConsumerState<HomePage> {
 }
 
 class _DiscoverTab extends StatelessWidget {
-  const _DiscoverTab({required this.onOpenDiscovery});
+  const _DiscoverTab({required this.snapshot, required this.onOpenDiscovery});
 
+  final HomeSnapshot snapshot;
   final VoidCallback onOpenDiscovery;
 
   @override
   Widget build(BuildContext context) {
+    final results = snapshot.liveResults?.results ?? const [];
     return ListView(
       children: [
         GradientHeroCard(
           title: 'Discover where to go next',
-          subtitle: 'Watch real creator takes, save spots for later, and find your next great place in minutes.',
-          pills: const [
-            AppPill(label: 'Video reviews', icon: Icons.play_circle_outline_rounded),
-            AppPill(label: 'Photo proof', icon: Icons.photo_library_outlined),
-            AppPill(label: 'Guides', icon: Icons.menu_book_outlined),
+          subtitle: 'Live recommendations update from your location and active sessions.',
+          pills: [
+            AppPill(label: '${snapshot.activeSessionCount} active sessions', icon: Icons.groups_rounded),
+            AppPill(label: '${results.length} live results', icon: Icons.insights_rounded),
           ],
           onTap: onOpenDiscovery,
         ),
         const SizedBox(height: AppSpacing.m),
         const SearchLaunchCard(),
         const SizedBox(height: AppSpacing.m),
-        const AppSectionHeader(title: 'Trending near you', subtitle: 'Fresh spots from creators you can trust.'),
+        const AppSectionHeader(title: 'Live nearby picks', subtitle: 'These cards come from the live results API.'),
         const SizedBox(height: AppSpacing.s),
-        const PlacePreviewCard(
-          title: 'Daylight Coffee Club',
-          category: 'Cafe · Brunch',
-          rating: '4.8',
-          distance: '0.9 mi',
-          creator: '@dinewithmika',
-        ),
-        const SizedBox(height: AppSpacing.s),
-        const AdInlineCard(),
-        const SizedBox(height: AppSpacing.s),
-        const PlacePreviewCard(
-          title: 'Moonbow Ramen',
-          category: 'Japanese · Noodles',
-          rating: '4.7',
-          distance: '1.2 mi',
-          creator: '@eatwithray',
-        ),
+        if (results.isEmpty)
+          const EmptyStateCard(
+            icon: Icons.location_searching_rounded,
+            title: 'No live nearby picks yet',
+            description: 'Allow location and start swiping in a session to get ranked nearby options.',
+            cta: 'Open sessions',
+          )
+        else
+          ...results.take(3).map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                  child: PlacePreviewCard(
+                    title: item.topPlanTitle,
+                    category: 'Session ${item.sessionId}',
+                    rating: item.score.toStringAsFixed(2),
+                    distance: 'Live',
+                    creator: 'Live results API',
+                  ),
+                ),
+              ),
       ],
     );
   }
@@ -129,39 +138,34 @@ class _SearchTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      children: [
+      children: const [
         SearchLaunchCard(),
-        SizedBox(height: AppSpacing.m),
-        AppCard(
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.tune_rounded),
-            title: Text('Filters and sort feel cleaner'),
-            subtitle: Text('Categories, vibes, and distance are easy to scan and adjust.'),
-          ),
-        ),
       ],
     );
   }
 }
 
 class _SavedTab extends StatelessWidget {
-  const _SavedTab();
+  const _SavedTab({required this.snapshot});
+
+  final HomeSnapshot snapshot;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      children: const [
-        AppSectionHeader(
+      children: [
+        const AppSectionHeader(
           title: 'Saved places & guides',
-          subtitle: 'Build lists, curate collections, and share your taste.',
+          subtitle: 'Your saved content appears here as you swipe and lock plans.',
         ),
-        SizedBox(height: AppSpacing.m),
+        const SizedBox(height: AppSpacing.m),
         EmptyStateCard(
           icon: Icons.bookmark_add_outlined,
-          title: 'Start your first list',
-          description: 'Tap save on places you love, then organize them into guides.',
-          cta: 'Browse discovery',
+          title: 'No saved places yet',
+          description: snapshot.activeSessionCount == 0
+              ? 'Create your first session to start saving places.'
+              : 'Open a session and swipe right on places you want to revisit.',
+          cta: 'Open sessions',
         ),
       ],
     );
@@ -169,23 +173,39 @@ class _SavedTab extends StatelessWidget {
 }
 
 class _FollowingTab extends StatelessWidget {
-  const _FollowingTab();
+  const _FollowingTab({required this.snapshot});
+
+  final HomeSnapshot snapshot;
 
   @override
   Widget build(BuildContext context) {
+    final results = snapshot.liveResults?.results ?? const [];
     return ListView(
       children: [
-        AppSectionHeader(
+        const AppSectionHeader(
           title: 'Following feed',
-          subtitle: 'See creator updates, new reviews, and local finds in one stream.',
+          subtitle: 'Feed items render from current live results instead of sample creator posts.',
         ),
-        SizedBox(height: AppSpacing.m),
-        FeedUpdateCard(
-          name: 'Jordan Lee',
-          handle: '@jordaneats',
-          place: 'Terracotta Kitchen',
-          note: 'Posted a quick video review with price tips and best dishes.',
-        ),
+        const SizedBox(height: AppSpacing.m),
+        if (results.isEmpty)
+          const EmptyStateCard(
+            icon: Icons.dynamic_feed_outlined,
+            title: 'Your feed is empty',
+            description: 'Follow creators or generate session activity to populate this feed.',
+            cta: 'Browse sessions',
+          )
+        else
+          ...results.take(4).map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                  child: FeedUpdateCard(
+                    name: 'Session ${item.sessionId}',
+                    handle: '@live',
+                    place: item.topPlanTitle,
+                    note: 'Current top pick with score ${item.score.toStringAsFixed(2)}.',
+                  ),
+                ),
+              ),
       ],
     );
   }
@@ -202,7 +222,7 @@ class _CreateTab extends StatelessWidget {
       children: [
         const AppSectionHeader(
           title: 'Create and share your take',
-          subtitle: 'Post reviews, upload videos, and publish guides. Everything is free.',
+          subtitle: 'Post reviews, upload videos, and publish guides.',
         ),
         const SizedBox(height: AppSpacing.m),
         SurfaceNavCard(
@@ -211,28 +231,30 @@ class _CreateTab extends StatelessWidget {
           description: 'Share what stood out, what to order, and who should go.',
           onTap: onOpenCreatorHub,
         ),
-        const SizedBox(height: AppSpacing.s),
-        SurfaceNavCard(
-          icon: Icons.videocam_outlined,
-          title: 'Upload a video review',
-          description: 'Short clips get top placement on place pages and feed.',
-          onTap: onOpenCreatorHub,
-        ),
       ],
     );
   }
 }
 
-class _ProfileTab extends StatelessWidget {
-  const _ProfileTab({required this.onOpenSettings});
+class _ProfileTab extends ConsumerWidget {
+  const _ProfileTab({required this.snapshot, required this.onOpenSettings});
 
+  final HomeSnapshot snapshot;
   final VoidCallback onOpenSettings;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final categorySummary = snapshot.onboardingCategories.isEmpty
+        ? 'No onboarding interests selected yet'
+        : snapshot.onboardingCategories.join(', ');
+
     return ListView(
       children: [
-        const CreatorProfileHeader(name: 'You', handle: '@yourtaste', tagline: 'Collector of cozy cafes and late-night eats'),
+        CreatorProfileHeader(
+          name: 'Perbug user',
+          handle: '@${snapshot.userId.length > 8 ? snapshot.userId.substring(0, 8) : snapshot.userId}',
+          tagline: categorySummary,
+        ),
         const SizedBox(height: AppSpacing.m),
         SurfaceNavCard(
           icon: Icons.settings_outlined,

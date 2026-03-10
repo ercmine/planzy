@@ -12,6 +12,7 @@ class IdentityStore {
 
   static const userIdKey = 'perbug_user_id';
   static const onboardingCompletedKey = 'onboarding_completed';
+  static const onboardingCategoriesKey = 'onboarding_categories';
 
   final SharedPreferences _prefs;
   final FlutterSecureStorage _secureStorage;
@@ -33,5 +34,15 @@ class IdentityStore {
 
   Future<void> setOnboardingCompleted(bool value) {
     return _prefs.setBool(onboardingCompletedKey, value);
+  }
+
+  Future<List<String>> getOnboardingCategories() async {
+    final values = _prefs.getStringList(onboardingCategoriesKey) ?? const <String>[];
+    return values.where((value) => value.isNotEmpty).toList(growable: false);
+  }
+
+  Future<void> setOnboardingCategories(List<String> values) {
+    final cleaned = values.where((value) => value.isNotEmpty).toSet().toList(growable: false);
+    return _prefs.setStringList(onboardingCategoriesKey, cleaned);
   }
 }

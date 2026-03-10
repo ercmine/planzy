@@ -12,6 +12,7 @@ import '../features/ideas/ideas_page.dart';
 import '../features/invite/invite_page.dart';
 import '../features/onboarding/bootstrap_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
+import '../features/onboarding/onboarding_interests_page.dart';
 import '../features/onboarding/onboarding_permissions_page.dart';
 import '../features/onboarding/onboarding_signin_page.dart';
 import '../features/results/results_page.dart';
@@ -75,6 +76,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/onboarding',
         name: 'onboarding',
         builder: (context, state) => const OnboardingIntroPage(),
+      ),
+      GoRoute(
+        path: '/onboarding/interests',
+        name: 'onboarding-interests',
+        builder: (context, state) => const OnboardingInterestsPage(),
       ),
       GoRoute(
         path: '/onboarding/permissions',

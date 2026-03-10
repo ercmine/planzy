@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../models/category_labels.dart';
 import '../../../../models/session_filters.dart';
 
 class CategoryPicker extends StatelessWidget {
@@ -20,17 +21,12 @@ class CategoryPicker extends StatelessWidget {
       children: Category.values
           .map(
             (category) => FilterChip(
-              label: Text(_label(category)),
+              label: Text(categoryLabel(category)),
               selected: selected.contains(category),
               onSelected: (_) => onToggle(category),
             ),
           )
           .toList(growable: false),
     );
-  }
-
-  String _label(Category category) {
-    final raw = category.name;
-    return '${raw[0].toUpperCase()}${raw.substring(1)}';
   }
 }
