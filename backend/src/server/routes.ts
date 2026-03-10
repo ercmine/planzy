@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import { createAccountsHttpHandlers } from "../accounts/http.js";
 import { createDiscoveryHttpHandlers } from "../discovery/http.js";
+import { createGeocodingHttpHandlers } from "../geocoding/http.js";
 import { createRankingTuningHandlers } from "../discovery/tuningHttp.js";
 import type { RankingConfigResolver, RankingConfigService } from "../discovery/tuning.js";
 import type { PlaceDiscoveryRepository } from "../discovery/types.js";
@@ -22,6 +23,7 @@ import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
 import type { CollaborationService } from "../collaboration/service.js";
 import type { BusinessPremiumService } from "../businessPremium/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
+import type { GeocodingService } from "../geocoding/service.js";
 import { PermissionAction, ProfileType } from "../accounts/types.js";
 import type { ActorContextResolved } from "../accounts/types.js";
 import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
@@ -137,6 +139,7 @@ export function createRoutes(
     analyticsService?: AnalyticsService;
     analyticsQueryService?: AnalyticsQueryService;
     rolloutService?: RolloutService;
+    geocodingService?: GeocodingService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -147,6 +150,7 @@ export function createRoutes(
     : null;
   const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
+  const geocodingHandlers = deps?.geocodingService ? createGeocodingHttpHandlers(deps.geocodingService) : null;
   const rankingTuningHandlers = deps?.rankingTuning ? createRankingTuningHandlers(deps.rankingTuning.service, deps.rankingTuning.resolver, deps.rankingTuning.repo) : null;
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
   const creatorVerificationHandlers = deps?.creatorVerificationService ? createCreatorVerificationHttpHandlers(deps.creatorVerificationService) : null;
@@ -464,6 +468,31 @@ export function createRoutes(
       if (rankingTuningHandlers && normalizedPath === "/v1/admin/ranking/preview" && req.method === "POST") {
         if (!rankingTuningHandlers.ensureAdmin(req, res)) return;
         await rankingTuningHandlers.preview(req, res);
+        return;
+      }
+
+      if (geocodingHandlers && req.method === "GET" && normalizedPath === "/v1/geocode") {
+        await geocodingHandlers.geocode(req, res);
+        return;
+      }
+
+      if (geocodingHandlers && req.method === "POST" && normalizedPath === "/v1/geocode") {
+        await geocodingHandlers.geocode(req, res);
+        return;
+      }
+
+      if (geocodingHandlers && req.method === "GET" && normalizedPath === "/v1/reverse-geocode") {
+        await geocodingHandlers.reverseGeocode(req, res);
+        return;
+      }
+
+      if (geocodingHandlers && req.method === "POST" && normalizedPath === "/v1/reverse-geocode") {
+        await geocodingHandlers.reverseGeocode(req, res);
+        return;
+      }
+
+      if (geocodingHandlers && req.method === "GET" && normalizedPath === "/v1/geocoding/health") {
+        await geocodingHandlers.health(req, res);
         return;
       }
 
