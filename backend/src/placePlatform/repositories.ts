@@ -14,6 +14,7 @@ import type {
 
 export interface CanonicalPlaceRepository {
   getById(id: string): CanonicalPlace | undefined;
+  listPlaces(): CanonicalPlace[];
   findBySource(sourceName: string, sourceRecordId: string): CanonicalPlace | undefined;
   upsertPlace(place: CanonicalPlace): CanonicalPlace;
   findNearby(query: NearbyPlacesQuery): NearbyPlaceResult[];
@@ -77,6 +78,10 @@ export class InMemoryPlacePlatformRepository implements CanonicalPlaceRepository
 
   getById(id: string): CanonicalPlace | undefined {
     return this.places.get(id);
+  }
+
+  listPlaces(): CanonicalPlace[] {
+    return Array.from(this.places.values());
   }
 
   findBySource(sourceName: string, sourceRecordId: string): CanonicalPlace | undefined {
@@ -192,5 +197,64 @@ WHERE cp.status = ANY($3::text[])
   AND ($5::boolean = FALSE OR cpc.category_id = ANY($6::text[]))
 ORDER BY distance_meters ASC
 LIMIT $7;
+`.trim();
+}
+
+export function buildTextSearchPlacesSqlQuery(): string {
+  return `
+SELECT
+  cp.id,
+  cp.primary_name,
+  cp.city,
+  cp.region,
+  cp.country_code,
+  ts_rank_cd(
+    setweight(to_tsvector('simple', coalesce(cp.primary_name, '')), 'A') ||
+    setweight(to_tsvector('simple', coalesce(cp.description, '')), 'B') ||
+    setweight(to_tsvector('simple', coalesce(cp.address_line1, '')), 'C') ||
+    setweight(to_tsvector('simple', coalesce(cp.city, '') || ' ' || coalesce(cp.region, '')), 'C'),
+    plainto_tsquery('simple', $1)
+  ) AS text_rank,
+  similarity(cp.primary_name, $1) AS name_similarity,
+  ST_Distance(cp.geo_point, ST_SetSRID(ST_MakePoint($3, $2), 4326)::geography) AS distance_meters
+FROM canonical_places cp
+LEFT JOIN canonical_place_categories cpc
+  ON cpc.canonical_place_id = cp.id
+WHERE cp.status = 'ACTIVE'
+  AND (
+    setweight(to_tsvector('simple', coalesce(cp.primary_name, '')), 'A') ||
+    setweight(to_tsvector('simple', coalesce(cp.description, '')), 'B') ||
+    setweight(to_tsvector('simple', coalesce(cp.address_line1, '')), 'C') ||
+    setweight(to_tsvector('simple', coalesce(cp.city, '') || ' ' || coalesce(cp.region, '')), 'C')
+  ) @@ plainto_tsquery('simple', $1)
+  AND ($4::text IS NULL OR cp.city = $4)
+  AND ($5::text IS NULL OR cp.region = $5)
+  AND ($6::text[] IS NULL OR cpc.category_id = ANY($6::text[]))
+ORDER BY (text_rank * 0.75 + name_similarity * 0.25) DESC, distance_meters ASC
+LIMIT $7;
+`.trim();
+}
+
+export function buildCategorySearchPlacesSqlQuery(): string {
+  return `
+SELECT
+  cp.id,
+  cp.primary_name,
+  cp.city,
+  cp.region,
+  cp.country_code,
+  cpc.category_id,
+  cp.quality_score,
+  ST_Distance(cp.geo_point, ST_SetSRID(ST_MakePoint($3, $2), 4326)::geography) AS distance_meters
+FROM canonical_places cp
+INNER JOIN canonical_place_categories cpc
+  ON cpc.canonical_place_id = cp.id
+WHERE cp.status = 'ACTIVE'
+  AND cpc.category_id = ANY($1::text[])
+  AND ($4::boolean = FALSE OR ST_DWithin(cp.geo_point, ST_SetSRID(ST_MakePoint($3, $2), 4326)::geography, $5))
+  AND ($6::text IS NULL OR cp.city = $6)
+  AND ($7::text IS NULL OR cp.region = $7)
+ORDER BY cp.quality_score DESC NULLS LAST, distance_meters ASC
+LIMIT $8;
 `.trim();
 }

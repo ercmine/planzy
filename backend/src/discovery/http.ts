@@ -44,6 +44,15 @@ export interface DiscoveryHttpHandlerDeps {
 export function createDiscoveryHttpHandlers(deps: DiscoveryHttpHandlerDeps): DiscoveryHandlers {
   const normalizer = new QueryNormalizationService();
 
+  function handleSearchError(res: ServerResponse, error: unknown): void {
+    const code = error instanceof Error ? error.message : "internal_search_failure";
+    if (["invalid_lat", "invalid_lng", "invalid_radius", "nearby_requires_coordinates", "text_search_requires_q", "category_search_requires_category"].includes(code)) {
+      sendJson(res, 400, { error: code });
+      return;
+    }
+    sendJson(res, 500, { error: "internal_search_failure" });
+  }
+
   function requestContext(req: IncomingMessage) {
     const base = `http://${req.headers.host ?? "localhost"}`;
     const url = new URL(req.url ?? "/", base);
@@ -53,14 +62,26 @@ export function createDiscoveryHttpHandlers(deps: DiscoveryHttpHandlerDeps): Dis
   return {
     async search(req, res) {
       const { context } = requestContext(req);
-      const payload = await deps.searchService.search(context);
+      let payload;
+      try {
+        payload = await deps.searchService.search(context);
+      } catch (error) {
+        handleSearchError(res, error);
+        return;
+      }
       await deps.analyticsService?.track({ eventName: "search_submitted", metadata: { hasQuery: Boolean(context.query) } }, { actorUserId: String(readHeader(req, "x-user-id") ?? "").trim() || undefined, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, sourceRoute: "/v1/discovery/search", cityName: context.city, categoryName: context.categorySlug, platform: "backend" });
       await deps.analyticsService?.track({ eventName: "search_results_viewed", metadata: { total: payload.items.length, zeroResults: payload.items.length === 0 } }, { actorUserId: String(readHeader(req, "x-user-id") ?? "").trim() || undefined, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, sourceRoute: "/v1/discovery/search", cityName: context.city, categoryName: context.categorySlug, platform: "backend" });
       sendJson(res, 200, payload);
     },
     async browse(req, res) {
       const { context } = requestContext(req);
-      const payload = await deps.browseService.browse(context);
+      let payload;
+      try {
+        payload = await deps.browseService.browse(context);
+      } catch (error) {
+        handleSearchError(res, error);
+        return;
+      }
       await deps.analyticsService?.track({ eventName: "category_page_viewed", metadata: { total: payload.items.length } }, { actorUserId: String(readHeader(req, "x-user-id") ?? "").trim() || undefined, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, categoryName: context.categorySlug, sourceRoute: "/v1/discovery/browse", platform: "backend" });
       sendJson(res, 200, payload);
     },
@@ -73,7 +94,13 @@ export function createDiscoveryHttpHandlers(deps: DiscoveryHttpHandlerDeps): Dis
     },
     async nearby(req, res) {
       const { context } = requestContext(req);
-      const payload = await deps.nearbyService.nearby(context);
+      let payload;
+      try {
+        payload = await deps.nearbyService.nearby(context);
+      } catch (error) {
+        handleSearchError(res, error);
+        return;
+      }
       await deps.analyticsService?.track({ eventName: "nearby_results_viewed", metadata: { total: payload.items.length } }, { actorUserId: String(readHeader(req, "x-user-id") ?? "").trim() || undefined, sessionId: String(readHeader(req, "x-session-id") ?? "").trim() || undefined, cityName: context.city, sourceRoute: "/v1/discovery/nearby", platform: "backend" });
       sendJson(res, 200, payload);
     },

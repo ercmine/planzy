@@ -43,6 +43,83 @@ interface PagingCursorState {
   offset: number;
 }
 
+interface SearchTelemetrySnapshot {
+  nearbyQueries: number;
+  textQueries: number;
+  categoryQueries: number;
+  cacheHits: number;
+  cacheMisses: number;
+  zeroResults: number;
+}
+
+class SearchInfra {
+  private readonly cache = new Map<string, { expiresAt: number; value: RankedCandidate[] }>();
+  private readonly telemetry: SearchTelemetrySnapshot = {
+    nearbyQueries: 0,
+    textQueries: 0,
+    categoryQueries: 0,
+    cacheHits: 0,
+    cacheMisses: 0,
+    zeroResults: 0
+  };
+
+  constructor(private readonly ttlMs = 30_000) {}
+
+  read(key: string): RankedCandidate[] | undefined {
+    const hit = this.cache.get(key);
+    if (!hit || hit.expiresAt <= Date.now()) {
+      if (hit) this.cache.delete(key);
+      this.telemetry.cacheMisses += 1;
+      return undefined;
+    }
+    this.telemetry.cacheHits += 1;
+    return hit.value;
+  }
+
+  write(key: string, value: RankedCandidate[]): void {
+    this.cache.set(key, { expiresAt: Date.now() + this.ttlMs, value });
+  }
+
+  count(mode: "nearby" | "text" | "category", results: number): void {
+    if (mode === "nearby") this.telemetry.nearbyQueries += 1;
+    if (mode === "text") this.telemetry.textQueries += 1;
+    if (mode === "category") this.telemetry.categoryQueries += 1;
+    if (results === 0) this.telemetry.zeroResults += 1;
+  }
+
+  snapshot(): SearchTelemetrySnapshot {
+    return { ...this.telemetry };
+  }
+}
+
+const searchInfra = new SearchInfra();
+
+function buildSearchCacheKey(mode: string, context: DiscoveryQueryContext): string {
+  return JSON.stringify({
+    mode,
+    query: tokenize(context.query).join(" "),
+    category: context.categoryId ?? context.categorySlug,
+    city: context.city,
+    region: context.region,
+    country: context.country,
+    lat: context.lat,
+    lng: context.lng,
+    radius: context.radiusMeters,
+    filters: context.filters,
+    sort: context.sort
+  });
+}
+
+function assertSearchInputs(context: DiscoveryQueryContext, mode: "nearby" | "text" | "category"): void {
+  if (context.lat !== undefined && (context.lat < -90 || context.lat > 90)) throw new Error("invalid_lat");
+  if (context.lng !== undefined && (context.lng < -180 || context.lng > 180)) throw new Error("invalid_lng");
+  if (context.radiusMeters !== undefined && (context.radiusMeters < 100 || context.radiusMeters > 50_000)) throw new Error("invalid_radius");
+  if (mode === "nearby" && (context.lat === undefined || context.lng === undefined)) throw new Error("nearby_requires_coordinates");
+  if (mode === "text" && !context.query?.trim()) throw new Error("text_search_requires_q");
+  if (mode === "category" && !(context.categoryId || context.categorySlug)) throw new Error("category_search_requires_category");
+}
+
+
 const DEFAULT_RECOMMENDATION_CONFIG: RecommendationConfig = {
   weights: {
     categoryInterest: 0.19,
@@ -185,6 +262,10 @@ function applyBaseFilters(place: PlaceDocument, context: DiscoveryQueryContext):
   if (context.filters?.hasPhotos && place.imageUrls.length === 0) return false;
   if (context.filters?.hasReviews && (place.reviewCount ?? 0) === 0) return false;
   if (context.filters?.priceLevels?.length && !context.filters.priceLevels.includes(place.priceLevel ?? -1)) return false;
+  if (context.filters?.priceLevelMax !== undefined && (place.priceLevel ?? Number.MAX_SAFE_INTEGER) > context.filters.priceLevelMax) return false;
+  if (context.city && String(place.city ?? "").toLowerCase() !== context.city.toLowerCase()) return false;
+  if (context.region && !(place.neighborhood ?? "").toLowerCase().includes(context.region.toLowerCase())) return false;
+  if (context.country && !place.sourceAttribution.join(" ").toLowerCase().includes(context.country.toLowerCase())) return false;
   if ((context.categoryId || context.categorySlug)) {
     const token = String(context.categoryId ?? context.categorySlug).toLowerCase();
     const categories = [place.primaryCategory, ...place.secondaryCategories].join(" ").toLowerCase();
@@ -312,54 +393,72 @@ class DiversityBalancer {
   }
 }
 
-async function rankPlaces(repo: PlaceDiscoveryRepository, context: DiscoveryQueryContext, resolver?: RankingConfigResolver): Promise<RankedCandidate[]> {
+async function rankPlaces(repo: PlaceDiscoveryRepository, context: DiscoveryQueryContext, mode: "nearby" | "text" | "category", resolver?: RankingConfigResolver): Promise<RankedCandidate[]> {
+  assertSearchInputs(context, mode);
+  const cacheKey = buildSearchCacheKey(mode, context);
+  const cached = searchInfra.read(cacheKey);
+  if (cached) {
+    searchInfra.count(mode, cached.length);
+    return cached;
+  }
+
   const places = (await repo.listPlaces()).filter((place) => applyBaseFilters(place, context));
   const terms = tokenize(context.query);
   const cityToken = String(context.city ?? "").toLowerCase();
   const radius = Math.max(100, Math.min(50_000, Number(context.radiusMeters ?? 4_000)));
   const resolved = resolver?.resolve({ city: context.city, categoryId: context.categoryId ?? context.categorySlug, surface: context.surface });
 
-  return places
+  const ranked = places
     .map((place): RankedCandidate => {
       const textCorpus = [place.name, place.shortDescription, place.longDescription, place.description, ...place.keywords, place.primaryCategory, ...place.secondaryCategories, place.city, place.neighborhood]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-      const textMatch = terms.length === 0 ? 0.6 : terms.filter((term) => textCorpus.includes(term)).length / terms.length;
+      const textMatch = terms.length === 0 ? 0.45 : terms.filter((term) => textCorpus.includes(term)).length / terms.length;
+      const categoryToken = String(context.categoryId ?? context.categorySlug ?? "").toLowerCase();
+      const categoryCorpus = [place.primaryCategory, ...place.secondaryCategories].join(" ").toLowerCase();
+      const categoryMatch = !categoryToken ? 0.5 : (categoryCorpus.includes(categoryToken) ? 1 : 0);
       const cityFit = !cityToken ? 0.5 : String(place.city ?? "").toLowerCase().includes(cityToken) ? 1 : 0;
       const distance = context.lat !== undefined && context.lng !== undefined
         ? distanceMeters(context.lat, context.lng, place.lat, place.lng)
         : undefined;
       const distanceFit = distance === undefined ? 0.5 : Math.max(0, 1 - Math.min(distance, radius) / radius);
-      const score = (textMatch * 0.5) + (cityFit * 0.2) + (distanceFit * 0.1) + (place.qualityScore * 0.15) + (place.trendingScore * 0.05);
+      const nearbyScore = (distanceFit * 0.55) + (categoryMatch * 0.1) + (textMatch * 0.08) + (place.qualityScore * 0.2) + (place.popularityScore * 0.07);
+      const textScore = (textMatch * 0.56) + (distanceFit * 0.15) + (categoryMatch * 0.09) + (cityFit * 0.08) + (place.qualityScore * 0.12);
+      const categoryScore = (categoryMatch * 0.54) + (distanceFit * 0.16) + (cityFit * 0.1) + (place.qualityScore * 0.15) + (place.trendingScore * 0.05);
+      const score = mode === "nearby" ? nearbyScore : mode === "text" ? textScore : categoryScore;
       const tuned = resolved ? evaluateRankingAdjustments(place, score, resolved, { city: context.city, categoryId: context.categoryId, surface: context.surface, provider: place.sourceAttribution[0] }) : { score, reasons: [], excluded: false };
       return {
         place,
         score: tuned.score,
         distanceMeters: distance,
-        reasons: [textMatch > 0.7 ? "query_match" : "broad_match", ...tuned.reasons],
+        reasons: [mode === "text" && textMatch > 0.7 ? "strong_text_match" : `${mode}_match`, ...tuned.reasons],
         diversityBucket: `${place.primaryCategory}:${place.city ?? "global"}`,
-        explain: { score, contributions: { textMatch, cityFit, distanceFit }, reasonCodes: ["search"] }
+        explain: { score, contributions: { textMatch, cityFit, distanceFit, categoryMatch }, reasonCodes: [mode] }
       };
     })
     .filter((candidate) => !resolved || !evaluateRankingAdjustments(candidate.place, candidate.score, resolved, { city: context.city, categoryId: context.categoryId, surface: context.surface, provider: candidate.place.sourceAttribution[0] }).excluded)
     .filter((candidate) => candidate.distanceMeters === undefined || candidate.distanceMeters <= radius)
     .sort((a, b) => b.score - a.score || a.place.canonicalPlaceId.localeCompare(b.place.canonicalPlaceId));
+
+  searchInfra.write(cacheKey, ranked);
+  searchInfra.count(mode, ranked.length);
+  return ranked;
 }
 
 export class PlaceSearchService {
   constructor(private readonly repo: PlaceDiscoveryRepository, private readonly resolver?: RankingConfigResolver) {}
 
   async search(context: DiscoveryQueryContext): Promise<SearchResponse> {
-    const ranked = await rankPlaces(this.repo, context, this.resolver);
+    const ranked = await rankPlaces(this.repo, context, "text", this.resolver);
     const page = paginate(ranked, clampPageSize(context.pageSize), context.cursor);
     return {
       query: { q: context.query, normalizedQ: tokenize(context.query).join(" "), sort: context.sort ?? "relevance" },
-      constraints: { categoryId: context.categoryId ?? context.categorySlug, city: context.city, lat: context.lat, lng: context.lng, radiusMeters: context.radiusMeters },
+      constraints: { categoryId: context.categoryId ?? context.categorySlug, city: context.city, region: context.region, country: context.country, lat: context.lat, lng: context.lng, radiusMeters: context.radiusMeters },
       appliedFilters: context.filters ?? {},
       items: page.items.map((item) => mapResult(item, Boolean(context.explain))),
       nextCursor: page.nextCursor,
-      debug: context.explain ? { candidateCount: ranked.length } : undefined
+      debug: context.explain ? { candidateCount: ranked.length, telemetry: searchInfra.snapshot(), rankingMode: "text" } : undefined
     };
   }
 }
@@ -368,15 +467,15 @@ export class CategoryBrowseService {
   constructor(private readonly repo: PlaceDiscoveryRepository, private readonly resolver?: RankingConfigResolver) {}
 
   async browse(context: DiscoveryQueryContext): Promise<BrowseResponse> {
-    const ranked = await rankPlaces(this.repo, context, this.resolver);
+    const ranked = await rankPlaces(this.repo, context, "category", this.resolver);
     const page = paginate(ranked, clampPageSize(context.pageSize), context.cursor);
     return {
       category: { id: context.categoryId ?? context.categorySlug ?? "all", slug: context.categorySlug ?? context.categoryId ?? "all" },
-      scope: { city: context.city, lat: context.lat, lng: context.lng, radiusMeters: context.radiusMeters },
+      scope: { city: context.city, region: context.region, country: context.country, lat: context.lat, lng: context.lng, radiusMeters: context.radiusMeters },
       appliedFilters: context.filters ?? {},
       items: page.items.map((item) => mapResult(item, Boolean(context.explain))),
       nextCursor: page.nextCursor,
-      debug: context.explain ? { categoryThresholdApplied: true } : undefined
+      debug: context.explain ? { categoryThresholdApplied: true, telemetry: searchInfra.snapshot(), rankingMode: "category" } : undefined
     };
   }
 }
@@ -386,15 +485,15 @@ export class NearbyDiscoveryService {
 
   async nearby(context: DiscoveryQueryContext): Promise<NearbyResponse> {
     const requested = Math.max(200, Math.min(50_000, Number(context.radiusMeters ?? 2_500)));
-    const ranked = await rankPlaces(this.repo, { ...context, radiusMeters: requested }, this.resolver);
-    const expanded = ranked.length >= 3 ? ranked : await rankPlaces(this.repo, { ...context, radiusMeters: Math.min(requested * 2, 50_000) }, this.resolver);
+    const ranked = await rankPlaces(this.repo, { ...context, radiusMeters: requested }, "nearby", this.resolver);
+    const expanded = ranked.length >= 3 ? ranked : await rankPlaces(this.repo, { ...context, radiusMeters: Math.min(requested * 2, 50_000) }, "nearby", this.resolver);
     const page = paginate(expanded, clampPageSize(context.pageSize), context.cursor);
     return {
       origin: { lat: context.lat ?? 0, lng: context.lng ?? 0 },
       radius: { requestedMeters: requested, appliedMeters: ranked.length >= 3 ? requested : Math.min(requested * 2, 50_000) },
       items: page.items.map((item) => mapResult(item, Boolean(context.explain))),
       nextCursor: page.nextCursor,
-      debug: context.explain ? { fallbackExpanded: ranked.length < 3 } : undefined
+      debug: context.explain ? { fallbackExpanded: ranked.length < 3, telemetry: searchInfra.snapshot(), rankingMode: "nearby" } : undefined
     };
   }
 }
