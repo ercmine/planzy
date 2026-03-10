@@ -26,11 +26,8 @@ class GradientHeroCard extends StatelessWidget {
       child: Ink(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppSpacing.radiusXL),
-          gradient: LinearGradient(
-            colors: [
-              theme.colorScheme.primary,
-              theme.colorScheme.tertiary,
-            ],
+          gradient: const LinearGradient(
+            colors: [Color(0xFF6741FF), Color(0xFFFF6B8B)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -43,7 +40,7 @@ class GradientHeroCard extends StatelessWidget {
               Text(
                 title,
                 style: theme.textTheme.headlineSmall?.copyWith(
-                  color: theme.colorScheme.onPrimary,
+                  color: Colors.white,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -51,7 +48,7 @@ class GradientHeroCard extends StatelessWidget {
               Text(
                 subtitle,
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onPrimary.withOpacity(0.92),
+                  color: Colors.white.withOpacity(0.92),
                 ),
               ),
               const SizedBox(height: AppSpacing.m),
@@ -90,10 +87,7 @@ class SurfaceNavCard extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.xs),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 20,
-                child: Icon(icon),
-              ),
+              CircleAvatar(radius: 20, child: Icon(icon)),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
@@ -118,36 +112,170 @@ class SurfaceNavCard extends StatelessWidget {
   }
 }
 
-class QuotaProgressTile extends StatelessWidget {
-  const QuotaProgressTile({
-    required this.label,
-    required this.used,
-    required this.limit,
-    super.key,
-  });
-
-  final String label;
-  final int used;
-  final int limit;
+class SearchLaunchCard extends StatelessWidget {
+  const SearchLaunchCard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final ratio = limit <= 0 ? 0.0 : (used / limit).clamp(0, 1).toDouble();
+    return AppCard(
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded),
+          const SizedBox(width: AppSpacing.s),
+          Expanded(
+            child: Text(
+              'Search places, creators, and guides',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          const AppPill(label: 'Near me'),
+        ],
+      ),
+    );
+  }
+}
+
+class PlacePreviewCard extends StatelessWidget {
+  const PlacePreviewCard({required this.title, required this.category, required this.rating, required this.distance, required this.creator, super.key});
+
+  final String title;
+  final String category;
+  final String rating;
+  final String distance;
+  final String creator;
+
+  @override
+  Widget build(BuildContext context) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: AppSpacing.xs),
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: ratio),
-            duration: const Duration(milliseconds: 450),
-            builder: (context, value, _) {
-              return LinearProgressIndicator(value: value, minHeight: 8);
-            },
+          Container(
+            height: 140,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+              gradient: const LinearGradient(colors: [Color(0xFFFFD7A8), Color(0xFFFF8A8A)]),
+            ),
           ),
+          const SizedBox(height: AppSpacing.s),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          Text(category, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: AppSpacing.s),
+          Row(
+            children: [
+              AppPill(label: '$rating ★'),
+              const SizedBox(width: AppSpacing.xs),
+              AppPill(label: distance),
+              const Spacer(),
+              Text(creator, style: Theme.of(context).textTheme.labelMedium),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AdInlineCard extends StatelessWidget {
+  const AdInlineCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.s),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+        child: const Row(
+          children: [
+            AppPill(label: 'Sponsored'),
+            SizedBox(width: AppSpacing.s),
+            Expanded(child: Text('Ad slot: local picks from partners, placed every 10 cards.')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class EmptyStateCard extends StatelessWidget {
+  const EmptyStateCard({required this.icon, required this.title, required this.description, required this.cta, super.key});
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final String cta;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        children: [
+          Icon(icon, size: 34),
+          const SizedBox(height: AppSpacing.s),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.xs),
-          Text('$used / $limit used', style: Theme.of(context).textTheme.bodySmall),
+          Text(description, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: AppSpacing.s),
+          FilledButton.tonal(onPressed: () {}, child: Text(cta)),
+        ],
+      ),
+    );
+  }
+}
+
+class FeedUpdateCard extends StatelessWidget {
+  const FeedUpdateCard({required this.name, required this.handle, required this.place, required this.note, super.key});
+
+  final String name;
+  final String handle;
+  final String place;
+  final String note;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const CircleAvatar(child: Icon(Icons.person_outline_rounded)),
+              const SizedBox(width: AppSpacing.s),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(name), Text(handle, style: Theme.of(context).textTheme.labelMedium)]),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s),
+          Text('at $place', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: AppSpacing.xs),
+          Text(note, style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ),
+    );
+  }
+}
+
+class CreatorProfileHeader extends StatelessWidget {
+  const CreatorProfileHeader({required this.name, required this.handle, required this.tagline, super.key});
+
+  final String name;
+  final String handle;
+  final String tagline;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const CircleAvatar(radius: 30, child: Icon(Icons.person_outline_rounded, size: 30)),
+          const SizedBox(height: AppSpacing.s),
+          Text(name, style: Theme.of(context).textTheme.titleLarge),
+          Text(handle, style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: AppSpacing.xs),
+          Text(tagline, style: Theme.of(context).textTheme.bodyMedium),
         ],
       ),
     );

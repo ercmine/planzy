@@ -99,6 +99,7 @@ class AppScaffold extends StatelessWidget {
     required this.body,
     this.appBar,
     this.floatingActionButton,
+    this.bottomNavigationBar,
     this.padding = const EdgeInsets.all(AppSpacing.m),
     super.key,
   });
@@ -106,6 +107,7 @@ class AppScaffold extends StatelessWidget {
   final PreferredSizeWidget? appBar;
   final Widget body;
   final Widget? floatingActionButton;
+  final Widget? bottomNavigationBar;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -122,6 +124,7 @@ class AppScaffold extends StatelessWidget {
     return Scaffold(
       appBar: appBar,
       floatingActionButton: floatingActionButton,
+      bottomNavigationBar: bottomNavigationBar,
       body: DecoratedBox(
         decoration: const BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(

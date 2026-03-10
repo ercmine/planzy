@@ -16,9 +16,9 @@ class ActivityPage extends StatelessWidget {
         'icon': Icons.person_add_alt_1
       },
       {
-        'title': 'Business reply',
-        'desc': 'Bluebird Cafe replied to your review',
-        'icon': Icons.storefront_outlined
+        'title': 'New comment',
+        'desc': 'Bluebird Cafe lovers reacted to your review',
+        'icon': Icons.chat_bubble_outline
       },
       {
         'title': 'Moderation update',
@@ -26,18 +26,15 @@ class ActivityPage extends StatelessWidget {
         'icon': Icons.verified_outlined
       },
       {
-        'title': 'Collab invite',
-        'desc': 'A business invited you to a collaboration',
-        'icon': Icons.handshake_outlined
+        'title': 'Guide saved',
+        'desc': '12 people saved your weekend brunch guide',
+        'icon': Icons.bookmark_added_outlined
       },
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: const AppBackButton(),
-        title: const Text('Activity & notifications')),
+    return AppScaffold(
+      appBar: AppBar(leading: const AppBackButton(), title: const Text('Following & activity')),
       body: ListView.separated(
-        padding: const EdgeInsets.all(AppSpacing.m),
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.s),
         itemBuilder: (context, index) {

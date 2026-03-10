@@ -10,27 +10,18 @@ class PlannerPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const steps = <Map<String, String>>[
-      {'title': 'Pick mood', 'desc': 'Casual bites, date night, team outing'},
-      {
-        'title': 'Blend signals',
-        'desc': 'Recommendations, trusted reviews, distance, and quotas'
-      },
-      {
-        'title': 'Publish itinerary',
-        'desc': 'Save to list, invite collaborators, and share'
-      },
+      {'title': 'Pick a vibe', 'desc': 'Cozy coffee, date night, or quick eats'},
+      {'title': 'Blend signals', 'desc': 'Top creator reviews, distance, and saved lists'},
+      {'title': 'Build your guide', 'desc': 'Save picks into a shareable plan and invite friends'},
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: const AppBackButton(),
-        title: const Text('AI Planner')),
+    return AppScaffold(
+      appBar: AppBar(leading: const AppBackButton(), title: const Text('Planner')),
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.m),
         children: [
           const AppSectionHeader(
             title: 'Plan your next outing',
-            subtitle: 'A guided itinerary builder with premium-aware limits and save flows.',
+            subtitle: 'Turn discovery into a simple guide in a few taps.',
           ),
           const SizedBox(height: AppSpacing.m),
           ...steps.asMap().entries.map((entry) {
@@ -42,10 +33,7 @@ class PlannerPage extends StatelessWidget {
               builder: (context, value, child) {
                 return Opacity(
                   opacity: value,
-                  child: Transform.translate(
-                    offset: Offset(0, 10 * (1 - value)),
-                    child: child,
-                  ),
+                  child: Transform.translate(offset: Offset(0, 10 * (1 - value)), child: child),
                 );
               },
               child: AppCard(
@@ -58,14 +46,6 @@ class PlannerPage extends StatelessWidget {
               ),
             );
           }),
-          const SizedBox(height: AppSpacing.m),
-          const AppCard(
-            child: ListTile(
-              leading: Icon(Icons.workspace_premium_outlined),
-              title: Text('Premium planner states'),
-              subtitle: Text('When limits are reached, upgrade messaging is sourced from entitlement lock reasons.'),
-            ),
-          ),
         ],
       ),
     );
