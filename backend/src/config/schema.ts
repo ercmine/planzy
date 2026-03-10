@@ -58,6 +58,16 @@ export interface PlansRouterConfig {
 }
 
 export interface AppConfig {
+  geocoding?: {
+    baseUrl?: string;
+    timeoutMs: number;
+    geocodeCacheTtlMs: number;
+    reverseCacheTtlMs: number;
+    defaultLimit: number;
+    enableFallback: boolean;
+    fallbackBaseUrl?: string;
+    userAgent?: string;
+  };
   env: "dev" | "stage" | "prod";
   affiliate?: AffiliateConfig;
   retention?: Partial<RetentionConfig>;
@@ -82,6 +92,14 @@ export function defaultConfig(env: AppConfig["env"]): AppConfig {
       ttlMs: 60_000,
       timeoutMs: 2_000,
       allowInsecureHttp: false
+    },
+    geocoding: {
+      timeoutMs: 2_000,
+      geocodeCacheTtlMs: 3_600_000,
+      reverseCacheTtlMs: 86_400_000,
+      defaultLimit: 5,
+      enableFallback: false,
+      userAgent: "perbug-geocoder/1.0"
     },
     plans: {
       router: {

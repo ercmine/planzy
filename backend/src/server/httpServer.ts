@@ -28,6 +28,7 @@ import type { NotificationService } from "../notifications/service.js";
 import type { AnalyticsQueryService } from "../analytics/queryService.js";
 import type { AnalyticsService } from "../analytics/service.js";
 import type { RolloutService } from "../rollouts/service.js";
+import type { GeocodingService } from "../geocoding/service.js";
 import { createRoutes } from "./routes.js";
 
 export function matchPath(pattern: string, pathname: string): Record<string, string> | null {
@@ -89,6 +90,7 @@ export function createHttpServer(
     analyticsService?: AnalyticsService;
     analyticsQueryService?: AnalyticsQueryService;
     rolloutService?: RolloutService;
+    geocodingService?: GeocodingService;
   }
 ): Server {
   const route = createRoutes(service, merchantService, deps);

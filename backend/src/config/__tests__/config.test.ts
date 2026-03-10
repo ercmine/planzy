@@ -82,4 +82,19 @@ describe("config", () => {
     expect(result.warnings).toHaveLength(0);
   });
 
+  it("env overlay parses nominatim settings", () => {
+    const result = readEnvConfigWithWarnings({
+      NOMINATIM_BASE_URL: "http://nominatim.internal",
+      NOMINATIM_TIMEOUT_MS: "1500",
+      NOMINATIM_GEOCODE_CACHE_TTL_MS: "120000",
+      NOMINATIM_REVERSE_CACHE_TTL_MS: "300000",
+      NOMINATIM_DEFAULT_LIMIT: "8",
+      NOMINATIM_ENABLE_FALLBACK: "false"
+    });
+
+    expect(result.config.geocoding?.baseUrl).toBe("http://nominatim.internal");
+    expect(result.config.geocoding?.timeoutMs).toBe(1500);
+    expect(result.config.geocoding?.defaultLimit).toBe(8);
+    expect(result.warnings).toHaveLength(0);
+  });
 });

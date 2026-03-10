@@ -102,6 +102,27 @@ export function readEnvConfigWithWarnings(processEnv: NodeJS.ProcessEnv): EnvRea
     };
   }
 
+
+  const nominatimBaseUrl = processEnv.NOMINATIM_BASE_URL;
+  const nominatimTimeoutMs = parseNumber(processEnv.NOMINATIM_TIMEOUT_MS);
+  const nominatimGeocodeCacheTtlMs = parseNumber(processEnv.NOMINATIM_GEOCODE_CACHE_TTL_MS);
+  const nominatimReverseCacheTtlMs = parseNumber(processEnv.NOMINATIM_REVERSE_CACHE_TTL_MS);
+  const nominatimDefaultLimit = parseNumber(processEnv.NOMINATIM_DEFAULT_LIMIT);
+  const nominatimFallback = parseBoolean(processEnv.NOMINATIM_ENABLE_FALLBACK);
+
+  if (nominatimBaseUrl || nominatimTimeoutMs !== undefined || nominatimGeocodeCacheTtlMs !== undefined || nominatimReverseCacheTtlMs !== undefined || nominatimDefaultLimit !== undefined || nominatimFallback !== undefined) {
+    config.geocoding = {
+      baseUrl: nominatimBaseUrl,
+      timeoutMs: nominatimTimeoutMs ?? 2_000,
+      geocodeCacheTtlMs: nominatimGeocodeCacheTtlMs ?? 3_600_000,
+      reverseCacheTtlMs: nominatimReverseCacheTtlMs ?? 86_400_000,
+      defaultLimit: nominatimDefaultLimit ?? 5,
+      enableFallback: nominatimFallback ?? false,
+      fallbackBaseUrl: processEnv.NOMINATIM_FALLBACK_BASE_URL,
+      userAgent: processEnv.NOMINATIM_USER_AGENT
+    };
+  }
+
   const routerTimeoutMs = parseNumber(processEnv.PLANS_ROUTER_DEFAULT_TIMEOUT_MS);
   const routerAllowPartial = parseBoolean(processEnv.PLANS_ROUTER_ALLOW_PARTIAL);
   const routerMaxFanout = parseNumber(processEnv.PLANS_ROUTER_MAX_FANOUT);
