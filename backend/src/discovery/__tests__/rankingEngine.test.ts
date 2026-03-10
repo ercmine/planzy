@@ -60,6 +60,41 @@ describe("ranking engine", () => {
     expect(rich).toBeGreaterThan(poor);
   });
 
+
+  it("incorporates first-party engagement signals without overpowering distance", () => {
+    const context = { categoryId: "food", radiusMeters: 4000 };
+    const nearLowContent = scorePlaceForMode({
+      place: place({ canonicalPlaceId: "near", qualityScore: 0.6, popularityScore: 0.4, trendingScore: 0.4 }),
+      mode: "nearby",
+      context,
+      distanceMeters: 120
+    }).score;
+
+    const farHighContent = scorePlaceForMode({
+      place: place({
+        canonicalPlaceId: "far",
+        qualityScore: 0.8,
+        popularityScore: 0.8,
+        trendingScore: 0.7,
+        firstPartySignals: {
+          reviewCount: 40,
+          creatorVideoCount: 12,
+          saveCount: 80,
+          publicGuideCount: 8,
+          trustedReviewCount: 18,
+          helpfulVoteCount: 120,
+          engagementVelocity30d: 0.9,
+          qualityBoost: 0.85
+        }
+      }),
+      mode: "nearby",
+      context,
+      distanceMeters: 2200
+    }).score;
+
+    expect(nearLowContent).toBeGreaterThan(farHighContent);
+  });
+
   it("prioritizes textual relevance in text mode", () => {
     const context = { query: "coffee", radiusMeters: 3000 };
     const relevant = scorePlaceForMode({ place: place({ name: "Coffee House", keywords: ["espresso"] }), mode: "text", context, distanceMeters: 1200 }).score;

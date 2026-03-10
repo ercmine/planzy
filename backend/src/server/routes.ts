@@ -51,6 +51,7 @@ import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 import type { ReviewsStore } from "../reviews/store.js";
 import { getPlaceReviewVideoSection } from "../reviews/placeVideoSection.js";
 import type { SavedHttpHandlers } from "../saved/http.js";
+import type { PlaceContentHttpHandlers } from "../placeContent/http.js";
 import type { OutingPlannerService } from "../outingPlanner/service.js";
 import { createOutingPlannerHandlers } from "../outingPlanner/http.js";
 import type { ModerationService } from "../moderation/service.js";
@@ -132,6 +133,7 @@ export function createRoutes(
     discovery?: DiscoveryHttpHandlerDeps;
     rankingTuning?: { service: RankingConfigService; resolver: RankingConfigResolver; repo: PlaceDiscoveryRepository };
     savedHandlers?: SavedHttpHandlers;
+    placeContentHandlers?: PlaceContentHttpHandlers;
     outingPlannerService?: OutingPlannerService;
     moderationService?: ModerationService;
     placeService?: PlaceNormalizationService;
@@ -2123,6 +2125,51 @@ export function createRoutes(
         const publicListsMatch = /^\/v1\/profiles\/([^/]+)\/lists$/.exec(normalizedPath);
         if (publicListsMatch && req.method === "GET") {
           await deps.savedHandlers.listPublicByUser(req, res, decodeURIComponent(publicListsMatch[1] ?? ""));
+          return;
+        }
+      }
+
+
+
+      if (deps?.placeContentHandlers) {
+        if (req.method === "POST" && normalizedPath === "/v1/place-content/reviews") {
+          await deps.placeContentHandlers.createReview(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/place-content/videos") {
+          await deps.placeContentHandlers.createVideo(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/place-content/saves") {
+          await deps.placeContentHandlers.savePlace(req, res);
+          return;
+        }
+        if (req.method === "POST" && normalizedPath === "/v1/place-content/guides") {
+          await deps.placeContentHandlers.createGuide(req, res);
+          return;
+        }
+
+        const saveDeleteMatch = /^\/v1\/place-content\/saves\/([^/]+)$/.exec(normalizedPath);
+        if (saveDeleteMatch && req.method === "DELETE") {
+          await deps.placeContentHandlers.removeSave(req, res, decodeURIComponent(saveDeleteMatch[1] ?? ""));
+          return;
+        }
+
+        const guidePlaceAddMatch = /^\/v1\/place-content\/guides\/([^/]+)\/places$/.exec(normalizedPath);
+        if (guidePlaceAddMatch && req.method === "POST") {
+          await deps.placeContentHandlers.addGuidePlace(req, res, decodeURIComponent(guidePlaceAddMatch[1] ?? ""));
+          return;
+        }
+
+        const placeContentMatch = /^\/v1\/place-content\/places\/([^/]+)$/.exec(normalizedPath);
+        if (placeContentMatch && req.method === "GET") {
+          await deps.placeContentHandlers.placeContent(req, res, decodeURIComponent(placeContentMatch[1] ?? ""));
+          return;
+        }
+
+        const creatorContentMatch = /^\/v1\/place-content\/profiles\/([^/]+)$/.exec(normalizedPath);
+        if (creatorContentMatch && req.method === "GET") {
+          await deps.placeContentHandlers.creatorContent(req, res, decodeURIComponent(creatorContentMatch[1] ?? ""));
           return;
         }
       }

@@ -21,6 +21,7 @@ import type { TelemetryService } from "../telemetry/telemetryService.js";
 import type { ReviewsStore } from "../reviews/store.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 import type { SavedHttpHandlers } from "../saved/http.js";
+import type { PlaceContentHttpHandlers } from "../placeContent/http.js";
 import type { OutingPlannerService } from "../outingPlanner/service.js";
 import type { ModerationService } from "../moderation/service.js";
 import type { PlaceNormalizationService } from "../places/service.js";
@@ -83,6 +84,7 @@ export function createHttpServer(
     discovery?: DiscoveryHttpHandlerDeps;
     rankingTuning?: { service: RankingConfigService; resolver: RankingConfigResolver; repo: PlaceDiscoveryRepository };
     savedHandlers?: SavedHttpHandlers;
+    placeContentHandlers?: PlaceContentHttpHandlers;
     outingPlannerService?: OutingPlannerService;
     moderationService?: ModerationService;
     placeService?: PlaceNormalizationService;
