@@ -4,6 +4,7 @@ import 'package:perbug/core/ads/ad_deck_injector.dart';
 import 'package:perbug/core/ads/ads_config.dart';
 import 'package:perbug/core/location/location_controller.dart';
 import 'package:perbug/core/location/location_models.dart';
+import 'package:perbug/core/location/location_permission_service.dart';
 import 'package:perbug/core/location/location_service.dart';
 import 'package:perbug/core/permissions/permission_service.dart';
 import 'package:perbug/core/permissions/permission_state.dart';
@@ -36,6 +37,29 @@ class _FakePermissionService extends PermissionService {
   Future<PermissionState> checkLocation() async => PermissionState.granted;
 }
 
+class _DeniedLocationPermissionService extends LocationPermissionService {
+  _DeniedLocationPermissionService()
+      : super(permissionService: _DeniedPermissionService(), locationService: _DisabledLocationService());
+}
+
+class _DeniedPermissionService extends PermissionService {
+  @override
+  Future<PermissionState> requestLocation() async => PermissionState.denied;
+
+  @override
+  Future<PermissionState> checkLocation() async => PermissionState.denied;
+}
+
+class _DisabledLocationService extends LocationService {
+  @override
+  Future<bool> isLocationServiceEnabled() async => false;
+
+  @override
+  Future<AppLocation> getCurrentLocation() {
+    throw StateError('location disabled');
+  }
+}
+
 class _FakeLocationService extends LocationService {
   @override
   Future<bool> isLocationServiceEnabled() async => true;
@@ -51,7 +75,7 @@ class _FakeLocationService extends LocationService {
 class _FakeLocationController extends LocationController {
   _FakeLocationController()
       : super(
-          permissionService: _FakePermissionService(),
+          locationPermissionService: LocationPermissionService(permissionService: _FakePermissionService(), locationService: _FakeLocationService()),
           locationService: _FakeLocationService(),
         ) {
     state = state.copyWith(
@@ -543,6 +567,79 @@ void main() {
     await controller.maybePrefetchMore();
 
     verify(() => deckRepository.fetchDeckBatch(created.sessionId, any())).called(greaterThan(1));
+    controller.dispose();
+  });
+
+  test('batch requests preserve live location context across pagination and refresh', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'Location context',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    when(() => deckRepository.fetchDeckBatch(created.sessionId, any())).thenAnswer(
+      (_) async => _batch(
+        [for (var i = 0; i < 12; i++) _plan('ctx-$i')],
+        nextCursor: 'cursor-next',
+        sessionId: created.sessionId,
+      ),
+    );
+
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+    await controller.loadNextBatch();
+    await controller.refresh();
+
+    final calls = verify(() => deckRepository.fetchDeckBatch(created.sessionId, captureAny())).captured;
+    expect(calls, isNotEmpty);
+    for (final call in calls.cast<DeckQueryParams>()) {
+      expect(call.lat, 37.78);
+      expect(call.lng, -122.41);
+    }
+
+    controller.dispose();
+  });
+
+  test('without a location, deck requires permission instead of fake nearby results', () async {
+    final created = await sessionsRepository.createLocalSession(
+      title: 'Needs location',
+      filters: const SessionFilters(),
+      members: const [],
+    );
+
+    final locationlessController = LocationController(
+      locationPermissionService: _DeniedLocationPermissionService(),
+      locationService: _FakeLocationService(),
+    );
+
+    final controller = DeckController(
+      sessionId: created.sessionId,
+      deckRepository: deckRepository,
+      swipesRepository: swipesRepository,
+      telemetryRepository: telemetryRepository,
+      telemetryDispatcher: dispatcher,
+      sessionsRepository: sessionsRepository,
+      locationController: locationlessController,
+      adDeckInjector: const AdDeckInjector(config: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50)),
+    );
+
+    await Future<void>.microtask(() {});
+    await Future<void>.microtask(() {});
+
+    expect(controller.state.locationRequired, true);
+    verifyNever(() => deckRepository.fetchDeckBatch(created.sessionId, any()));
+
     controller.dispose();
   });
 
