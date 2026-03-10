@@ -35,7 +35,7 @@ class SettingsPage extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => _handleBackPressed(context, ref),
         ),
-        title: const Text('Settings'),
+        title: const Text('Profile & settings'),
       ),
       body: ListView(
         children: [
@@ -175,7 +175,7 @@ class SettingsPage extends ConsumerWidget {
               children: [
                 Text('Ads may be shown. We do not sell personal info.'),
                 SizedBox(height: AppSpacing.xs),
-                Text('TODO: add consent manager for region-specific requirements.'),
+                Text('You can adjust ad and privacy controls in your device settings.'),
               ],
             ),
           ),
@@ -187,7 +187,7 @@ class SettingsPage extends ConsumerWidget {
               children: [
                 const PerbugLogo(size: 40, variant: PerbugLogoVariant.withWordmark),
                 const SizedBox(height: AppSpacing.s),
-                const Text('Perbug helps your group find plans together.'),
+                const Text('Perbug helps you discover great places, follow creators, and share real reviews.'),
                 const SizedBox(height: AppSpacing.xs),
                 Text('Version: ${state.appVersion}'),
               ],

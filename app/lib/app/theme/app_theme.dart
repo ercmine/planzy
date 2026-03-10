@@ -24,8 +24,9 @@ class AppTheme {
       textTheme: AppTypography.textTheme(colorScheme),
       scaffoldBackgroundColor: colorScheme.surface,
       appBarTheme: AppBarTheme(
-        backgroundColor: colorScheme.surface.withOpacity(0.92),
+        backgroundColor: Colors.transparent,
         foregroundColor: colorScheme.onSurface,
+        surfaceTintColor: Colors.transparent,
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -44,8 +45,9 @@ class AppTheme {
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: colorScheme.surface,
-        indicatorColor: colorScheme.secondaryContainer,
+        backgroundColor: colorScheme.surface.withOpacity(0.92),
+        indicatorColor: colorScheme.primaryContainer,
+        elevation: 0,
         labelTextStyle: WidgetStatePropertyAll(
           TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
         ),
