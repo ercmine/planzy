@@ -56,9 +56,6 @@ class DeckController extends StateNotifier<DeckState> {
   static const int _minNewItems = 10;
   static const int _maxExtraFetchAttempts = 3;
   static const List<int> _radiusPattern = <int>[5000, 10000, 30000];
-  static const double _debugDefaultLat = 44.8620;
-  static const double _debugDefaultLng = -93.5590;
-
   DateTime? _viewStartedAt;
   String? _viewPlanId;
   int _batchRequestCounter = 0;
@@ -314,11 +311,7 @@ class DeckController extends StateNotifier<DeckState> {
       return;
     }
 
-    var location = _locationController.state.effectiveLocation;
-    if (location == null && kDebugMode) {
-      _locationController.setManualOverride(_debugDefaultLat, _debugDefaultLng);
-      location = _locationController.state.effectiveLocation;
-    }
+    final location = _locationController.state.effectiveLocation;
     if (location == null) {
       state = state.copyWith(
         isLoadingInitial: false,
@@ -587,11 +580,7 @@ class DeckController extends StateNotifier<DeckState> {
     await _locationController.requestPermissionAndLoad();
     final loaded = _locationController.state.effectiveLocation;
 
-    if (loaded == null && kDebugMode) {
-      _locationController.setManualOverride(_debugDefaultLat, _debugDefaultLng);
-    }
-
-    if (_locationController.state.effectiveLocation == null) {
+    if (loaded == null) {
       state = state.copyWith(
         isLoadingInitial: false,
         locationRequired: true,

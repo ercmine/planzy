@@ -65,7 +65,7 @@ class DeckQueryParams {
     return <String, String?>{
       'cursor': cursor,
       'seed': seed,
-      'maxResults': _clampedMaxResults.toString(),
+      'limit': _clampedMaxResults.toString(),
       'lat': lat == null ? null : lat!.toStringAsFixed(6),
       'lng': lng == null ? null : lng!.toStringAsFixed(6),
       'radiusMeters': radiusMeters?.toString(),
@@ -120,17 +120,23 @@ class DeckRepository {
     }
 
     if (params.lat == null || params.lng == null) {
-      throw const FormatException('Missing required lat/lng query params for /plans');
+      throw const FormatException('Missing required lat/lng query params for deck fetch');
     }
 
     List<dynamic>? responseList;
     try {
+      final query = params.toQueryMap(defaultLocale: 'en-US');
       final response = await apiClient.getDecoded(
-        ApiEndpoints.plans,
-        queryParameters: params.toQueryMap(defaultLocale: 'en-US'),
+        ApiEndpoints.sessionDeck(sessionId),
+        queryParameters: query,
       );
+      if (response is! Map<String, dynamic>) {
+        Log.warn('[DeckRepository] expected deck envelope from ${ApiEndpoints.sessionDeck(sessionId)} but received ${response.runtimeType}; nearby metadata unavailable.');
+      }
       responseList = _extractPlansList(response);
       final nextCursor = _extractNextCursor(response);
+      final mix = _extractMix(response);
+      final debug = _extractDebug(response);
       final plans = responseList
           .map((item) {
             if (item is! Map<String, dynamic>) {
@@ -151,12 +157,13 @@ class DeckRepository {
         sessionId: sessionId,
         plans: plans,
         nextCursor: nextCursor,
-        mix: DeckSourceMix(
+        mix: mix ?? DeckSourceMix(
           providersUsed: plans.map((p) => p.source).toSet().toList(growable: false),
           planSourceCounts: _sourceCounts(plans),
           categoryCounts: _categoryCounts(plans),
           sponsoredCount: 0,
         ),
+        debug: debug,
       );
       _deckBatchCache.set(cacheKey, deck);
 
@@ -217,6 +224,31 @@ String? _extractNextCursor(Object decoded) {
   }
   final value = cursor.toString().trim();
   return value.isEmpty ? null : value;
+}
+
+
+DeckSourceMix? _extractMix(Object decoded) {
+  if (decoded is! Map<String, dynamic>) {
+    return null;
+  }
+
+  final mix = decoded['mix'];
+  if (mix is Map<String, dynamic>) {
+    return DeckSourceMix.fromJson(mix);
+  }
+  return null;
+}
+
+DeckDebug? _extractDebug(Object decoded) {
+  if (decoded is! Map<String, dynamic>) {
+    return null;
+  }
+
+  final debug = decoded['debug'];
+  if (debug is Map<String, dynamic>) {
+    return DeckDebug.fromJson(debug);
+  }
+  return null;
 }
 
 void _logFirstPlanRuntimeTypes(List<dynamic>? plans) {
