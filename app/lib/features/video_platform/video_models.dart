@@ -1,6 +1,6 @@
 enum FeedScope { local, regional, global }
 
-enum StudioVideoStatus { draft, uploading, processing, published, failed, moderated }
+enum StudioVideoStatus { draft, awaiting_upload, uploaded, processing, published, failed, hidden, rejected, archived }
 
 class PlaceSearchResult {
   const PlaceSearchResult({
@@ -28,19 +28,45 @@ class PlaceSearchResult {
   }
 }
 
+class VideoUploadSession {
+  const VideoUploadSession({required this.id, required this.bucket, required this.key, required this.uploadMode, required this.expiresAt, this.parts = const []});
+
+  final String id;
+  final String bucket;
+  final String key;
+  final String uploadMode;
+  final String expiresAt;
+  final List<String> parts;
+
+  factory VideoUploadSession.fromJson(Map<String, dynamic> json) {
+    final partRows = json['parts'] is List ? (json['parts'] as List).whereType<Map<String, dynamic>>() : const <Map<String, dynamic>>[];
+    return VideoUploadSession(
+      id: (json['id'] ?? '').toString(),
+      bucket: (json['bucket'] ?? '').toString(),
+      key: (json['key'] ?? '').toString(),
+      uploadMode: (json['uploadMode'] ?? 'single').toString(),
+      expiresAt: (json['expiresAt'] ?? '').toString(),
+      parts: partRows.map((part) => (part['signedUrl'] ?? '').toString()).toList(growable: false),
+    );
+  }
+}
+
 class PlaceVideoFeedItem {
   const PlaceVideoFeedItem({
     required this.videoId,
     required this.placeId,
-    required this.placeName,
-    required this.placeCategory,
-    required this.regionLabel,
     required this.scope,
-    required this.creatorName,
-    required this.creatorHandle,
     required this.caption,
     required this.videoUrl,
     required this.rating,
+    required this.status,
+    this.placeName = '',
+    this.placeCategory = 'Place',
+    this.regionLabel = 'Unknown',
+    this.creatorName = 'Creator',
+    this.creatorHandle = '@creator',
+    this.thumbnailUrl,
+    this.coverUrl,
   });
 
   final String videoId;
@@ -53,7 +79,10 @@ class PlaceVideoFeedItem {
   final String creatorHandle;
   final String caption;
   final String videoUrl;
+  final String? thumbnailUrl;
+  final String? coverUrl;
   final int rating;
+  final String status;
 
   factory PlaceVideoFeedItem.fromJson(Map<String, dynamic> json, FeedScope scope) {
     return PlaceVideoFeedItem(
@@ -65,9 +94,12 @@ class PlaceVideoFeedItem {
       scope: scope,
       creatorName: (json['creatorName'] ?? 'Creator').toString(),
       creatorHandle: (json['creatorHandle'] ?? '@creator').toString(),
-      caption: (json['caption'] ?? '').toString(),
-      videoUrl: (json['videoUrl'] ?? '').toString(),
+      caption: (json['caption'] ?? json['title'] ?? '').toString(),
+      videoUrl: (json['playbackUrl'] ?? json['videoUrl'] ?? '').toString(),
+      thumbnailUrl: json['thumbnailUrl']?.toString(),
+      coverUrl: json['coverUrl']?.toString(),
       rating: json['rating'] is num ? (json['rating'] as num).toInt() : 0,
+      status: (json['status'] ?? 'draft').toString(),
     );
   }
 }
@@ -94,8 +126,8 @@ class StudioVideo {
       orElse: () => StudioVideoStatus.draft,
     );
     return StudioVideo(
-      videoId: (json['videoId'] ?? '').toString(),
-      placeId: (json['placeId'] ?? '').toString(),
+      videoId: (json['id'] ?? json['videoId'] ?? '').toString(),
+      placeId: (json['canonicalPlaceId'] ?? json['placeId'] ?? '').toString(),
       placeName: (json['placeName'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
       status: status,

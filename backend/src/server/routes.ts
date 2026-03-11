@@ -66,6 +66,8 @@ import { createAdminHttpHandlers } from "../admin/http.js";
 import { AdminService } from "../admin/service.js";
 import type { PlaceNormalizationService } from "../places/service.js";
 import { createRolloutHttpHandlers } from "../rollouts/http.js";
+import { createVideoPlatformHttpHandlers } from "../videoPlatform/http.js";
+import type { VideoPlatformService } from "../videoPlatform/service.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
@@ -142,6 +144,7 @@ export function createRoutes(
     analyticsQueryService?: AnalyticsQueryService;
     rolloutService?: RolloutService;
     geoGateway?: GeoGateway;
+    videoPlatformService?: VideoPlatformService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -165,6 +168,7 @@ export function createRoutes(
   const rolloutHandlers = deps?.rolloutService ? createRolloutHttpHandlers(deps.rolloutService) : null;
   const notificationHandlers = deps?.notificationService ? createNotificationHttpHandlers(deps.notificationService) : null;
   const analyticsHandlers = deps?.analyticsService && deps?.analyticsQueryService ? createAnalyticsHttpHandlers(deps.analyticsService, deps.analyticsQueryService) : null;
+  const videoPlatformHandlers = deps?.videoPlatformService ? createVideoPlatformHttpHandlers(deps.videoPlatformService) : null;
   const adminHandlers = deps?.accountsService && deps?.moderationService
     ? createAdminHttpHandlers(new AdminService({
       accountsService: deps.accountsService,
@@ -2090,6 +2094,50 @@ export function createRoutes(
           await subscriptionHandlers.authorizeAction(req, res);
           return;
         }
+      }
+
+      const videoUploadMatch = /^\/v1\/videos\/([^/]+)\/upload-session$/.exec(normalizedPath);
+      const videoFinalizeMatch = /^\/v1\/videos\/([^/]+)\/finalize-upload$/.exec(normalizedPath);
+      const videoPublishMatch = /^\/v1\/videos\/([^/]+)\/publish$/.exec(normalizedPath);
+      const videoPatchMatch = /^\/v1\/videos\/([^/]+)$/.exec(normalizedPath);
+      const placeVideosMatch = /^\/v1\/places\/([^/]+)\/videos$/.exec(normalizedPath);
+      const creatorVideosMatch = /^\/v1\/creators\/([^/]+)\/videos$/.exec(normalizedPath);
+
+      if (videoPlatformHandlers && req.method === "POST" && normalizedPath === "/v1/videos") {
+        await videoPlatformHandlers.createDraft(req, res);
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "GET" && normalizedPath === "/v1/feed/videos") {
+        await videoPlatformHandlers.listFeed(req, res, url.searchParams);
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "GET" && normalizedPath === "/v1/studio/videos") {
+        await videoPlatformHandlers.listStudio(req, res);
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "POST" && videoUploadMatch) {
+        await videoPlatformHandlers.requestUpload(req, res, decodeURIComponent(videoUploadMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "POST" && videoFinalizeMatch) {
+        await videoPlatformHandlers.finalizeUpload(req, res, decodeURIComponent(videoFinalizeMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "POST" && videoPublishMatch) {
+        await videoPlatformHandlers.publish(req, res, decodeURIComponent(videoPublishMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "PATCH" && videoPatchMatch) {
+        await videoPlatformHandlers.updateDraft(req, res, decodeURIComponent(videoPatchMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "GET" && placeVideosMatch) {
+        await videoPlatformHandlers.listPlaceVideos(req, res, decodeURIComponent(placeVideosMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "GET" && creatorVideosMatch) {
+        await videoPlatformHandlers.listCreatorVideos(req, res, decodeURIComponent(creatorVideosMatch[1] ?? ""));
+        return;
       }
 
       if (deps?.savedHandlers) {

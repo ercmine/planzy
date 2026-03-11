@@ -56,6 +56,7 @@ import { VenueClaimsService } from "../venues/claims/claimsService.js";
 import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
 import { MemoryRolloutStore } from "../rollouts/store.js";
 import { rolloutSeedForLocalDev, RolloutService } from "../rollouts/service.js";
+import { MemoryVideoPlatformStore, VideoPlatformService } from "../videoPlatform/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -181,6 +182,19 @@ export function createServer(options?: CreateServerOptions) {
   });
   const rolloutService = new RolloutService(new MemoryRolloutStore(rolloutSeedForLocalDev()), accountsService, subscriptionService);
   const geoGateway = createBackendGeoGatewayFromEnv();
+  const videoPlatformService = new VideoPlatformService(
+    new MemoryVideoPlatformStore(),
+    { exists: (placeId) => Boolean(placeService.getCanonicalPlace(placeId)) },
+    {
+      awsRegion: process.env.AWS_REGION ?? "us-east-1",
+      rawBucket: process.env.AWS_S3_VIDEO_RAW_BUCKET ?? "perbug-media-raw-dev",
+      processedBucket: process.env.AWS_S3_VIDEO_PROCESSED_BUCKET ?? "perbug-media-processed-dev",
+      cloudFrontBaseUrl: process.env.AWS_CLOUDFRONT_MEDIA_BASE_URL,
+      uploadTtlSeconds: Number.parseInt(process.env.VIDEO_UPLOAD_URL_TTL_SECONDS ?? "900", 10),
+      maxUploadBytes: Number.parseInt(process.env.VIDEO_MAX_UPLOAD_BYTES ?? String(2 * 1024 * 1024 * 1024), 10),
+      multipartThresholdBytes: Number.parseInt(process.env.VIDEO_MULTIPART_THRESHOLD_BYTES ?? String(50 * 1024 * 1024), 10)
+    }
+  );
 
   return createHttpServer(service, merchantService, {
     deckHandler,
@@ -220,7 +234,8 @@ export function createServer(options?: CreateServerOptions) {
     analyticsService,
     analyticsQueryService,
     rolloutService,
-    geoGateway: geoGateway ?? undefined
+    geoGateway: geoGateway ?? undefined,
+    videoPlatformService
   });
 }
 

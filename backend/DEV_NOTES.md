@@ -185,3 +185,19 @@ Pass `debug=true` to ranking helpers to include per-item score breakdowns.
 ### Current integration
 
 `getPlaceReviewVideoSection` now builds normalized media candidates and delegates ordering + featured selection to the centralized ranking engine.
+
+
+## AWS video platform
+
+- New video routes:
+  - `POST /v1/videos` create draft
+  - `POST /v1/videos/:videoId/upload-session` create presigned upload intent
+  - `POST /v1/videos/:videoId/finalize-upload` mark S3 upload complete
+  - `PATCH /v1/videos/:videoId` update draft metadata/place
+  - `POST /v1/videos/:videoId/publish` publish + processing handoff
+  - `GET /v1/studio/videos` creator studio list
+  - `GET /v1/feed/videos` public published feed list
+  - `GET /v1/places/:placeId/videos` place linked published videos
+  - `GET /v1/creators/:userId/videos` creator published videos
+- Configure S3 + CloudFront with `AWS_S3_VIDEO_RAW_BUCKET`, `AWS_S3_VIDEO_PROCESSED_BUCKET`, and `AWS_CLOUDFRONT_MEDIA_BASE_URL`.
+- Current implementation uses deterministic object key patterns for raw and processed assets and is ready for async processing workers.
