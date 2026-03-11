@@ -30,6 +30,57 @@ class VideoRepository {
     return items.whereType<Map<String, dynamic>>().map(StudioVideo.fromJson).toList(growable: false);
   }
 
+  Future<String> createDraft({
+    required String placeId,
+    required String title,
+    required String caption,
+    required int rating,
+  }) async {
+    final response = await apiClient.postJson('/v1/videos', body: {
+      'canonicalPlaceId': placeId,
+      'title': title,
+      'caption': caption,
+      'rating': rating,
+    });
+    final video = response['video'];
+    if (video is! Map<String, dynamic>) return '';
+    return (video['id'] ?? '').toString();
+  }
+
+  Future<VideoUploadSession> requestUploadSession({
+    required String videoId,
+    required String fileName,
+    required String contentType,
+    required int sizeBytes,
+  }) async {
+    final response = await apiClient.postJson('/v1/videos/$videoId/upload-session', body: {
+      'fileName': fileName,
+      'contentType': contentType,
+      'sizeBytes': sizeBytes,
+    });
+    final payload = response['uploadSession'];
+    return VideoUploadSession.fromJson(payload is Map<String, dynamic> ? payload : const {});
+  }
+
+  Future<void> finalizeUpload({
+    required String videoId,
+    required String uploadSessionId,
+    int? durationMs,
+    int? width,
+    int? height,
+  }) async {
+    await apiClient.postJson('/v1/videos/$videoId/finalize-upload', body: {
+      'uploadSessionId': uploadSessionId,
+      'durationMs': durationMs,
+      'width': width,
+      'height': height,
+    });
+  }
+
+  Future<void> publish({required String videoId}) async {
+    await apiClient.postJson('/v1/videos/$videoId/publish', body: const {});
+  }
+
   Future<void> submitDraft({
     required String source,
     required String placeId,
@@ -37,13 +88,15 @@ class VideoRepository {
     required String caption,
     required int rating,
   }) async {
-    await apiClient.postJson('/v1/studio/videos', body: {
-      'source': source,
-      'placeId': placeId,
-      'title': title,
-      'caption': caption,
-      'rating': rating,
-      'status': 'draft',
-    });
+    final videoId = await createDraft(placeId: placeId, title: title, caption: caption, rating: rating);
+    if (videoId.isEmpty) return;
+    final upload = await requestUploadSession(
+      videoId: videoId,
+      fileName: source == 'record' ? 'recorded.mp4' : 'device-upload.mp4',
+      contentType: 'video/mp4',
+      sizeBytes: 20 * 1024 * 1024,
+    );
+    await finalizeUpload(videoId: videoId, uploadSessionId: upload.id);
+    await publish(videoId: videoId);
   }
 }
