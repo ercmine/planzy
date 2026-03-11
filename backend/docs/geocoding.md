@@ -1,63 +1,37 @@
-# Geocoding platform service (self-hosted Nominatim)
+# Geospatial platform integration (`geo.perbug.com`)
 
-Perbug now exposes a centralized geocoding service backed by a self-hosted Nominatim instance.
+Perbug geospatial responsibilities are now split across two deployable services:
 
-## Internal API
+- **Backend server**: business/product APIs, calls geo service through a typed gateway (`backend/src/geo`).
+- **Geo server (`geo.perbug.com`)**: geocode/reverse-geocode API in front of self-hosted Nominatim.
 
-- `GET|POST /v1/geocode`
-- `GET|POST /v1/reverse-geocode`
+## Backend integration path
+
+Backend routes call `GeoGateway` rather than scattered raw HTTP/Nominatim calls:
+
+- `backend/src/geo/config.ts`: env-driven runtime config
+- `backend/src/geo/client.ts`: typed client with timeout/retry/auth header
+- `backend/src/geo/gateway.ts`: switches between remote geo host and local fallback
+- `backend/src/geo/http.ts`: standardized handlers for geocoding endpoints and health/readiness/version
+
+## API surface
+
+- `POST|GET /v1/geocode`
+- `POST|GET /v1/reverse-geocode`
 - `GET /v1/geocoding/health`
+- `GET /health`
+- `GET /ready`
+- `GET /version`
 
-The handlers call `GeocodingService` (`backend/src/geocoding/service.ts`) rather than invoking Nominatim directly.
+## Security model
 
-## Normalization strategy
+Service-to-service requests may include `x-perbug-geo-service` set from `GEO_SERVICE_AUTH_SECRET`.
 
-Nominatim responses are normalized into typed internal contracts:
+## Deployment assets
 
-- Forward geocode returns display name, coordinates, city/county/state/country hierarchy, postal code, neighborhood, class/type, and optional bounding box.
-- Reverse geocode returns display name, coordinates, and area context fields.
+See top-level `geo/` for `geo.perbug.com` deployment templates:
 
-Locality fallback order is:
-
-- `city -> town -> village -> municipality -> hamlet`.
-
-Neighborhood fallback order is:
-
-- `neighbourhood -> suburb -> city_district -> quarter`.
-
-## Caching
-
-`GeocodingService` maintains dedicated cache keys and TTLs for:
-
-- Forward geocode text lookups
-- Reverse geocode coordinate lookups (rounded to 5 decimals)
-
-Default TTLs:
-
-- Forward: 1 hour
-- Reverse: 24 hours
-
-## Fallback policy
-
-Production traffic always targets self-hosted Nominatim. Optional fallback only activates when:
-
-- `NOMINATIM_ENABLE_FALLBACK=true`
-- environment is not `prod`
-- `NOMINATIM_FALLBACK_BASE_URL` is set
-
-## Observability and health
-
-- Structured logs for geocode and reverse geocode success/fallback paths
-- Metrics snapshot for requests, failures, timeouts, no-results, cache hits/misses
-- `/v1/geocoding/health` verifies Nominatim reachability via `/status`
-
-## Environment variables
-
-- `NOMINATIM_BASE_URL`
-- `NOMINATIM_TIMEOUT_MS`
-- `NOMINATIM_GEOCODE_CACHE_TTL_MS`
-- `NOMINATIM_REVERSE_CACHE_TTL_MS`
-- `NOMINATIM_DEFAULT_LIMIT`
-- `NOMINATIM_ENABLE_FALLBACK`
-- `NOMINATIM_FALLBACK_BASE_URL`
-- `NOMINATIM_USER_AGENT`
+- Nginx TLS reverse proxy config
+- systemd unit template
+- deployment sequence script
+- env examples and runbooks

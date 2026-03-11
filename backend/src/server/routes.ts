@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import { createAccountsHttpHandlers } from "../accounts/http.js";
 import { createDiscoveryHttpHandlers } from "../discovery/http.js";
-import { createGeocodingHttpHandlers } from "../geocoding/http.js";
+import { createGeoHttpHandlers } from "../geo/http.js";
 import { createRankingTuningHandlers } from "../discovery/tuningHttp.js";
 import type { RankingConfigResolver, RankingConfigService } from "../discovery/tuning.js";
 import type { PlaceDiscoveryRepository } from "../discovery/types.js";
@@ -23,7 +23,7 @@ import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
 import type { CollaborationService } from "../collaboration/service.js";
 import type { BusinessPremiumService } from "../businessPremium/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
-import type { GeocodingService } from "../geocoding/service.js";
+import type { GeoGateway } from "../geo/gateway.js";
 import { PermissionAction, ProfileType } from "../accounts/types.js";
 import type { ActorContextResolved } from "../accounts/types.js";
 import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
@@ -141,7 +141,7 @@ export function createRoutes(
     analyticsService?: AnalyticsService;
     analyticsQueryService?: AnalyticsQueryService;
     rolloutService?: RolloutService;
-    geocodingService?: GeocodingService;
+    geoGateway?: GeoGateway;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -152,7 +152,7 @@ export function createRoutes(
     : null;
   const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
-  const geocodingHandlers = deps?.geocodingService ? createGeocodingHttpHandlers(deps.geocodingService) : null;
+  const geoHandlers = deps?.geoGateway ? createGeoHttpHandlers(deps.geoGateway) : null;
   const rankingTuningHandlers = deps?.rankingTuning ? createRankingTuningHandlers(deps.rankingTuning.service, deps.rankingTuning.resolver, deps.rankingTuning.repo) : null;
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
   const creatorVerificationHandlers = deps?.creatorVerificationService ? createCreatorVerificationHttpHandlers(deps.creatorVerificationService) : null;
@@ -204,6 +204,21 @@ export function createRoutes(
         return;
       }
 
+
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/health") {
+        await geoHandlers.health(req, res);
+        return;
+      }
+
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/ready") {
+        await geoHandlers.ready(req, res);
+        return;
+      }
+
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/version") {
+        await geoHandlers.version(req, res);
+        return;
+      }
       if (req.method === "GET" && normalizedPath === "/v1/admin/overview" && adminHandlers) {
         await adminHandlers.overview(req, res);
         return;
@@ -473,28 +488,28 @@ export function createRoutes(
         return;
       }
 
-      if (geocodingHandlers && req.method === "GET" && normalizedPath === "/v1/geocode") {
-        await geocodingHandlers.geocode(req, res);
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/v1/geocode") {
+        await geoHandlers.geocode(req, res);
         return;
       }
 
-      if (geocodingHandlers && req.method === "POST" && normalizedPath === "/v1/geocode") {
-        await geocodingHandlers.geocode(req, res);
+      if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/geocode") {
+        await geoHandlers.geocode(req, res);
         return;
       }
 
-      if (geocodingHandlers && req.method === "GET" && normalizedPath === "/v1/reverse-geocode") {
-        await geocodingHandlers.reverseGeocode(req, res);
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/v1/reverse-geocode") {
+        await geoHandlers.reverseGeocode(req, res);
         return;
       }
 
-      if (geocodingHandlers && req.method === "POST" && normalizedPath === "/v1/reverse-geocode") {
-        await geocodingHandlers.reverseGeocode(req, res);
+      if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/reverse-geocode") {
+        await geoHandlers.reverseGeocode(req, res);
         return;
       }
 
-      if (geocodingHandlers && req.method === "GET" && normalizedPath === "/v1/geocoding/health") {
-        await geocodingHandlers.health(req, res);
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/v1/geocoding/health") {
+        await geoHandlers.health(req, res);
         return;
       }
 

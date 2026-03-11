@@ -46,7 +46,7 @@ import { SubscriptionService } from "../subscriptions/service.js";
 import { MemoryUsageStore } from "../subscriptions/usage.js";
 import { TelemetryService } from "../telemetry/telemetryService.js";
 import { createSavedHttpHandlers } from "../saved/http.js";
-import { createGeocodingServiceFromEnv } from "../geocoding/index.js";
+import { createBackendGeoGatewayFromEnv } from "../geo/gateway.js";
 import { SavedService } from "../saved/service.js";
 import { MemorySavedStore } from "../saved/store.js";
 import { createPlaceContentHttpHandlers, MemoryPlaceContentStore, PlaceContentService } from "../placeContent/index.js";
@@ -180,7 +180,7 @@ export function createServer(options?: CreateServerOptions) {
     logger: options?.logger
   });
   const rolloutService = new RolloutService(new MemoryRolloutStore(rolloutSeedForLocalDev()), accountsService, subscriptionService);
-  const geocodingService = createGeocodingServiceFromEnv();
+  const geoGateway = createBackendGeoGatewayFromEnv();
 
   return createHttpServer(service, merchantService, {
     deckHandler,
@@ -220,7 +220,7 @@ export function createServer(options?: CreateServerOptions) {
     analyticsService,
     analyticsQueryService,
     rolloutService,
-    geocodingService: geocodingService ?? undefined
+    geoGateway: geoGateway ?? undefined
   });
 }
 
