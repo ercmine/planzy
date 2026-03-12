@@ -132,8 +132,12 @@ void main() {
     final fakeApi = _FakeApiClient(
       details: {
         'description': 'Loaded description',
-        'photos': [
-          {'name': 'places/a/photos/1'},
+        'notable': {
+          'landmarkType': 'museum',
+          'aliases': ['Arc Museum']
+        },
+        'images': [
+          {'url': 'https://example.test/wikidata.jpg', 'source': 'wikidata', 'attributionText': 'Image from Wikidata'},
           {'name': 'places/a/photos/2'},
         ]
       },
@@ -157,6 +161,9 @@ void main() {
 
     expect(find.text('Loaded description'), findsOneWidget);
     expect(find.byType(GestureDetector), findsAtLeastNWidgets(2));
+    expect(find.textContaining('Landmark type: museum'), findsOneWidget);
+    expect(find.textContaining('Also known as: Arc Museum'), findsOneWidget);
+    expect(find.textContaining('Photo: Image from Wikidata'), findsOneWidget);
     expect(fakeApi.fetchPlaceDetailCalls, 1);
   });
 

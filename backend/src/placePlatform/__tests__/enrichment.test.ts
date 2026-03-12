@@ -36,6 +36,11 @@ function setup() {
       aliases: ["Chateau Ancien"],
       landmarkType: "castle",
       externalIds: { viaf: "765" },
+      wikipediaUrl: "https://en.wikipedia.org/wiki/Old_Castle",
+      imageUrl: "https://upload.wikimedia.org/old-castle.jpg",
+      imageSourceUrl: "https://commons.wikimedia.org/wiki/File:Old_Castle.jpg",
+      imageAttributionText: "Image from Wikidata",
+      imageAllowed: true,
       lat: 48.8601,
       lng: 2.3401
     })),
@@ -68,10 +73,12 @@ function setup() {
 
 describe("place enrichment", () => {
   it("normalizes Wikidata payload", () => {
-    const normalized = normalizeWikidataResponse({ id: "Q1", url: "u", aliases: ["a"], externalIds: { gnd: "x" } });
+    const normalized = normalizeWikidataResponse({ id: "Q1", url: "u", aliases: ["a"], externalIds: { gnd: "x" }, imageUrl: "https://img/test.jpg", imageAllowed: true });
     expect(normalized.sourceId).toBe("Q1");
     expect(normalized.aliases).toEqual(["a"]);
     expect(normalized.externalIds.gnd).toBe("x");
+
+    expect(normalized.image?.url).toBeDefined();
   });
 
   it("normalizes GeoNames payload", () => {
@@ -105,6 +112,7 @@ describe("place enrichment", () => {
     expect(record.status).toBe("succeeded");
     expect(placeRepo.getById(canonicalPlaceId)?.description).toContain("Historic hilltop");
     expect(enrichmentRepo.listFieldAttributions(canonicalPlaceId).some((a) => a.field === "description" && a.sourceName === "wikidata")).toBe(true);
+    expect((placeRepo.getById(canonicalPlaceId)?.metadata.wikidata as { image?: { url?: string } }).image?.url).toContain('wikimedia');
   });
 
   it("applies GeoNames admin context safely", async () => {

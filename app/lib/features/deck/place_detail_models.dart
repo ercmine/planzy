@@ -16,6 +16,18 @@ class PlaceSourceAttribution {
   final bool isPrimary;
 }
 
+class PlaceNotableContext {
+  const PlaceNotableContext({
+    this.landmarkType,
+    this.aliases = const <String>[],
+    this.wikipediaUrl,
+  });
+
+  final String? landmarkType;
+  final List<String> aliases;
+  final String? wikipediaUrl;
+}
+
 class PlaceDetailPhoto {
   const PlaceDetailPhoto({
     required this.url,
@@ -118,6 +130,7 @@ class PlaceDetailViewData {
     this.lng,
     this.serviceOptions = const <String>[],
     this.amenities = const <String>[],
+    this.notableContext,
   });
 
   final String id;
@@ -144,6 +157,7 @@ class PlaceDetailViewData {
   final double? lng;
   final List<String> serviceOptions;
   final List<String> amenities;
+  final PlaceNotableContext? notableContext;
 
   String? get effectiveDescription {
     final long = longDescription?.trim();
@@ -162,6 +176,7 @@ PlaceDetailViewData normalizePlaceDetail({
 }) {
   final raw = details ?? const <String, dynamic>{};
   final photos = normalizeDetailPhotos(basePlan: basePlan, details: raw, buildPhotoUrl: buildPhotoUrl);
+  final notable = _parseNotableContext(raw);
   final description = _pickDetailDescription(raw) ?? basePlan.description;
   final shortDescription = _pickString(raw, const ['summary', 'editorialSummary.text']);
 
@@ -202,6 +217,7 @@ PlaceDetailViewData normalizePlaceDetail({
     lng: lng,
     serviceOptions: _parseStringList(raw['serviceOptions']),
     amenities: _parseStringList(raw['amenities']),
+    notableContext: notable,
   );
 }
 
@@ -267,7 +283,7 @@ List<PlaceDetailPhoto> normalizeDetailPhotos({
     );
   }
 
-  final photos = details['photos'];
+  final photos = details['images'] ?? details['photos'];
   if (photos is List) {
     for (final item in photos) {
       if (item is Map<String, dynamic>) {
@@ -285,7 +301,7 @@ List<PlaceDetailPhoto> normalizeDetailPhotos({
           attributionText: item['attributionText']?.toString(),
           sortOrder: parseInt(item['sortOrder']),
           rankScore: parseDouble(item['rankScore']),
-          isPrimary: item['isPrimary'] == true,
+          isPrimary: item['isPrimary'] == true || (item['source']?.toString().toLowerCase() == 'wikidata' && parseInt(item['sortOrder']) == null),
           status: item['status']?.toString() ?? 'active',
         );
       } else {
@@ -480,6 +496,24 @@ Object? _resolveKeyPath(Map<String, dynamic> map, String path) {
     }
   }
   return current;
+}
+
+PlaceNotableContext? _parseNotableContext(Map<String, dynamic> details) {
+  final notable = details['notable'];
+  if (notable is! Map<String, dynamic>) {
+    return null;
+  }
+  final aliases = parseStringList(notable['aliases']) ?? const <String>[];
+  final landmarkType = notable['landmarkType']?.toString().trim();
+  final wikipediaUrl = notable['wikipediaUrl']?.toString().trim();
+  if ((landmarkType == null || landmarkType.isEmpty) && aliases.isEmpty && (wikipediaUrl == null || wikipediaUrl.isEmpty)) {
+    return null;
+  }
+  return PlaceNotableContext(
+    landmarkType: landmarkType?.isEmpty == true ? null : landmarkType,
+    aliases: aliases,
+    wikipediaUrl: isHttpUrl(wikipediaUrl ?? '') ? wikipediaUrl : null,
+  );
 }
 
 List<String> _parseStringList(Object? value) {
