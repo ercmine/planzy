@@ -6,6 +6,7 @@ import type { CreatorVerificationService } from "../creatorVerification/service.
 import type { ModerationService } from "../moderation/service.js";
 import type { ModerationDecisionType, ModerationTargetRef } from "../moderation/types.js";
 import { PlaceDataQualityService, createPlaceDataQualityConfigFromEnv, type PlaceDataQualityIssueStatus } from "../places/dataQuality.js";
+import { PlaceMaintenanceService } from "../places/maintenance.js";
 import type { PlaceNormalizationService } from "../places/service.js";
 import type { PlaceStatus } from "../places/types.js";
 import type { ReviewsStore } from "../reviews/store.js";
@@ -27,7 +28,13 @@ export interface AdminServiceDeps {
 export class AdminService {
   private readonly audit: AdminActionAudit[] = [];
   private readonly qualityService = new PlaceDataQualityService(createPlaceDataQualityConfigFromEnv());
-  constructor(private readonly deps: AdminServiceDeps) {}
+  private readonly maintenanceService: PlaceMaintenanceService | undefined;
+
+  constructor(private readonly deps: AdminServiceDeps) {
+    this.maintenanceService = this.deps.placeService
+      ? new PlaceMaintenanceService(this.deps.placeService.store)
+      : undefined;
+  }
 
   getRolesForUser(userId: string) {
     return this.deps.accountsService.getIdentitySummary(userId).roles;
@@ -233,6 +240,52 @@ export class AdminService {
     const offset = Math.max(0, filter.offset ?? 0);
     const limit = Math.max(1, Math.min(filter.limit ?? 50, 200));
     return { total: rows.length, items: rows.slice(offset, offset + limit) };
+  }
+
+
+  detectPlaceDuplicateCandidates() {
+    if (!this.maintenanceService) return [];
+    return this.maintenanceService.detectDuplicateCandidates();
+  }
+
+  listPlaceDuplicateCandidates(status?: string) {
+    return this.deps.placeService?.store.listDuplicateCandidates(status as never) ?? [];
+  }
+
+  reviewPlaceDuplicateCandidate(input: { actorUserId: string; candidateId: string; status: "approved" | "rejected"; note?: string }) {
+    if (!this.maintenanceService) return undefined;
+    return this.maintenanceService.reviewDuplicateCandidate(input);
+  }
+
+  mergeCanonicalPlaces(input: { actorUserId: string; targetPlaceId: string; sourcePlaceIds: string[]; reason?: string; allowFarDistance?: boolean }) {
+    if (!this.maintenanceService) return undefined;
+    return this.maintenanceService.mergePlaces(input);
+  }
+
+  correctCanonicalPlace(input: {
+    actorUserId: string;
+    placeId: string;
+    reason: string;
+    note?: string;
+    updates: Record<string, unknown>;
+  }) {
+    if (!this.maintenanceService) return undefined;
+    return this.maintenanceService.correctPlace({
+      placeId: input.placeId,
+      actorUserId: input.actorUserId,
+      reason: input.reason,
+      note: input.note,
+      updates: input.updates as never
+    });
+  }
+
+  reassignPlaceAttachment(input: { actorUserId: string; linkId: string; toPlaceId: string; reason: string }) {
+    if (!this.maintenanceService) return undefined;
+    return this.maintenanceService.reassignAttachment(input);
+  }
+
+  listPlaceMaintenanceAudits(placeId?: string) {
+    return this.deps.placeService?.store.listMaintenanceAudits(placeId) ?? [];
   }
 
   getModerationQueue(filter: { targetType?: ModerationTargetRef["targetType"]; state?: string; severity?: string; limit?: number }) {

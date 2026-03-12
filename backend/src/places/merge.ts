@@ -99,7 +99,7 @@ export function mergeIntoCanonicalPlace(params: {
       canonicalPlaceId,
       slug: buildSlug(normalized.name, canonicalPlaceId),
       status: "active",
-      primaryDisplayName: normalized.name,
+      primaryDisplayName: existingPlace?.manualOverrides.primaryDisplayName ?? normalized.name,
       alternateNames: normalized.aliases,
       latitude: normalized.latitude,
       longitude: normalized.longitude,
@@ -112,8 +112,8 @@ export function mergeIntoCanonicalPlace(params: {
       postalCode: normalized.postalCode,
       countryCode: normalized.countryCode,
       neighborhood: normalized.neighborhood,
-      canonicalCategory: category.canonicalCategory,
-      canonicalSubcategory: category.canonicalSubcategory,
+      canonicalCategory: existingPlace?.manualOverrides.canonicalCategory ?? category.canonicalCategory,
+      canonicalSubcategory: existingPlace?.manualOverrides.canonicalSubcategory ?? category.canonicalSubcategory,
       providerCategories: [...new Set(normalized.providerCategories)],
       tags: [...new Set([...normalized.tags, ...category.tags])],
       cuisineTags: [],
@@ -196,6 +196,8 @@ export function mergeIntoCanonicalPlace(params: {
     place.providerCategories = [...new Set([...place.providerCategories, ...normalized.providerCategories])];
     if (!place.manualOverrides.canonicalCategory) {
       place.canonicalCategory = category.canonicalCategory;
+    }
+    if (!place.manualOverrides.canonicalSubcategory) {
       place.canonicalSubcategory = category.canonicalSubcategory;
     }
     place.tags = [...new Set([...place.tags, ...normalized.tags, ...category.tags])];

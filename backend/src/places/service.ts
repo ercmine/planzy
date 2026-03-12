@@ -16,7 +16,7 @@ function nowIso(): string {
 }
 
 export class PlaceNormalizationService {
-  constructor(private readonly store: PlaceStore) {}
+  constructor(public readonly store: PlaceStore) {}
 
   normalizeProviderPlace(provider: string, rawPayload: unknown, sourceUrl?: string): NormalizedProviderPlace {
     return getProviderAdapter(provider).normalizeProviderPlace(rawPayload, { sourceUrl });

@@ -271,6 +271,36 @@ export function createRoutes(
         await adminHandlers.listPlaces(req, res);
         return;
       }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/places/duplicates:detect" && adminHandlers) {
+        await adminHandlers.detectPlaceDuplicates(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/places/duplicates" && adminHandlers) {
+        await adminHandlers.listPlaceDuplicateCandidates(req, res);
+        return;
+      }
+      const duplicateCandidateMatch = /^\/v1\/admin\/places\/duplicates\/([^/]+)$/.exec(normalizedPath);
+      if (duplicateCandidateMatch && req.method === "PATCH" && adminHandlers) {
+        await adminHandlers.reviewPlaceDuplicateCandidate(req, res, duplicateCandidateMatch[1] ?? "");
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/places:merge" && adminHandlers) {
+        await adminHandlers.mergeCanonicalPlaces(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/places/attachments:reassign" && adminHandlers) {
+        await adminHandlers.reassignPlaceAttachment(req, res);
+        return;
+      }
+      const placeCorrectionMatch = /^\/v1\/admin\/places\/([^/]+)\/corrections$/.exec(normalizedPath);
+      if (placeCorrectionMatch && req.method === "PATCH" && adminHandlers) {
+        await adminHandlers.correctCanonicalPlace(req, res, placeCorrectionMatch[1] ?? "");
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/places/maintenance/audit" && adminHandlers) {
+        await adminHandlers.listPlaceMaintenanceAudits(req, res);
+        return;
+      }
 
       if (req.method === "POST" && normalizedPath === "/v1/admin/places/import-source" && adminHandlers) {
         await adminHandlers.importPlaceSource(req, res);

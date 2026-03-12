@@ -114,6 +114,99 @@ describe("admin operations routes", () => {
     expect(auditJson.items.some((item: { actionType: string }) => item.actionType === "place_quality.resolved")).toBe(true);
   });
 
+
+  it("supports duplicate review, merge, correction, and maintenance audit endpoints", async () => {
+    const payloadA = {
+      provider: "foursquare",
+      rawPayload: {
+        fsq_id: "dup-a",
+        name: "Union Cafe",
+        geocodes: { main: { latitude: 37.775, longitude: -122.414 } },
+        categories: [{ name: "Coffee Shop" }],
+        location: { formatted_address: "100 Market St, San Francisco" },
+        tel: "+14155550111"
+      }
+    };
+    const payloadB = {
+      provider: "google",
+      rawPayload: {
+        id: "dup-b",
+        displayName: { text: "Pier Gift Shop" },
+        location: { latitude: 37.80, longitude: -122.40 },
+        formattedAddress: "20 Pier Ave, San Francisco, CA",
+        types: ["store"]
+      }
+    };
+
+    const ingestA = await fetch(`${baseUrl}/v1/admin/places/import-source`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret" },
+      body: JSON.stringify(payloadA)
+    });
+    const ingestB = await fetch(`${baseUrl}/v1/admin/places/import-source`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret" },
+      body: JSON.stringify(payloadB)
+    });
+    expect(ingestA.status).toBe(201);
+    expect(ingestB.status).toBe(201);
+    const ingestAJson = await ingestA.json();
+    const ingestBJson = await ingestB.json();
+
+    const alignSecond = await fetch(`${baseUrl}/v1/admin/places/${encodeURIComponent(ingestBJson.canonicalPlaceId)}/corrections`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-merge" },
+      body: JSON.stringify({
+        reason: "prep_duplicate_review",
+        updates: {
+          primaryDisplayName: "Union Cafe SF",
+          canonicalCategory: "coffee_shop",
+          latitude: 37.77501,
+          longitude: -122.41401
+        }
+      })
+    });
+    expect(alignSecond.status).toBe(200);
+
+    const detect = await fetch(`${baseUrl}/v1/admin/places/duplicates:detect`, {
+      method: "POST",
+      headers: { "x-admin-key": "admin-secret" }
+    });
+    expect(detect.status).toBe(200);
+
+    const candidates = await fetch(`${baseUrl}/v1/admin/places/duplicates`, { headers: { "x-admin-key": "admin-secret" } });
+    const candidatesJson = await candidates.json();
+    expect(candidatesJson.items.length).toBeGreaterThan(0);
+    const candidateId = candidatesJson.items[0].id as string;
+
+    const approve = await fetch(`${baseUrl}/v1/admin/places/duplicates/${encodeURIComponent(candidateId)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-merge" },
+      body: JSON.stringify({ status: "approved", note: "same storefront" })
+    });
+    expect(approve.status).toBe(200);
+
+    const placeIds = [ingestAJson.canonicalPlaceId as string, ingestBJson.canonicalPlaceId as string];
+    const merge = await fetch(`${baseUrl}/v1/admin/places:merge`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-merge" },
+      body: JSON.stringify({ targetPlaceId: placeIds[0], sourcePlaceIds: [placeIds[1]], reason: "duplicate" })
+    });
+    expect(merge.status).toBe(200);
+
+    const correction = await fetch(`${baseUrl}/v1/admin/places/${encodeURIComponent(placeIds[0])}/corrections`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-merge" },
+      body: JSON.stringify({ reason: "taxonomy_fix", updates: { canonicalCategory: "coffee_shop", primaryDisplayName: "Union Coffee" } })
+    });
+    expect(correction.status).toBe(200);
+
+    const audits = await fetch(`${baseUrl}/v1/admin/places/maintenance/audit?placeId=${encodeURIComponent(placeIds[0])}`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(audits.status).toBe(200);
+    const auditsJson = await audits.json();
+    expect(auditsJson.items.some((item: { actionType: string }) => item.actionType === "merge")).toBe(true);
+    expect(auditsJson.items.some((item: { actionType: string }) => item.actionType === "correction")).toBe(true);
+  });
   it("supports user suspension workflow", async () => {
     const suspend = await fetch(`${baseUrl}/v1/admin/users/user-to-suspend/suspend`, {
       method: "POST",
