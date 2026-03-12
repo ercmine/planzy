@@ -74,7 +74,23 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
     async listFeed(_req, res, query) {
       const limit = Number.parseInt(query.get("limit") ?? "10", 10);
       const cursor = query.get("cursor") ?? undefined;
-      sendJson(res, 200, await service.listFeed({ limit, cursor }));
+      const rawScope = String(query.get("scope") ?? "local");
+      const scope = rawScope === "regional" || rawScope === "global" ? rawScope : "local";
+      const lat = query.get("lat");
+      const lng = query.get("lng");
+      const city = query.get("city") ?? undefined;
+      const region = query.get("region") ?? undefined;
+      sendJson(res, 200, await service.listFeed({
+        scope,
+        limit,
+        cursor,
+        context: {
+          lat: lat ? Number(lat) : undefined,
+          lng: lng ? Number(lng) : undefined,
+          city,
+          region
+        }
+      }));
     },
     async listPlaceVideos(_req, res, placeId) {
       sendJson(res, 200, { items: await service.listPlaceVideos(placeId) });

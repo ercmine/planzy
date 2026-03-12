@@ -44,7 +44,7 @@ describe("VideoPlatformService lifecycle", () => {
 
     expect(published.status).toBe("published");
 
-    const feed = await service.listFeed({ limit: 10 });
+    const feed = await service.listFeed({ scope: "local", limit: 10 });
     expect(feed.items).toHaveLength(1);
     expect(feed.items[0]?.playbackUrl).toBe(`https://cdn.perbug.com/processed/place-review-videos/${draft.id}/playback.mp4`);
   });
@@ -108,7 +108,7 @@ describe("VideoPlatformService lifecycle", () => {
     await service.finalizeUpload({ userId: "u", videoId: draft.id, uploadSessionId: upload.id });
     await service.processNextQueuedJob();
 
-    expect((await service.listFeed({ limit: 10 })).items).toHaveLength(0);
+    expect((await service.listFeed({ scope: "local", limit: 10 })).items).toHaveLength(0);
     expect((await service.listPlaceVideos("place_1")).length).toBe(0);
     expect((await service.listCreatorVideos("u")).length).toBe(0);
   });
