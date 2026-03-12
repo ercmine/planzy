@@ -2099,6 +2099,8 @@ export function createRoutes(
       const videoUploadMatch = /^\/v1\/videos\/([^/]+)\/upload-session$/.exec(normalizedPath);
       const videoFinalizeMatch = /^\/v1\/videos\/([^/]+)\/finalize-upload$/.exec(normalizedPath);
       const videoPublishMatch = /^\/v1\/videos\/([^/]+)\/publish$/.exec(normalizedPath);
+      const videoRetryUploadMatch = /^\/v1\/videos\/([^/]+)\/retry-upload$/.exec(normalizedPath);
+      const videoRetryProcessingMatch = /^\/v1\/videos\/([^/]+)\/retry-processing$/.exec(normalizedPath);
       const videoPatchMatch = /^\/v1\/videos\/([^/]+)$/.exec(normalizedPath);
       const placeVideosMatch = /^\/v1\/places\/([^/]+)\/videos$/.exec(normalizedPath);
       const creatorVideosMatch = /^\/v1\/creators\/([^/]+)\/videos$/.exec(normalizedPath);
@@ -2125,6 +2127,19 @@ export function createRoutes(
       }
       if (videoPlatformHandlers && req.method === "POST" && videoPublishMatch) {
         await videoPlatformHandlers.publish(req, res, decodeURIComponent(videoPublishMatch[1] ?? ""));
+        return;
+      }
+
+      if (videoPlatformHandlers && req.method === "POST" && videoRetryUploadMatch) {
+        await videoPlatformHandlers.retryUpload(req, res, decodeURIComponent(videoRetryUploadMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "POST" && videoRetryProcessingMatch) {
+        await videoPlatformHandlers.retryProcessing(req, res, decodeURIComponent(videoRetryProcessingMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "POST" && normalizedPath === "/v1/videos/jobs/process-next") {
+        await videoPlatformHandlers.processNextJob(req, res);
         return;
       }
       if (videoPlatformHandlers && req.method === "PATCH" && videoPatchMatch) {
