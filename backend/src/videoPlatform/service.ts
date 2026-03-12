@@ -1,7 +1,33 @@
 import { randomUUID } from "node:crypto";
 
-import type { VideoStatus, UploadSession, VideoAsset, VideoFeedItem } from "./types.js";
+import type {
+  VideoLifecycleStatus,
+  UploadSession,
+  VideoAsset,
+  VideoFeedItem,
+  VideoOperationalDiagnostics,
+  VideoProcessingJob,
+  VideoStudioItem
+} from "./types.js";
 import type { VideoPlatformStore } from "./store.js";
+
+const VALID_TRANSITIONS: Record<VideoLifecycleStatus, readonly VideoLifecycleStatus[]> = {
+  draft: ["awaiting_upload", "archived"],
+  awaiting_upload: ["uploading", "failed_upload", "archived"],
+  uploading: ["upload_received", "failed_upload", "archived"],
+  upload_received: ["processing_queued", "failed_upload", "archived"],
+  processing_queued: ["processing", "failed_processing", "archived"],
+  processing: ["processed", "failed_processing", "archived"],
+  processed: ["publish_pending", "moderation_pending", "published", "archived"],
+  publish_pending: ["published", "moderation_pending", "rejected", "hidden", "archived"],
+  published: ["hidden", "rejected", "archived"],
+  failed_upload: ["awaiting_upload", "archived"],
+  failed_processing: ["processing_queued", "archived"],
+  moderation_pending: ["publish_pending", "published", "hidden", "rejected", "archived"],
+  hidden: ["published", "archived"],
+  rejected: ["archived"],
+  archived: []
+};
 
 export interface VideoStorageConfig {
   awsRegion: string;
@@ -11,23 +37,52 @@ export interface VideoStorageConfig {
   uploadTtlSeconds: number;
   maxUploadBytes: number;
   multipartThresholdBytes: number;
+  autoPublishAfterProcessing?: boolean;
+  maxProcessingAttempts?: number;
 }
 
 export interface PlaceLookup {
   exists(placeId: string): boolean;
 }
 
+export interface UploadObjectVerifier {
+  verifyObjectExists(input: { bucket: string; key: string; minBytes?: number; contentType?: string }): Promise<boolean>;
+}
+
+export interface VideoProcessingExecutor {
+  process(input: { video: VideoAsset; rawAssetKey: string }): Promise<{ durationMs?: number; width?: number; height?: number; processedAssetKey: string; thumbnailAssetKey?: string; coverAssetKey?: string }>;
+}
+
+const permissiveObjectVerifier: UploadObjectVerifier = {
+  async verifyObjectExists() {
+    return true;
+  }
+};
+
+const defaultProcessingExecutor: VideoProcessingExecutor = {
+  async process(input) {
+    return {
+      durationMs: input.video.durationMs,
+      width: input.video.width,
+      height: input.video.height,
+      processedAssetKey: `processed/place-review-videos/${input.video.id}/playback.mp4`,
+      thumbnailAssetKey: `processed/place-review-videos/${input.video.id}/thumb.jpg`,
+      coverAssetKey: `processed/place-review-videos/${input.video.id}/cover.jpg`
+    };
+  }
+};
+
 export class VideoPlatformService {
   constructor(
     private readonly store: VideoPlatformStore,
     private readonly placeLookup: PlaceLookup,
-    private readonly cfg: VideoStorageConfig
+    private readonly cfg: VideoStorageConfig,
+    private readonly uploadVerifier: UploadObjectVerifier = permissiveObjectVerifier,
+    private readonly processingExecutor: VideoProcessingExecutor = defaultProcessingExecutor
   ) {}
 
   async createDraft(input: { userId: string; canonicalPlaceId: string; title?: string; caption?: string; rating?: number }): Promise<VideoAsset> {
-    if (!this.placeLookup.exists(input.canonicalPlaceId)) {
-      throw new Error("canonical_place_not_found");
-    }
+    if (!this.placeLookup.exists(input.canonicalPlaceId)) throw new Error("canonical_place_not_found");
     const now = new Date().toISOString();
     const id = `vid_${randomUUID()}`;
     return this.store.createVideo({
@@ -36,20 +91,21 @@ export class VideoPlatformService {
       authorUserId: input.userId,
       status: "draft",
       moderationStatus: "pending",
-      visibility: "public",
+      visibility: "private",
       title: input.title,
       caption: input.caption,
       rating: input.rating,
-      createdAt: now,
-      updatedAt: now
+      lifecycle: { createdAt: now, updatedAt: now },
+      retryCount: 0
     });
   }
 
   async requestUploadSession(input: { userId: string; videoId: string; fileName: string; contentType: string; sizeBytes: number }): Promise<UploadSession> {
     const video = await this.requireOwnerVideo(input.userId, input.videoId);
-    if (input.sizeBytes > this.cfg.maxUploadBytes) {
-      throw new Error("file_too_large");
-    }
+    if (input.sizeBytes > this.cfg.maxUploadBytes) throw new Error("file_too_large");
+    if (!["draft", "awaiting_upload", "failed_upload"].includes(video.status)) throw new Error("video_not_ready_for_upload");
+
+    await this.transition(video, "awaiting_upload");
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.cfg.uploadTtlSeconds * 1000).toISOString();
     const uploadMode = input.sizeBytes >= this.cfg.multipartThresholdBytes ? "multipart" : "single";
@@ -59,93 +115,205 @@ export class VideoPlatformService {
       userId: input.userId,
       videoId: video.id,
       purpose: "place_review_video",
-      status: "pending",
+      status: "uploading",
       bucket: this.cfg.rawBucket,
       key,
       uploadMode,
       uploadId: uploadMode === "multipart" ? `mpu_${randomUUID()}` : undefined,
-      parts: uploadMode === "multipart"
-        ? [1, 2, 3, 4, 5].map((partNumber) => ({ partNumber, signedUrl: this.signedUploadUrl(this.cfg.rawBucket, key, partNumber) }))
-        : undefined,
+      parts: uploadMode === "multipart" ? [1, 2, 3, 4, 5].map((partNumber) => ({ partNumber, signedUrl: this.signedUploadUrl(this.cfg.rawBucket, key, partNumber) })) : undefined,
       expiresAt,
       contentType: input.contentType,
       maxBytes: this.cfg.maxUploadBytes,
       createdAt: now.toISOString()
     };
     await this.store.createUploadSession(session);
-    video.status = "awaiting_upload";
     video.sourceFileName = input.fileName;
     video.sourceContentType = input.contentType;
-    video.updatedAt = new Date().toISOString();
-    await this.store.updateVideo(video);
+    video.sizeBytes = input.sizeBytes;
+    video.lifecycle.uploadStartedAt = now.toISOString();
+    await this.transition(video, "uploading");
     return session;
   }
 
   async finalizeUpload(input: { userId: string; videoId: string; uploadSessionId: string; durationMs?: number; width?: number; height?: number }): Promise<VideoAsset> {
     const video = await this.requireOwnerVideo(input.userId, input.videoId);
     const session = await this.store.getUploadSession(input.uploadSessionId);
-    if (!session || session.videoId !== input.videoId || session.userId !== input.userId) {
-      throw new Error("upload_session_not_found");
-    }
+    if (!session || session.videoId !== input.videoId || session.userId !== input.userId) throw new Error("upload_session_not_found");
     if (new Date(session.expiresAt).getTime() < Date.now()) {
       session.status = "expired";
       await this.store.updateUploadSession(session);
+      await this.failUpload(video, "upload_session_expired");
       throw new Error("upload_session_expired");
     }
-    session.status = "uploaded";
+
+    const objectExists = await this.uploadVerifier.verifyObjectExists({
+      bucket: session.bucket,
+      key: session.key,
+      minBytes: video.sizeBytes,
+      contentType: session.contentType
+    });
+    if (!objectExists) {
+      session.status = "failed";
+      session.failureReason = "upload_object_missing";
+      await this.store.updateUploadSession(session);
+      await this.failUpload(video, "upload_object_missing");
+      throw new Error("upload_object_missing");
+    }
+
+    session.status = "completed";
+    session.finalizedAt = new Date().toISOString();
     await this.store.updateUploadSession(session);
-    video.originalAssetKey = session.key;
+
+    video.rawAssetKey = session.key;
     video.durationMs = input.durationMs;
     video.width = input.width;
     video.height = input.height;
-    if (input.width && input.height) {
-      video.aspectRatio = input.width / input.height;
-    }
-    video.status = "uploaded";
-    video.updatedAt = new Date().toISOString();
-    await this.store.updateVideo(video);
+    if (input.width && input.height) video.aspectRatio = input.width / input.height;
+    video.lifecycle.uploadCompletedAt = new Date().toISOString();
+    video.failureReason = undefined;
+    await this.transition(video, "upload_received");
+    await this.enqueueProcessing(video);
     return video;
   }
 
   async publish(input: { userId: string; videoId: string }): Promise<VideoAsset> {
     const video = await this.requireOwnerVideo(input.userId, input.videoId);
-    if (!video.originalAssetKey) {
-      throw new Error("video_upload_required");
-    }
-    const updated = new Date().toISOString();
-    video.playbackAssetKey = `processed/place-review-videos/${video.id}/playback.mp4`;
-    video.thumbnailAssetKey = `processed/place-review-videos/${video.id}/thumb.jpg`;
-    video.coverAssetKey = `processed/place-review-videos/${video.id}/cover.jpg`;
-    video.status = "processing";
-    video.updatedAt = updated;
-    await this.store.updateVideo(video);
+    const readiness = this.computePublishReadiness(video);
+    if (!readiness.ready) throw new Error(`video_not_publish_ready:${readiness.missing.join(",")}`);
+    return this.completePublish(video);
+  }
 
-    video.status = "published";
-    video.moderationStatus = "approved";
-    video.publishedAt = new Date().toISOString();
-    video.updatedAt = video.publishedAt;
-    await this.store.updateVideo(video);
+  async retryProcessing(input: { userId: string; videoId: string }): Promise<VideoAsset> {
+    const video = await this.requireOwnerVideo(input.userId, input.videoId);
+    if (video.status !== "failed_processing") throw new Error("video_not_failed_processing");
+    return this.enqueueProcessing(video);
+  }
+
+  async retryUpload(input: { userId: string; videoId: string }): Promise<VideoAsset> {
+    const video = await this.requireOwnerVideo(input.userId, input.videoId);
+    if (video.status !== "failed_upload") throw new Error("video_not_failed_upload");
+    await this.transition(video, "awaiting_upload");
     return video;
   }
 
-  async updateDraft(input: { userId: string; videoId: string; title?: string; caption?: string; rating?: number; canonicalPlaceId?: string; status?: VideoStatus }): Promise<VideoAsset> {
-    const video = await this.requireOwnerVideo(input.userId, input.videoId);
-    if (input.canonicalPlaceId && !this.placeLookup.exists(input.canonicalPlaceId)) {
-      throw new Error("canonical_place_not_found");
+  async processNextQueuedJob(): Promise<VideoProcessingJob | undefined> {
+    const job = await this.store.claimNextQueuedProcessingJob();
+    if (!job) return undefined;
+    const video = await this.store.getVideo(job.videoId);
+    if (!video) {
+      job.status = "failed";
+      job.lastError = "video_not_found";
+      job.completedAt = new Date().toISOString();
+      await this.store.updateProcessingJob(job);
+      return job;
     }
+
+    try {
+      await this.transition(video, "processing", { allowNoop: true });
+      video.lifecycle.processingStartedAt = job.startedAt ?? new Date().toISOString();
+      const result = await this.processingExecutor.process({ video, rawAssetKey: video.rawAssetKey ?? "" });
+      job.status = "succeeded";
+      job.completedAt = new Date().toISOString();
+      await this.store.updateProcessingJob(job);
+
+      video.processedAssetKey = result.processedAssetKey;
+      video.thumbnailAssetKey = result.thumbnailAssetKey ?? video.thumbnailAssetKey;
+      video.coverAssetKey = result.coverAssetKey ?? result.thumbnailAssetKey ?? video.coverAssetKey;
+      video.durationMs = result.durationMs ?? video.durationMs;
+      video.width = result.width ?? video.width;
+      video.height = result.height ?? video.height;
+      if (video.width && video.height) video.aspectRatio = video.width / video.height;
+      video.failureReason = undefined;
+      video.lifecycle.processingCompletedAt = job.completedAt;
+
+      await this.transition(video, "processed");
+      if (video.moderationStatus === "pending") {
+        await this.transition(video, "moderation_pending");
+      } else if (this.cfg.autoPublishAfterProcessing && video.moderationStatus === "approved") {
+        await this.completePublish(video);
+      } else {
+        await this.transition(video, "publish_pending", { allowNoop: true });
+      }
+      return job;
+    } catch (error) {
+      job.status = "failed";
+      job.lastError = error instanceof Error ? error.message : "processing_failed";
+      job.completedAt = new Date().toISOString();
+      await this.store.updateProcessingJob(job);
+      await this.failProcessing(video, job.lastError);
+      return job;
+    }
+  }
+
+  async applyModeration(input: { videoId: string; status: "approved" | "flagged" | "rejected" }): Promise<VideoAsset> {
+    const video = await this.store.getVideo(input.videoId);
+    if (!video) throw new Error("video_not_found");
+    video.moderationStatus = input.status;
+    video.lifecycle.moderatedAt = new Date().toISOString();
+
+    if (input.status === "approved") {
+      if (video.status === "moderation_pending") {
+        await this.transition(video, "publish_pending");
+      }
+    } else if (input.status === "flagged") {
+      await this.transition(video, "hidden", { allowNoop: true });
+    } else {
+      await this.transition(video, "rejected", { allowNoop: true });
+    }
+    return video;
+  }
+
+  async updateDraft(input: { userId: string; videoId: string; title?: string; caption?: string; rating?: number; canonicalPlaceId?: string; visibility?: "public" | "private" | "unlisted" }): Promise<VideoAsset> {
+    const video = await this.requireOwnerVideo(input.userId, input.videoId);
+    if (input.canonicalPlaceId && !this.placeLookup.exists(input.canonicalPlaceId)) throw new Error("canonical_place_not_found");
     if (input.canonicalPlaceId) video.canonicalPlaceId = input.canonicalPlaceId;
     if (input.title !== undefined) video.title = input.title;
     if (input.caption !== undefined) video.caption = input.caption;
     if (input.rating !== undefined) video.rating = input.rating;
-    if (input.status) video.status = input.status;
-    video.updatedAt = new Date().toISOString();
+    if (input.visibility !== undefined) video.visibility = input.visibility;
+    video.lifecycle.updatedAt = new Date().toISOString();
     await this.store.updateVideo(video);
     return video;
   }
 
-  async listStudio(userId: string): Promise<VideoAsset[]> {
+  async listStudio(userId: string): Promise<VideoStudioItem[]> {
     const rows = await this.store.listByAuthor(userId);
-    return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return rows
+      .sort((a, b) => b.lifecycle.updatedAt.localeCompare(a.lifecycle.updatedAt))
+      .map((video) => {
+        const readiness = this.computePublishReadiness(video);
+        return {
+          videoId: video.id,
+          placeId: video.canonicalPlaceId,
+          title: video.title,
+          caption: video.caption,
+          status: video.status,
+          moderationStatus: video.moderationStatus,
+          statusLabel: this.statusLabel(video.status),
+          isRetryable: video.status === "failed_processing" || video.status === "failed_upload",
+          failureReason: video.failureReason,
+          uploadProgressState: ["awaiting_upload", "draft"].includes(video.status)
+            ? "not_started"
+            : ["uploading"].includes(video.status)
+              ? "in_progress"
+              : ["failed_upload"].includes(video.status)
+                ? "failed"
+                : "completed",
+          processingProgressState: ["processing_queued"].includes(video.status)
+            ? "queued"
+            : ["processing"].includes(video.status)
+              ? "in_progress"
+              : ["failed_processing"].includes(video.status)
+                ? "failed"
+                : ["processed", "publish_pending", "published", "moderation_pending", "hidden", "rejected"].includes(video.status)
+                  ? "completed"
+                  : "not_started",
+          publishReadiness: readiness,
+          updatedAt: video.lifecycle.updatedAt,
+          publishedAt: video.lifecycle.publishedAt,
+          thumbnailUrl: this.playbackUrl(video.thumbnailAssetKey)
+        };
+      });
   }
 
   async listPlaceVideos(placeId: string): Promise<VideoFeedItem[]> {
@@ -159,8 +327,86 @@ export class VideoPlatformService {
   }
 
   async listCreatorVideos(userId: string): Promise<VideoFeedItem[]> {
-    const rows = (await this.store.listByAuthor(userId)).filter((video) => video.status === "published");
+    const rows = (await this.store.listByAuthor(userId)).filter((video) => video.status === "published" && video.moderationStatus === "approved");
     return rows.map((video) => this.toFeedItem(video));
+  }
+
+  async getDiagnostics(now = new Date()): Promise<VideoOperationalDiagnostics> {
+    const jobs = await this.store.listProcessingJobs();
+    const staleDraftThreshold = now.getTime() - 1000 * 60 * 60 * 24;
+    const stuckThreshold = now.getTime() - 1000 * 60 * 30;
+    const allVideos = await this.store.listVideos();
+
+    return {
+      queuedProcessingJobs: jobs.filter((job) => job.status === "queued").length,
+      failedProcessingJobs: jobs.filter((job) => job.status === "failed").length,
+      staleDraftCount: allVideos.filter((video) => video.status === "draft" && new Date(video.lifecycle.createdAt).getTime() < staleDraftThreshold).length,
+      stuckProcessingCount: allVideos.filter((video) => ["processing", "processing_queued"].includes(video.status) && new Date(video.lifecycle.updatedAt).getTime() < stuckThreshold).length
+    };
+  }
+
+  private async enqueueProcessing(video: VideoAsset): Promise<VideoAsset> {
+    await this.transition(video, "processing_queued");
+    const now = new Date().toISOString();
+    const latest = await this.store.getLatestProcessingJobByVideo(video.id);
+    const attempt = (latest?.attempt ?? 0) + 1;
+    const job: VideoProcessingJob = {
+      id: `vjob_${randomUUID()}`,
+      videoId: video.id,
+      status: "queued",
+      attempt,
+      maxAttempts: this.cfg.maxProcessingAttempts ?? 3,
+      queuedAt: now
+    };
+    await this.store.createProcessingJob(job);
+    video.processingJobId = job.id;
+    video.lifecycle.processingQueuedAt = now;
+    video.retryCount = Math.max(video.retryCount, attempt - 1);
+    await this.store.updateVideo(video);
+    return video;
+  }
+
+  private async completePublish(video: VideoAsset): Promise<VideoAsset> {
+    await this.transition(video, "published", { allowNoop: true });
+    video.moderationStatus = "approved";
+    video.visibility = video.visibility === "private" ? "public" : video.visibility;
+    video.lifecycle.publishedAt = video.lifecycle.publishedAt ?? new Date().toISOString();
+    video.lifecycle.updatedAt = new Date().toISOString();
+    await this.store.updateVideo(video);
+    return video;
+  }
+
+  private computePublishReadiness(video: VideoAsset): { ready: boolean; missing: string[] } {
+    const missing: string[] = [];
+    if (!video.canonicalPlaceId) missing.push("canonical_place_id");
+    if (!video.rawAssetKey) missing.push("raw_asset");
+    if (!video.processedAssetKey) missing.push("processed_asset");
+    if (!video.thumbnailAssetKey && !video.coverAssetKey) missing.push("thumbnail_or_cover");
+    if (!video.title && !video.caption) missing.push("metadata");
+    if (video.moderationStatus !== "approved") missing.push("moderation_approval");
+    if (video.visibility === "private") missing.push("public_visibility");
+    return { ready: missing.length === 0, missing };
+  }
+
+  private async transition(video: VideoAsset, target: VideoLifecycleStatus, options?: { allowNoop?: boolean }): Promise<void> {
+    if (video.status === target && options?.allowNoop) return;
+    const allowed = VALID_TRANSITIONS[video.status] ?? [];
+    if (!allowed.includes(target)) throw new Error(`invalid_video_transition:${video.status}->${target}`);
+    video.status = target;
+    video.lifecycle.updatedAt = new Date().toISOString();
+    await this.store.updateVideo(video);
+  }
+
+  private async failUpload(video: VideoAsset, reason: string): Promise<void> {
+    video.failureReason = reason;
+    video.lifecycle.failedAt = new Date().toISOString();
+    await this.transition(video, "failed_upload", { allowNoop: true });
+  }
+
+  private async failProcessing(video: VideoAsset, reason: string): Promise<void> {
+    video.failureReason = reason;
+    video.lifecycle.failedAt = new Date().toISOString();
+    await this.transition(video, "failed_processing", { allowNoop: true });
   }
 
   private toFeedItem(video: VideoAsset): VideoFeedItem {
@@ -170,20 +416,18 @@ export class VideoPlatformService {
       title: video.title,
       caption: video.caption,
       creatorUserId: video.authorUserId,
-      playbackUrl: this.playbackUrl(video.playbackAssetKey),
+      playbackUrl: this.playbackUrl(video.processedAssetKey),
       thumbnailUrl: this.playbackUrl(video.thumbnailAssetKey),
       coverUrl: this.playbackUrl(video.coverAssetKey),
       status: video.status,
       moderationStatus: video.moderationStatus,
-      publishedAt: video.publishedAt
+      publishedAt: video.lifecycle.publishedAt
     };
   }
 
   private playbackUrl(key?: string): string | undefined {
     if (!key) return undefined;
-    if (this.cfg.cloudFrontBaseUrl) {
-      return `${this.cfg.cloudFrontBaseUrl.replace(/\/$/, "")}/${key}`;
-    }
+    if (this.cfg.cloudFrontBaseUrl) return `${this.cfg.cloudFrontBaseUrl.replace(/\/$/, "")}/${key}`;
     return `https://${this.cfg.processedBucket}.s3.${this.cfg.awsRegion}.amazonaws.com/${key}`;
   }
 
@@ -192,11 +436,30 @@ export class VideoPlatformService {
     return `https://${bucket}.s3.${this.cfg.awsRegion}.amazonaws.com/${key}${suffix}`;
   }
 
+  private statusLabel(status: VideoLifecycleStatus): string {
+    const labels: Record<VideoLifecycleStatus, string> = {
+      draft: "Draft",
+      awaiting_upload: "Awaiting upload",
+      uploading: "Uploading",
+      upload_received: "Upload received",
+      processing_queued: "Processing queued",
+      processing: "Processing",
+      processed: "Processed",
+      publish_pending: "Ready to publish",
+      published: "Published",
+      failed_upload: "Upload failed",
+      failed_processing: "Processing failed",
+      moderation_pending: "Moderation pending",
+      hidden: "Hidden",
+      rejected: "Rejected",
+      archived: "Archived"
+    };
+    return labels[status];
+  }
+
   private async requireOwnerVideo(userId: string, videoId: string): Promise<VideoAsset> {
     const video = await this.store.getVideo(videoId);
-    if (!video || video.authorUserId !== userId) {
-      throw new Error("video_not_found");
-    }
+    if (!video || video.authorUserId !== userId) throw new Error("video_not_found");
     return video;
   }
 }

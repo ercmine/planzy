@@ -15,6 +15,9 @@ export interface VideoPlatformHttpHandlers {
   requestUpload(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
   finalizeUpload(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
   publish(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
+  retryUpload(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
+  retryProcessing(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
+  processNextJob(_req: IncomingMessage, res: ServerResponse): Promise<void>;
   updateDraft(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
   listStudio(req: IncomingMessage, res: ServerResponse): Promise<void>;
   listFeed(req: IncomingMessage, res: ServerResponse, query: URLSearchParams): Promise<void>;
@@ -34,9 +37,7 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
     async requestUpload(req, res, videoId) {
       const userId = requireUserId(req);
       const body = await parseJsonBody(req) as { fileName?: string; contentType?: string; sizeBytes?: number };
-      if (!body?.fileName || !body?.contentType || typeof body.sizeBytes !== "number") {
-        throw new ValidationError(["fileName, contentType, sizeBytes are required"]);
-      }
+      if (!body?.fileName || !body?.contentType || typeof body.sizeBytes !== "number") throw new ValidationError(["fileName, contentType, sizeBytes are required"]);
       const uploadSession = await service.requestUploadSession({ userId, videoId, fileName: body.fileName, contentType: body.contentType, sizeBytes: body.sizeBytes });
       sendJson(res, 201, { uploadSession });
     },
@@ -51,9 +52,20 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
       const userId = requireUserId(req);
       sendJson(res, 200, { video: await service.publish({ userId, videoId }) });
     },
+    async retryUpload(req, res, videoId) {
+      const userId = requireUserId(req);
+      sendJson(res, 200, { video: await service.retryUpload({ userId, videoId }) });
+    },
+    async retryProcessing(req, res, videoId) {
+      const userId = requireUserId(req);
+      sendJson(res, 200, { video: await service.retryProcessing({ userId, videoId }) });
+    },
+    async processNextJob(_req, res) {
+      sendJson(res, 200, { job: await service.processNextQueuedJob() });
+    },
     async updateDraft(req, res, videoId) {
       const userId = requireUserId(req);
-      const body = await parseJsonBody(req) as { title?: string; caption?: string; rating?: number; canonicalPlaceId?: string; status?: never };
+      const body = await parseJsonBody(req) as { title?: string; caption?: string; rating?: number; canonicalPlaceId?: string; visibility?: "public" | "private" | "unlisted" };
       sendJson(res, 200, { video: await service.updateDraft({ userId, videoId, ...body }) });
     },
     async listStudio(req, res) {
