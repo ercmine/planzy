@@ -2,6 +2,8 @@ enum FeedScope { local, regional, global }
 
 enum StudioVideoStatus { draft, awaiting_upload, uploaded, processing, published, failed, hidden, rejected, archived }
 
+enum StudioSection { drafts, processing, published, needsAttention, archived }
+
 class PlaceSearchResult {
   const PlaceSearchResult({
     required this.placeId,
@@ -130,6 +132,7 @@ class StudioVideo {
     required this.placeName,
     required this.title,
     required this.status,
+    required this.section,
     this.moderationState,
     this.moderationReason,
   });
@@ -139,6 +142,7 @@ class StudioVideo {
   final String placeName;
   final String title;
   final StudioVideoStatus status;
+  final StudioSection section;
   final String? moderationState;
   final String? moderationReason;
 
@@ -148,14 +152,49 @@ class StudioVideo {
       (item) => item.name == raw,
       orElse: () => StudioVideoStatus.draft,
     );
+    final rawSection = (json['section'] ?? 'drafts').toString();
+    final section = switch (rawSection) {
+      'processing' => StudioSection.processing,
+      'published' => StudioSection.published,
+      'needs_attention' => StudioSection.needsAttention,
+      'archived' => StudioSection.archived,
+      _ => StudioSection.drafts,
+    };
     return StudioVideo(
       videoId: (json['id'] ?? json['videoId'] ?? '').toString(),
-      placeId: (json['canonicalPlaceId'] ?? json['placeId'] ?? '').toString(),
-      placeName: (json['placeName'] ?? '').toString(),
-      title: (json['title'] ?? '').toString(),
+      placeId: (json['placeId'] ?? '').toString(),
+      placeName: (json['placeName'] ?? json['placeId'] ?? '').toString(),
+      title: (json['title'] ?? json['caption'] ?? 'Untitled draft').toString(),
       status: status,
+      section: section,
       moderationState: json['moderationState']?.toString(),
       moderationReason: json['moderationReason']?.toString(),
+    );
+  }
+}
+
+class StudioAnalyticsOverview {
+  const StudioAnalyticsOverview({
+    required this.totalVideosPublished,
+    required this.totalViews,
+    required this.statusCounts,
+    required this.topPlaces,
+  });
+
+  final int totalVideosPublished;
+  final int totalViews;
+  final Map<String, int> statusCounts;
+  final List<Map<String, dynamic>> topPlaces;
+
+  factory StudioAnalyticsOverview.fromJson(Map<String, dynamic> json) {
+    final summary = json['summary'] is Map<String, dynamic> ? json['summary'] as Map<String, dynamic> : const <String, dynamic>{};
+    final status = json['statusCounts'] is Map<String, dynamic> ? json['statusCounts'] as Map<String, dynamic> : const <String, dynamic>{};
+    final topPlaces = json['topPlaces'] is List ? (json['topPlaces'] as List).whereType<Map<String, dynamic>>().toList(growable: false) : const <Map<String, dynamic>>[];
+    return StudioAnalyticsOverview(
+      totalVideosPublished: summary['totalVideosPublished'] is num ? (summary['totalVideosPublished'] as num).toInt() : 0,
+      totalViews: summary['totalViews'] is num ? (summary['totalViews'] as num).toInt() : 0,
+      statusCounts: status.map((key, value) => MapEntry(key, value is num ? value.toInt() : 0)),
+      topPlaces: topPlaces,
     );
   }
 }

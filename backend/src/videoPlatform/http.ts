@@ -20,6 +20,9 @@ export interface VideoPlatformHttpHandlers {
   processNextJob(_req: IncomingMessage, res: ServerResponse): Promise<void>;
   updateDraft(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
   listStudio(req: IncomingMessage, res: ServerResponse): Promise<void>;
+  getStudioAnalytics(req: IncomingMessage, res: ServerResponse): Promise<void>;
+  archiveDraft(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
+  trackEvent(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
   listFeed(req: IncomingMessage, res: ServerResponse, query: URLSearchParams): Promise<void>;
   listPlaceVideos(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void>;
   listCreatorVideos(req: IncomingMessage, res: ServerResponse, userId: string): Promise<void>;
@@ -69,7 +72,15 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
       sendJson(res, 200, { video: await service.updateDraft({ userId, videoId, ...body }) });
     },
     async listStudio(req, res) {
-      sendJson(res, 200, { items: await service.listStudio(requireUserId(req)) });
+      const query = new URL(req.url ?? "", "http://localhost").searchParams;
+      const sectionRaw = String(query.get("section") ?? "").trim();
+      const sortRaw = String(query.get("sort") ?? "newest").trim();
+      const section = ["drafts", "processing", "published", "needs_attention", "archived"].includes(sectionRaw) ? sectionRaw as "drafts" | "processing" | "published" | "needs_attention" | "archived" : undefined;
+      const sort = ["newest", "oldest", "most_views", "most_engagement"].includes(sortRaw) ? sortRaw as "newest" | "oldest" | "most_views" | "most_engagement" : "newest";
+      sendJson(res, 200, { items: await service.listStudio(requireUserId(req), { section, sort }) });
+    },
+    async getStudioAnalytics(req, res) {
+      sendJson(res, 200, { analytics: await service.getCreatorStudioAnalytics(requireUserId(req)) });
     },
     async listFeed(_req, res, query) {
       const limit = Number.parseInt(query.get("limit") ?? "10", 10);
@@ -91,6 +102,16 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
           region
         }
       }));
+    },
+    async archiveDraft(req, res, videoId) {
+      const userId = requireUserId(req);
+      const video = await service.archiveVideo({ userId, videoId });
+      sendJson(res, 200, { video });
+    },
+    async trackEvent(req, res, videoId) {
+      const body = await parseJsonBody(req) as { event?: "video_viewed" | "video_liked" | "video_saved" | "video_shared" | "video_completed" };
+      if (!body?.event) throw new ValidationError(["event is required"]);
+      sendJson(res, 200, { video: await service.recordVideoEvent({ videoId, event: body.event }) });
     },
     async listPlaceVideos(_req, res, placeId) {
       sendJson(res, 200, { items: await service.listPlaceVideos(placeId) });

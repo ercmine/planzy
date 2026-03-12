@@ -112,4 +112,40 @@ describe("VideoPlatformService lifecycle", () => {
     expect((await service.listPlaceVideos("place_1")).length).toBe(0);
     expect((await service.listCreatorVideos("u")).length).toBe(0);
   });
+
+
+  it("segments studio content and returns creator analytics", async () => {
+    const service = createService();
+    const draft = await service.createDraft({ userId: "u", canonicalPlaceId: "place_1", title: "draft" });
+
+    const pub = await service.createDraft({ userId: "u", canonicalPlaceId: "place_2", title: "published" });
+    const upload = await service.requestUploadSession({ userId: "u", videoId: pub.id, fileName: "review.mp4", contentType: "video/mp4", sizeBytes: 30 });
+    await service.finalizeUpload({ userId: "u", videoId: pub.id, uploadSessionId: upload.id });
+    await service.processNextQueuedJob();
+    await service.applyModeration({ videoId: pub.id, status: "approved" });
+    await service.updateDraft({ userId: "u", videoId: pub.id, visibility: "public" });
+    await service.publish({ userId: "u", videoId: pub.id });
+
+    await service.recordVideoEvent({ videoId: pub.id, event: "video_viewed" });
+    await service.recordVideoEvent({ videoId: pub.id, event: "video_saved" });
+
+    const drafts = await service.listStudio("u", { section: "drafts" });
+    const published = await service.listStudio("u", { section: "published" });
+    expect(drafts.some((item) => item.videoId === draft.id)).toBe(true);
+    expect(published.some((item) => item.videoId === pub.id)).toBe(true);
+
+    const analytics = await service.getCreatorStudioAnalytics("u");
+    expect(analytics.summary.totalVideosPublished).toBe(1);
+    expect(analytics.summary.totalViews).toBe(1);
+    expect(analytics.topPlaces[0]?.placeId).toBe("place_2");
+  });
+
+  it("archives drafts", async () => {
+    const service = createService();
+    const draft = await service.createDraft({ userId: "u", canonicalPlaceId: "place_1", title: "to archive" });
+    const archived = await service.archiveVideo({ userId: "u", videoId: draft.id });
+    expect(archived.status).toBe("archived");
+    const rows = await service.listStudio("u", { section: "archived" });
+    expect(rows[0]?.videoId).toBe(draft.id);
+  });
 });

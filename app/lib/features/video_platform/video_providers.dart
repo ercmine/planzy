@@ -14,9 +14,14 @@ final videoFeedProvider = FutureProvider.family<List<PlaceVideoFeedItem>, FeedSc
   return repo.fetchFeed(scope: scope);
 });
 
-final studioVideosProvider = FutureProvider<List<StudioVideo>>((ref) async {
+final studioVideosProvider = FutureProvider.family<List<StudioVideo>, StudioSection?>((ref, section) async {
   final repo = await ref.watch(videoRepositoryProvider.future);
-  return repo.fetchStudioVideos();
+  return repo.fetchStudioVideos(section: section);
+});
+
+final studioAnalyticsProvider = FutureProvider<StudioAnalyticsOverview>((ref) async {
+  final repo = await ref.watch(videoRepositoryProvider.future);
+  return repo.fetchStudioAnalytics();
 });
 
 final placeSearchProvider = FutureProvider.family<List<PlaceSearchResult>, ({String query, FeedScope scope})>((ref, arg) async {

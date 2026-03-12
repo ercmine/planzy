@@ -8,6 +8,9 @@ import type {
   VideoOperationalDiagnostics,
   VideoProcessingJob,
   VideoStudioItem,
+  CreatorStudioAnalyticsOverview,
+  CreatorStudioSection,
+  CreatorStudioStatusCounts,
   FeedScope,
   FeedScopeRequestContext,
   PlaceFeedSignals,
@@ -17,6 +20,7 @@ import { rankPlaceLinkedVideoFeed } from "./feedRanking.js";
 import type { VideoPlatformStore } from "./store.js";
 import type { ModerationService } from "../moderation/service.js";
 import { TrustSafetyService } from "../trustSafety/service.js";
+import type { NotificationService } from "../notifications/service.js";
 
 const VALID_TRANSITIONS: Record<VideoLifecycleStatus, readonly VideoLifecycleStatus[]> = {
   draft: ["awaiting_upload", "archived"],
@@ -87,7 +91,8 @@ export class VideoPlatformService {
     private readonly uploadVerifier: UploadObjectVerifier = permissiveObjectVerifier,
     private readonly processingExecutor: VideoProcessingExecutor = defaultProcessingExecutor,
     private readonly moderationService?: ModerationService,
-    private readonly trustSafetyService?: TrustSafetyService
+    private readonly trustSafetyService?: TrustSafetyService,
+    private readonly notificationService?: NotificationService
   ) {}
 
   async createDraft(input: { userId: string; canonicalPlaceId: string; title?: string; caption?: string; rating?: number }): Promise<VideoAsset> {
@@ -193,6 +198,12 @@ export class VideoPlatformService {
     return this.completePublish(video);
   }
 
+  async archiveVideo(input: { userId: string; videoId: string }): Promise<VideoAsset> {
+    const video = await this.requireOwnerVideo(input.userId, input.videoId);
+    await this.transition(video, "archived", { allowNoop: true });
+    return video;
+  }
+
   async retryProcessing(input: { userId: string; videoId: string }): Promise<VideoAsset> {
     const video = await this.requireOwnerVideo(input.userId, input.videoId);
     if (video.status !== "failed_processing") throw new Error("video_not_failed_processing");
@@ -240,6 +251,7 @@ export class VideoPlatformService {
       video.lifecycle.processingCompletedAt = job.completedAt;
 
       await this.transition(video, "processed");
+      await this.notificationService?.notify({ type: "video.processing.finished", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId });
       if (video.moderationStatus === "pending") {
         await this.transition(video, "moderation_pending");
       } else if (this.cfg.autoPublishAfterProcessing && video.moderationStatus === "approved") {
@@ -254,6 +266,7 @@ export class VideoPlatformService {
       job.completedAt = new Date().toISOString();
       await this.store.updateProcessingJob(job);
       await this.failProcessing(video, job.lastError);
+      await this.notificationService?.notify({ type: "video.processing.failed", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId, reason: video.failureReason });
       return job;
     }
   }
@@ -289,9 +302,41 @@ export class VideoPlatformService {
     return video;
   }
 
-  async listStudio(userId: string): Promise<VideoStudioItem[]> {
+  private sectionFor(video: VideoAsset): CreatorStudioSection {
+    if (video.status === "archived") return "archived";
+    if (["failed_upload", "failed_processing", "hidden", "rejected"].includes(video.status)) return "needs_attention";
+    if (["processing_queued", "processing", "moderation_pending", "publish_pending", "processed", "upload_received", "uploading"].includes(video.status)) return "processing";
+    if (video.status === "published") return "published";
+    return "drafts";
+  }
+
+  private computeStatusCounts(rows: VideoAsset[]): CreatorStudioStatusCounts {
+    const counts: CreatorStudioStatusCounts = { drafts: 0, processing: 0, published: 0, needsAttention: 0, archived: 0 };
+    for (const row of rows) {
+      const section = this.sectionFor(row);
+      if (section === "needs_attention") counts.needsAttention += 1;
+      else if (section === "drafts") counts.drafts += 1;
+      else if (section === "processing") counts.processing += 1;
+      else if (section === "published") counts.published += 1;
+      else counts.archived += 1;
+    }
+    return counts;
+  }
+
+  async listStudio(userId: string, input?: { section?: CreatorStudioSection; sort?: "newest" | "oldest" | "most_views" | "most_engagement" }): Promise<VideoStudioItem[]> {
     const rows = await this.store.listByAuthor(userId);
-    return rows
+    const filtered = input?.section ? rows.filter((row) => this.sectionFor(row) === input.section) : rows;
+    const sorted = [...filtered].sort((a, b) => {
+      if (input?.sort === "oldest") return a.lifecycle.updatedAt.localeCompare(b.lifecycle.updatedAt);
+      if (input?.sort === "most_views") return (b.engagement?.views ?? 0) - (a.engagement?.views ?? 0);
+      if (input?.sort === "most_engagement") {
+        const aScore = (a.engagement?.likes ?? 0) + (a.engagement?.saves ?? 0) + (a.engagement?.shares ?? 0);
+        const bScore = (b.engagement?.likes ?? 0) + (b.engagement?.saves ?? 0) + (b.engagement?.shares ?? 0);
+        return bScore - aScore;
+      }
+      return b.lifecycle.updatedAt.localeCompare(a.lifecycle.updatedAt);
+    });
+    return sorted
       .sort((a, b) => b.lifecycle.updatedAt.localeCompare(a.lifecycle.updatedAt))
       .map((video) => {
         const readiness = this.computePublishReadiness(video);
@@ -307,6 +352,7 @@ export class VideoPlatformService {
           moderationState: moderationAggregate?.state,
           moderationReason: moderationAggregate?.state === "pending_review" ? "Under moderation review" : moderationAggregate?.state,
           statusLabel: this.statusLabel(video.status),
+          section: this.sectionFor(video),
           isRetryable: video.status === "failed_processing" || video.status === "failed_upload",
           failureReason: video.failureReason,
           uploadProgressState: ["awaiting_upload", "draft"].includes(video.status)
@@ -331,6 +377,85 @@ export class VideoPlatformService {
           thumbnailUrl: this.playbackUrl(video.thumbnailAssetKey)
         };
       });
+  }
+
+  async getCreatorStudioAnalytics(userId: string): Promise<CreatorStudioAnalyticsOverview> {
+    const rows = await this.store.listByAuthor(userId);
+    const published = rows.filter((row) => row.status === "published");
+    const totals = published.reduce((acc, row) => {
+      acc.views += row.engagement?.views ?? 0;
+      acc.likes += row.engagement?.likes ?? 0;
+      acc.saves += row.engagement?.saves ?? 0;
+      acc.shares += row.engagement?.shares ?? 0;
+      acc.completion += row.engagement?.completionRate ?? 0;
+      return acc;
+    }, { views: 0, likes: 0, saves: 0, shares: 0, completion: 0 });
+
+    const topVideos = published
+      .map((row) => ({
+        videoId: row.id,
+        placeId: row.canonicalPlaceId,
+        title: row.title,
+        views: row.engagement?.views ?? 0,
+        likes: row.engagement?.likes ?? 0,
+        saves: row.engagement?.saves ?? 0,
+        shares: row.engagement?.shares ?? 0,
+        completionRate: row.engagement?.completionRate ?? 0,
+        publishedAt: row.lifecycle.publishedAt
+      }))
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 5);
+
+    const placeMap = new Map<string, { videos: number; views: number; saves: number; completion: number }>();
+    for (const row of published) {
+      const key = row.canonicalPlaceId;
+      const current = placeMap.get(key) ?? { videos: 0, views: 0, saves: 0, completion: 0 };
+      current.videos += 1;
+      current.views += row.engagement?.views ?? 0;
+      current.saves += row.engagement?.saves ?? 0;
+      current.completion += row.engagement?.completionRate ?? 0;
+      placeMap.set(key, current);
+    }
+
+    const topPlaces = [...placeMap.entries()]
+      .map(([placeId, stats]) => ({
+        placeId,
+        videos: stats.videos,
+        views: stats.views,
+        saves: stats.saves,
+        avgCompletionRate: stats.videos > 0 ? stats.completion / stats.videos : 0
+      }))
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 5);
+
+    return {
+      summary: {
+        totalVideosPublished: published.length,
+        totalViews: totals.views,
+        totalSaves: totals.saves,
+        totalLikes: totals.likes,
+        totalShares: totals.shares,
+        avgCompletionRate: published.length ? totals.completion / published.length : 0
+      },
+      statusCounts: this.computeStatusCounts(rows),
+      topVideos,
+      topPlaces
+    };
+  }
+
+  async recordVideoEvent(input: { videoId: string; event: "video_viewed" | "video_liked" | "video_saved" | "video_shared" | "video_completed" }): Promise<VideoAsset> {
+    const video = await this.store.getVideo(input.videoId);
+    if (!video) throw new Error("video_not_found");
+    const engagement = video.engagement ?? { views: 0, likes: 0, saves: 0, shares: 0, completionRate: 0 };
+    if (input.event === "video_viewed") engagement.views += 1;
+    if (input.event === "video_liked") engagement.likes += 1;
+    if (input.event === "video_saved") engagement.saves += 1;
+    if (input.event === "video_shared") engagement.shares += 1;
+    if (input.event === "video_completed") engagement.completionRate = Math.min(1, engagement.completionRate + 0.05);
+    video.engagement = engagement;
+    video.lifecycle.updatedAt = new Date().toISOString();
+    await this.store.updateVideo(video);
+    return video;
   }
 
   async listPlaceVideos(placeId: string): Promise<VideoFeedItem[]> {
@@ -402,6 +527,7 @@ export class VideoPlatformService {
     video.lifecycle.publishedAt = video.lifecycle.publishedAt ?? new Date().toISOString();
     video.lifecycle.updatedAt = new Date().toISOString();
     await this.store.updateVideo(video);
+    await this.notificationService?.notify({ type: "video.published", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId });
     return video;
   }
 

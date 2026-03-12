@@ -41,11 +41,33 @@ class VideoRepository {
     return items.whereType<Map<String, dynamic>>().map(PlaceSearchResult.fromJson).toList(growable: false);
   }
 
-  Future<List<StudioVideo>> fetchStudioVideos() async {
-    final response = await apiClient.getJson('/v1/studio/videos');
+  Future<List<StudioVideo>> fetchStudioVideos({StudioSection? section}) async {
+    final response = await apiClient.getJson('/v1/studio/videos', queryParameters: {if (section != null) 'section': _sectionParam(section)});
     final items = response['items'];
     if (items is! List) return const [];
     return items.whereType<Map<String, dynamic>>().map(StudioVideo.fromJson).toList(growable: false);
+  }
+
+
+  Future<StudioAnalyticsOverview> fetchStudioAnalytics() async {
+    final response = await apiClient.getJson('/v1/studio/analytics');
+    final payload = response['analytics'];
+    return StudioAnalyticsOverview.fromJson(payload is Map<String, dynamic> ? payload : const {});
+  }
+
+  String _sectionParam(StudioSection section) {
+    switch (section) {
+      case StudioSection.processing:
+        return 'processing';
+      case StudioSection.published:
+        return 'published';
+      case StudioSection.needsAttention:
+        return 'needs_attention';
+      case StudioSection.archived:
+        return 'archived';
+      case StudioSection.drafts:
+        return 'drafts';
+    }
   }
 
   Future<String> createDraft({
