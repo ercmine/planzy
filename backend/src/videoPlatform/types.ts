@@ -18,6 +18,7 @@ export type VideoLifecycleStatus =
 export type ModerationStatus = "pending" | "approved" | "flagged" | "rejected";
 export type Visibility = "public" | "unlisted" | "private";
 export type UploadPurpose = "place_review_video" | "thumbnail" | "cover" | "draft_asset";
+export type FeedScope = "local" | "regional" | "global";
 
 export interface VideoLifecycleTimestamps {
   createdAt: string;
@@ -58,6 +59,93 @@ export interface VideoAsset {
   failureReason?: string;
   processingJobId?: string;
   retryCount: number;
+  engagement?: {
+    views: number;
+    likes: number;
+    saves: number;
+    shares: number;
+    completionRate: number;
+  };
+  processedPlaybackUrl?: string;
+  thumbnailPlaybackUrl?: string;
+  coverPlaybackUrl?: string;
+  feedDebug?: {
+    distanceMeters?: number;
+    placeCity?: string;
+    placeRegion?: string;
+  };
+}
+
+export interface PlaceFeedSignals {
+  canonicalPlaceId: string;
+  name: string;
+  category: string;
+  city?: string;
+  region?: string;
+  lat?: number;
+  lng?: number;
+  qualityScore: number;
+  contentRichnessScore: number;
+  trustedReviewScore: number;
+  distanceMeters?: number;
+}
+
+export interface CreatorFeedSignals {
+  creatorUserId: string;
+  displayName: string;
+  handle: string;
+  qualityScore: number;
+  trustScore: number;
+}
+
+export interface FeedScopeProfile {
+  localityWeight: number;
+  placeQualityWeight: number;
+  placeRichnessWeight: number;
+  creatorQualityWeight: number;
+  freshnessWeight: number;
+  engagementWeight: number;
+  trustWeight: number;
+  diversityWeight: number;
+  minCandidateCount: number;
+}
+
+export interface FeedScopeRequestContext {
+  lat?: number;
+  lng?: number;
+  city?: string;
+  region?: string;
+}
+
+export interface FeedScoreComponents {
+  locality: number;
+  placeQuality: number;
+  placeRichness: number;
+  creatorQuality: number;
+  freshness: number;
+  engagement: number;
+  trust: number;
+  diversityPenalty: number;
+}
+
+export interface RankingSignalBreakdown {
+  finalScore: number;
+  components: FeedScoreComponents;
+}
+
+export interface VideoFeedCursorPayload {
+  offset: number;
+  scope: FeedScope;
+}
+
+export interface FeedObservabilityEvent {
+  scope: FeedScope;
+  candidateCount: number;
+  rankedCount: number;
+  fallbackApplied: boolean;
+  zeroResult: boolean;
+  diversitySuppressions: number;
+  averageComponentScores: FeedScoreComponents;
 }
 
 export interface UploadPart {
@@ -101,12 +189,43 @@ export interface VideoProcessingJob {
 export interface VideoFeedItem {
   videoId: string;
   placeId: string;
+  placeName?: string;
+  placeCategory?: string;
+  regionLabel?: string;
   title?: string;
   caption?: string;
   creatorUserId: string;
+  creatorSummary?: {
+    creatorUserId: string;
+    displayName: string;
+    handle: string;
+    qualityScore: number;
+    trustScore: number;
+  };
+  placeSummary?: {
+    canonicalPlaceId: string;
+    name: string;
+    category: string;
+    city?: string;
+    region?: string;
+    distanceMeters?: number;
+    qualityScore: number;
+    contentRichnessScore: number;
+    trustedReviewScore: number;
+  };
   playbackUrl?: string;
   thumbnailUrl?: string;
   coverUrl?: string;
+  rating?: number;
+  engagementSummary?: {
+    views: number;
+    likes: number;
+    saves: number;
+    shares: number;
+    completionRate: number;
+  };
+  scope?: FeedScope;
+  ranking?: RankingSignalBreakdown;
   status: VideoLifecycleStatus;
   moderationStatus: ModerationStatus;
   publishedAt?: string;

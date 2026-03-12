@@ -7,8 +7,13 @@ import type {
   VideoFeedItem,
   VideoOperationalDiagnostics,
   VideoProcessingJob,
-  VideoStudioItem
+  VideoStudioItem,
+  FeedScope,
+  FeedScopeRequestContext,
+  PlaceFeedSignals,
+  CreatorFeedSignals
 } from "./types.js";
+import { rankPlaceLinkedVideoFeed } from "./feedRanking.js";
 import type { VideoPlatformStore } from "./store.js";
 
 const VALID_TRANSITIONS: Record<VideoLifecycleStatus, readonly VideoLifecycleStatus[]> = {
@@ -96,7 +101,8 @@ export class VideoPlatformService {
       caption: input.caption,
       rating: input.rating,
       lifecycle: { createdAt: now, updatedAt: now },
-      retryCount: 0
+      retryCount: 0,
+      engagement: { views: 0, likes: 0, saves: 0, shares: 0, completionRate: 0 }
     });
   }
 
@@ -219,6 +225,9 @@ export class VideoPlatformService {
       video.processedAssetKey = result.processedAssetKey;
       video.thumbnailAssetKey = result.thumbnailAssetKey ?? video.thumbnailAssetKey;
       video.coverAssetKey = result.coverAssetKey ?? result.thumbnailAssetKey ?? video.coverAssetKey;
+      video.processedPlaybackUrl = this.playbackUrl(video.processedAssetKey);
+      video.thumbnailPlaybackUrl = this.playbackUrl(video.thumbnailAssetKey);
+      video.coverPlaybackUrl = this.playbackUrl(video.coverAssetKey);
       video.durationMs = result.durationMs ?? video.durationMs;
       video.width = result.width ?? video.width;
       video.height = result.height ?? video.height;
@@ -321,9 +330,19 @@ export class VideoPlatformService {
     return rows.map((video) => this.toFeedItem(video));
   }
 
-  async listFeed(input: { limit: number; cursor?: string }): Promise<{ items: VideoFeedItem[]; nextCursor?: string }> {
-    const rows = await this.store.listPublishedFeed(Math.min(Math.max(input.limit, 1), 30), input.cursor);
-    return { items: rows.items.map((video) => this.toFeedItem(video)), nextCursor: rows.nextCursor };
+  async listFeed(input: { scope: FeedScope; limit: number; cursor?: string; context?: FeedScopeRequestContext }): Promise<{ items: VideoFeedItem[]; nextCursor?: string; meta: Record<string, unknown> }> {
+    const limit = Math.min(Math.max(input.limit, 1), 30);
+    const videos = await this.store.listVideos();
+    const ranked = rankPlaceLinkedVideoFeed({
+      scope: input.scope,
+      allVideos: videos,
+      context: input.context,
+      cursor: input.cursor,
+      limit,
+      placeSignalsFor: (placeId) => this.placeSignalsFor(videos, placeId, input.context),
+      creatorSignalsFor: (creatorId) => this.creatorSignalsFor(videos, creatorId)
+    });
+    return { items: ranked.ranked.map((row) => row.item), nextCursor: ranked.nextCursor, meta: { observability: ranked.observability } };
   }
 
   async listCreatorVideos(userId: string): Promise<VideoFeedItem[]> {
@@ -422,6 +441,41 @@ export class VideoPlatformService {
       status: video.status,
       moderationStatus: video.moderationStatus,
       publishedAt: video.lifecycle.publishedAt
+    };
+  }
+
+  private placeSignalsFor(videos: VideoAsset[], placeId: string, context?: FeedScopeRequestContext): PlaceFeedSignals {
+    const placeVideos = videos.filter((row) => row.canonicalPlaceId === placeId);
+    const reviewCount = placeVideos.length;
+    const avgRating = placeVideos.length ? placeVideos.reduce((acc, row) => acc + (row.rating ?? 0), 0) / placeVideos.length : 0;
+    const saves = placeVideos.reduce((acc, row) => acc + (row.engagement?.saves ?? 0), 0);
+    const trusted = placeVideos.filter((row) => row.moderationStatus === "approved").length / Math.max(1, reviewCount);
+    const exemplar = placeVideos[0];
+    const city = exemplar?.feedDebug?.placeCity ?? context?.city;
+    const region = exemplar?.feedDebug?.placeRegion ?? context?.region;
+    return {
+      canonicalPlaceId: placeId,
+      name: `Place ${placeId}`,
+      category: "place_review",
+      city,
+      region,
+      qualityScore: Math.min(1, (avgRating / 5) * 0.7 + trusted * 0.3),
+      contentRichnessScore: Math.min(1, reviewCount / 8 + saves / 200),
+      trustedReviewScore: trusted,
+      distanceMeters: exemplar?.feedDebug?.distanceMeters
+    };
+  }
+
+  private creatorSignalsFor(videos: VideoAsset[], creatorId: string): CreatorFeedSignals {
+    const creatorVideos = videos.filter((row) => row.authorUserId === creatorId);
+    const avgCompletion = creatorVideos.length ? creatorVideos.reduce((acc, row) => acc + (row.engagement?.completionRate ?? 0), 0) / creatorVideos.length : 0;
+    const avgLikes = creatorVideos.length ? creatorVideos.reduce((acc, row) => acc + (row.engagement?.likes ?? 0), 0) / creatorVideos.length : 0;
+    return {
+      creatorUserId: creatorId,
+      displayName: `Creator ${creatorId}`,
+      handle: `@${creatorId}`,
+      qualityScore: Math.min(1, avgCompletion * 0.6 + Math.min(1, avgLikes / 150) * 0.4),
+      trustScore: Math.min(1, creatorVideos.filter((row) => row.moderationStatus === "approved").length / Math.max(1, creatorVideos.length))
     };
   }
 
