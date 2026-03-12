@@ -31,6 +31,7 @@ import type { AnalyticsService } from "../analytics/service.js";
 import type { RolloutService } from "../rollouts/service.js";
 import type { GeoGateway } from "../geo/gateway.js";
 import type { VideoPlatformService } from "../videoPlatform/service.js";
+import type { TrustSafetyService } from "../trustSafety/service.js";
 import { createRoutes } from "./routes.js";
 
 export function matchPath(pattern: string, pathname: string): Record<string, string> | null {
@@ -88,6 +89,7 @@ export function createHttpServer(
     placeContentHandlers?: PlaceContentHttpHandlers;
     outingPlannerService?: OutingPlannerService;
     moderationService?: ModerationService;
+    trustSafetyService?: TrustSafetyService;
     placeService?: PlaceNormalizationService;
     notificationService?: NotificationService;
     analyticsService?: AnalyticsService;

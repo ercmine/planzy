@@ -15,6 +15,8 @@ import type {
 } from "./types.js";
 import { rankPlaceLinkedVideoFeed } from "./feedRanking.js";
 import type { VideoPlatformStore } from "./store.js";
+import type { ModerationService } from "../moderation/service.js";
+import { TrustSafetyService } from "../trustSafety/service.js";
 
 const VALID_TRANSITIONS: Record<VideoLifecycleStatus, readonly VideoLifecycleStatus[]> = {
   draft: ["awaiting_upload", "archived"],
@@ -83,7 +85,9 @@ export class VideoPlatformService {
     private readonly placeLookup: PlaceLookup,
     private readonly cfg: VideoStorageConfig,
     private readonly uploadVerifier: UploadObjectVerifier = permissiveObjectVerifier,
-    private readonly processingExecutor: VideoProcessingExecutor = defaultProcessingExecutor
+    private readonly processingExecutor: VideoProcessingExecutor = defaultProcessingExecutor,
+    private readonly moderationService?: ModerationService,
+    private readonly trustSafetyService?: TrustSafetyService
   ) {}
 
   async createDraft(input: { userId: string; canonicalPlaceId: string; title?: string; caption?: string; rating?: number }): Promise<VideoAsset> {
@@ -291,6 +295,8 @@ export class VideoPlatformService {
       .sort((a, b) => b.lifecycle.updatedAt.localeCompare(a.lifecycle.updatedAt))
       .map((video) => {
         const readiness = this.computePublishReadiness(video);
+        const moderationTarget = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId, subjectUserId: video.authorUserId };
+        const moderationAggregate = this.moderationService?.getAggregate(moderationTarget);
         return {
           videoId: video.id,
           placeId: video.canonicalPlaceId,
@@ -298,6 +304,8 @@ export class VideoPlatformService {
           caption: video.caption,
           status: video.status,
           moderationStatus: video.moderationStatus,
+          moderationState: moderationAggregate?.state,
+          moderationReason: moderationAggregate?.state === "pending_review" ? "Under moderation review" : moderationAggregate?.state,
           statusLabel: this.statusLabel(video.status),
           isRetryable: video.status === "failed_processing" || video.status === "failed_upload",
           failureReason: video.failureReason,
@@ -327,12 +335,14 @@ export class VideoPlatformService {
 
   async listPlaceVideos(placeId: string): Promise<VideoFeedItem[]> {
     const rows = await this.store.listPublishedByPlace(placeId);
-    return rows.map((video) => this.toFeedItem(video));
+    return rows
+      .filter((video) => this.isVisibleVideo(video))
+      .map((video) => this.toFeedItem(video));
   }
 
   async listFeed(input: { scope: FeedScope; limit: number; cursor?: string; context?: FeedScopeRequestContext }): Promise<{ items: VideoFeedItem[]; nextCursor?: string; meta: Record<string, unknown> }> {
     const limit = Math.min(Math.max(input.limit, 1), 30);
-    const videos = await this.store.listVideos();
+    const videos = (await this.store.listVideos()).filter((video) => this.isVisibleVideo(video));
     const ranked = rankPlaceLinkedVideoFeed({
       scope: input.scope,
       allVideos: videos,
@@ -346,7 +356,7 @@ export class VideoPlatformService {
   }
 
   async listCreatorVideos(userId: string): Promise<VideoFeedItem[]> {
-    const rows = (await this.store.listByAuthor(userId)).filter((video) => video.status === "published" && video.moderationStatus === "approved");
+    const rows = (await this.store.listByAuthor(userId)).filter((video) => video.status === "published" && video.moderationStatus === "approved" && this.isVisibleVideo(video));
     return rows.map((video) => this.toFeedItem(video));
   }
 
@@ -429,6 +439,8 @@ export class VideoPlatformService {
   }
 
   private toFeedItem(video: VideoAsset): VideoFeedItem {
+    const target = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId, subjectUserId: video.authorUserId };
+    const trust = this.trustSafetyService?.getContentSummary(target, 0.6);
     return {
       videoId: video.id,
       placeId: video.canonicalPlaceId,
@@ -440,6 +452,7 @@ export class VideoPlatformService {
       coverUrl: this.playbackUrl(video.coverAssetKey),
       status: video.status,
       moderationStatus: video.moderationStatus,
+      trust: trust ? { trustScore: trust.trustScore, trustTier: trust.trustTier, badges: trust.badges } : undefined,
       publishedAt: video.lifecycle.publishedAt
     };
   }
@@ -450,6 +463,10 @@ export class VideoPlatformService {
     const avgRating = placeVideos.length ? placeVideos.reduce((acc, row) => acc + (row.rating ?? 0), 0) / placeVideos.length : 0;
     const saves = placeVideos.reduce((acc, row) => acc + (row.engagement?.saves ?? 0), 0);
     const trusted = placeVideos.filter((row) => row.moderationStatus === "approved").length / Math.max(1, reviewCount);
+    const placeTrust = this.trustSafetyService?.summarizePlace({
+      placeId,
+      contentTargets: placeVideos.map((row) => ({ targetType: "place_review_video" as const, targetId: row.id, placeId: row.canonicalPlaceId, subjectUserId: row.authorUserId }))
+    });
     const exemplar = placeVideos[0];
     const city = exemplar?.feedDebug?.placeCity ?? context?.city;
     const region = exemplar?.feedDebug?.placeRegion ?? context?.region;
@@ -459,9 +476,9 @@ export class VideoPlatformService {
       category: "place_review",
       city,
       region,
-      qualityScore: Math.min(1, (avgRating / 5) * 0.7 + trusted * 0.3),
+      qualityScore: Math.min(1, (avgRating / 5) * 0.65 + trusted * 0.25 + (placeTrust?.trustScore ?? 0.5) * 0.1),
       contentRichnessScore: Math.min(1, reviewCount / 8 + saves / 200),
-      trustedReviewScore: trusted,
+      trustedReviewScore: Math.min(1, trusted * 0.7 + (placeTrust?.trustedContentRatio ?? 0) * 0.3),
       distanceMeters: exemplar?.feedDebug?.distanceMeters
     };
   }
@@ -470,13 +487,23 @@ export class VideoPlatformService {
     const creatorVideos = videos.filter((row) => row.authorUserId === creatorId);
     const avgCompletion = creatorVideos.length ? creatorVideos.reduce((acc, row) => acc + (row.engagement?.completionRate ?? 0), 0) / creatorVideos.length : 0;
     const avgLikes = creatorVideos.length ? creatorVideos.reduce((acc, row) => acc + (row.engagement?.likes ?? 0), 0) / creatorVideos.length : 0;
+    const creatorTrust = this.trustSafetyService?.summarizeCreator({
+      creatorUserId: creatorId,
+      contentTargets: creatorVideos.map((row) => ({ targetType: "place_review_video" as const, targetId: row.id, placeId: row.canonicalPlaceId, subjectUserId: creatorId }))
+    });
     return {
       creatorUserId: creatorId,
       displayName: `Creator ${creatorId}`,
       handle: `@${creatorId}`,
       qualityScore: Math.min(1, avgCompletion * 0.6 + Math.min(1, avgLikes / 150) * 0.4),
-      trustScore: Math.min(1, creatorVideos.filter((row) => row.moderationStatus === "approved").length / Math.max(1, creatorVideos.length))
+      trustScore: Math.min(1, creatorVideos.filter((row) => row.moderationStatus === "approved").length / Math.max(1, creatorVideos.length) * 0.6 + (creatorTrust?.trustScore ?? 0.5) * 0.4)
     };
+  }
+
+  private isVisibleVideo(video: VideoAsset): boolean {
+    if (!["published", "moderation_pending", "publish_pending"].includes(video.status)) return false;
+    if (!this.moderationService) return true;
+    return this.moderationService.isPubliclyVisible({ targetType: "place_review_video", targetId: video.id, placeId: video.canonicalPlaceId, subjectUserId: video.authorUserId });
   }
 
   private playbackUrl(key?: string): string | undefined {

@@ -68,6 +68,7 @@ import type { PlaceNormalizationService } from "../places/service.js";
 import { createRolloutHttpHandlers } from "../rollouts/http.js";
 import { createVideoPlatformHttpHandlers } from "../videoPlatform/http.js";
 import type { VideoPlatformService } from "../videoPlatform/service.js";
+import type { TrustSafetyService } from "../trustSafety/service.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
@@ -138,6 +139,7 @@ export function createRoutes(
     placeContentHandlers?: PlaceContentHttpHandlers;
     outingPlannerService?: OutingPlannerService;
     moderationService?: ModerationService;
+    trustSafetyService?: TrustSafetyService;
     placeService?: PlaceNormalizationService;
     notificationService?: NotificationService;
     analyticsService?: AnalyticsService;
@@ -1396,6 +1398,38 @@ export function createRoutes(
           limit: Number(url.searchParams.get("limit") ?? "50")
         });
         sendJson(res, 200, { queue });
+        return;
+      }
+
+      if (normalizedPath === "/v1/admin/trust/actors" && req.method === "GET" && deps?.moderationService) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 401, { error: "unauthorized" });
+          return;
+        }
+        sendJson(res, 200, { items: deps.moderationService.listActorSummaries(Number(url.searchParams.get("limit") ?? "100")) });
+        return;
+      }
+
+      if (normalizedPath === "/v1/admin/trust/places" && req.method === "GET" && deps?.moderationService) {
+        if (!assertAdmin(req)) {
+          sendJson(res, 401, { error: "unauthorized" });
+          return;
+        }
+        sendJson(res, 200, { items: deps.moderationService.listPlaceSummaries(Number(url.searchParams.get("limit") ?? "100")) });
+        return;
+      }
+
+      if (normalizedPath === "/v1/trust/content" && req.method === "GET" && deps?.trustSafetyService) {
+        const targetType = String(url.searchParams.get("targetType") ?? "").trim();
+        const targetId = String(url.searchParams.get("targetId") ?? "").trim();
+        if (!targetType || !targetId) throw new ValidationError(["targetType and targetId are required"]);
+        const summary = deps.trustSafetyService.getContentSummary({
+          targetType: targetType as never,
+          targetId,
+          placeId: url.searchParams.get("placeId") ?? undefined,
+          subjectUserId: url.searchParams.get("subjectUserId") ?? undefined
+        });
+        sendJson(res, 200, { summary });
         return;
       }
 

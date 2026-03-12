@@ -99,4 +99,19 @@ class VideoRepository {
     await finalizeUpload(videoId: videoId, uploadSessionId: upload.id);
     await publish(videoId: videoId);
   }
+
+  Future<void> reportVideo({
+    required String videoId,
+    required String placeId,
+    required String reasonCode,
+    String? note,
+  }) async {
+    await apiClient.postJson('/v1/moderation/reports', body: {
+      'targetType': 'place_review_video',
+      'targetId': videoId,
+      'placeId': placeId,
+      'reasonCode': reasonCode,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+  }
 }

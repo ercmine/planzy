@@ -201,6 +201,8 @@ export interface VideoFeedItem {
     handle: string;
     qualityScore: number;
     trustScore: number;
+    trustTier?: "low" | "developing" | "trusted" | "high";
+    trustBadges?: string[];
   };
   placeSummary?: {
     canonicalPlaceId: string;
@@ -212,6 +214,7 @@ export interface VideoFeedItem {
     qualityScore: number;
     contentRichnessScore: number;
     trustedReviewScore: number;
+    trustTier?: "low" | "developing" | "trusted" | "high";
   };
   playbackUrl?: string;
   thumbnailUrl?: string;
@@ -228,6 +231,11 @@ export interface VideoFeedItem {
   ranking?: RankingSignalBreakdown;
   status: VideoLifecycleStatus;
   moderationStatus: ModerationStatus;
+  trust?: {
+    trustScore: number;
+    trustTier: "low" | "developing" | "trusted" | "high";
+    badges: string[];
+  };
   publishedAt?: string;
 }
 
@@ -238,6 +246,8 @@ export interface VideoStudioItem {
   caption?: string;
   status: VideoLifecycleStatus;
   moderationStatus: ModerationStatus;
+  moderationState?: "active" | "pending_review" | "auto_limited" | "hidden" | "removed" | "rejected" | "restored" | "escalated";
+  moderationReason?: string;
   statusLabel: string;
   isRetryable: boolean;
   failureReason?: string;

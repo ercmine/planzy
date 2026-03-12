@@ -67,6 +67,8 @@ class PlaceVideoFeedItem {
     this.creatorHandle = '@creator',
     this.thumbnailUrl,
     this.coverUrl,
+    this.trustTier,
+    this.trustBadges = const [],
   });
 
   final String videoId;
@@ -81,6 +83,8 @@ class PlaceVideoFeedItem {
   final String videoUrl;
   final String? thumbnailUrl;
   final String? coverUrl;
+  final String? trustTier;
+  final List<String> trustBadges;
   final int rating;
   final String status;
 
@@ -101,6 +105,10 @@ class PlaceVideoFeedItem {
       videoUrl: (json['playbackUrl'] ?? json['videoUrl'] ?? '').toString(),
       thumbnailUrl: json['thumbnailUrl']?.toString(),
       coverUrl: json['coverUrl']?.toString(),
+      trustTier: (json['trust'] is Map ? (json['trust'] as Map)['trustTier'] : null)?.toString(),
+      trustBadges: (json['trust'] is Map && (json['trust'] as Map)['badges'] is List)
+          ? ((json['trust'] as Map)['badges'] as List).map((e) => e.toString()).toList(growable: false)
+          : const [],
       rating: json['rating'] is num ? (json['rating'] as num).toInt() : 0,
       status: (json['status'] ?? 'draft').toString(),
     );
@@ -114,6 +122,8 @@ class StudioVideo {
     required this.placeName,
     required this.title,
     required this.status,
+    this.moderationState,
+    this.moderationReason,
   });
 
   final String videoId;
@@ -121,6 +131,8 @@ class StudioVideo {
   final String placeName;
   final String title;
   final StudioVideoStatus status;
+  final String? moderationState;
+  final String? moderationReason;
 
   factory StudioVideo.fromJson(Map<String, dynamic> json) {
     final raw = (json['status'] ?? 'draft').toString();
@@ -134,6 +146,8 @@ class StudioVideo {
       placeName: (json['placeName'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
       status: status,
+      moderationState: json['moderationState']?.toString(),
+      moderationReason: json['moderationReason']?.toString(),
     );
   }
 }
