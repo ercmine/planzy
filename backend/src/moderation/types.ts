@@ -1,6 +1,9 @@
 export type ModerationTargetType =
   | "review"
   | "review_media"
+  | "place_review_video"
+  | "guide"
+  | "creator_profile"
   | "place_media"
   | "business_reply"
   | "business_review_response"
@@ -141,6 +144,22 @@ export interface ModerationAggregate {
   };
   lastReviewedAt?: string;
   reviewerUserId?: string;
+}
+
+export interface ModerationActorSummary {
+  actorUserId: string;
+  openReportCount: number;
+  confirmedViolationCount: number;
+  reportToViolationRatio: number;
+  lastActivityAt?: string;
+}
+
+export interface ModerationPlaceSummary {
+  placeId: string;
+  openReportCount: number;
+  hiddenOrRemovedCount: number;
+  pendingReviewCount: number;
+  lastActivityAt?: string;
 }
 
 export interface ModerationQueueItem {

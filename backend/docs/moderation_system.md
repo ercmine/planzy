@@ -91,3 +91,28 @@ The moderation target abstraction and signal schema are vendor-agnostic and can 
 - third-party media safety classifiers
 - additional content types (guides, profile bios, comments)
 - dynamic threshold/rule configuration and feature flags
+
+## Trust + ranking integration foundation
+The moderation subsystem now feeds a dedicated trust computation layer (`backend/src/trustSafety`) that derives:
+- content trust score/tier + ranking adjustment
+- creator trust summary (published vs hidden/removed history)
+- place trust summary (trusted-content ratio + moderation issue counts)
+
+New moderation targets include `place_review_video`, `guide`, and `creator_profile` to support non-review surfaces.
+
+### Public trust endpoint
+- `GET /v1/trust/content?targetType=...&targetId=...`
+- returns normalized trust summary with `trustScore`, `trustTier`, badges, moderation state, and ranking adjustment.
+
+### Operator trust endpoints
+- `GET /v1/admin/trust/actors`
+- `GET /v1/admin/trust/places`
+
+These endpoints provide repeat-offender and place-level abuse visibility for moderation operations.
+
+### Video ranking + visibility behavior
+`VideoPlatformService` now:
+- excludes content from feed/creator/place public lists when moderation has hidden/removed/rejected the video target
+- enriches feed items with trust metadata (`trustScore`, `trustTier`, badges)
+- injects place/creator trust summaries into ranking signals for quality/trust weighting
+- surfaces moderation state hints in studio payloads to improve creator-facing status clarity.

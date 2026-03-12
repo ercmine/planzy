@@ -57,6 +57,7 @@ import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
 import { MemoryRolloutStore } from "../rollouts/store.js";
 import { rolloutSeedForLocalDev, RolloutService } from "../rollouts/service.js";
 import { MemoryVideoPlatformStore, VideoPlatformService } from "../videoPlatform/index.js";
+import { TrustSafetyService } from "../trustSafety/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -97,6 +98,7 @@ export function createServer(options?: CreateServerOptions) {
   const notificationStore = new MemoryNotificationStore();
   const notificationService = new NotificationService(notificationStore);
   const moderationService = new ModerationService(new ReviewsModerationEnforcementAdapter(reviewsStore));
+  const trustSafetyService = new TrustSafetyService(moderationService);
   const usageStore = new MemoryUsageStore();
   const subscriptionService = new SubscriptionService(usageStore, new DevBillingProvider(), {
     onEvent: async (event, subscription) => {
@@ -193,7 +195,11 @@ export function createServer(options?: CreateServerOptions) {
       uploadTtlSeconds: Number.parseInt(process.env.VIDEO_UPLOAD_URL_TTL_SECONDS ?? "900", 10),
       maxUploadBytes: Number.parseInt(process.env.VIDEO_MAX_UPLOAD_BYTES ?? String(2 * 1024 * 1024 * 1024), 10),
       multipartThresholdBytes: Number.parseInt(process.env.VIDEO_MULTIPART_THRESHOLD_BYTES ?? String(50 * 1024 * 1024), 10)
-    }
+    },
+    undefined,
+    undefined,
+    moderationService,
+    trustSafetyService
   );
 
   return createHttpServer(service, merchantService, {
@@ -202,6 +208,7 @@ export function createServer(options?: CreateServerOptions) {
     telemetryService,
     reviewsStore,
     moderationService,
+    trustSafetyService,
     placeService,
     notificationService,
     subscriptionService,

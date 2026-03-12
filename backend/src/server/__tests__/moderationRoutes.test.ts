@@ -57,6 +57,14 @@ describe("moderation routes", () => {
     expect(details.status).toBe(200);
     const detailsJson = await details.json();
     expect(detailsJson.reports.length).toBeGreaterThan(0);
+
+    const trust = await fetch(`${baseUrl}/v1/trust/content?targetType=review&targetId=${encodeURIComponent(reviewId)}`);
+    expect(trust.status).toBe(200);
+    const trustJson = await trust.json();
+    expect(typeof trustJson.summary.trustScore).toBe("number");
+
+    const adminActors = await fetch(`${baseUrl}/v1/admin/trust/actors`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(adminActors.status).toBe(200);
   });
 
   it("allows reversible admin decisions that affect visibility", async () => {

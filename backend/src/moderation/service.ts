@@ -15,6 +15,8 @@ import type {
   ModerationSource,
   ModerationState,
   ModerationTargetRef,
+  ModerationActorSummary,
+  ModerationPlaceSummary,
   ReportReasonCode
 } from "./types.js";
 
@@ -286,6 +288,69 @@ export class ModerationService {
   isPubliclyVisible(target: ModerationTargetRef): boolean {
     const state = this.currentState(target);
     return !["hidden", "removed", "rejected"].includes(state);
+  }
+
+  getState(target: ModerationTargetRef): ModerationState {
+    return this.currentState(target);
+  }
+
+  listActorSummaries(limit = 100): ModerationActorSummary[] {
+    const byActor = new Map<string, ModerationActorSummary>();
+    for (const reportList of this.reports.values()) {
+      for (const report of reportList) {
+        const row = byActor.get(report.reporterUserId) ?? {
+          actorUserId: report.reporterUserId,
+          openReportCount: 0,
+          confirmedViolationCount: 0,
+          reportToViolationRatio: 0,
+          lastActivityAt: undefined
+        };
+        if (report.status === "open") row.openReportCount += 1;
+        row.lastActivityAt = [row.lastActivityAt, report.createdAt].filter(Boolean).sort().at(-1);
+        byActor.set(report.reporterUserId, row);
+      }
+    }
+    for (const decisionList of this.decisions.values()) {
+      for (const decision of decisionList) {
+        if (!["hide", "remove", "reject"].includes(decision.decisionType)) continue;
+        const actor = decision.target.subjectUserId;
+        if (!actor) continue;
+        const row = byActor.get(actor) ?? {
+          actorUserId: actor,
+          openReportCount: 0,
+          confirmedViolationCount: 0,
+          reportToViolationRatio: 0,
+          lastActivityAt: undefined
+        };
+        row.confirmedViolationCount += 1;
+        row.lastActivityAt = [row.lastActivityAt, decision.createdAt].filter(Boolean).sort().at(-1);
+        byActor.set(actor, row);
+      }
+    }
+    return [...byActor.values()]
+      .map((row) => ({ ...row, reportToViolationRatio: row.confirmedViolationCount === 0 ? row.openReportCount : Number((row.openReportCount / row.confirmedViolationCount).toFixed(2)) }))
+      .sort((a, b) => b.confirmedViolationCount - a.confirmedViolationCount || b.openReportCount - a.openReportCount)
+      .slice(0, Math.max(1, Math.min(limit, 500)));
+  }
+
+  listPlaceSummaries(limit = 100): ModerationPlaceSummary[] {
+    const map = new Map<string, ModerationPlaceSummary>();
+    for (const [key, reportList] of this.reports.entries()) {
+      const [targetType, ...targetIdParts] = key.split(":");
+      const target: ModerationTargetRef = { targetType: targetType as ModerationTargetRef["targetType"], targetId: targetIdParts.join(":") };
+      const placeId = reportList[0]?.target.placeId ?? target.placeId;
+      if (!placeId) continue;
+      const aggregate = this.getAggregate(target);
+      const row = map.get(placeId) ?? { placeId, openReportCount: 0, hiddenOrRemovedCount: 0, pendingReviewCount: 0, lastActivityAt: undefined };
+      row.openReportCount += aggregate.reportCount;
+      if (["hidden", "removed", "rejected"].includes(aggregate.state)) row.hiddenOrRemovedCount += 1;
+      if (["pending_review", "escalated", "auto_limited"].includes(aggregate.state)) row.pendingReviewCount += 1;
+      row.lastActivityAt = [row.lastActivityAt, ...reportList.map((item) => item.createdAt)].filter(Boolean).sort().at(-1);
+      map.set(placeId, row);
+    }
+    return [...map.values()]
+      .sort((a, b) => b.hiddenOrRemovedCount - a.hiddenOrRemovedCount || b.openReportCount - a.openReportCount)
+      .slice(0, Math.max(1, Math.min(limit, 500)));
   }
 
   private async transitionState(input: { target: ModerationTargetRef; newState: ModerationState; source: ModerationSource; actorUserId?: string; reasonCode: string; now: Date }): Promise<void> {
