@@ -65,6 +65,7 @@ import type { AnalyticsService } from "../analytics/service.js";
 import { createAdminHttpHandlers } from "../admin/http.js";
 import { AdminService } from "../admin/service.js";
 import type { PlaceNormalizationService } from "../places/service.js";
+import { autocompleteCanonicalPlaces } from "../places/autocomplete.js";
 import { createRolloutHttpHandlers } from "../rollouts/http.js";
 import { createVideoPlatformHttpHandlers } from "../videoPlatform/http.js";
 import type { VideoPlatformService } from "../videoPlatform/service.js";
@@ -171,6 +172,8 @@ export function createRoutes(
   const notificationHandlers = deps?.notificationService ? createNotificationHttpHandlers(deps.notificationService) : null;
   const analyticsHandlers = deps?.analyticsService && deps?.analyticsQueryService ? createAnalyticsHttpHandlers(deps.analyticsService, deps.analyticsQueryService) : null;
   const videoPlatformHandlers = deps?.videoPlatformService ? createVideoPlatformHttpHandlers(deps.videoPlatformService) : null;
+  const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
+
   const adminHandlers = deps?.accountsService && deps?.moderationService
     ? createAdminHttpHandlers(new AdminService({
       accountsService: deps.accountsService,
@@ -202,6 +205,60 @@ export function createRoutes(
     const normalizedPath = normalizeAliasPath(url.pathname);
 
     try {
+
+      if (req.method === "GET" && (normalizedPath === "/v1/places/autocomplete" || normalizedPath === "/v1/places/search")) {
+        const q = String(url.searchParams.get("q") ?? "").trim();
+        if (!q) {
+          sendJson(res, 200, { query: "", suggestions: [], places: [] });
+          return;
+        }
+        const limit = Number.parseInt(url.searchParams.get("limit") ?? "8", 10);
+        const lat = url.searchParams.get("lat");
+        const lng = url.searchParams.get("lng");
+        const city = url.searchParams.get("city") ?? undefined;
+        const region = url.searchParams.get("region") ?? undefined;
+        const category = url.searchParams.get("category") ?? undefined;
+        const rawScope = String(url.searchParams.get("scope") ?? "local").toLowerCase();
+        const scope = rawScope === "regional" || rawScope === "global" ? rawScope : "local";
+
+        const cacheKey = JSON.stringify({ q: q.toLowerCase(), limit, lat, lng, city, region, category, scope });
+        const cacheHit = placeAutocompleteCache.get(cacheKey);
+        if (cacheHit && cacheHit.expiresAt > Date.now()) {
+          sendJson(res, 200, cacheHit.payload);
+          return;
+        }
+
+        const places = deps?.placeService?.listCanonicalPlaces() ?? [];
+        const suggestions = autocompleteCanonicalPlaces(places, {
+          q,
+          limit,
+          lat: lat ? Number(lat) : undefined,
+          lng: lng ? Number(lng) : undefined,
+          city,
+          region,
+          category,
+          scope
+        });
+
+        const payload = {
+          query: q,
+          suggestions,
+          places: suggestions.map((item) => ({
+            placeId: item.canonicalPlaceId,
+            canonicalPlaceId: item.canonicalPlaceId,
+            name: item.displayName,
+            category: item.category,
+            regionLabel: [item.city, item.region].filter(Boolean).join(", "),
+            distanceKm: typeof item.distanceMeters === "number" ? Number((item.distanceMeters / 1000).toFixed(2)) : undefined,
+            addressSnippet: item.addressSnippet,
+            thumbnailUrl: item.thumbnailUrl
+          }))
+        };
+        placeAutocompleteCache.set(cacheKey, { expiresAt: Date.now() + 20_000, payload });
+        sendJson(res, 200, payload);
+        return;
+      }
+
       if (req.method === "GET" && normalizedPath === "/") {
         sendJson(res, 200, {
           service: "perbug-api",

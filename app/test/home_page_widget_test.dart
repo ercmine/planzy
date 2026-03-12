@@ -43,6 +43,9 @@ void main() {
               localItems.first.copyWith(scope: FeedScope.global, caption: 'Global highlight'),
             ]),
         placeSearchProvider((query: '', scope: FeedScope.local)).overrideWith((ref) async => const []),
+        placeSearchProvider((query: 'Cafe', scope: FeedScope.local)).overrideWith((ref) async => const [
+              PlaceSearchResult(placeId: 'place_123', name: 'Cafe Orbit', category: 'Cafe', regionLabel: 'Downtown'),
+            ]),
         studioVideosProvider.overrideWith((ref) async => const []),
       ]),
     );
@@ -59,13 +62,16 @@ void main() {
     expect(find.text('Global highlight'), findsOneWidget);
   });
 
-  testWidgets('Create flow supports record and upload entry points and requires place id', (tester) async {
+  testWidgets('Create flow requires canonical place selection before save', (tester) async {
     await tester.pumpWidget(
       buildApp([
         videoFeedProvider(FeedScope.local).overrideWith((ref) async => localItems),
         videoFeedProvider(FeedScope.regional).overrideWith((ref) async => const []),
         videoFeedProvider(FeedScope.global).overrideWith((ref) async => const []),
         placeSearchProvider((query: '', scope: FeedScope.local)).overrideWith((ref) async => const []),
+        placeSearchProvider((query: 'Cafe', scope: FeedScope.local)).overrideWith((ref) async => const [
+              PlaceSearchResult(placeId: 'place_123', name: 'Cafe Orbit', category: 'Cafe', regionLabel: 'Downtown'),
+            ]),
         studioVideosProvider.overrideWith((ref) async => const []),
       ]),
     );
@@ -82,7 +88,10 @@ void main() {
     final saveButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save Draft'));
     expect(saveButton.onPressed, isNull);
 
-    await tester.enterText(find.byKey(const Key('place-id-field')), 'place_123');
+    await tester.enterText(find.byKey(const Key('place-search-field')), 'Cafe');
+    await tester.pump(const Duration(milliseconds: 260));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cafe Orbit').first);
     await tester.pumpAndSettle();
 
     final enabledSaveButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save Draft'));
@@ -120,6 +129,9 @@ void main() {
         videoFeedProvider(FeedScope.regional).overrideWith((ref) async => const []),
         videoFeedProvider(FeedScope.global).overrideWith((ref) async => const []),
         placeSearchProvider((query: '', scope: FeedScope.local)).overrideWith((ref) async => const []),
+        placeSearchProvider((query: 'Cafe', scope: FeedScope.local)).overrideWith((ref) async => const [
+              PlaceSearchResult(placeId: 'place_123', name: 'Cafe Orbit', category: 'Cafe', regionLabel: 'Downtown'),
+            ]),
         studioVideosProvider.overrideWith((ref) async => const [
               StudioVideo(videoId: 'v2', placeId: 'p1', placeName: 'Cafe Orbit', title: 'Cafe Orbit review', status: StudioVideoStatus.processing),
             ]),

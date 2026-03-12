@@ -13,12 +13,30 @@ class VideoRepository {
     return items.whereType<Map<String, dynamic>>().map((item) => PlaceVideoFeedItem.fromJson(item, scope)).toList(growable: false);
   }
 
-  Future<List<PlaceSearchResult>> searchPlaces({required String query, FeedScope scope = FeedScope.local, String? category}) async {
+  Future<List<PlaceSearchResult>> searchPlaces({
+    required String query,
+    FeedScope scope = FeedScope.local,
+    String? category,
+    double? lat,
+    double? lng,
+    String? city,
+    String? region,
+    int limit = 8,
+  }) async {
     final response = await apiClient.getJson(
-      '/v1/places/search',
-      queryParameters: {'q': query, 'scope': scope.name, 'category': category},
+      '/v1/places/autocomplete',
+      queryParameters: {
+        'q': query,
+        'scope': scope.name,
+        'category': category,
+        'lat': lat,
+        'lng': lng,
+        'city': city,
+        'region': region,
+        'limit': limit,
+      },
     );
-    final items = response['places'];
+    final items = response['suggestions'] ?? response['places'];
     if (items is! List) return const [];
     return items.whereType<Map<String, dynamic>>().map(PlaceSearchResult.fromJson).toList(growable: false);
   }

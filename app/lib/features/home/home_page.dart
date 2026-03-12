@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -113,32 +114,57 @@ class _SearchTab extends ConsumerStatefulWidget {
 
 class _SearchTabState extends ConsumerState<_SearchTab> {
   final _controller = TextEditingController();
+  String _debouncedQuery = '';
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final results = ref.watch(placeSearchProvider((query: _controller.text, scope: widget.scope)));
+    final results = ref.watch(placeSearchProvider((query: _debouncedQuery, scope: widget.scope)));
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(12),
           child: TextField(
             controller: _controller,
-            decoration: const InputDecoration(labelText: 'Search places', prefixIcon: Icon(Icons.search)),
-            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Search places',
+              hintText: 'Type a place name, category, or neighborhood',
+              prefixIcon: Icon(Icons.search),
+            ),
+            onChanged: (value) {
+              _debounce?.cancel();
+              _debounce = Timer(const Duration(milliseconds: 220), () {
+                if (!mounted) return;
+                setState(() => _debouncedQuery = value.trim());
+              });
+            },
           ),
         ),
         Expanded(
           child: results.when(
-            data: (items) => ListView(
-              children: items
-                  .map((item) => ListTile(
-                        title: Text(item.name),
-                        subtitle: Text('${item.category} • ${item.regionLabel}'),
-                      ))
-                  .toList(growable: false),
-            ),
+            data: (items) {
+              if (_debouncedQuery.isEmpty) return const Center(child: Text('Start typing to search canonical places.'));
+              if (items.isEmpty) return const Center(child: Text('No places found. Try another area or query.'));
+              return ListView(
+                children: items
+                    .map((item) => ListTile(
+                          leading: const Icon(Icons.place_outlined),
+                          title: Text(item.name),
+                          subtitle: Text('${item.category} • ${item.regionLabel}${item.addressSnippet == null ? '' : '\n${item.addressSnippet}'}'),
+                          trailing: item.distanceKm == null ? null : Text('${item.distanceKm!.toStringAsFixed(1)} km'),
+                        ))
+                    .toList(growable: false),
+              );
+            },
             error: (_, __) => const Center(child: Text('Search unavailable')),
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => _debouncedQuery.isEmpty ? const SizedBox.shrink() : const Center(child: CircularProgressIndicator()),
           ),
         ),
       ],
@@ -155,13 +181,27 @@ class _CreateTab extends ConsumerStatefulWidget {
 
 class _CreateTabState extends ConsumerState<_CreateTab> {
   String _source = 'record';
-  String _placeId = '';
   final _titleController = TextEditingController();
   final _captionController = TextEditingController();
+  final _placeSearchController = TextEditingController();
+  Timer? _searchDebounce;
+  String _searchQuery = '';
+  PlaceSearchResult? _selectedPlace;
+  final List<PlaceSearchResult> _recentPlaces = [];
   int _rating = 4;
 
   @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _titleController.dispose();
+    _captionController.dispose();
+    _placeSearchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final suggestions = ref.watch(placeSearchProvider((query: _searchQuery, scope: FeedScope.local)));
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -182,11 +222,86 @@ class _CreateTabState extends ConsumerState<_CreateTab> {
           onPressed: _source == 'record' ? _requestCamera : _requestStorage,
           child: Text(_source == 'record' ? 'Open Recorder' : 'Open Media Picker'),
         ),
+        const SizedBox(height: 12),
         TextField(
-          key: const Key('place-id-field'),
-          decoration: const InputDecoration(labelText: 'Canonical place ID (required)'),
-          onChanged: (value) => _placeId = value,
+          key: const Key('place-search-field'),
+          controller: _placeSearchController,
+          decoration: InputDecoration(
+            labelText: 'Tag reviewed place',
+            hintText: 'Search for the canonical place',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _selectedPlace == null
+                ? null
+                : IconButton(
+                    onPressed: () => setState(() => _selectedPlace = null),
+                    icon: const Icon(Icons.edit_location_alt_outlined),
+                    tooltip: 'Change place',
+                  ),
+          ),
+          onChanged: (value) {
+            _searchDebounce?.cancel();
+            _searchDebounce = Timer(const Duration(milliseconds: 220), () {
+              if (!mounted) return;
+              setState(() => _searchQuery = value.trim());
+            });
+          },
         ),
+        const SizedBox(height: 8),
+        if (_selectedPlace != null)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.verified),
+              title: Text(_selectedPlace!.name),
+              subtitle: Text('${_selectedPlace!.category} • ${_selectedPlace!.regionLabel}\nCanonical: ${_selectedPlace!.placeId}'),
+            ),
+          )
+        else ...[
+          if (_recentPlaces.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              children: _recentPlaces
+                  .map((item) => ActionChip(
+                        label: Text(item.name),
+                        onPressed: () => setState(() => _selectedPlace = item),
+                      ))
+                  .toList(growable: false),
+            ),
+          suggestions.when(
+            data: (items) {
+              if (_searchQuery.isEmpty) return const SizedBox.shrink();
+              if (items.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text('No matching place found. Try a nearby area or different keywords.'),
+                );
+              }
+              return Column(
+                children: items
+                    .map((item) => ListTile(
+                          title: Text(item.name),
+                          subtitle: Text('${item.category} • ${item.regionLabel}'),
+                          trailing: item.distanceKm == null ? null : Text('${item.distanceKm!.toStringAsFixed(1)} km'),
+                          onTap: () => setState(() {
+                            _selectedPlace = item;
+                            _placeSearchController.text = item.name;
+                            if (_recentPlaces.every((entry) => entry.placeId != item.placeId)) {
+                              _recentPlaces.insert(0, item);
+                              if (_recentPlaces.length > 4) {
+                                _recentPlaces.removeLast();
+                              }
+                            }
+                          }),
+                        ))
+                    .toList(growable: false),
+              );
+            },
+            error: (_, __) => const Text('Place suggestions unavailable right now.'),
+            loading: () => _searchQuery.isEmpty ? const SizedBox.shrink() : const Padding(
+              padding: EdgeInsets.all(8),
+              child: LinearProgressIndicator(),
+            ),
+          ),
+        ],
         TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title')),
         TextField(controller: _captionController, decoration: const InputDecoration(labelText: 'Caption')),
         DropdownButtonFormField<int>(
@@ -197,19 +312,19 @@ class _CreateTabState extends ConsumerState<_CreateTab> {
         ),
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: _placeId.isEmpty
+          onPressed: _selectedPlace == null
               ? null
               : () async {
                   final repo = await ref.read(videoRepositoryProvider.future);
                   await repo.submitDraft(
                     source: _source,
-                    placeId: _placeId,
+                    placeId: _selectedPlace!.placeId,
                     title: _titleController.text,
                     caption: _captionController.text,
                     rating: _rating,
                   );
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Draft saved to studio')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Draft saved for ${_selectedPlace!.name}')));
                 },
           child: const Text('Save Draft'),
         ),
