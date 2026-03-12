@@ -1,4 +1,4 @@
-export const NOTIFICATION_CATEGORIES = ["social", "reviews", "business", "creator", "moderation", "premium", "collaborations", "system"] as const;
+export const NOTIFICATION_CATEGORIES = ["social", "reviews", "business", "creator", "moderation", "premium", "collaborations", "system", "saved_places", "discovery", "guides", "studio"] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
 export const NOTIFICATION_TYPES = [
@@ -12,7 +12,16 @@ export const NOTIFICATION_TYPES = [
   "premium_feature_upsell",
   "collaboration_invite_received",
   "collaboration_invite_accepted",
-  "collaboration_invite_declined"
+  "collaboration_invite_declined",
+  "video_processing_finished",
+  "video_processing_failed",
+  "video_published",
+  "video_moderation_state_changed",
+  "followed_creator_posted",
+  "saved_place_new_videos",
+  "local_discovery_highlights",
+  "guide_updated",
+  "draft_reminder"
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -71,6 +80,19 @@ export interface NotificationPreference {
   updatedAt: string;
 }
 
+export interface DeviceTokenRegistration {
+  id: string;
+  userId: string;
+  token: string;
+  platform: "ios" | "android" | "web";
+  appVersion?: string;
+  locale?: string;
+  pushEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  revokedAt?: string;
+}
+
 export interface NotificationDeliveryAttempt {
   id: string;
   notificationId: string;
@@ -97,4 +119,13 @@ export type NotificationEvent =
   | { eventId?: string; type: "premium.feature.upsell"; recipientUserId: string; featureKey: string; occurredAt?: string }
   | { eventId?: string; type: "collaboration.invite.received"; recipientUserId: string; actor: NotificationActorSummary; inviteId: string; title: string; businessProfileId: string; occurredAt?: string }
   | { eventId?: string; type: "collaboration.invite.accepted"; recipientUserId: string; actor: NotificationActorSummary; inviteId: string; occurredAt?: string }
-  | { eventId?: string; type: "collaboration.invite.declined"; recipientUserId: string; actor: NotificationActorSummary; inviteId: string; occurredAt?: string };
+  | { eventId?: string; type: "collaboration.invite.declined"; recipientUserId: string; actor: NotificationActorSummary; inviteId: string; occurredAt?: string }
+  | { eventId?: string; type: "video.processing.finished"; recipientUserId: string; videoId: string; placeId: string; placeName?: string; occurredAt?: string }
+  | { eventId?: string; type: "video.processing.failed"; recipientUserId: string; videoId: string; placeId: string; reason?: string; occurredAt?: string }
+  | { eventId?: string; type: "video.published"; recipientUserId: string; videoId: string; placeId: string; placeName?: string; occurredAt?: string }
+  | { eventId?: string; type: "video.moderation.changed"; recipientUserId: string; videoId: string; placeId: string; moderationState: "pending" | "hidden" | "rejected" | "approved"; occurredAt?: string }
+  | { eventId?: string; type: "creator.followed.posted"; recipientUserId: string; actor: NotificationActorSummary; videoId: string; placeId: string; placeName?: string; localityScope?: "local" | "regional" | "global"; occurredAt?: string }
+  | { eventId?: string; type: "saved.place.new_videos"; recipientUserId: string; placeId: string; placeName?: string; newVideoCount: number; occurredAt?: string }
+  | { eventId?: string; type: "discovery.local.highlights"; recipientUserId: string; city: string; highlightsCount: number; occurredAt?: string }
+  | { eventId?: string; type: "guide.updated"; recipientUserId: string; guideId: string; guideTitle: string; placeId?: string; actor?: NotificationActorSummary; occurredAt?: string }
+  | { eventId?: string; type: "studio.draft.reminder"; recipientUserId: string; draftCount: number; oldestDraftAgeHours: number; occurredAt?: string };

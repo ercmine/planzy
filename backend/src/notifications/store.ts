@@ -1,4 +1,4 @@
-import type { Notification, NotificationCategory, NotificationDeliveryAttempt, NotificationPreference, NotificationType } from "./types.js";
+import type { DeviceTokenRegistration, Notification, NotificationCategory, NotificationDeliveryAttempt, NotificationPreference, NotificationType } from "./types.js";
 
 export function encodeOffsetCursor(offset: number): string {
   return Buffer.from(String(offset), "utf8").toString("base64url");
@@ -23,4 +23,7 @@ export interface NotificationStore {
   listPreferences(userId: string): Promise<NotificationPreference[]>;
   listDeliveryAttempts(notificationId: string): Promise<NotificationDeliveryAttempt[]>;
   createDeliveryAttempt(attempt: NotificationDeliveryAttempt): Promise<void>;
+  upsertDeviceToken(registration: DeviceTokenRegistration): Promise<DeviceTokenRegistration>;
+  revokeDeviceToken(userId: string, token: string, revokedAt: string): Promise<boolean>;
+  listActiveDeviceTokens(userId: string): Promise<DeviceTokenRegistration[]>;
 }

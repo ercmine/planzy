@@ -204,6 +204,19 @@ class ApiClient {
     return _sendForJsonMap(method: 'DELETE', path: path, body: body);
   }
 
+  Future<JsonMap> putJson(
+    String path, {
+    Object? body,
+    Map<String, String?>? queryParameters,
+  }) {
+    return _sendForJsonMap(
+      method: 'PUT',
+      path: path,
+      queryParameters: queryParameters,
+      body: body,
+    );
+  }
+
   Future<JsonMap> patchJson(
     String path, {
     Object? body,

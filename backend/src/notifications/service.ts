@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 import type { NotificationStore } from "./store.js";
-import type { Notification, NotificationEvent } from "./types.js";
+import type { DeviceTokenRegistration, Notification, NotificationEvent } from "./types.js";
 import { NotificationComposer } from "./composer.js";
 import { NotificationPreferenceService } from "./preferences.js";
 import { NotificationDedupeService } from "./dedupe.js";
 
 export class NotificationService {
   private readonly composer = new NotificationComposer();
+  private readonly metrics = new Map<string, number>();
   private readonly preferences: NotificationPreferenceService;
   private readonly dedupe: NotificationDedupeService;
 
@@ -20,8 +21,15 @@ export class NotificationService {
     const composed = this.composer.compose(event);
     const createdAt = event.occurredAt ?? this.now().toISOString();
 
-    if (!(await this.preferences.canDeliverInApp(event.recipientUserId, composed.category))) return null;
-    if (await this.dedupe.isDuplicate({ recipientUserId: event.recipientUserId, dedupeKey: composed.dedupeKey, type: composed.type, createdAt })) return null;
+    this.bump(`generated.${composed.type}`);
+    if (!(await this.preferences.canDeliverInApp(event.recipientUserId, composed.category))) {
+      this.bump(`suppressed.preference.${composed.category}`);
+      return null;
+    }
+    if (await this.dedupe.isDuplicate({ recipientUserId: event.recipientUserId, dedupeKey: composed.dedupeKey, type: composed.type, createdAt })) {
+      this.bump(`suppressed.dedupe.${composed.type}`);
+      return null;
+    }
 
     const notification: Notification = {
       id: randomUUID(),
@@ -49,6 +57,7 @@ export class NotificationService {
 
     await this.store.create(notification);
     await this.store.createDeliveryAttempt({ id: randomUUID(), notificationId: notification.id, channel: "in_app", status: "sent", attemptedAt: createdAt });
+    this.bump(`delivered.in_app.${composed.type}`);
     return notification;
   }
 
@@ -74,5 +83,41 @@ export class NotificationService {
 
   async updatePreference(userId: string, category: Notification["category"], patch: { inAppEnabled?: boolean; pushEnabled?: boolean; emailEnabled?: boolean; frequency?: "instant" | "daily_digest" | "weekly_digest" }) {
     return this.preferences.updatePreference(userId, category, patch);
+  }
+
+  async registerDeviceToken(input: { userId: string; token: string; platform: "ios" | "android" | "web"; appVersion?: string; locale?: string; pushEnabled?: boolean }): Promise<DeviceTokenRegistration> {
+    const now = this.now().toISOString();
+    const registration: DeviceTokenRegistration = {
+      id: randomUUID(),
+      userId: input.userId,
+      token: input.token,
+      platform: input.platform,
+      appVersion: input.appVersion,
+      locale: input.locale,
+      pushEnabled: input.pushEnabled ?? true,
+      createdAt: now,
+      updatedAt: now
+    };
+    const saved = await this.store.upsertDeviceToken(registration);
+    this.bump("device_token.registered");
+    return saved;
+  }
+
+  async unregisterDeviceToken(userId: string, token: string): Promise<boolean> {
+    const removed = await this.store.revokeDeviceToken(userId, token, this.now().toISOString());
+    if (removed) this.bump("device_token.revoked");
+    return removed;
+  }
+
+  async listActiveDeviceTokens(userId: string): Promise<DeviceTokenRegistration[]> {
+    return this.store.listActiveDeviceTokens(userId);
+  }
+
+  getMetricsSnapshot(): Record<string, number> {
+    return Object.fromEntries(this.metrics.entries());
+  }
+
+  private bump(key: string): void {
+    this.metrics.set(key, (this.metrics.get(key) ?? 0) + 1);
   }
 }
