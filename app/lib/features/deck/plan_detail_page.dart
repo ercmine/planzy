@@ -405,12 +405,29 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
           const SizedBox(height: AppSpacing.m),
           _Section(
             title: 'About',
-            child: _isLoadingDetails && (viewData.effectiveDescription == null)
-                ? const Padding(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_isLoadingDetails && (viewData.effectiveDescription == null))
+                  const Padding(
                     padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
                     child: LinearProgressIndicator(),
                   )
-                : Text(viewData.effectiveDescription ?? 'Explore this place for details and updates.'),
+                else
+                  Text(viewData.effectiveDescription ?? 'Explore this place for details and updates.'),
+                if (viewData.notableContext?.landmarkType?.trim().isNotEmpty == true) ...[
+                  const SizedBox(height: AppSpacing.s),
+                  Chip(
+                    avatar: const Icon(Icons.location_city_outlined, size: 16),
+                    label: Text('Landmark type: ${viewData.notableContext!.landmarkType!}'),
+                  ),
+                ],
+                if (viewData.notableContext?.aliases.isNotEmpty == true) ...[
+                  const SizedBox(height: AppSpacing.s),
+                  Text('Also known as: ${viewData.notableContext!.aliases.take(3).join(', ')}'),
+                ],
+              ],
+            ),
           ),
           if (viewData.phone?.trim().isNotEmpty == true || viewData.website?.trim().isNotEmpty == true) ...[
             const SizedBox(height: AppSpacing.m),
@@ -477,7 +494,9 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: viewData.attribution
-                    .map((item) => Text(item.label ?? 'Information provided by trusted partners'))
+                    .map((item) => Text(
+                          item.label ?? (item.provider.toLowerCase() == 'wikidata' ? 'Description from Wikidata' : 'Information provided by trusted partners'),
+                        ))
                     .toList(growable: false),
               ),
             ),

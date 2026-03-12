@@ -58,6 +58,8 @@ export interface EnrichmentCandidate {
   latitude?: number;
   longitude?: number;
   countryCode?: string;
+  city?: string;
+  region?: string;
   categoryHints?: string[];
 }
 
@@ -103,6 +105,32 @@ export function scoreCandidateMatch(
   if (candidate.countryCode && place.countryCode && candidate.countryCode.toUpperCase() === place.countryCode.toUpperCase()) {
     score += 0.1;
     reasons.push("country_match");
+  }
+
+  const canonicalCity = normalizeText(place.city);
+  const canonicalRegion = normalizeText(place.region);
+  if (candidate.city && canonicalCity && normalizeText(candidate.city) === canonicalCity) {
+    score += 0.05;
+    reasons.push("city_match");
+  }
+  if (candidate.region && canonicalRegion && normalizeText(candidate.region) === canonicalRegion) {
+    score += 0.05;
+    reasons.push("region_match");
+  }
+
+  const canonicalTags = typeof place.metadata.tags === "object" && place.metadata.tags
+    ? Object.entries(place.metadata.tags as Record<string, unknown>).map(([k, v]) => `${normalizeText(k)}:${normalizeText(String(v))}`)
+    : [];
+  const normalizedHints = (candidate.categoryHints ?? []).map((item) => normalizeText(item)).filter(Boolean);
+  if (normalizedHints.length > 0 && canonicalTags.length > 0) {
+    const categoryCompatible = normalizedHints.some((hint) => canonicalTags.some((tag) => tag.includes(hint) || hint.includes(tag.split(":")[1] ?? "")));
+    if (categoryCompatible) {
+      score += 0.08;
+      reasons.push("category_compatible");
+    } else {
+      reasons.push("category_mismatch");
+      score -= 0.1;
+    }
   }
 
   const confidence = Math.max(0, Math.min(1, Number(score.toFixed(3))));
@@ -247,7 +275,14 @@ export interface WikidataNormalized {
   description?: string;
   aliases: string[];
   landmarkType?: string;
+  wikipediaUrl?: string;
   imageUrl?: string;
+  image?: {
+    url: string;
+    sourceUrl: string;
+    attributionText: string;
+    license?: string;
+  };
   externalIds: Record<string, string>;
   latitude?: number;
   longitude?: number;
@@ -289,6 +324,10 @@ export function normalizeWikidataResponse(payload: Record<string, unknown>): Wik
     }, {})
     : {};
 
+  const imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl : undefined;
+  const imageLicense = typeof payload.imageLicense === "string" ? payload.imageLicense : undefined;
+  const imageAllowed = payload.imageAllowed !== false;
+
   return {
     sourceId: String(payload.id ?? ""),
     sourceUrl: String(payload.url ?? ""),
@@ -296,7 +335,16 @@ export function normalizeWikidataResponse(payload: Record<string, unknown>): Wik
     description: typeof payload.description === "string" ? payload.description : undefined,
     aliases,
     landmarkType: typeof payload.landmarkType === "string" ? payload.landmarkType : undefined,
-    imageUrl: typeof payload.imageUrl === "string" ? payload.imageUrl : undefined,
+    wikipediaUrl: typeof payload.wikipediaUrl === "string" ? payload.wikipediaUrl : undefined,
+    imageUrl,
+    image: imageUrl && imageAllowed
+      ? {
+        url: imageUrl,
+        sourceUrl: String(payload.imageSourceUrl ?? payload.url ?? ""),
+        attributionText: String(payload.imageAttributionText ?? "Image from Wikidata"),
+        license: imageLicense
+      }
+      : undefined,
     externalIds,
     latitude: typeof payload.lat === "number" ? payload.lat : undefined,
     longitude: typeof payload.lng === "number" ? payload.lng : undefined
@@ -536,12 +584,28 @@ export class PlaceEnrichmentService {
         metadata: {
           ...next.metadata,
           wikidata: {
+            entityId: normalized.sourceId,
+            entityUrl: normalized.sourceUrl,
             aliases: normalized.aliases,
             landmarkType: normalized.landmarkType,
+            wikipediaUrl: normalized.wikipediaUrl,
+            image: normalized.image,
             externalIds: normalized.externalIds
           }
         }
       };
+
+      if (normalized.image && typeof normalized.image === "object") {
+        fieldAttributions.push({
+          field: "images.wikidata",
+          sourceName,
+          sourceId: String(normalized.sourceId ?? ""),
+          sourceUrl: typeof normalized.sourceUrl === "string" ? normalized.sourceUrl : undefined,
+          confidence,
+          observedAt: timestamp
+        });
+        updatedFields.push("images.wikidata");
+      }
     }
 
     if (sourceName === "geonames") {

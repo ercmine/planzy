@@ -104,6 +104,7 @@ describe("open-data operational infrastructure", () => {
     const detail = await backend.getDetail(created.canonicalPlaceId);
 
     expect(detail?.attribution.primary?.label).toBe("OpenStreetMap");
+    expect(detail?.images).toEqual([]);
     expect(detail?.attribution.requiredNotice).toContain("OpenStreetMap");
   });
 
@@ -131,6 +132,8 @@ describe("open-data operational infrastructure", () => {
         placeId: "p2",
         title: "Fallback Place",
         location: { lat: 0, lng: 0 },
+        images: [],
+        notable: { aliases: [] },
         attribution: { primary: { source: "osm", label: "OpenStreetMap" }, allSources: [{ source: "osm", label: "OpenStreetMap" }] },
         trustIndicators: { hasEnrichment: false, sourceCount: 1 }
       })

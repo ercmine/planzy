@@ -326,6 +326,13 @@ export interface DiscoveryCardContract {
   locationSummary?: string;
   distanceMeters?: number;
   preview?: string;
+  previewImage?: {
+    url: string;
+    source: string;
+    attributionText?: string;
+  };
+  shortDescription?: string;
+  landmarkType?: string;
   attribution?: PlaceAttributionSummary;
 }
 
@@ -334,6 +341,18 @@ export interface PlaceDetailContract {
   title: string;
   location: { lat: number; lng: number; city?: string; region?: string; countryCode?: string };
   description?: string;
+  descriptionSource?: string;
+  notable?: {
+    landmarkType?: string;
+    aliases: string[];
+    wikipediaUrl?: string;
+  };
+  images: Array<{
+    url: string;
+    source: string;
+    attributionText?: string;
+    isPrimary: boolean;
+  }>;
   qualityScore?: number;
   attribution: PlaceAttributionSummary;
   firstPartySummary?: string;
@@ -417,11 +436,33 @@ export class CanonicalDetailBackend implements DetailBackend {
     const place: CanonicalPlace | undefined = this.places.getById(placeId);
     if (!place) return undefined;
     const attribution = this.attribution.summarize(placeId);
+    const wikidata = typeof place.metadata.wikidata === "object" && place.metadata.wikidata
+      ? (place.metadata.wikidata as Record<string, unknown>)
+      : undefined;
+    const image = wikidata && typeof wikidata.image === "object" && wikidata.image
+      ? (wikidata.image as Record<string, unknown>)
+      : undefined;
+    const images = image && typeof image.url === "string"
+      ? [{
+        url: image.url,
+        source: "wikidata",
+        attributionText: typeof image.attributionText === "string" ? image.attributionText : "Image from Wikidata",
+        isPrimary: true
+      }]
+      : [];
+
     return {
       placeId: place.id,
       title: place.primaryName,
       location: { lat: place.latitude, lng: place.longitude, city: place.city, region: place.region, countryCode: place.countryCode },
       description: place.description,
+      descriptionSource: wikidata ? "wikidata" : undefined,
+      notable: {
+        landmarkType: typeof wikidata?.landmarkType === "string" ? wikidata.landmarkType : undefined,
+        aliases: Array.isArray(wikidata?.aliases) ? wikidata?.aliases.filter((item): item is string => typeof item === "string") : [],
+        wikipediaUrl: typeof wikidata?.wikipediaUrl === "string" ? wikidata.wikipediaUrl : undefined
+      },
+      images,
       qualityScore: place.qualityScore,
       attribution,
       firstPartySummary: typeof place.metadata["firstPartySummary"] === "string" ? String(place.metadata["firstPartySummary"]) : undefined,

@@ -95,4 +95,30 @@ void main() {
     expect(photos[1].thumbUrl, 'https://img/thumb-b.jpg');
   });
 
+
+  test('normalizePlaceDetail parses notable context and image contracts', () {
+    final detail = normalizePlaceDetail(
+      basePlan: basePlan(),
+      details: {
+        'description': 'Historic landmark',
+        'notable': {
+          'landmarkType': 'castle',
+          'aliases': ['Ancient Keep'],
+          'wikipediaUrl': 'https://en.wikipedia.org/wiki/Castle'
+        },
+        'images': [
+          {
+            'url': 'https://img.wikimedia.org/castle.jpg',
+            'source': 'wikidata',
+            'attributionText': 'Image from Wikidata'
+          }
+        ]
+      },
+      buildPhotoUrl: (token) => token,
+    );
+
+    expect(detail.notableContext?.landmarkType, 'castle');
+    expect(detail.notableContext?.aliases, contains('Ancient Keep'));
+    expect(detail.photos.first.url, contains('wikimedia'));
+  });
 }
