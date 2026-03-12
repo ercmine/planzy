@@ -199,7 +199,8 @@ export function createServer(options?: CreateServerOptions) {
     undefined,
     undefined,
     moderationService,
-    trustSafetyService
+    trustSafetyService,
+    notificationService
   );
 
   return createHttpServer(service, merchantService, {

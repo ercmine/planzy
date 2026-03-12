@@ -249,6 +249,7 @@ export interface VideoStudioItem {
   moderationState?: "active" | "pending_review" | "auto_limited" | "hidden" | "removed" | "rejected" | "restored" | "escalated";
   moderationReason?: string;
   statusLabel: string;
+  section: CreatorStudioSection;
   isRetryable: boolean;
   failureReason?: string;
   uploadProgressState: "not_started" | "in_progress" | "completed" | "failed";
@@ -260,6 +261,50 @@ export interface VideoStudioItem {
   updatedAt: string;
   publishedAt?: string;
   thumbnailUrl?: string;
+}
+
+export type CreatorStudioSection = "drafts" | "processing" | "published" | "needs_attention" | "archived";
+
+export interface CreatorStudioStatusCounts {
+  drafts: number;
+  processing: number;
+  published: number;
+  needsAttention: number;
+  archived: number;
+}
+
+export interface CreatorStudioVideoAnalytics {
+  videoId: string;
+  placeId: string;
+  title?: string;
+  views: number;
+  likes: number;
+  saves: number;
+  shares: number;
+  completionRate: number;
+  publishedAt?: string;
+}
+
+export interface CreatorStudioPlaceAnalytics {
+  placeId: string;
+  videos: number;
+  views: number;
+  saves: number;
+  avgCompletionRate: number;
+}
+
+export interface CreatorStudioAnalyticsOverview {
+  summary: {
+    totalVideosPublished: number;
+    totalViews: number;
+    totalSaves: number;
+    totalLikes: number;
+    totalShares: number;
+    avgCompletionRate: number;
+  };
+  statusCounts: CreatorStudioStatusCounts;
+  topVideos: CreatorStudioVideoAnalytics[];
+  topPlaces: CreatorStudioPlaceAnalytics[];
 }
 
 export interface VideoOperationalDiagnostics {

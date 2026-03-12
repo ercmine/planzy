@@ -348,26 +348,89 @@ class _SavedTab extends StatelessWidget {
   Widget build(BuildContext context) => const Center(child: Text('Saved places/videos'));
 }
 
-class _ProfileStudioTab extends ConsumerWidget {
+class _ProfileStudioTab extends ConsumerStatefulWidget {
   const _ProfileStudioTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final videos = ref.watch(studioVideosProvider);
-    return videos.when(
-      data: (items) => ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          const Text('Creator Profile + Studio', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          ...items.map((video) => ListTile(
-                title: Text(video.title),
-                subtitle: Text('${video.placeName} • ${video.status.name}'),
-              )),
-        ],
+  ConsumerState<_ProfileStudioTab> createState() => _ProfileStudioTabState();
+}
+
+class _ProfileStudioTabState extends ConsumerState<_ProfileStudioTab> {
+  StudioSection _section = StudioSection.drafts;
+
+  @override
+  Widget build(BuildContext context) {
+    final analytics = ref.watch(studioAnalyticsProvider);
+    final videos = ref.watch(studioVideosProvider(_section));
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        const Text('Creator Studio', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        analytics.when(
+          data: (a) => Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _metricCard('Published', a.totalVideosPublished.toString()),
+              _metricCard('Views', a.totalViews.toString()),
+              _metricCard('Drafts', (a.statusCounts['drafts'] ?? 0).toString()),
+              _metricCard('Needs attention', (a.statusCounts['needsAttention'] ?? 0).toString()),
+            ],
+          ),
+          error: (_, __) => const Text('Analytics unavailable right now.'),
+          loading: () => const LinearProgressIndicator(),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 6,
+          children: [
+            _sectionChip('Drafts', StudioSection.drafts),
+            _sectionChip('Processing', StudioSection.processing),
+            _sectionChip('Published', StudioSection.published),
+            _sectionChip('Needs Attention', StudioSection.needsAttention),
+            _sectionChip('Archived', StudioSection.archived),
+          ],
+        ),
+        const SizedBox(height: 12),
+        videos.when(
+          data: (items) {
+            if (items.isEmpty) {
+              return const Card(child: ListTile(title: Text('No items yet'), subtitle: Text('Start a place review draft to populate your studio.')));
+            }
+            return Column(
+              children: items.map((video) => Card(
+                child: ListTile(
+                  title: Text(video.title),
+                  subtitle: Text('${video.placeName} • ${video.status.name}'),
+                ),
+              )).toList(growable: false),
+            );
+          },
+          error: (_, __) => const Center(child: Text('Studio unavailable')),
+          loading: () => const Center(child: CircularProgressIndicator()),
+        )
+      ],
+    );
+  }
+
+  Widget _sectionChip(String label, StudioSection section) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: _section == section,
+      onSelected: (_) => setState(() => _section = section),
+    );
+  }
+
+  Widget _metricCard(String label, String value) {
+    return SizedBox(
+      width: 150,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label), Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))]),
+        ),
       ),
-      error: (_, __) => const Center(child: Text('Studio unavailable')),
-      loading: () => const Center(child: CircularProgressIndicator()),
     );
   }
 }

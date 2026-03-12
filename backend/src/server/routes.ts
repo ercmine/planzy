@@ -2243,6 +2243,8 @@ export function createRoutes(
       const videoRetryUploadMatch = /^\/v1\/videos\/([^/]+)\/retry-upload$/.exec(normalizedPath);
       const videoRetryProcessingMatch = /^\/v1\/videos\/([^/]+)\/retry-processing$/.exec(normalizedPath);
       const videoPatchMatch = /^\/v1\/videos\/([^/]+)$/.exec(normalizedPath);
+      const videoArchiveMatch = /^\/v1\/videos\/([^/]+)\/archive$/.exec(normalizedPath);
+      const videoEventMatch = /^\/v1\/videos\/([^/]+)\/events$/.exec(normalizedPath);
       const placeVideosMatch = /^\/v1\/places\/([^/]+)\/videos$/.exec(normalizedPath);
       const creatorVideosMatch = /^\/v1\/creators\/([^/]+)\/videos$/.exec(normalizedPath);
 
@@ -2256,6 +2258,10 @@ export function createRoutes(
       }
       if (videoPlatformHandlers && req.method === "GET" && normalizedPath === "/v1/studio/videos") {
         await videoPlatformHandlers.listStudio(req, res);
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "GET" && normalizedPath === "/v1/studio/analytics") {
+        await videoPlatformHandlers.getStudioAnalytics(req, res);
         return;
       }
       if (videoPlatformHandlers && req.method === "POST" && videoUploadMatch) {
@@ -2285,6 +2291,14 @@ export function createRoutes(
       }
       if (videoPlatformHandlers && req.method === "PATCH" && videoPatchMatch) {
         await videoPlatformHandlers.updateDraft(req, res, decodeURIComponent(videoPatchMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "POST" && videoArchiveMatch) {
+        await videoPlatformHandlers.archiveDraft(req, res, decodeURIComponent(videoArchiveMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "POST" && videoEventMatch) {
+        await videoPlatformHandlers.trackEvent(req, res, decodeURIComponent(videoEventMatch[1] ?? ""));
         return;
       }
       if (videoPlatformHandlers && req.method === "GET" && placeVideosMatch) {
