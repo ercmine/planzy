@@ -1,5 +1,5 @@
 import { ValidationError } from "../plans/errors.js";
-import type { Notification, NotificationCategory, NotificationDeliveryAttempt, NotificationPreference, NotificationType } from "./types.js";
+import type { DeviceTokenRegistration, Notification, NotificationCategory, NotificationDeliveryAttempt, NotificationPreference, NotificationType } from "./types.js";
 import { decodeOffsetCursor, encodeOffsetCursor, type NotificationStore } from "./store.js";
 
 export class MemoryNotificationStore implements NotificationStore {
@@ -7,6 +7,7 @@ export class MemoryNotificationStore implements NotificationStore {
   private readonly dedupeIndex = new Map<string, Notification>();
   private readonly preferencesByUser = new Map<string, Map<string, NotificationPreference>>();
   private readonly deliveryAttemptsByNotification = new Map<string, NotificationDeliveryAttempt[]>();
+  private readonly deviceTokensByUser = new Map<string, Map<string, DeviceTokenRegistration>>();
 
   async create(notification: Notification): Promise<void> {
     this.notifications.push(notification);
@@ -80,4 +81,31 @@ export class MemoryNotificationStore implements NotificationStore {
   async listDeliveryAttempts(notificationId: string): Promise<NotificationDeliveryAttempt[]> {
     return this.deliveryAttemptsByNotification.get(notificationId) ?? [];
   }
+
+
+  async upsertDeviceToken(registration: DeviceTokenRegistration): Promise<DeviceTokenRegistration> {
+    const map = this.deviceTokensByUser.get(registration.userId) ?? new Map<string, DeviceTokenRegistration>();
+    map.set(registration.token, registration);
+    this.deviceTokensByUser.set(registration.userId, map);
+    return registration;
+  }
+
+  async revokeDeviceToken(userId: string, token: string, revokedAt: string): Promise<boolean> {
+    const map = this.deviceTokensByUser.get(userId);
+    if (!map) return false;
+    const existing = map.get(token);
+    if (!existing) return false;
+    existing.revokedAt = revokedAt;
+    existing.pushEnabled = false;
+    existing.updatedAt = revokedAt;
+    map.set(token, existing);
+    return true;
+  }
+
+  async listActiveDeviceTokens(userId: string): Promise<DeviceTokenRegistration[]> {
+    const map = this.deviceTokensByUser.get(userId);
+    if (!map) return [];
+    return [...map.values()].filter((row) => !row.revokedAt && row.pushEnabled);
+  }
+
 }

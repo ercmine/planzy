@@ -416,6 +416,26 @@ export function createRoutes(
         return;
       }
 
+      if (req.method === "POST" && normalizedPath === "/v1/notifications/device-tokens" && notificationHandlers) {
+        await notificationHandlers.registerDeviceToken(req, res);
+        return;
+      }
+
+      if (req.method === "DELETE" && normalizedPath === "/v1/notifications/device-tokens" && notificationHandlers) {
+        await notificationHandlers.unregisterDeviceToken(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/notifications/device-tokens" && notificationHandlers) {
+        await notificationHandlers.listDeviceTokens(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/notifications/metrics" && notificationHandlers) {
+        await notificationHandlers.metrics(req, res);
+        return;
+      }
+
       if (req.method === "POST" && normalizedPath === "/v1/collaboration/invites" && collaborationHandlers) {
         await collaborationHandlers.createInvite(req, res);
         return;

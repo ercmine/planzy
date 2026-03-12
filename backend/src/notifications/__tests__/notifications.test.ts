@@ -40,4 +40,28 @@ describe("notification service", () => {
     const list = await service.list("u4");
     expect(list.items).toHaveLength(1);
   });
+
+  it("creates retention loop notifications for creator and discovery flows", async () => {
+    const service = new NotificationService(new MemoryNotificationStore(), () => new Date("2026-03-09T08:00:00.000Z"));
+    await service.notify({ type: "video.processing.finished", recipientUserId: "creator-1", videoId: "vid-1", placeId: "place-1", placeName: "Harbor Cafe" });
+    await service.notify({ type: "video.published", recipientUserId: "creator-1", videoId: "vid-1", placeId: "place-1", placeName: "Harbor Cafe" });
+    await service.notify({ type: "saved.place.new_videos", recipientUserId: "user-2", placeId: "place-1", placeName: "Harbor Cafe", newVideoCount: 3 });
+    await service.notify({ type: "discovery.local.highlights", recipientUserId: "user-2", city: "Austin", highlightsCount: 5 });
+
+    const creator = await service.list("creator-1");
+    expect(creator.items.map((item) => item.type).sort()).toEqual(["video_processing_finished", "video_published"]);
+
+    const user = await service.list("user-2");
+    expect(user.items).toHaveLength(2);
+    expect(user.items[0]?.route?.name).toBe("feed");
+    expect(user.items[1]?.route?.name).toBe("place");
+  });
+
+  it("registers and revokes device tokens", async () => {
+    const service = new NotificationService(new MemoryNotificationStore(), () => new Date("2026-03-09T08:00:00.000Z"));
+    await service.registerDeviceToken({ userId: "u-device", token: "token-1", platform: "ios", appVersion: "1.2.0" });
+    expect(await service.listActiveDeviceTokens("u-device")).toHaveLength(1);
+    expect(await service.unregisterDeviceToken("u-device", "token-1")).toBe(true);
+    expect(await service.listActiveDeviceTokens("u-device")).toHaveLength(0);
+  });
 });

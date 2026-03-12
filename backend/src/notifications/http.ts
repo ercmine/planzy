@@ -58,6 +58,40 @@ export function createNotificationHttpHandlers(service: NotificationService) {
         frequency: payload.frequency === "instant" || payload.frequency === "daily_digest" || payload.frequency === "weekly_digest" ? payload.frequency : undefined
       });
       sendJson(res, 200, updated);
+    },
+    registerDeviceToken: async (req: IncomingMessage, res: ServerResponse) => {
+      const userId = requireUserId(req);
+      const body = await parseJsonBody(req);
+      const payload = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+      const token = String(payload.token ?? "").trim();
+      const platformRaw = String(payload.platform ?? "").trim();
+      if (!token) throw new ValidationError(["token is required"]);
+      if (!["ios", "android", "web"].includes(platformRaw)) throw new ValidationError(["platform must be ios|android|web"]);
+      const registration = await service.registerDeviceToken({
+        userId,
+        token,
+        platform: platformRaw as "ios" | "android" | "web",
+        appVersion: payload.appVersion == null ? undefined : String(payload.appVersion),
+        locale: payload.locale == null ? undefined : String(payload.locale),
+        pushEnabled: typeof payload.pushEnabled === "boolean" ? payload.pushEnabled : undefined
+      });
+      sendJson(res, 201, { registration });
+    },
+    unregisterDeviceToken: async (req: IncomingMessage, res: ServerResponse) => {
+      const userId = requireUserId(req);
+      const body = await parseJsonBody(req);
+      const payload = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+      const token = String(payload.token ?? "").trim();
+      if (!token) throw new ValidationError(["token is required"]);
+      const ok = await service.unregisterDeviceToken(userId, token);
+      sendJson(res, ok ? 200 : 404, { ok });
+    },
+    listDeviceTokens: async (req: IncomingMessage, res: ServerResponse) => {
+      const userId = requireUserId(req);
+      sendJson(res, 200, { tokens: await service.listActiveDeviceTokens(userId) });
+    },
+    metrics: async (_req: IncomingMessage, res: ServerResponse) => {
+      sendJson(res, 200, { metrics: service.getMetricsSnapshot() });
     }
   };
 }

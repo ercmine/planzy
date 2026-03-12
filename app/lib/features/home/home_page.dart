@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../notifications/notification_center_tab.dart';
+import '../notifications/notification_providers.dart';
 import '../video_platform/video_models.dart';
 import '../video_platform/video_providers.dart';
 
@@ -18,12 +20,13 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final unreadCount = ref.watch(unreadNotificationCountProvider).valueOrNull ?? 0;
     final pages = [
       _FeedTab(scope: _scope, onScopeChanged: (scope) => setState(() => _scope = scope)),
       _SearchTab(scope: _scope),
       const _CreateTab(),
       const _SavedTab(),
-      const _NotificationsTab(),
+      const NotificationCenterTab(),
       const _ProfileStudioTab(),
     ];
 
@@ -35,12 +38,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
         onDestinationSelected: (value) => setState(() => _navIndex = value),
-        destinations: const [
+        destinations: [
           NavigationDestination(icon: Icon(Icons.play_circle_outline), selectedIcon: Icon(Icons.play_circle), label: 'Feed'),
           NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: 'Search'),
           NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle), label: 'Create'),
           NavigationDestination(icon: Icon(Icons.bookmark_border), selectedIcon: Icon(Icons.bookmark), label: 'Saved'),
-          NavigationDestination(icon: Icon(Icons.notifications_none), selectedIcon: Icon(Icons.notifications), label: 'Alerts'),
+          NavigationDestination(icon: Badge(isLabelVisible: unreadCount > 0, label: Text(unreadCount > 99 ? '99+' : '$unreadCount'), child: const Icon(Icons.notifications_none)), selectedIcon: const Icon(Icons.notifications), label: 'Alerts'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Studio'),
         ],
       ),
@@ -228,13 +231,6 @@ class _SavedTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const Center(child: Text('Saved places/videos'));
-}
-
-class _NotificationsTab extends StatelessWidget {
-  const _NotificationsTab();
-
-  @override
-  Widget build(BuildContext context) => const Center(child: Text('Creator notifications'));
 }
 
 class _ProfileStudioTab extends ConsumerWidget {
