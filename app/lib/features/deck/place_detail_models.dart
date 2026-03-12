@@ -283,7 +283,7 @@ List<PlaceDetailPhoto> normalizeDetailPhotos({
     );
   }
 
-  final photos = details['images'] ?? details['photos'];
+  final photos = details['imageGallery'] ?? details['images'] ?? details['photos'];
   if (photos is List) {
     for (final item in photos) {
       if (item is Map<String, dynamic>) {
@@ -308,6 +308,22 @@ List<PlaceDetailPhoto> normalizeDetailPhotos({
         addPhoto(item?.toString());
       }
     }
+  }
+
+  final primaryImage = details['primaryImage'];
+  if (primaryImage is Map<String, dynamic>) {
+    addPhoto(
+      primaryImage['sourceRecordId']?.toString(),
+      url: primaryImage['imageUrl']?.toString() ?? primaryImage['url']?.toString(),
+      fullUrl: primaryImage['imageUrl']?.toString(),
+      width: parseInt(primaryImage['width']),
+      height: parseInt(primaryImage['height']),
+      provider: primaryImage['sourceName']?.toString() ?? details['source']?.toString(),
+      sourceType: 'enrichment',
+      attributionText: primaryImage['attributionLabel']?.toString(),
+      isPrimary: true,
+      isFallback: true,
+    );
   }
 
   addPhoto(
@@ -454,15 +470,15 @@ List<PlaceSourceAttribution> _composeAttribution({
     }
   }
 
-  final explicit = details['attribution'];
+  final explicit = details['attribution'] ?? details['imageAttributionSummary'];
   if (explicit is List) {
     for (final item in explicit.whereType<Map<String, dynamic>>()) {
-      final provider = item['provider']?.toString();
+      final provider = item['provider']?.toString() ?? item['sourceName']?.toString();
       if (provider == null || provider.isEmpty) continue;
       out.add(PlaceSourceAttribution(
         provider: provider,
-        label: item['label']?.toString() ?? 'Data from $provider',
-        url: item['url']?.toString(),
+        label: item['label']?.toString() ?? item['attributionLabel']?.toString() ?? 'Data from $provider',
+        url: item['url']?.toString() ?? item['attributionUrl']?.toString(),
       ));
     }
   }

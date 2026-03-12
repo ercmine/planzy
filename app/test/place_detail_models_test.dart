@@ -96,6 +96,43 @@ void main() {
   });
 
 
+
+
+  test('normalizePlaceDetail uses normalized primaryImage/imageGallery and attribution summary', () {
+    final detail = normalizePlaceDetail(
+      basePlan: basePlan(),
+      details: {
+        'primaryImage': {
+          'imageUrl': 'https://img.opentripmap.com/hero.jpg',
+          'sourceName': 'opentripmap',
+          'attributionLabel': 'Image from OpenTripMap',
+        },
+        'imageGallery': [
+          {
+            'imageUrl': 'https://img.opentripmap.com/hero.jpg',
+            'sourceName': 'opentripmap',
+            'attributionLabel': 'Image from OpenTripMap',
+          },
+          {
+            'imageUrl': 'https://img.wikimedia.org/alt.jpg',
+            'sourceName': 'wikidata',
+            'attributionLabel': 'Image from Wikidata',
+          }
+        ],
+        'imageAttributionSummary': [
+          {'sourceName': 'opentripmap', 'label': 'Image from OpenTripMap'},
+          {'sourceName': 'wikidata', 'label': 'Image from Wikidata'}
+        ]
+      },
+      buildPhotoUrl: (token) => token,
+    );
+
+    expect(detail.photos.first.isPrimary, isTrue);
+    expect(detail.photos.first.url, 'https://img.opentripmap.com/hero.jpg');
+    expect(detail.attribution.any((item) => item.provider == 'opentripmap'), isTrue);
+    expect(detail.attribution.any((item) => item.provider == 'wikidata'), isTrue);
+  });
+
   test('normalizePlaceDetail parses notable context and image contracts', () {
     final detail = normalizePlaceDetail(
       basePlan: basePlan(),
