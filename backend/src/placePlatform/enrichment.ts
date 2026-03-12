@@ -309,8 +309,135 @@ export interface OpenTripMapNormalized {
   tourismKinds: string[];
   wikipedia?: string;
   imageUrl?: string;
+  image?: NormalizedPlaceImage;
   latitude?: number;
   longitude?: number;
+}
+
+export interface NormalizedPlaceImage {
+  canonicalPlaceId?: string;
+  imageUrl: string;
+  sourceName: SourceName;
+  sourceRecordId?: string;
+  sourceEntityId?: string;
+  attributionLabel: string;
+  attributionUrl?: string;
+  license?: string;
+  width?: number;
+  height?: number;
+  isPrimaryCandidate: boolean;
+  confidence: number;
+  imageType: "hero" | "gallery" | "supplemental" | "attraction" | "landmark";
+  createdAt: string;
+  refreshedAt: string;
+  isActive: boolean;
+  rawMetadata?: Record<string, unknown>;
+}
+
+interface PlaceImageDTO {
+  imageUrl: string;
+  sourceName: SourceName;
+  attributionLabel: string;
+  attributionUrl?: string;
+  license?: string;
+  imageType: NormalizedPlaceImage["imageType"];
+}
+
+function isSafeImageUrl(value: unknown): value is string {
+  if (typeof value !== "string" || value.trim().length < 12) {
+    return false;
+  }
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function imageDedupKey(image: PlaceImageDTO): string {
+  return `${image.sourceName}|${image.imageUrl.trim().toLowerCase()}`;
+}
+
+export function buildNormalizedPlaceImage(params: {
+  canonicalPlaceId: string;
+  sourceName: SourceName;
+  sourceRecordId?: string;
+  sourceEntityId?: string;
+  imageUrl: string;
+  attributionLabel: string;
+  attributionUrl?: string;
+  license?: string;
+  width?: number;
+  height?: number;
+  confidence: number;
+  imageType: NormalizedPlaceImage["imageType"];
+  rawMetadata?: Record<string, unknown>;
+  isPrimaryCandidate?: boolean;
+}): NormalizedPlaceImage | undefined {
+  if (!isSafeImageUrl(params.imageUrl)) {
+    return undefined;
+  }
+  if (typeof params.width === "number" && typeof params.height === "number") {
+    const pixels = params.width * params.height;
+    if (pixels > 0 && pixels < 30_000) {
+      return undefined;
+    }
+  }
+  const now = nowIso();
+  return {
+    canonicalPlaceId: params.canonicalPlaceId,
+    imageUrl: params.imageUrl,
+    sourceName: params.sourceName,
+    sourceRecordId: params.sourceRecordId,
+    sourceEntityId: params.sourceEntityId,
+    attributionLabel: params.attributionLabel,
+    attributionUrl: params.attributionUrl,
+    license: params.license,
+    width: params.width,
+    height: params.height,
+    isPrimaryCandidate: params.isPrimaryCandidate ?? true,
+    confidence: Number(Math.max(0, Math.min(1, params.confidence)).toFixed(3)),
+    imageType: params.imageType,
+    createdAt: now,
+    refreshedAt: now,
+    isActive: true,
+    rawMetadata: params.rawMetadata
+  };
+}
+
+export function selectPrioritizedPlaceImages(images: PlaceImageDTO[]): { primaryImage?: PlaceImageDTO; imageGallery: PlaceImageDTO[] } {
+  const priority: Record<string, number> = {
+    perbug: 0,
+    wikidata: 1,
+    opentripmap: 2
+  };
+  const deduped = new Map<string, PlaceImageDTO>();
+  for (const image of images) {
+    if (!isSafeImageUrl(image.imageUrl)) {
+      continue;
+    }
+    const existing = deduped.get(imageDedupKey(image));
+    if (!existing) {
+      deduped.set(imageDedupKey(image), image);
+      continue;
+    }
+    const existingPriority = priority[existing.sourceName] ?? 99;
+    const candidatePriority = priority[image.sourceName] ?? 99;
+    if (candidatePriority < existingPriority) {
+      deduped.set(imageDedupKey(image), image);
+    }
+  }
+
+  const sorted = [...deduped.values()].sort((a, b) => {
+    const pDiff = (priority[a.sourceName] ?? 99) - (priority[b.sourceName] ?? 99);
+    if (pDiff !== 0) return pDiff;
+    return a.imageUrl.localeCompare(b.imageUrl);
+  });
+  return {
+    primaryImage: sorted[0],
+    imageGallery: sorted.slice(0, 8)
+  };
 }
 
 export function normalizeWikidataResponse(payload: Record<string, unknown>): WikidataNormalized {
@@ -373,6 +500,25 @@ export function normalizeOpenTripMapResponse(payload: Record<string, unknown>): 
   const kinds = typeof payload.kinds === "string"
     ? payload.kinds.split(",").map((item) => item.trim()).filter(Boolean)
     : [];
+  const imageUrl = typeof payload.image === "string" ? payload.image : undefined;
+  const normalizedImage = imageUrl
+    ? buildNormalizedPlaceImage({
+      canonicalPlaceId: "",
+      sourceName: "opentripmap",
+      sourceRecordId: String(payload.xid ?? ""),
+      sourceEntityId: String(payload.xid ?? ""),
+      imageUrl,
+      attributionLabel: String(payload.imageAttributionText ?? "Image from OpenTripMap"),
+      attributionUrl: typeof payload.imageSourceUrl === "string" ? payload.imageSourceUrl : String(payload.url ?? ""),
+      license: typeof payload.imageLicense === "string" ? payload.imageLicense : undefined,
+      width: typeof payload.imageWidth === "number" ? payload.imageWidth : undefined,
+      height: typeof payload.imageHeight === "number" ? payload.imageHeight : undefined,
+      confidence: 0.58,
+      imageType: "attraction",
+      rawMetadata: { xid: payload.xid, kinds: payload.kinds }
+    })
+    : undefined;
+
   return {
     sourceId: String(payload.xid ?? ""),
     sourceUrl: String(payload.url ?? ""),
@@ -380,7 +526,8 @@ export function normalizeOpenTripMapResponse(payload: Record<string, unknown>): 
     description: typeof payload.description === "string" ? payload.description : undefined,
     tourismKinds: kinds,
     wikipedia: typeof payload.wikipedia === "string" ? payload.wikipedia : undefined,
-    imageUrl: typeof payload.image === "string" ? payload.image : undefined,
+    imageUrl,
+    image: normalizedImage,
     latitude: typeof payload.lat === "number" ? payload.lat : undefined,
     longitude: typeof payload.lng === "number" ? payload.lng : undefined
   };
@@ -626,6 +773,78 @@ export class PlaceEnrichmentService {
 
     if (sourceName === "opentripmap") {
       setField("description", preferCanonical(next.description, normalized.description as string | undefined));
+      const existingImages = Array.isArray((next.metadata.placeImages as unknown[] | undefined))
+        ? (next.metadata.placeImages as unknown[])
+        : [];
+      const opentripImage = normalized.image && typeof normalized.image === "object"
+        ? buildNormalizedPlaceImage({
+          canonicalPlaceId: place.id,
+          sourceName,
+          sourceRecordId: String(normalized.sourceId ?? ""),
+          sourceEntityId: String(normalized.sourceId ?? ""),
+          imageUrl: String((normalized.image as { imageUrl?: unknown }).imageUrl ?? ""),
+          attributionLabel: String((normalized.image as { attributionLabel?: unknown }).attributionLabel ?? "Image from OpenTripMap"),
+          attributionUrl: typeof (normalized.image as { attributionUrl?: unknown }).attributionUrl === "string"
+            ? (normalized.image as { attributionUrl?: string }).attributionUrl
+            : String(normalized.sourceUrl ?? ""),
+          license: typeof (normalized.image as { license?: unknown }).license === "string" ? (normalized.image as { license?: string }).license : undefined,
+          width: typeof (normalized.image as { width?: unknown }).width === "number" ? (normalized.image as { width?: number }).width : undefined,
+          height: typeof (normalized.image as { height?: unknown }).height === "number" ? (normalized.image as { height?: number }).height : undefined,
+          confidence,
+          imageType: "attraction",
+          rawMetadata: normalized.image as Record<string, unknown>
+        })
+        : undefined;
+
+      const wikidataImage = normalized.sourceId
+        ? ((next.metadata.wikidata as { image?: { url?: string; sourceUrl?: string; attributionText?: string; license?: string } } | undefined)?.image)
+        : undefined;
+      const wikidataCandidate = wikidataImage?.url
+        ? buildNormalizedPlaceImage({
+          canonicalPlaceId: place.id,
+          sourceName: "wikidata",
+          sourceRecordId: String((next.metadata.wikidata as { entityId?: string } | undefined)?.entityId ?? ""),
+          sourceEntityId: String((next.metadata.wikidata as { entityId?: string } | undefined)?.entityId ?? ""),
+          imageUrl: wikidataImage.url,
+          attributionLabel: wikidataImage.attributionText ?? "Image from Wikidata",
+          attributionUrl: wikidataImage.sourceUrl,
+          license: wikidataImage.license,
+          confidence: 0.85,
+          imageType: "landmark"
+        })
+        : undefined;
+
+      const selected = selectPrioritizedPlaceImages([
+        ...existingImages.filter((item): item is PlaceImageDTO => {
+          if (!item || typeof item !== "object") return false;
+          const r = item as Record<string, unknown>;
+          return isSafeImageUrl(r.imageUrl) && typeof r.sourceName === "string" && typeof r.attributionLabel === "string";
+        }).map((item) => ({
+          imageUrl: item.imageUrl,
+          sourceName: item.sourceName,
+          attributionLabel: item.attributionLabel,
+          attributionUrl: item.attributionUrl,
+          license: item.license,
+          imageType: item.imageType
+        })),
+        ...(wikidataCandidate ? [{
+          imageUrl: wikidataCandidate.imageUrl,
+          sourceName: wikidataCandidate.sourceName,
+          attributionLabel: wikidataCandidate.attributionLabel,
+          attributionUrl: wikidataCandidate.attributionUrl,
+          license: wikidataCandidate.license,
+          imageType: wikidataCandidate.imageType
+        }] : []),
+        ...(opentripImage ? [{
+          imageUrl: opentripImage.imageUrl,
+          sourceName: opentripImage.sourceName,
+          attributionLabel: opentripImage.attributionLabel,
+          attributionUrl: opentripImage.attributionUrl,
+          license: opentripImage.license,
+          imageType: opentripImage.imageType
+        }] : [])
+      ]);
+
       next = {
         ...next,
         metadata: {
@@ -633,9 +852,30 @@ export class PlaceEnrichmentService {
           opentripmap: {
             kinds: normalized.tourismKinds,
             wikipedia: normalized.wikipedia
-          }
+          },
+          placeImages: selected.imageGallery.map((image) => ({ ...image, confidence: image.sourceName === "wikidata" ? 0.85 : confidence })),
+          primaryImage: selected.primaryImage,
+          imageGallery: selected.imageGallery,
+          imageAttributionSummary: selected.imageGallery.map((image) => ({
+            sourceName: image.sourceName,
+            label: image.attributionLabel,
+            url: image.attributionUrl,
+            license: image.license
+          }))
         }
       };
+
+      if (selected.primaryImage) {
+        updatedFields.push("images.primary");
+        fieldAttributions.push({
+          field: "images.primary",
+          sourceName: selected.primaryImage.sourceName,
+          sourceId: String(normalized.sourceId ?? ""),
+          sourceUrl: selected.primaryImage.attributionUrl,
+          confidence: selected.primaryImage.sourceName === "wikidata" ? 0.85 : confidence,
+          observedAt: timestamp
+        });
+      }
     }
 
     next = {

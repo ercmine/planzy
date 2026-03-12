@@ -8,7 +8,8 @@ import {
   normalizeOpenTripMapResponse,
   normalizeWikidataResponse,
   PlaceEnrichmentService,
-  scoreCandidateMatch
+  scoreCandidateMatch,
+  selectPrioritizedPlaceImages
 } from "../index.js";
 import { CategoryNormalizationService, PlaceImportService } from "../services.js";
 
@@ -89,9 +90,93 @@ describe("place enrichment", () => {
   });
 
   it("normalizes OpenTripMap payload", () => {
-    const normalized = normalizeOpenTripMapResponse({ xid: "N1", kinds: "museum, architecture" });
+    const normalized = normalizeOpenTripMapResponse({ xid: "N1", kinds: "museum, architecture", image: "https://images.opentripmap.com/a.jpg" });
     expect(normalized.sourceId).toBe("N1");
     expect(normalized.tourismKinds).toEqual(["museum", "architecture"]);
+    expect(normalized.image?.sourceName).toBe("opentripmap");
+  });
+
+
+  it("selects trusted image priority with Wikidata preferred over fallback", () => {
+    const selected = selectPrioritizedPlaceImages([
+      {
+        imageUrl: "https://img.example.com/opentrip.jpg",
+        sourceName: "opentripmap",
+        attributionLabel: "Image from OpenTripMap",
+        attributionUrl: "https://opentripmap.com",
+        imageType: "attraction"
+      },
+      {
+        imageUrl: "https://img.example.com/wikidata.jpg",
+        sourceName: "wikidata",
+        attributionLabel: "Image from Wikidata",
+        attributionUrl: "https://commons.wikimedia.org",
+        imageType: "landmark"
+      }
+    ]);
+
+    expect(selected.primaryImage?.sourceName).toBe("wikidata");
+    expect(selected.imageGallery).toHaveLength(2);
+  });
+
+  it("keeps OpenTripMap as fallback image when Wikidata image is missing", async () => {
+    const { service, placeRepo, canonicalPlaceId, providers } = setup();
+    providers.wikidata.mockImplementation(async () => ({
+      id: "Q123",
+      url: "https://www.wikidata.org/wiki/Q123",
+      label: "Old Castle",
+      description: "Historic site",
+      aliases: [],
+      landmarkType: "castle",
+      externalIds: {},
+      wikipediaUrl: "https://en.wikipedia.org/wiki/Old_Castle",
+      imageAllowed: false,
+      lat: 48.8601,
+      lng: 2.3401
+    } as any));
+    providers.opentripmap.mockImplementation(async () => ({
+      xid: "N123",
+      url: "https://opentripmap.com/en/card/N123",
+      description: "Fallback image candidate",
+      image: "https://images.opentripmap.com/castle.jpg",
+      imageAttributionText: "Image from OpenTripMap",
+      imageSourceUrl: "https://opentripmap.com/en/card/N123",
+      kinds: "historic,tourism",
+      wikipedia: "https://en.wikipedia.org/wiki/Old_Castle",
+      lat: 48.8601,
+      lng: 2.3402
+    } as any));
+
+    await service.enrichPlace(canonicalPlaceId, "wikidata");
+    const fallbackResult = await service.enrichPlace(canonicalPlaceId, "opentripmap");
+
+    expect(fallbackResult.status).toBe("succeeded");
+    const metadata = placeRepo.getById(canonicalPlaceId)?.metadata as Record<string, unknown>;
+    const primaryImage = metadata.primaryImage as { sourceName?: string; imageUrl?: string } | undefined;
+    const gallery = metadata.imageGallery as Array<{ sourceName?: string; imageUrl?: string }> | undefined;
+    const attr = metadata.imageAttributionSummary as Array<{ sourceName?: string; label?: string }> | undefined;
+
+    expect(primaryImage?.sourceName).toBe("opentripmap");
+    expect(primaryImage?.imageUrl).toContain("opentripmap");
+    expect(gallery?.some((item) => item.sourceName === "opentripmap")).toBe(true);
+    expect(attr?.some((item) => item.sourceName === "opentripmap" && item.label?.includes("OpenTripMap"))).toBe(true);
+  });
+
+  it("rejects weak fallback image matches and keeps no-image state", async () => {
+    const { service, placeRepo, canonicalPlaceId, providers } = setup();
+    providers.opentripmap.mockImplementation(async () => ({
+      xid: "N999",
+      url: "https://opentripmap.com/en/card/N999",
+      description: "Other location",
+      kinds: "tourism",
+      image: "https://images.opentripmap.com/other.jpg",
+      lat: 35.0,
+      lng: -80.0
+    } as any));
+
+    const result = await service.enrichPlace(canonicalPlaceId, "opentripmap");
+    expect(result.status).toBe("no_match");
+    expect((placeRepo.getById(canonicalPlaceId)?.metadata as Record<string, unknown>).primaryImage).toBeUndefined();
   });
 
   it("scores conservative match and no-match behavior", () => {

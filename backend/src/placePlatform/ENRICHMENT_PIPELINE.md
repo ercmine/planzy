@@ -32,13 +32,11 @@
 - Canonical place IDs are never replaced during enrichment.
 
 ## Image handling strategy
-- Backend normalizes external enrichment images into a clean app-facing image array (`images[]`) with:
-  - URL
-  - source (`wikidata`)
-  - attribution text
-  - primary flag
-- If image licensing/availability is uncertain, image is omitted (graceful no-image fallback).
-- App never receives raw Wikidata response payloads.
+- Backend normalizes external enrichment images into source-aware records (`metadata.placeImages`) and app-facing contracts: `primaryImage`, `imageGallery`, and `imageAttributionSummary`.
+- Current image source priority is explicit and conservative: `perbug` first-party > `wikidata` > `opentripmap` > no-image fallback.
+- OpenTripMap image candidates are used only as fallback when trusted matching passes and images pass basic quality checks (safe URL + tiny-image rejection).
+- Duplicate image candidates are deduped by normalized source+URL key before selection.
+- App never receives raw source response payloads for image rendering.
 
 ## Attribution model
 - Store enrichment `PlaceSourceRecord` per source and linked source ID.
