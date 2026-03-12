@@ -13,3 +13,5 @@ export * from "./photoGallery.js";
 export * from "./dataQuality.js";
 
 export * from "./maintenance.js";
+
+export * from "./autocomplete.js";

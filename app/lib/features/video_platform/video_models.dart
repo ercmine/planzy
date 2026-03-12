@@ -8,22 +8,30 @@ class PlaceSearchResult {
     required this.name,
     required this.category,
     required this.regionLabel,
+    this.addressSnippet,
     this.distanceKm,
+    this.thumbnailUrl,
   });
 
   final String placeId;
   final String name;
   final String category;
   final String regionLabel;
+  final String? addressSnippet;
   final double? distanceKm;
+  final String? thumbnailUrl;
 
   factory PlaceSearchResult.fromJson(Map<String, dynamic> json) {
     return PlaceSearchResult(
-      placeId: (json['placeId'] ?? '').toString(),
-      name: (json['name'] ?? '').toString(),
+      placeId: (json['canonicalPlaceId'] ?? json['placeId'] ?? '').toString(),
+      name: (json['displayName'] ?? json['name'] ?? '').toString(),
       category: (json['category'] ?? 'Place').toString(),
-      regionLabel: (json['regionLabel'] ?? '').toString(),
-      distanceKm: json['distanceKm'] is num ? (json['distanceKm'] as num).toDouble() : null,
+      regionLabel: (json['regionLabel'] ?? [json['city'], json['region']].whereType<String>().where((item) => item.isNotEmpty).join(', ')).toString(),
+      addressSnippet: json['addressSnippet']?.toString(),
+      distanceKm: json['distanceKm'] is num
+          ? (json['distanceKm'] as num).toDouble()
+          : (json['distanceMeters'] is num ? ((json['distanceMeters'] as num).toDouble() / 1000) : null),
+      thumbnailUrl: json['thumbnailUrl']?.toString(),
     );
   }
 }
