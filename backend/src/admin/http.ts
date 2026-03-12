@@ -80,6 +80,95 @@ export function createAdminHttpHandlers(service: AdminService) {
       sendJson(res, 200, await service.applyModerationAction({ actorUserId: actor.userId, target: body.target as never, decisionType: body.decisionType as never, reasonCode: String(body.reasonCode ?? "admin_action"), notes: typeof body.notes === "string" ? body.notes : undefined }));
     },
 
+
+    async detectPlaceDuplicates(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.places.manage")) return;
+      sendJson(res, 200, { items: service.detectPlaceDuplicateCandidates() });
+    },
+    async listPlaceDuplicateCandidates(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.places.manage")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, { items: service.listPlaceDuplicateCandidates(url.searchParams.get("status") ?? undefined) });
+    },
+    async reviewPlaceDuplicateCandidate(req: IncomingMessage, res: ServerResponse, candidateId: string) {
+      const actor = ensurePermission(service, req, res, "admin.places.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as { status?: unknown; note?: unknown };
+      const updated = service.reviewPlaceDuplicateCandidate({
+        actorUserId: actor.userId,
+        candidateId: decodeURIComponent(candidateId),
+        status: (String(body.status ?? "rejected") as "approved" | "rejected"),
+        note: typeof body.note === "string" ? body.note : undefined
+      });
+      if (!updated) {
+        sendJson(res, 404, { error: "not_found" });
+        return;
+      }
+      sendJson(res, 200, updated);
+    },
+    async mergeCanonicalPlaces(req: IncomingMessage, res: ServerResponse) {
+      const actor = ensurePermission(service, req, res, "admin.places.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as { targetPlaceId?: unknown; sourcePlaceIds?: unknown; reason?: unknown; allowFarDistance?: unknown };
+      try {
+        const merged = service.mergeCanonicalPlaces({
+          actorUserId: actor.userId,
+          targetPlaceId: String(body.targetPlaceId ?? ""),
+          sourcePlaceIds: Array.isArray(body.sourcePlaceIds) ? body.sourcePlaceIds.map((item) => String(item)) : [],
+          reason: typeof body.reason === "string" ? body.reason : undefined,
+          allowFarDistance: Boolean(body.allowFarDistance)
+        });
+        if (!merged) {
+          sendJson(res, 503, { error: "place_service_unavailable" });
+          return;
+        }
+        sendJson(res, 200, merged);
+      } catch (error) {
+        sendJson(res, 400, { error: "invalid_merge", detail: error instanceof Error ? error.message : String(error) });
+      }
+    },
+    async correctCanonicalPlace(req: IncomingMessage, res: ServerResponse, placeId: string) {
+      const actor = ensurePermission(service, req, res, "admin.places.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as { updates?: unknown; reason?: unknown; note?: unknown };
+      const corrected = service.correctCanonicalPlace({
+        actorUserId: actor.userId,
+        placeId: decodeURIComponent(placeId),
+        reason: String(body.reason ?? "admin_correction"),
+        note: typeof body.note === "string" ? body.note : undefined,
+        updates: typeof body.updates === "object" && body.updates ? body.updates as Record<string, unknown> : {}
+      });
+      if (!corrected) {
+        sendJson(res, 404, { error: "not_found" });
+        return;
+      }
+      sendJson(res, 200, corrected);
+    },
+    async reassignPlaceAttachment(req: IncomingMessage, res: ServerResponse) {
+      const actor = ensurePermission(service, req, res, "admin.places.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as { linkId?: unknown; toPlaceId?: unknown; reason?: unknown };
+      try {
+        const result = service.reassignPlaceAttachment({
+          actorUserId: actor.userId,
+          linkId: String(body.linkId ?? ""),
+          toPlaceId: String(body.toPlaceId ?? ""),
+          reason: String(body.reason ?? "admin_reassignment")
+        });
+        if (!result) {
+          sendJson(res, 503, { error: "place_service_unavailable" });
+          return;
+        }
+        sendJson(res, 200, result);
+      } catch (error) {
+        sendJson(res, 400, { error: "invalid_attachment_reassignment", detail: error instanceof Error ? error.message : String(error) });
+      }
+    },
+    async listPlaceMaintenanceAudits(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.audit.read")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, { items: service.listPlaceMaintenanceAudits(url.searchParams.get("placeId") ?? undefined) });
+    },
     async placeQualityOverview(req: IncomingMessage, res: ServerResponse) {
       if (!ensurePermission(service, req, res, "admin.places.manage")) return;
       sendJson(res, 200, service.getPlaceQualityOverview());

@@ -258,6 +258,47 @@ export interface ImportProviderPlaceResult {
   mergeSummary: MergeSummary;
 }
 
+export type DuplicateCandidateStatus = "pending" | "approved" | "rejected" | "merged";
+
+export interface DuplicateCandidate {
+  id: string;
+  placeIdA: string;
+  placeIdB: string;
+  confidence: number;
+  reasons: string[];
+  status: DuplicateCandidateStatus;
+  reviewedByUserId?: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlaceMaintenanceAuditEntry {
+  id: string;
+  actionType: "merge" | "correction" | "candidate_review" | "attachment_relink";
+  actorUserId: string;
+  targetPlaceId?: string;
+  sourcePlaceIds?: string[];
+  reason?: string;
+  note?: string;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export type PlaceAttachmentType = "review" | "video" | "save" | "guide" | "trust" | "moderation";
+
+export interface PlaceAttachmentLink {
+  id: string;
+  placeId: string;
+  attachmentType: PlaceAttachmentType;
+  attachmentId: string;
+  ownerUserId?: string;
+  metadata: Record<string, unknown>;
+}
+
 export interface ProviderAdapter {
   provider: string;
   normalizeProviderPlace(rawPayload: unknown, ctx: { sourceUrl?: string }): NormalizedProviderPlace;
@@ -271,4 +312,12 @@ export interface PlaceStore {
   listCanonicalPlaces(): CanonicalPlace[];
   listSourceRecordsForPlace(canonicalPlaceId: string): PlaceSourceRecord[];
   listSourceRecords(): PlaceSourceRecord[];
+  upsertDuplicateCandidate(candidate: DuplicateCandidate): DuplicateCandidate;
+  listDuplicateCandidates(status?: DuplicateCandidateStatus): DuplicateCandidate[];
+  getDuplicateCandidate(candidateId: string): DuplicateCandidate | undefined;
+  upsertMaintenanceAudit(entry: PlaceMaintenanceAuditEntry): PlaceMaintenanceAuditEntry;
+  listMaintenanceAudits(placeId?: string): PlaceMaintenanceAuditEntry[];
+  upsertAttachmentLink(link: PlaceAttachmentLink): PlaceAttachmentLink;
+  listAttachmentLinks(placeId: string): PlaceAttachmentLink[];
+  removeAttachmentLink(linkId: string): void;
 }
