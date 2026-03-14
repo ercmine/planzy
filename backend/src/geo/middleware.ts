@@ -7,3 +7,7 @@ export function assertGeoAuth(req: IncomingMessage, expectedSecret: string | und
     throw new Error("unauthorized_geo_service_call");
   }
 }
+
+export function shouldProtectGeoEndpoint(pathname: string): boolean {
+  return pathname.startsWith("/v1/");
+}

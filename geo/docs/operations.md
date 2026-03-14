@@ -1,11 +1,34 @@
 # Geo Operations Runbook
 
-## Health model
-- `/health`: overall availability + upstream status.
-- `/ready`: readiness for traffic, including upstream checks.
-- `/version`: service metadata.
+## Deploy target
+- Host: home server (Dell R910 supported) or equivalent Linux host.
+- Public endpoint: `https://geo.perbug.com` via nginx reverse proxy + TLS.
+
+## Critical checks
+1. `curl -f https://geo.perbug.com/health`
+2. `curl -f https://geo.perbug.com/ready`
+3. `curl -f https://geo.perbug.com/version`
+4. `curl -f https://geo.perbug.com/metrics`
+
+## Security
+- Set `GEO_INTERNAL_AUTH_SECRET` on geo service and backend.
+- Reject all `/v1/*` requests missing `x-perbug-geo-service`.
+- Keep health/readiness public for external uptime checks.
+
+## Home-hosted hardening
+- Monitor dynamic DNS updater (Hostinger) at least every 5 minutes.
+- Alert if WAN IP changed but DNS record stale >10 minutes.
+- Validate router NAT/port forwarding for 80/443.
+- Ensure certbot auto-renew timer is active and tested monthly.
+- Watch disk pressure for Nominatim DB/flatnode volumes.
+
+## Backup / restore
+- Use `ops/scripts/backup_postgres.sh` for backing postgres/Nominatim datastore.
+- Validate manifests with `ops/scripts/verify_backup_manifest.sh`.
+- Restore drills with `ops/scripts/restore_postgres.sh` on a staging host monthly.
 
 ## Failure domains
-- backend -> geo auth mismatch
-- geo -> nominatim timeout/unavailable
-- backend feature fail-open behavior when geo host is down (`GEO_SERVICE_FAIL_OPEN`)
+- backend -> geo auth mismatch (`401 geo_service_unauthorized`)
+- geo -> Nominatim timeout (`502 geo_upstream_error`, timeout in metrics)
+- DNS drift after home IP change (public checks fail; local health still ok)
+- certbot renewal failure (TLS errors while local HTTP remains healthy)
