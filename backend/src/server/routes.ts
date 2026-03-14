@@ -158,7 +158,7 @@ export function createRoutes(
     : null;
   const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
-  const geoHandlers = deps?.geoGateway ? createGeoHttpHandlers(deps.geoGateway) : null;
+  const geoHandlers = deps?.geoGateway ? createGeoHttpHandlers(deps.geoGateway, { authSecret: process.env.GEO_INTERNAL_AUTH_SECRET }) : null;
   const rankingTuningHandlers = deps?.rankingTuning ? createRankingTuningHandlers(deps.rankingTuning.service, deps.rankingTuning.resolver, deps.rankingTuning.repo) : null;
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
   const creatorVerificationHandlers = deps?.creatorVerificationService ? createCreatorVerificationHttpHandlers(deps.creatorVerificationService) : null;
@@ -280,6 +280,11 @@ export function createRoutes(
 
       if (geoHandlers && req.method === "GET" && normalizedPath === "/version") {
         await geoHandlers.version(req, res);
+        return;
+      }
+
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/metrics") {
+        await geoHandlers.metrics(req, res);
         return;
       }
       if (req.method === "GET" && normalizedPath === "/v1/admin/overview" && adminHandlers) {
@@ -618,6 +623,21 @@ export function createRoutes(
 
       if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/reverse-geocode") {
         await geoHandlers.reverseGeocode(req, res);
+        return;
+      }
+
+      if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/autocomplete") {
+        await geoHandlers.autocomplete(req, res);
+        return;
+      }
+
+      if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/place-lookup") {
+        await geoHandlers.placeLookup(req, res);
+        return;
+      }
+
+      if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/area-context") {
+        await geoHandlers.areaContext(req, res);
         return;
       }
 

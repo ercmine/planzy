@@ -1,4 +1,16 @@
-import type { GeoGeocodeRequest, GeoHealthResponse, GeoReverseGeocodeRequest, GeoReverseResult, GeoResult } from "./contracts.js";
+import type {
+  GeoAreaContext,
+  GeoAreaContextRequest,
+  GeoAutocompleteRequest,
+  GeoHealthResponse,
+  GeoGeocodeRequest,
+  GeoPlaceLookupCandidate,
+  GeoPlaceLookupRequest,
+  GeoReverseGeocodeRequest,
+  GeoReverseResult,
+  GeoResult,
+  GeoSuggestion
+} from "./contracts.js";
 import type { GeoClientConfig } from "./config.js";
 
 export class GeoServiceClient {
@@ -12,6 +24,21 @@ export class GeoServiceClient {
   async reverseGeocode(input: GeoReverseGeocodeRequest): Promise<GeoReverseResult> {
     const payload = await this.request<{ result: GeoReverseResult }>("/v1/reverse-geocode", input);
     return payload.result;
+  }
+
+  async autocomplete(input: GeoAutocompleteRequest): Promise<GeoSuggestion[]> {
+    const payload = await this.request<{ suggestions: GeoSuggestion[] }>("/v1/autocomplete", input);
+    return payload.suggestions;
+  }
+
+  async placeLookup(input: GeoPlaceLookupRequest): Promise<GeoPlaceLookupCandidate[]> {
+    const payload = await this.request<{ candidates: GeoPlaceLookupCandidate[] }>("/v1/place-lookup", input);
+    return payload.candidates;
+  }
+
+  async areaContext(input: GeoAreaContextRequest): Promise<GeoAreaContext> {
+    const payload = await this.request<{ context: GeoAreaContext }>("/v1/area-context", input);
+    return payload.context;
   }
 
   async health(): Promise<GeoHealthResponse> {

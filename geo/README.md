@@ -1,16 +1,23 @@
-# Perbug Geo Super-Directory
+# Perbug Geo Platform (`geo.perbug.com`)
 
-This directory centralizes everything required to run Perbug geospatial infrastructure independently on `geo.perbug.com`.
+Production geo subsystem that owns geocoding/reverse-geocoding abstraction, normalized place contracts, canonical-place support helpers, and backend service-to-service integrations.
 
-## Layout
-- `api/`: endpoint definitions and handler notes for `/v1/geocode`, `/v1/reverse-geocode`, `/health`, `/ready`, `/version`.
-- `client/`: backend-facing typed client contract and usage notes.
-- `contracts/`: canonical request/response DTOs shared between backend and geo service.
-- `config/`: geo and backend env variable catalogs.
-- `services/`: Nominatim integration responsibilities and response normalization rules.
-- `middleware/`: service-to-service auth and rate-limiting behavior.
-- `cache/`: cache key, TTL, and stale-data policies.
-- `observability/`: logs, metrics, and health/readiness semantics.
-- `deploy/`: nginx, systemd, and rollout scripts for `geo.perbug.com`.
-- `docs/`: architecture/runbook/deployment docs.
-- `tests/`: contract and integration test plans.
+## Components
+- **Geo API** (`/v1/geocode`, `/v1/reverse-geocode`, `/v1/autocomplete`, `/v1/place-lookup`, `/v1/area-context`).
+- **Provider abstraction** around self-hosted Nominatim with timeout/error translation and normalized DTOs.
+- **Backend typed client** (`backend/src/geo/client.ts`) for all backend-to-geo traffic.
+- **Security** with shared secret header `x-perbug-geo-service`.
+- **Cache and observability** from geocoding service metrics and health/readiness/metrics endpoints.
+
+## Directory map
+- `api/`: API surface notes and endpoint behavior.
+- `contracts/`: canonical wire contracts for geo responses.
+- `client/`: backend client integration guidance.
+- `services/`: provider, normalization, and canonical helper behavior.
+- `cache/`: key strategy and TTL guidance.
+- `middleware/`: auth enforcement + request controls.
+- `observability/`: metrics/logging standards.
+- `deploy/`: nginx/systemd/deploy scripts for `geo.perbug.com`.
+- `config/`: required env variables.
+- `tests/`: contract and integration test coverage plan.
+- `docs/`: architecture and runbooks.

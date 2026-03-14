@@ -1,8 +1,17 @@
+export interface GeoBiasContext {
+  lat?: number;
+  lng?: number;
+  city?: string;
+  region?: string;
+  countryCode?: string;
+}
+
 export interface GeoGeocodeRequest {
   query: string;
   language?: string;
   countryCodes?: string[];
   limit?: number;
+  bias?: GeoBiasContext;
 }
 
 export interface GeoReverseGeocodeRequest {
@@ -12,8 +21,28 @@ export interface GeoReverseGeocodeRequest {
   zoom?: number;
 }
 
+export interface GeoAutocompleteRequest {
+  query: string;
+  limit?: number;
+  language?: string;
+  bias?: GeoBiasContext;
+}
+
+export interface GeoPlaceLookupRequest {
+  query: string;
+  limit?: number;
+  language?: string;
+}
+
+export interface GeoAreaContextRequest {
+  lat: number;
+  lng: number;
+  language?: string;
+}
+
 export interface GeoResult {
   displayName: string;
+  normalizedName?: string;
   lat: number;
   lng: number;
   city?: string;
@@ -27,10 +56,56 @@ export interface GeoResult {
   class?: string;
   type?: string;
   importance?: number;
+  confidence?: number;
   source: "nominatim";
 }
 
 export interface GeoReverseResult extends Omit<GeoResult, "boundingBox" | "importance"> {}
+
+export interface GeoSuggestion {
+  id: string;
+  displayName: string;
+  normalizedName?: string;
+  lat: number;
+  lng: number;
+  city?: string;
+  region?: string;
+  country?: string;
+  countryCode?: string;
+  category?: string;
+  type?: string;
+  relevanceScore: number;
+  source: "nominatim";
+}
+
+export interface GeoPlaceLookupCandidate {
+  displayName: string;
+  lat: number;
+  lng: number;
+  city?: string;
+  region?: string;
+  country?: string;
+  countryCode?: string;
+  category?: string;
+  confidence?: number;
+  canonicalSummary: {
+    canonicalKey: string;
+    normalizedName: string;
+  };
+}
+
+export interface GeoAreaContext {
+  city?: string;
+  region?: string;
+  county?: string;
+  country?: string;
+  countryCode?: string;
+  postalCode?: string;
+  neighborhood?: string;
+  lat: number;
+  lng: number;
+  source: "nominatim";
+}
 
 export interface GeoHealthResponse {
   ok: boolean;
@@ -39,6 +114,15 @@ export interface GeoHealthResponse {
     ok: boolean;
     latencyMs?: number;
     error?: string;
+  };
+  metrics?: {
+    geocodeRequests: number;
+    reverseGeocodeRequests: number;
+    cacheHits: number;
+    cacheMisses: number;
+    failures: number;
+    timeouts: number;
+    noResults: number;
   };
   version: string;
 }

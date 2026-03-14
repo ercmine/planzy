@@ -27,4 +27,22 @@ describe("GeoServiceClient", () => {
     expect(rows).toHaveLength(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("calls autocomplete endpoint", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ suggestions: [{ id: "1", displayName: "Austin", lat: 1, lng: 2, relevanceScore: 0.9, source: "nominatim" }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new GeoServiceClient({
+      enabled: true,
+      baseUrl: "https://geo.perbug.com",
+      timeoutMs: 500,
+      retries: 0,
+      authSecret: "shh",
+      failOpen: true
+    });
+
+    const rows = await client.autocomplete({ query: "aus" });
+    expect(rows[0]?.displayName).toBe("Austin");
+  });
+
 });
