@@ -66,6 +66,7 @@ import { createAdminHttpHandlers } from "../admin/http.js";
 import { AdminService } from "../admin/service.js";
 import type { PlaceNormalizationService } from "../places/service.js";
 import { autocompleteCanonicalPlaces } from "../places/autocomplete.js";
+import { searchCanonicalPlacesInBounds } from "../places/mapDiscovery.js";
 import { createRolloutHttpHandlers } from "../rollouts/http.js";
 import { createVideoPlatformHttpHandlers } from "../videoPlatform/http.js";
 import type { VideoPlatformService } from "../videoPlatform/service.js";
@@ -205,6 +206,52 @@ export function createRoutes(
     const normalizedPath = normalizeAliasPath(url.pathname);
 
     try {
+
+
+      if (req.method === "GET" && (normalizedPath === "/v1/places/map-discovery" || normalizedPath === "/places/map-discovery")) {
+        const north = Number(url.searchParams.get("north"));
+        const south = Number(url.searchParams.get("south"));
+        const east = Number(url.searchParams.get("east"));
+        const west = Number(url.searchParams.get("west"));
+        if (![north, south, east, west].every((value) => Number.isFinite(value))) {
+          throw new ValidationError(["north, south, east, and west are required numeric query parameters"]);
+        }
+
+        const categories = String(url.searchParams.get("categories") ?? "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+        const zoom = Number(url.searchParams.get("zoom"));
+        const limit = Number(url.searchParams.get("limit"));
+        const centerLat = Number(url.searchParams.get("centerLat"));
+        const centerLng = Number(url.searchParams.get("centerLng"));
+        const mode = String(url.searchParams.get("mode") ?? "nearby").trim().toLowerCase();
+
+        const places = deps?.placeService?.listCanonicalPlaces() ?? [];
+        const items = searchCanonicalPlacesInBounds(places, {
+          bounds: { north, south, east, west },
+          categories,
+          zoom: Number.isFinite(zoom) ? zoom : undefined,
+          limit: Number.isFinite(limit) ? limit : undefined,
+          centerLat: Number.isFinite(centerLat) ? centerLat : undefined,
+          centerLng: Number.isFinite(centerLng) ? centerLng : undefined
+        });
+
+        await track({
+          type: "map_discovery_searched",
+          mode,
+          categories,
+          resultCount: items.length
+        });
+
+        sendJson(res, 200, {
+          bounds: { north, south, east, west },
+          categories,
+          mode,
+          places: items
+        });
+        return;
+      }
 
       if (req.method === "GET" && (normalizedPath === "/v1/places/autocomplete" || normalizedPath === "/v1/places/search")) {
         const q = String(url.searchParams.get("q") ?? "").trim();

@@ -15,3 +15,5 @@ export * from "./dataQuality.js";
 export * from "./maintenance.js";
 
 export * from "./autocomplete.js";
+
+export * from "./mapDiscovery.js";
