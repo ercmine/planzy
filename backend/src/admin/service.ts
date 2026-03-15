@@ -13,7 +13,18 @@ import type { ReviewsStore } from "../reviews/store.js";
 import type { SubscriptionService } from "../subscriptions/service.js";
 import { SubscriptionStatus } from "../subscriptions/types.js";
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
-import type { AdminActionAudit } from "./types.js";
+import type {
+  AdminActionAudit,
+  CurationStatus,
+  FeaturedCityEntry,
+  FeaturedCreatorEntry,
+  FeaturedPlaceEntry,
+  LaunchCollection,
+  LaunchCollectionItem,
+  LaunchReadinessStatus,
+  ManualBoostRule,
+  SourceHealthReviewItem
+} from "./types.js";
 
 export interface AdminServiceDeps {
   accountsService: AccountsService;
@@ -29,6 +40,12 @@ export class AdminService {
   private readonly audit: AdminActionAudit[] = [];
   private readonly qualityService = new PlaceDataQualityService(createPlaceDataQualityConfigFromEnv());
   private readonly maintenanceService: PlaceMaintenanceService | undefined;
+  private readonly featuredCreators: FeaturedCreatorEntry[] = [];
+  private readonly featuredPlaces: FeaturedPlaceEntry[] = [];
+  private readonly featuredCities: FeaturedCityEntry[] = [];
+  private readonly manualBoostRules: ManualBoostRule[] = [];
+  private readonly launchCollections: LaunchCollection[] = [];
+  private readonly sourceHealthReviews: SourceHealthReviewItem[] = [];
 
   constructor(private readonly deps: AdminServiceDeps) {
     this.maintenanceService = this.deps.placeService
@@ -81,6 +98,7 @@ export class AdminService {
         placeQuality,
         subscriptions: subscriptionOps.summary,
         ads: adsOps.summary,
+        curation: this.getCurationOpsSummary(),
         recentAdminActions: this.audit.slice(-20).reverse()
       };
     });
@@ -316,6 +334,244 @@ export class AdminService {
     const after = this.deps.accountsService.updateUserStatus(input.userId, UserStatus.ACTIVE);
     this.recordAudit({ actorUserId: input.actorUserId, actionType: "users.reinstate", targetType: "user", targetId: input.userId, reason: input.reason, note: input.note, before: before as never, after: after as never });
     return after;
+  }
+
+  private nowIso() { return new Date().toISOString(); }
+
+  private isActiveWindow(status: CurationStatus, startsAt?: string, endsAt?: string) {
+    if (status !== "active") return false;
+    const now = Date.now();
+    if (startsAt && Date.parse(startsAt) > now) return false;
+    if (endsAt && Date.parse(endsAt) < now) return false;
+    return true;
+  }
+
+  private getCreatorTrustWarning(creatorId: string): string | undefined {
+    const summary = this.deps.accountsService.getIdentitySummary(creatorId);
+    if (summary.user.status === UserStatus.SUSPENDED) return "creator_suspended";
+    if ((summary.user.moderationFlags ?? []).length > 0) return "creator_flagged";
+    return undefined;
+  }
+
+  private getPlaceModerationWarning(placeId: string): string | undefined {
+    const q = this.deps.moderationService.listQueue({ targetType: "place", limit: 200 });
+    const hit = q.find((item) => item.targetId === placeId && item.unresolvedReports > 0);
+    if (hit) return `open_reports:${hit.unresolvedReports}`;
+    return undefined;
+  }
+
+  private getCurationOpsSummary() {
+    const now = Date.now();
+    const expiringSoon = (v: { status: CurationStatus; endsAt?: string }) => v.status === "active" && v.endsAt && Date.parse(v.endsAt) > now && Date.parse(v.endsAt) < now + 1000 * 60 * 60 * 24 * 7;
+    return {
+      featuredCreatorsActive: this.featuredCreators.filter((row) => this.isActiveWindow(row.status, row.startsAt, row.endsAt)).length,
+      featuredPlacesActive: this.featuredPlaces.filter((row) => this.isActiveWindow(row.status, row.startsAt, row.endsAt)).length,
+      featuredCitiesActive: this.featuredCities.filter((row) => this.isActiveWindow(row.status, row.startsAt, row.endsAt)).length,
+      activeBoosts: this.manualBoostRules.filter((row) => this.isActiveWindow(row.status, row.startsAt, row.endsAt)).length,
+      launchCollectionsActive: this.launchCollections.filter((row) => row.status === "active").length,
+      expiringSoon: {
+        creators: this.featuredCreators.filter(expiringSoon).length,
+        places: this.featuredPlaces.filter(expiringSoon).length,
+        cities: this.featuredCities.filter(expiringSoon).length,
+        boosts: this.manualBoostRules.filter(expiringSoon).length
+      }
+    };
+  }
+
+  listFeaturedCreators(filter: { status?: CurationStatus; city?: string; categoryId?: string; activeNow?: boolean; q?: string } = {}) {
+    return this.featuredCreators.filter((row) => {
+      if (filter.status && row.status !== filter.status) return false;
+      if (filter.city && row.context.city?.toLowerCase() !== filter.city.toLowerCase()) return false;
+      if (filter.categoryId && row.context.categoryId !== filter.categoryId) return false;
+      if (filter.activeNow && !this.isActiveWindow(row.status, row.startsAt, row.endsAt)) return false;
+      if (filter.q && !`${row.creatorId} ${row.reason} ${row.notes ?? ""}`.toLowerCase().includes(filter.q.toLowerCase())) return false;
+      return true;
+    }).sort((a, b) => b.priority - a.priority || b.weight - a.weight);
+  }
+
+  upsertFeaturedCreator(input: Omit<FeaturedCreatorEntry, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy" | "trustWarning"> & { id?: string; actorUserId: string }) {
+    const now = this.nowIso();
+    const trustWarning = this.getCreatorTrustWarning(input.creatorId);
+    const existing = input.id ? this.featuredCreators.find((row) => row.id === input.id) : undefined;
+    const next: FeaturedCreatorEntry = existing ? { ...existing, ...input, updatedAt: now, updatedBy: input.actorUserId, trustWarning } as FeaturedCreatorEntry : { ...input, id: `feat_creator_${randomUUID()}`, createdAt: now, updatedAt: now, createdBy: input.actorUserId, updatedBy: input.actorUserId, trustWarning } as FeaturedCreatorEntry;
+    if (!existing) this.featuredCreators.push(next); else Object.assign(existing, next);
+    this.recordAudit({ actorUserId: input.actorUserId, actionType: existing ? "curation.featured_creator.updated" : "curation.featured_creator.created", targetType: "featured_creator", targetId: next.id, reason: input.reason, note: input.notes, before: existing as never, after: next as never });
+    return next;
+  }
+
+  removeFeaturedCreator(input: { id: string; actorUserId: string; reason: string; note?: string }) {
+    const row = this.featuredCreators.find((item) => item.id === input.id);
+    if (!row) return undefined;
+    const before = { ...row };
+    row.status = "removed";
+    row.updatedAt = this.nowIso();
+    row.updatedBy = input.actorUserId;
+    this.recordAudit({ actorUserId: input.actorUserId, actionType: "curation.featured_creator.removed", targetType: "featured_creator", targetId: row.id, reason: input.reason, note: input.note, before: before as never, after: row as never });
+    return row;
+  }
+
+  listFeaturedPlaces(filter: { status?: CurationStatus; city?: string; categoryId?: string; activeNow?: boolean } = {}) {
+    return this.featuredPlaces.filter((row) => {
+      if (filter.status && row.status !== filter.status) return false;
+      if (filter.city && row.context.city?.toLowerCase() !== filter.city.toLowerCase()) return false;
+      if (filter.categoryId && row.context.categoryId !== filter.categoryId) return false;
+      if (filter.activeNow && !this.isActiveWindow(row.status, row.startsAt, row.endsAt)) return false;
+      return true;
+    }).sort((a, b) => b.priority - a.priority || b.weight - a.weight);
+  }
+
+  upsertFeaturedPlace(input: Omit<FeaturedPlaceEntry, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy" | "moderationWarning"> & { id?: string; actorUserId: string }) {
+    const now = this.nowIso();
+    const moderationWarning = this.getPlaceModerationWarning(input.canonicalPlaceId);
+    const existing = input.id ? this.featuredPlaces.find((row) => row.id === input.id) : undefined;
+    const next: FeaturedPlaceEntry = existing ? { ...existing, ...input, updatedAt: now, updatedBy: input.actorUserId, moderationWarning } as FeaturedPlaceEntry : { ...input, id: `feat_place_${randomUUID()}`, createdAt: now, updatedAt: now, createdBy: input.actorUserId, updatedBy: input.actorUserId, moderationWarning } as FeaturedPlaceEntry;
+    if (!existing) this.featuredPlaces.push(next); else Object.assign(existing, next);
+    this.recordAudit({ actorUserId: input.actorUserId, actionType: existing ? "curation.featured_place.updated" : "curation.featured_place.created", targetType: "featured_place", targetId: next.id, reason: input.reason, note: input.notes, before: existing as never, after: next as never });
+    return next;
+  }
+
+  removeFeaturedPlace(input: { id: string; actorUserId: string; reason: string; note?: string }) {
+    const row = this.featuredPlaces.find((item) => item.id === input.id);
+    if (!row) return undefined;
+    const before = { ...row };
+    row.status = "removed";
+    row.updatedAt = this.nowIso();
+    row.updatedBy = input.actorUserId;
+    this.recordAudit({ actorUserId: input.actorUserId, actionType: "curation.featured_place.removed", targetType: "featured_place", targetId: row.id, reason: input.reason, note: input.note, before: before as never, after: row as never });
+    return row;
+  }
+
+  listFeaturedCities(filter: { status?: CurationStatus; launchReadiness?: LaunchReadinessStatus; activeNow?: boolean; city?: string } = {}) {
+    return this.featuredCities.filter((row) => {
+      if (filter.status && row.status !== filter.status) return false;
+      if (filter.launchReadiness && row.launchReadiness !== filter.launchReadiness) return false;
+      if (filter.city && !row.city.toLowerCase().includes(filter.city.toLowerCase())) return false;
+      if (filter.activeNow && !this.isActiveWindow(row.status, row.startsAt, row.endsAt)) return false;
+      return true;
+    }).sort((a, b) => b.priority - a.priority);
+  }
+
+  upsertFeaturedCity(input: Omit<FeaturedCityEntry, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy"> & { id?: string; actorUserId: string }) {
+    const now = this.nowIso();
+    const existing = input.id ? this.featuredCities.find((row) => row.id === input.id) : undefined;
+    const next: FeaturedCityEntry = existing ? { ...existing, ...input, updatedAt: now, updatedBy: input.actorUserId } as FeaturedCityEntry : { ...input, id: `feat_city_${randomUUID()}`, createdAt: now, updatedAt: now, createdBy: input.actorUserId, updatedBy: input.actorUserId } as FeaturedCityEntry;
+    if (!existing) this.featuredCities.push(next); else Object.assign(existing, next);
+    this.recordAudit({ actorUserId: input.actorUserId, actionType: existing ? "curation.featured_city.updated" : "curation.featured_city.created", targetType: "featured_city", targetId: next.id, reason: input.reason, note: input.notes, before: existing as never, after: next as never });
+    return next;
+  }
+
+  removeFeaturedCity(input: { id: string; actorUserId: string; reason: string; note?: string }) {
+    const row = this.featuredCities.find((item) => item.id === input.id);
+    if (!row) return undefined;
+    const before = { ...row };
+    row.status = "removed";
+    row.updatedAt = this.nowIso();
+    row.updatedBy = input.actorUserId;
+    this.recordAudit({ actorUserId: input.actorUserId, actionType: "curation.featured_city.removed", targetType: "featured_city", targetId: row.id, reason: input.reason, note: input.note, before: before as never, after: row as never });
+    return row;
+  }
+
+  listManualBoostRules(filter: { status?: CurationStatus; targetType?: ManualBoostRule["targetType"]; activeNow?: boolean } = {}) {
+    return this.manualBoostRules.filter((row) => {
+      if (filter.status && row.status !== filter.status) return false;
+      if (filter.targetType && row.targetType !== filter.targetType) return false;
+      if (filter.activeNow && !this.isActiveWindow(row.status, row.startsAt, row.endsAt)) return false;
+      return true;
+    }).sort((a, b) => b.priority - a.priority || b.weight - a.weight);
+  }
+
+  upsertManualBoostRule(input: Omit<ManualBoostRule, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy"> & { id?: string; actorUserId: string }) {
+    const now = this.nowIso();
+    const existing = input.id ? this.manualBoostRules.find((row) => row.id === input.id) : undefined;
+    const next: ManualBoostRule = existing ? { ...existing, ...input, updatedAt: now, updatedBy: input.actorUserId } as ManualBoostRule : { ...input, id: `boost_${randomUUID()}`, createdAt: now, updatedAt: now, createdBy: input.actorUserId, updatedBy: input.actorUserId } as ManualBoostRule;
+    if (!existing) this.manualBoostRules.push(next); else Object.assign(existing, next);
+    this.recordAudit({ actorUserId: input.actorUserId, actionType: existing ? "curation.boost.updated" : "curation.boost.created", targetType: "manual_boost", targetId: next.id, reason: input.reason, note: input.notes, before: existing as never, after: next as never });
+    return next;
+  }
+
+  listLaunchCollections(filter: { status?: CurationStatus; city?: string; visibility?: LaunchCollection["visibility"] } = {}) {
+    return this.launchCollections.filter((row) => {
+      if (filter.status && row.status !== filter.status) return false;
+      if (filter.city && row.city?.toLowerCase() !== filter.city.toLowerCase()) return false;
+      if (filter.visibility && row.visibility !== filter.visibility) return false;
+      return true;
+    });
+  }
+
+  upsertLaunchCollection(input: Omit<LaunchCollection, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy"> & { id?: string; actorUserId: string; items?: LaunchCollectionItem[] }) {
+    const now = this.nowIso();
+    const existing = input.id ? this.launchCollections.find((row) => row.id === input.id) : undefined;
+    const next: LaunchCollection = existing
+      ? { ...existing, ...input, items: input.items ?? existing.items, updatedAt: now, updatedBy: input.actorUserId } as LaunchCollection
+      : { ...input, id: `launch_collection_${randomUUID()}`, items: input.items ?? [], createdAt: now, updatedAt: now, createdBy: input.actorUserId, updatedBy: input.actorUserId } as LaunchCollection;
+    if (!existing) this.launchCollections.push(next); else Object.assign(existing, next);
+    this.recordAudit({ actorUserId: input.actorUserId, actionType: existing ? "curation.launch_collection.updated" : "curation.launch_collection.created", targetType: "launch_collection", targetId: next.id, reason: input.reason, note: input.notes, before: existing as never, after: next as never });
+    return next;
+  }
+
+  addLaunchCollectionItem(input: { actorUserId: string; collectionId: string; itemType: LaunchCollectionItem["itemType"]; itemId: string; order: number; note?: string }) {
+    const collection = this.launchCollections.find((row) => row.id === input.collectionId);
+    if (!collection) return undefined;
+    const before = JSON.parse(JSON.stringify(collection));
+    collection.items = [...collection.items.filter((row) => row.itemId !== input.itemId), { id: `launch_item_${randomUUID()}`, itemType: input.itemType, itemId: input.itemId, order: input.order, note: input.note }].sort((a, b) => a.order - b.order);
+    collection.updatedAt = this.nowIso();
+    collection.updatedBy = input.actorUserId;
+    this.recordAudit({ actorUserId: input.actorUserId, actionType: "curation.launch_collection.item_added", targetType: "launch_collection", targetId: collection.id, reason: "item_added", note: input.note, before: before as never, after: collection as never });
+    return collection;
+  }
+
+  listSourceHealthReviewItems(filter: { status?: SourceHealthReviewItem["status"]; severity?: SourceHealthReviewItem["severity"]; city?: string; provider?: string } = {}) {
+    return this.sourceHealthReviews.filter((row) => {
+      if (filter.status && row.status !== filter.status) return false;
+      if (filter.severity && row.severity !== filter.severity) return false;
+      if (filter.city && row.city?.toLowerCase() !== filter.city.toLowerCase()) return false;
+      if (filter.provider && row.provider !== filter.provider) return false;
+      return true;
+    });
+  }
+
+  upsertSourceHealthReviewItem(input: Omit<SourceHealthReviewItem, "id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy"> & { id?: string; actorUserId: string }) {
+    const now = this.nowIso();
+    const existing = input.id ? this.sourceHealthReviews.find((row) => row.id === input.id) : undefined;
+    const next: SourceHealthReviewItem = existing ? { ...existing, ...input, updatedAt: now, updatedBy: input.actorUserId } as SourceHealthReviewItem : { ...input, id: `source_health_${randomUUID()}`, createdAt: now, updatedAt: now, createdBy: input.actorUserId, updatedBy: input.actorUserId } as SourceHealthReviewItem;
+    if (!existing) this.sourceHealthReviews.push(next); else Object.assign(existing, next);
+    this.recordAudit({ actorUserId: input.actorUserId, actionType: existing ? "source_health.review.updated" : "source_health.review.created", targetType: "source_health_review", targetId: next.id, reason: "source_health_triage", note: input.note, before: existing as never, after: next as never });
+    return next;
+  }
+
+  getLaunchReadiness(city?: string) {
+    const featuredCities = this.listFeaturedCities({ city });
+    return featuredCities.map((entry) => ({
+      city: entry.city,
+      launchReadiness: entry.launchReadiness,
+      status: entry.status,
+      readinessMetadata: entry.readinessMetadata,
+      activeFeaturedCreators: this.listFeaturedCreators({ city: entry.city, activeNow: true }).length,
+      activeFeaturedPlaces: this.listFeaturedPlaces({ city: entry.city, activeNow: true }).length,
+      sourceHealthOpenIssues: this.listSourceHealthReviewItems({ city: entry.city, status: "open" }).length
+    }));
+  }
+
+  getCurationPreview(input: { city?: string; categoryId?: string }) {
+    return {
+      featuredCreators: this.listFeaturedCreators({ city: input.city, categoryId: input.categoryId, activeNow: true }).slice(0, 10),
+      featuredPlaces: this.listFeaturedPlaces({ city: input.city, categoryId: input.categoryId, activeNow: true }).slice(0, 10),
+      activeBoosts: this.listManualBoostRules({ activeNow: true }).filter((row) => (input.city ? row.scope.city?.toLowerCase() === input.city.toLowerCase() : true)),
+      launchCollections: this.listLaunchCollections({ city: input.city }).filter((row) => row.status === "active"),
+      why: "preview_curated_modules"
+    };
+  }
+
+  getCurationInsights() {
+    return {
+      activeFeaturedCreators: this.listFeaturedCreators({ activeNow: true }).length,
+      activeFeaturedPlaces: this.listFeaturedPlaces({ activeNow: true }).length,
+      activeFeaturedCities: this.listFeaturedCities({ activeNow: true }).length,
+      activeBoosts: this.listManualBoostRules({ activeNow: true }).length,
+      launchMarketsByStatus: this.featuredCities.reduce<Record<string, number>>((acc, row) => { acc[row.launchReadiness] = (acc[row.launchReadiness] ?? 0) + 1; return acc; }, {}),
+      sourceHealthIssuesByType: this.sourceHealthReviews.reduce<Record<string, number>>((acc, row) => { acc[row.issueType] = (acc[row.issueType] ?? 0) + 1; return acc; }, {}),
+      moderationBlockedFeatureAttempts: this.audit.filter((row) => row.actionType.includes("featured_") && (row.after as Record<string, unknown> | undefined)?.moderationWarning).length
+    };
   }
 
   listAuditLogs(limit = 100) {
