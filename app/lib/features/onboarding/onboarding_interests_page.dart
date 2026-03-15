@@ -50,13 +50,13 @@ class OnboardingInterestsPage extends ConsumerWidget {
           const Spacer(),
           PrimaryButton(
             label: 'Continue',
-            onPressed: () => context.go('/onboarding/permissions'),
+            onPressed: () => context.go('/onboarding/discovery'),
             icon: const Icon(Icons.arrow_forward_rounded),
           ),
           const SizedBox(height: AppSpacing.s),
           SecondaryButton(
             label: 'Skip for now',
-            onPressed: () => context.go('/onboarding/permissions'),
+            onPressed: () => context.go('/onboarding/discovery'),
           ),
         ],
       ),

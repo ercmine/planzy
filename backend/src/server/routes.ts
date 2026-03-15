@@ -71,6 +71,7 @@ import { createRolloutHttpHandlers } from "../rollouts/http.js";
 import { createVideoPlatformHttpHandlers } from "../videoPlatform/http.js";
 import type { VideoPlatformService } from "../videoPlatform/service.js";
 import type { TrustSafetyService } from "../trustSafety/service.js";
+import type { OnboardingHttpHandlers } from "../onboarding/http.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
@@ -149,6 +150,7 @@ export function createRoutes(
     rolloutService?: RolloutService;
     geoGateway?: GeoGateway;
     videoPlatformService?: VideoPlatformService;
+    onboardingHandlers?: OnboardingHttpHandlers;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -173,6 +175,7 @@ export function createRoutes(
   const notificationHandlers = deps?.notificationService ? createNotificationHttpHandlers(deps.notificationService) : null;
   const analyticsHandlers = deps?.analyticsService && deps?.analyticsQueryService ? createAnalyticsHttpHandlers(deps.analyticsService, deps.analyticsQueryService) : null;
   const videoPlatformHandlers = deps?.videoPlatformService ? createVideoPlatformHttpHandlers(deps.videoPlatformService) : null;
+  const onboardingHandlers = deps?.onboardingHandlers ?? null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -2302,6 +2305,19 @@ export function createRoutes(
           await subscriptionHandlers.authorizeAction(req, res);
           return;
         }
+      }
+
+      if (onboardingHandlers && req.method === "GET" && normalizedPath === "/v1/onboarding/preferences") {
+        await onboardingHandlers.getPreferences(req, res);
+        return;
+      }
+      if (onboardingHandlers && req.method === "PUT" && normalizedPath === "/v1/onboarding/preferences") {
+        await onboardingHandlers.upsertPreferences(req, res);
+        return;
+      }
+      if (onboardingHandlers && req.method === "GET" && normalizedPath === "/v1/feed/bootstrap") {
+        await onboardingHandlers.bootstrapFeed(req, res);
+        return;
       }
 
       const videoUploadMatch = /^\/v1\/videos\/([^/]+)\/upload-session$/.exec(normalizedPath);

@@ -13,8 +13,8 @@ import '../features/invite/invite_page.dart';
 import '../features/onboarding/bootstrap_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
 import '../features/onboarding/onboarding_interests_page.dart';
-import '../features/onboarding/onboarding_permissions_page.dart';
-import '../features/onboarding/onboarding_signin_page.dart';
+import '../features/onboarding/onboarding_location_page.dart';
+import '../features/onboarding/onboarding_discovery_page.dart';
 import '../features/results/results_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/sessions/create_session/create_session_page.dart';
@@ -83,14 +83,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const OnboardingInterestsPage(),
       ),
       GoRoute(
-        path: '/onboarding/permissions',
-        name: 'onboarding-permissions',
-        builder: (context, state) => const OnboardingPermissionsPage(),
+        path: '/onboarding/location',
+        name: 'onboarding-location',
+        builder: (context, state) => const OnboardingLocationPage(),
       ),
       GoRoute(
-        path: '/onboarding/signin',
-        name: 'onboarding-signin',
-        builder: (context, state) => const OnboardingSignInPage(),
+        path: '/onboarding/discovery',
+        name: 'onboarding-discovery',
+        builder: (context, state) => const OnboardingDiscoveryPage(),
       ),
       GoRoute(
         path: '/',

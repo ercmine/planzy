@@ -19,13 +19,13 @@ class OnboardingIntroPage extends StatelessWidget {
           const Center(child: PerbugLogo(size: 92, variant: PerbugLogoVariant.withWordmark)),
           const SizedBox(height: AppSpacing.l),
           Text(
-            'Plan faster with your people.',
+            'Discover great places, tuned to you.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: AppSpacing.s),
           Text(
-            'Perbug keeps group decisions moving with less back-and-forth.',
+            'Set your city, interests, and discovery style to unlock a personalized Local, Regional, and Global feed.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge,
           ),
@@ -34,16 +34,16 @@ class OnboardingIntroPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                OnboardingBenefit(text: 'See nearby ideas in seconds.'),
-                OnboardingBenefit(text: 'Invite friends with one tap.'),
-                OnboardingBenefit(text: 'Vote quickly and pick together.'),
+                OnboardingBenefit(text: 'Choose your home city or current location.'),
+                OnboardingBenefit(text: 'Pick interests that shape ranking.'),
+                OnboardingBenefit(text: 'Start in Local, Regional, or Global based on your style.'),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.l),
           PrimaryButton(
             label: 'Get Started',
-            onPressed: () => context.go('/onboarding/interests'),
+            onPressed: () => context.go('/onboarding/location'),
             icon: const Icon(Icons.arrow_forward_rounded),
           ),
         ],

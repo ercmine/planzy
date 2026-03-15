@@ -57,6 +57,7 @@ import { MemoryVenueClaimStore } from "../venues/claims/memoryStore.js";
 import { MemoryRolloutStore } from "../rollouts/store.js";
 import { rolloutSeedForLocalDev, RolloutService } from "../rollouts/service.js";
 import { MemoryVideoPlatformStore, VideoPlatformService } from "../videoPlatform/index.js";
+import { createOnboardingHttpHandlers, MemoryOnboardingStore, OnboardingService } from "../onboarding/index.js";
 import { TrustSafetyService } from "../trustSafety/index.js";
 import { createHttpServer } from "./httpServer.js";
 
@@ -203,6 +204,10 @@ export function createServer(options?: CreateServerOptions) {
     notificationService
   );
 
+
+
+  const onboardingService = new OnboardingService(new MemoryOnboardingStore(), videoPlatformService);
+
   return createHttpServer(service, merchantService, {
     deckHandler,
     ideasHandlers,
@@ -243,7 +248,8 @@ export function createServer(options?: CreateServerOptions) {
     analyticsQueryService,
     rolloutService,
     geoGateway: geoGateway ?? undefined,
-    videoPlatformService
+    videoPlatformService,
+    onboardingHandlers: createOnboardingHttpHandlers(onboardingService)
   });
 }
 
