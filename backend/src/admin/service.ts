@@ -354,8 +354,8 @@ export class AdminService {
   }
 
   private getPlaceModerationWarning(placeId: string): string | undefined {
-    const q = this.deps.moderationService.listQueue({ targetType: "place", limit: 200 });
-    const hit = q.find((item) => item.targetId === placeId && item.unresolvedReports > 0);
+    const q = this.deps.moderationService.listQueue({ placeId, limit: 200 });
+    const hit = q.find((item) => (item.target.placeId === placeId || item.target.targetId === placeId) && item.unresolvedReports > 0);
     if (hit) return `open_reports:${hit.unresolvedReports}`;
     return undefined;
   }

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GeocodingError } from "../errors.js";
 import { GeocodingService } from "../service.js";
 
 describe("GeocodingService", () => {
@@ -50,7 +49,7 @@ describe("GeocodingService", () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
     const service = new GeocodingService({ baseUrl: "http://nominatim.test" });
 
-    await expect(service.geocode({ query: "zzzz unknown" })).rejects.toMatchObject<Partial<GeocodingError>>({
+    await expect(service.geocode({ query: "zzzz unknown" })).rejects.toMatchObject({
       code: "no_results",
       statusCode: 404
     });
@@ -60,7 +59,7 @@ describe("GeocodingService", () => {
     fetchMock.mockRejectedValue(Object.assign(new Error("aborted"), { name: "AbortError" }));
     const service = new GeocodingService({ baseUrl: "http://nominatim.test" });
 
-    await expect(service.geocode({ query: "Austin" })).rejects.toMatchObject<Partial<GeocodingError>>({
+    await expect(service.geocode({ query: "Austin" })).rejects.toMatchObject({
       code: "timeout",
       statusCode: 504
     });
@@ -68,7 +67,7 @@ describe("GeocodingService", () => {
 
   it("rejects invalid input", async () => {
     const service = new GeocodingService({ baseUrl: "http://nominatim.test" });
-    await expect(service.reverseGeocode({ lat: 99, lng: 10 })).rejects.toMatchObject<Partial<GeocodingError>>({ code: "invalid_input", statusCode: 400 });
+    await expect(service.reverseGeocode({ lat: 99, lng: 10 })).rejects.toMatchObject({ code: "invalid_input", statusCode: 400 });
   });
 
   it("does not enable public fallback in prod", async () => {
@@ -81,7 +80,7 @@ describe("GeocodingService", () => {
       env: "prod"
     });
 
-    await expect(service.geocode({ query: "Paris" })).rejects.toMatchObject<Partial<GeocodingError>>({
+    await expect(service.geocode({ query: "Paris" })).rejects.toMatchObject({
       code: "provider_unavailable"
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
