@@ -15,6 +15,7 @@ import '../../core/location/location_models.dart';
 import '../../core/permissions/permission_state.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/debug_flags.dart';
+import '../../core/widgets/section_card.dart';
 import '../../models/session.dart';
 import '../../providers/app_providers.dart';
 
@@ -39,7 +40,7 @@ class SettingsPage extends ConsumerWidget {
       ),
       body: ListView(
         children: [
-          _Section(
+          AppSectionCard(
             title: 'Account',
             icon: Icons.person_outline,
             child: Column(
@@ -66,7 +67,7 @@ class SettingsPage extends ConsumerWidget {
               ],
             ),
           ),
-          _Section(
+          AppSectionCard(
             title: 'Permissions',
             icon: Icons.shield_outlined,
             child: Column(
@@ -89,7 +90,7 @@ class SettingsPage extends ConsumerWidget {
               ],
             ),
           ),
-          _Section(
+          AppSectionCard(
             title: 'Location',
             icon: Icons.my_location,
             child: Column(
@@ -132,7 +133,7 @@ class SettingsPage extends ConsumerWidget {
               ],
             ),
           ),
-          _Section(
+          AppSectionCard(
             title: 'Notifications',
             icon: Icons.notifications_none,
             child: SwitchListTile.adaptive(
@@ -143,7 +144,7 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
           if (kShowDebugUi)
-            _Section(
+            AppSectionCard(
               title: 'Diagnostics',
               icon: Icons.monitor_heart_outlined,
               child: SwitchListTile.adaptive(
@@ -154,7 +155,7 @@ class SettingsPage extends ConsumerWidget {
                 onChanged: controller.setDiagnosticsLoggingEnabled,
               ),
             ),
-          _Section(
+          AppSectionCard(
             title: 'Support',
             icon: Icons.support_agent,
             child: Wrap(
@@ -167,7 +168,7 @@ class SettingsPage extends ConsumerWidget {
               ],
             ),
           ),
-          _Section(
+          AppSectionCard(
             title: 'Privacy',
             icon: Icons.privacy_tip_outlined,
             child: const Column(
@@ -179,7 +180,7 @@ class SettingsPage extends ConsumerWidget {
               ],
             ),
           ),
-          _Section(
+          AppSectionCard(
             title: 'About',
             icon: Icons.info_outline,
             child: Column(
@@ -346,37 +347,6 @@ class SettingsPage extends ConsumerWidget {
       return 'Live location';
     }
     return 'Unavailable';
-  }
-}
-
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child, required this.icon});
-
-  final String title;
-  final Widget child;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.m),
-      child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 18),
-                const SizedBox(width: AppSpacing.s),
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.s),
-            child,
-          ],
-        ),
-      ),
-    );
   }
 }
 

@@ -32,5 +32,17 @@ String formatRating(double? rating, int? reviews) {
     return ratingText;
   }
 
-  return '$ratingText ($reviews)';
+  return '$ratingText (${formatReviewCount(reviews)})';
+}
+
+String? formatReviewCount(int? reviewCount) {
+  if (reviewCount == null) return null;
+  if (reviewCount == 1) return '1 review';
+  return '$reviewCount reviews';
+}
+
+String formatSourceLabel(String source) {
+  final clean = source.trim();
+  if (clean.isEmpty) return 'Perbug';
+  return clean[0].toUpperCase() + clean.substring(1);
 }
