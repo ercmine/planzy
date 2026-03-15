@@ -19,10 +19,16 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   int _navIndex = 0;
   FeedScope _scope = FeedScope.local;
+  bool _scopeInitialized = false;
 
   @override
   Widget build(BuildContext context) {
     final unreadCount = ref.watch(unreadNotificationCountProvider).valueOrNull ?? 0;
+    final bootstrap = ref.watch(feedBootstrapProvider).valueOrNull;
+    if (!_scopeInitialized && bootstrap != null) {
+      _scope = bootstrap.defaultScope;
+      _scopeInitialized = true;
+    }
     final pages = [
       _FeedTab(scope: _scope, onScopeChanged: (scope) => setState(() => _scope = scope)),
       const MapDiscoveryTab(),
@@ -63,6 +69,7 @@ class _FeedTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final bootstrap = ref.watch(feedBootstrapProvider);
     final feed = ref.watch(videoFeedProvider(scope));
     return Column(
       children: [
@@ -77,27 +84,51 @@ class _FeedTab extends ConsumerWidget {
           onSelectionChanged: (value) => onScopeChanged(value.first),
         ),
         Expanded(
-          child: feed.when(
-            data: (items) => ListView.builder(
-              itemCount: items.length,
-              itemBuilder: (_, index) {
-                final item = items[index];
-                return Card(
-                  margin: const EdgeInsets.all(12),
-                  child: ListTile(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => PlaceVideoDetailPage(placeId: item.placeId, placeName: item.placeName),
+          child: bootstrap.when(
+            data: (boot) {
+              final seeded = boot.itemsByScope[scope] ?? const [];
+              final items = seeded.isNotEmpty ? seeded : feed.valueOrNull ?? const [];
+              if (items.isEmpty) {
+                return _FeedEmptyState(
+                  title: boot.emptyTitle ?? 'No nearby videos yet',
+                  body: boot.emptyBody ?? 'Try switching to Regional or Global and broaden your interests.',
+                  suggestions: boot.suggestions,
+                );
+              }
+              return ListView.builder(
+                itemCount: items.length,
+                itemBuilder: (_, index) {
+                  final item = items[index];
+                  return Card(
+                    margin: const EdgeInsets.all(12),
+                    child: ListTile(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => PlaceVideoDetailPage(placeId: item.placeId, placeName: item.placeName),
+                        ),
+                      ),
+                      title: Text(item.caption.isEmpty ? item.placeName : item.caption),
+                      subtitle: Text('${item.placeName} • ${item.placeCategory} • ${item.regionLabel}
+${item.creatorHandle}'),
+                      trailing: Chip(label: Text('${item.rating}/5')),
+                    ),
+                  );
+                },
+              );
+            },
+            error: (_, __) => feed.when(
+              data: (items) => items.isEmpty
+                  ? const _FeedEmptyState(title: 'No content yet', body: 'Try another scope or update preferences in settings.')
+                  : ListView.builder(
+                      itemCount: items.length,
+                      itemBuilder: (_, index) => Card(
+                        margin: const EdgeInsets.all(12),
+                        child: ListTile(title: Text(items[index].caption.isEmpty ? items[index].placeName : items[index].caption)),
                       ),
                     ),
-                    title: Text(item.caption.isEmpty ? item.placeName : item.caption),
-                    subtitle: Text('${item.placeName} • ${item.placeCategory} • ${item.regionLabel}\n${item.creatorHandle}'),
-                    trailing: Chip(label: Text('${item.rating}/5')),
-                  ),
-                );
-              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Feed unavailable: $e')),
             ),
-            error: (_, __) => const Center(child: Text('Feed unavailable.')),
             loading: () => const Center(child: CircularProgressIndicator()),
           ),
         ),
@@ -171,6 +202,39 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+class _FeedEmptyState extends StatelessWidget {
+  const _FeedEmptyState({required this.title, required this.body, this.suggestions = const []});
+
+  final String title;
+  final String body;
+  final List<String> suggestions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(body, textAlign: TextAlign.center),
+            if (suggestions.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ...suggestions.map((s) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text('• $s', textAlign: TextAlign.center),
+                  )),
+            ]
+          ],
+        ),
+      ),
     );
   }
 }

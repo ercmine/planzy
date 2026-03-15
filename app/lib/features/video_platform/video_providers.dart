@@ -4,6 +4,20 @@ import '../../providers/app_providers.dart';
 import 'video_models.dart';
 import 'video_repository.dart';
 
+import '../onboarding/onboarding_repository.dart';
+
+final onboardingRepositoryProvider = FutureProvider<OnboardingRepository>((ref) async {
+  final apiClient = await ref.watch(apiClientProvider.future);
+  final videoRepo = await ref.watch(videoRepositoryProvider.future);
+  return OnboardingRepository(apiClient: apiClient, videoRepository: videoRepo);
+});
+
+final feedBootstrapProvider = FutureProvider<FeedBootstrap>((ref) async {
+  final repo = await ref.watch(onboardingRepositoryProvider.future);
+  return repo.fetchBootstrap();
+});
+
+
 final videoRepositoryProvider = FutureProvider<VideoRepository>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);
   return VideoRepository(apiClient: apiClient);
