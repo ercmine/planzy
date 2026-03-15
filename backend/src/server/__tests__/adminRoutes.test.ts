@@ -207,6 +207,128 @@ describe("admin operations routes", () => {
     expect(auditsJson.items.some((item: { actionType: string }) => item.actionType === "merge")).toBe(true);
     expect(auditsJson.items.some((item: { actionType: string }) => item.actionType === "correction")).toBe(true);
   });
+
+
+  it("supports curation, boosts, source health review, launch readiness, preview, and insights", async () => {
+    const featuredCreator = await fetch(`${baseUrl}/v1/admin/curation/featured-creators`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-ops-1" },
+      body: JSON.stringify({
+        creatorId: "creator-launch-1",
+        status: "active",
+        priority: 100,
+        weight: 2,
+        context: { type: "city", city: "San Francisco", categoryId: "coffee_shop" },
+        reason: "launch_spotlight"
+      })
+    });
+    expect(featuredCreator.status).toBe(200);
+    const featuredCreatorJson = await featuredCreator.json();
+
+    const featuredPlace = await fetch(`${baseUrl}/v1/admin/curation/featured-places`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-ops-1" },
+      body: JSON.stringify({
+        canonicalPlaceId: "place-launch-1",
+        status: "active",
+        priority: 90,
+        weight: 1.5,
+        context: { type: "city", city: "San Francisco", categoryId: "coffee_shop" },
+        reason: "launch_spotlight"
+      })
+    });
+    expect(featuredPlace.status).toBe(200);
+
+    const featuredCity = await fetch(`${baseUrl}/v1/admin/curation/featured-cities`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-ops-1" },
+      body: JSON.stringify({
+        city: "San Francisco",
+        status: "active",
+        launchReadiness: "ready_for_promotion",
+        priority: 120,
+        reason: "city_launch_ready",
+        readinessMetadata: { creatorDensity: 12, contentDensity: 28, moderationRisk: "low" }
+      })
+    });
+    expect(featuredCity.status).toBe(200);
+
+    const boost = await fetch(`${baseUrl}/v1/admin/curation/boosts`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-ops-1" },
+      body: JSON.stringify({
+        targetType: "place",
+        targetId: "place-launch-1",
+        scope: { type: "city", city: "San Francisco" },
+        status: "active",
+        mode: "boost",
+        priority: 80,
+        weight: 1.4,
+        reason: "launch_campaign"
+      })
+    });
+    expect(boost.status).toBe(200);
+
+    const collection = await fetch(`${baseUrl}/v1/admin/curation/launch-collections`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-ops-1" },
+      body: JSON.stringify({
+        name: "SF Launch Starter Pack",
+        city: "San Francisco",
+        status: "active",
+        visibility: "internal",
+        reason: "launch_seed"
+      })
+    });
+    expect(collection.status).toBe(200);
+    const collectionJson = await collection.json();
+
+    const addCollectionItem = await fetch(`${baseUrl}/v1/admin/curation/launch-collections/${encodeURIComponent(collectionJson.id)}/items`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-ops-1" },
+      body: JSON.stringify({ itemType: "creator", itemId: "creator-launch-1", order: 1 })
+    });
+    expect(addCollectionItem.status).toBe(200);
+
+    const sourceReview = await fetch(`${baseUrl}/v1/admin/source-health/reviews`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-ops-2" },
+      body: JSON.stringify({ city: "San Francisco", provider: "foursquare", issueType: "missing_photos", severity: "high", status: "open", note: "launch city gap" })
+    });
+    expect(sourceReview.status).toBe(200);
+
+    const listCreators = await fetch(`${baseUrl}/v1/admin/curation/featured-creators?activeNow=true&city=San%20Francisco`, { headers: { "x-admin-key": "admin-secret" } });
+    const listCreatorsJson = await listCreators.json();
+    expect(listCreatorsJson.items.length).toBeGreaterThan(0);
+
+    const launchReadiness = await fetch(`${baseUrl}/v1/admin/launch-readiness?city=San%20Francisco`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(launchReadiness.status).toBe(200);
+    const launchReadinessJson = await launchReadiness.json();
+    expect(launchReadinessJson.items[0].city).toBe("San Francisco");
+
+    const preview = await fetch(`${baseUrl}/v1/admin/curation/preview?city=San%20Francisco`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(preview.status).toBe(200);
+    const previewJson = await preview.json();
+    expect(previewJson.featuredCreators.length).toBeGreaterThan(0);
+
+    const insights = await fetch(`${baseUrl}/v1/admin/curation/insights`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(insights.status).toBe(200);
+    const insightsJson = await insights.json();
+    expect(insightsJson.activeBoosts).toBeGreaterThan(0);
+
+    const removeCreator = await fetch(`${baseUrl}/v1/admin/curation/featured-creators/${encodeURIComponent(featuredCreatorJson.id)}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json", "x-admin-key": "admin-secret", "x-user-id": "admin-ops-1" },
+      body: JSON.stringify({ reason: "rotation" })
+    });
+    expect(removeCreator.status).toBe(200);
+
+    const audit = await fetch(`${baseUrl}/v1/admin/audit`, { headers: { "x-admin-key": "admin-secret" } });
+    const auditJson = await audit.json();
+    expect(auditJson.items.some((item: { actionType: string }) => item.actionType === "curation.featured_creator.created")).toBe(true);
+    expect(auditJson.items.some((item: { actionType: string }) => item.actionType === "curation.launch_collection.item_added")).toBe(true);
+  });
+
   it("supports user suspension workflow", async () => {
     const suspend = await fetch(`${baseUrl}/v1/admin/users/user-to-suspend/suspend`, {
       method: "POST",

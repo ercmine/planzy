@@ -379,6 +379,82 @@ export function createRoutes(
         return;
       }
 
+      if (req.method === "GET" && normalizedPath === "/v1/admin/curation/featured-creators" && adminHandlers) {
+        await adminHandlers.listFeaturedCreators(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/curation/featured-creators" && adminHandlers) {
+        await adminHandlers.upsertFeaturedCreator(req, res);
+        return;
+      }
+      const featuredCreatorMatch = /^\/v1\/admin\/curation\/featured-creators\/([^/]+)$/.exec(normalizedPath);
+      if (featuredCreatorMatch && req.method === "DELETE" && adminHandlers) {
+        await adminHandlers.removeFeaturedCreator(req, res, featuredCreatorMatch[1] ?? "");
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/curation/featured-places" && adminHandlers) {
+        await adminHandlers.listFeaturedPlaces(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/curation/featured-places" && adminHandlers) {
+        await adminHandlers.upsertFeaturedPlace(req, res);
+        return;
+      }
+      const featuredPlaceMatch = /^\/v1\/admin\/curation\/featured-places\/([^/]+)$/.exec(normalizedPath);
+      if (featuredPlaceMatch && req.method === "DELETE" && adminHandlers) {
+        await adminHandlers.removeFeaturedPlace(req, res, featuredPlaceMatch[1] ?? "");
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/curation/featured-cities" && adminHandlers) {
+        await adminHandlers.listFeaturedCities(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/curation/featured-cities" && adminHandlers) {
+        await adminHandlers.upsertFeaturedCity(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/curation/boosts" && adminHandlers) {
+        await adminHandlers.listBoostRules(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/curation/boosts" && adminHandlers) {
+        await adminHandlers.upsertBoostRule(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/curation/launch-collections" && adminHandlers) {
+        await adminHandlers.listLaunchCollections(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/curation/launch-collections" && adminHandlers) {
+        await adminHandlers.upsertLaunchCollection(req, res);
+        return;
+      }
+      const launchCollectionItemsMatch = /^\/v1\/admin\/curation\/launch-collections\/([^/]+)\/items$/.exec(normalizedPath);
+      if (launchCollectionItemsMatch && req.method === "POST" && adminHandlers) {
+        await adminHandlers.addLaunchCollectionItem(req, res, launchCollectionItemsMatch[1] ?? "");
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/source-health/reviews" && adminHandlers) {
+        await adminHandlers.listSourceHealthReviews(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/source-health/reviews" && adminHandlers) {
+        await adminHandlers.upsertSourceHealthReview(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/launch-readiness" && adminHandlers) {
+        await adminHandlers.launchReadiness(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/curation/preview" && adminHandlers) {
+        await adminHandlers.curationPreview(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/curation/insights" && adminHandlers) {
+        await adminHandlers.curationInsights(req, res);
+        return;
+      }
+
       if (req.method === "GET" && normalizedPath === "/v1/admin/places" && adminHandlers) {
         await adminHandlers.listPlaces(req, res);
         return;

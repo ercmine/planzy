@@ -36,6 +36,18 @@ function getActor(service: AdminService, req: IncomingMessage) {
   return { userId, roles, permissions };
 }
 
+
+
+function parseCurationContext(input: any) {
+  return {
+    type: String(input?.type ?? "global") as never,
+    city: typeof input?.city === "string" ? input.city : undefined,
+    categoryId: typeof input?.categoryId === "string" ? input.categoryId : undefined,
+    campaignId: typeof input?.campaignId === "string" ? input.campaignId : undefined,
+    launchSetId: typeof input?.launchSetId === "string" ? input.launchSetId : undefined
+  };
+}
+
 function ensurePermission(service: AdminService, req: IncomingMessage, res: ServerResponse, permission: AdminPermission): { userId: string } | null {
   const expectedKey = process.env.ADMIN_API_KEY;
   if (expectedKey && readHeader(req, "x-admin-key") === expectedKey) {
@@ -80,6 +92,205 @@ export function createAdminHttpHandlers(service: AdminService) {
       sendJson(res, 200, await service.applyModerationAction({ actorUserId: actor.userId, target: body.target as never, decisionType: body.decisionType as never, reasonCode: String(body.reasonCode ?? "admin_action"), notes: typeof body.notes === "string" ? body.notes : undefined }));
     },
 
+
+    async listFeaturedCreators(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.ops.manage")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, { items: service.listFeaturedCreators({
+        status: (url.searchParams.get("status") as never) ?? undefined,
+        city: url.searchParams.get("city") ?? undefined,
+        categoryId: url.searchParams.get("categoryId") ?? undefined,
+        activeNow: url.searchParams.get("activeNow") === "true",
+        q: url.searchParams.get("q") ?? undefined
+      }) });
+    },
+    async upsertFeaturedCreator(req: IncomingMessage, res: ServerResponse) {
+      const actor = ensurePermission(service, req, res, "admin.ops.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as any;
+      sendJson(res, 200, service.upsertFeaturedCreator({
+        id: typeof body.id === "string" ? body.id : undefined,
+        actorUserId: actor.userId,
+        creatorId: String(body.creatorId ?? ""),
+        status: String(body.status ?? "active") as never,
+        priority: Number(body.priority ?? 0),
+        weight: Number(body.weight ?? 0),
+        context: parseCurationContext(body.context),
+        startsAt: typeof body.startsAt === "string" ? body.startsAt : undefined,
+        endsAt: typeof body.endsAt === "string" ? body.endsAt : undefined,
+        reason: String(body.reason ?? "manual_curation"),
+        notes: typeof body.notes === "string" ? body.notes : undefined
+      }));
+    },
+    async removeFeaturedCreator(req: IncomingMessage, res: ServerResponse, entryId: string) {
+      const actor = ensurePermission(service, req, res, "admin.ops.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as any;
+      const removed = service.removeFeaturedCreator({ id: decodeURIComponent(entryId), actorUserId: actor.userId, reason: String(body.reason ?? "manual_remove"), note: typeof body.note === "string" ? body.note : undefined });
+      if (!removed) return sendJson(res, 404, { error: "not_found" });
+      sendJson(res, 200, removed);
+    },
+    async listFeaturedPlaces(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.ops.manage")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, { items: service.listFeaturedPlaces({
+        status: (url.searchParams.get("status") as never) ?? undefined,
+        city: url.searchParams.get("city") ?? undefined,
+        categoryId: url.searchParams.get("categoryId") ?? undefined,
+        activeNow: url.searchParams.get("activeNow") === "true"
+      }) });
+    },
+    async upsertFeaturedPlace(req: IncomingMessage, res: ServerResponse) {
+      const actor = ensurePermission(service, req, res, "admin.ops.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as any;
+      sendJson(res, 200, service.upsertFeaturedPlace({
+        id: typeof body.id === "string" ? body.id : undefined,
+        actorUserId: actor.userId,
+        canonicalPlaceId: String(body.canonicalPlaceId ?? ""),
+        status: String(body.status ?? "active") as never,
+        priority: Number(body.priority ?? 0),
+        weight: Number(body.weight ?? 0),
+        context: parseCurationContext(body.context),
+        startsAt: typeof body.startsAt === "string" ? body.startsAt : undefined,
+        endsAt: typeof body.endsAt === "string" ? body.endsAt : undefined,
+        reason: String(body.reason ?? "manual_curation"),
+        notes: typeof body.notes === "string" ? body.notes : undefined
+      }));
+    },
+    async removeFeaturedPlace(req: IncomingMessage, res: ServerResponse, entryId: string) {
+      const actor = ensurePermission(service, req, res, "admin.ops.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as any;
+      const removed = service.removeFeaturedPlace({ id: decodeURIComponent(entryId), actorUserId: actor.userId, reason: String(body.reason ?? "manual_remove"), note: typeof body.note === "string" ? body.note : undefined });
+      if (!removed) return sendJson(res, 404, { error: "not_found" });
+      sendJson(res, 200, removed);
+    },
+    async listFeaturedCities(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.ops.manage")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, { items: service.listFeaturedCities({
+        status: (url.searchParams.get("status") as never) ?? undefined,
+        launchReadiness: (url.searchParams.get("launchReadiness") as never) ?? undefined,
+        activeNow: url.searchParams.get("activeNow") === "true",
+        city: url.searchParams.get("city") ?? undefined
+      }) });
+    },
+    async upsertFeaturedCity(req: IncomingMessage, res: ServerResponse) {
+      const actor = ensurePermission(service, req, res, "admin.ops.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as any;
+      sendJson(res, 200, service.upsertFeaturedCity({
+        id: typeof body.id === "string" ? body.id : undefined,
+        actorUserId: actor.userId,
+        city: String(body.city ?? ""),
+        region: typeof body.region === "string" ? body.region : undefined,
+        country: typeof body.country === "string" ? body.country : undefined,
+        status: String(body.status ?? "active") as never,
+        launchReadiness: String(body.launchReadiness ?? "draft") as never,
+        priority: Number(body.priority ?? 0),
+        startsAt: typeof body.startsAt === "string" ? body.startsAt : undefined,
+        endsAt: typeof body.endsAt === "string" ? body.endsAt : undefined,
+        reason: String(body.reason ?? "launch_ops"),
+        notes: typeof body.notes === "string" ? body.notes : undefined,
+        readinessMetadata: typeof body.readinessMetadata === "object" && body.readinessMetadata ? body.readinessMetadata : {}
+      }));
+    },
+    async listBoostRules(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.ops.manage")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, { items: service.listManualBoostRules({
+        status: (url.searchParams.get("status") as never) ?? undefined,
+        targetType: (url.searchParams.get("targetType") as never) ?? undefined,
+        activeNow: url.searchParams.get("activeNow") === "true"
+      }) });
+    },
+    async upsertBoostRule(req: IncomingMessage, res: ServerResponse) {
+      const actor = ensurePermission(service, req, res, "admin.ops.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as any;
+      sendJson(res, 200, service.upsertManualBoostRule({
+        id: typeof body.id === "string" ? body.id : undefined,
+        actorUserId: actor.userId,
+        targetType: String(body.targetType ?? "place") as never,
+        targetId: String(body.targetId ?? ""),
+        scope: parseCurationContext(body.scope),
+        status: String(body.status ?? "active") as never,
+        weight: Number(body.weight ?? 0),
+        priority: Number(body.priority ?? 0),
+        mode: String(body.mode ?? "boost") as never,
+        startsAt: typeof body.startsAt === "string" ? body.startsAt : undefined,
+        endsAt: typeof body.endsAt === "string" ? body.endsAt : undefined,
+        reason: String(body.reason ?? "curation_manual_boost"),
+        notes: typeof body.notes === "string" ? body.notes : undefined
+      }));
+    },
+    async listLaunchCollections(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.ops.manage")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, { items: service.listLaunchCollections({ status: (url.searchParams.get("status") as never) ?? undefined, city: url.searchParams.get("city") ?? undefined, visibility: (url.searchParams.get("visibility") as never) ?? undefined }) });
+    },
+    async upsertLaunchCollection(req: IncomingMessage, res: ServerResponse) {
+      const actor = ensurePermission(service, req, res, "admin.ops.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as any;
+      sendJson(res, 200, service.upsertLaunchCollection({
+        id: typeof body.id === "string" ? body.id : undefined,
+        actorUserId: actor.userId,
+        name: String(body.name ?? ""),
+        city: typeof body.city === "string" ? body.city : undefined,
+        categoryId: typeof body.categoryId === "string" ? body.categoryId : undefined,
+        status: String(body.status ?? "draft") as never,
+        visibility: String(body.visibility ?? "internal") as never,
+        reason: String(body.reason ?? "launch_seed"),
+        notes: typeof body.notes === "string" ? body.notes : undefined,
+        items: Array.isArray(body.items) ? body.items : []
+      }));
+    },
+    async addLaunchCollectionItem(req: IncomingMessage, res: ServerResponse, collectionId: string) {
+      const actor = ensurePermission(service, req, res, "admin.ops.manage");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as any;
+      const updated = service.addLaunchCollectionItem({ actorUserId: actor.userId, collectionId: decodeURIComponent(collectionId), itemType: String(body.itemType ?? "place") as never, itemId: String(body.itemId ?? ""), order: Number(body.order ?? 0), note: typeof body.note === "string" ? body.note : undefined });
+      if (!updated) return sendJson(res, 404, { error: "not_found" });
+      sendJson(res, 200, updated);
+    },
+    async listSourceHealthReviews(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.source_health.read")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, { items: service.listSourceHealthReviewItems({ status: (url.searchParams.get("status") as never) ?? undefined, severity: (url.searchParams.get("severity") as never) ?? undefined, city: url.searchParams.get("city") ?? undefined, provider: url.searchParams.get("provider") ?? undefined }) });
+    },
+    async upsertSourceHealthReview(req: IncomingMessage, res: ServerResponse) {
+      const actor = ensurePermission(service, req, res, "admin.source_health.read");
+      if (!actor) return;
+      const body = await parseJsonBody(req) as any;
+      sendJson(res, 200, service.upsertSourceHealthReviewItem({
+        id: typeof body.id === "string" ? body.id : undefined,
+        actorUserId: actor.userId,
+        city: typeof body.city === "string" ? body.city : undefined,
+        provider: typeof body.provider === "string" ? body.provider : undefined,
+        issueType: String(body.issueType ?? "unknown"),
+        severity: String(body.severity ?? "medium") as never,
+        status: String(body.status ?? "open") as never,
+        canonicalPlaceId: typeof body.canonicalPlaceId === "string" ? body.canonicalPlaceId : undefined,
+        assignedTo: typeof body.assignedTo === "string" ? body.assignedTo : undefined,
+        note: typeof body.note === "string" ? body.note : undefined
+      }));
+    },
+    async launchReadiness(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.ops.manage")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, { items: service.getLaunchReadiness(url.searchParams.get("city") ?? undefined) });
+    },
+    async curationPreview(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.ops.manage")) return;
+      const url = new URL(req.url ?? "/", "http://localhost");
+      sendJson(res, 200, service.getCurationPreview({ city: url.searchParams.get("city") ?? undefined, categoryId: url.searchParams.get("categoryId") ?? undefined }));
+    },
+    async curationInsights(req: IncomingMessage, res: ServerResponse) {
+      if (!ensurePermission(service, req, res, "admin.ops.manage")) return;
+      sendJson(res, 200, service.getCurationInsights());
+    },
 
     async detectPlaceDuplicates(req: IncomingMessage, res: ServerResponse) {
       if (!ensurePermission(service, req, res, "admin.places.manage")) return;
