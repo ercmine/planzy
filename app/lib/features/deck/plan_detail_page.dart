@@ -605,7 +605,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
       if (distance != null) (icon: Icons.near_me_outlined, label: 'Distance', value: distance),
       if (viewData.reviewCount != null) (icon: Icons.reviews_outlined, label: 'Reviews', value: '${viewData.reviewCount}'),
       (icon: Icons.video_library_outlined, label: 'Creator videos', value: '${_videos.length}${_isLoadingVideos ? '+' : ''}'),
-      (icon: Icons.verified_user_outlined, label: 'Trusted reviews', value: '${_reviews.where((r) => r.trust?.reviewTrustDesignation == 'trusted' || r.trust?.reviewTrustDesignation == 'trusted_verified').length}'),
+      (icon: Icons.verified_user_outlined, label: 'Trusted reviews', value: '${_reviews.where((r) => r.trust?.verificationLevel == 'trusted' || r.trust?.verificationLevel == 'trusted_verified').length}'),
     ];
 
     return _Section(
