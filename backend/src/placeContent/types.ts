@@ -105,3 +105,42 @@ export interface FirstPartyRankingSignals {
   firstPartyQualityBoost: number;
   cappedTotalBoost: number;
 }
+
+export interface PlaceDetailPriorityRules {
+  heroMedia: string[];
+  creatorVideoOrder: string[];
+  reviewOrder: string[];
+  relatedPlaces: string[];
+}
+
+export interface PlaceDetailTrustSummary {
+  trustedReviewCount: number;
+  trustedCreatorVideoCount: number;
+  moderationCoverage: number;
+  verificationNotes: string[];
+}
+
+export interface PlaceDetailSourceSummary {
+  descriptionSourceLabel: string;
+  mediaSourceLabel: string;
+  attributionAvailable: boolean;
+}
+
+export interface PremiumPlaceDetailContent {
+  canonicalPlaceId: string;
+  heroMedia: CreatorVideoRecord[];
+  creatorVideos: CreatorVideoRecord[];
+  bestReviews: ReviewRecord[];
+  galleryMedia: CreatorVideoRecord[];
+  quickFacts: {
+    reviewCount: number;
+    creatorVideoCount: number;
+    saveCount: number;
+    trustedReviewCount: number;
+  };
+  sourceSummary: PlaceDetailSourceSummary;
+  trustSummary: PlaceDetailTrustSummary;
+  priorityRules: PlaceDetailPriorityRules;
+  metrics?: FirstPartyPlaceMetrics;
+  rankingBoost?: FirstPartyRankingSignals;
+}

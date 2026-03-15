@@ -60,7 +60,10 @@ describe("place content routes", () => {
       videos: [expect.objectContaining({ canonicalPlaceId: "cp_route_1" })],
       saveCount: 1,
       guides: [expect.objectContaining({ id: guide.guide.id })],
-      rankingBoost: expect.objectContaining({ cappedTotalBoost: expect.any(Number) })
+      premium: expect.objectContaining({
+        rankingBoost: expect.objectContaining({ cappedTotalBoost: expect.any(Number) }),
+        priorityRules: expect.objectContaining({ heroMedia: expect.any(Array) })
+      })
     });
   });
 });

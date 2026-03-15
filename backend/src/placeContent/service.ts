@@ -1,6 +1,13 @@
 import { computeFirstPartyRankingSignals } from "./ranking.js";
 import type { PlaceContentStore } from "./store.js";
-import type { ContentEngagementRecord, CreatorVideoRecord, FirstPartyPlaceMetrics, GuideRecord, ReviewRecord } from "./types.js";
+import type {
+  ContentEngagementRecord,
+  CreatorVideoRecord,
+  FirstPartyPlaceMetrics,
+  GuideRecord,
+  PremiumPlaceDetailContent,
+  ReviewRecord
+} from "./types.js";
 
 interface PlaceContentLogger {
   info?(event: string, payload: Record<string, unknown>): void;
@@ -114,6 +121,58 @@ export class PlaceContentService {
     const guides = (await this.store.listGuidesByPlace(canonicalPlaceId)).filter((item) => item.status === "published" && item.visibility === "public");
     const metrics = await this.store.getPlaceMetrics(canonicalPlaceId);
     return { reviews, videos, saveCount: saves.length, guides, metrics };
+  }
+
+  async getPremiumPlaceDetailContent(canonicalPlaceId: string): Promise<PremiumPlaceDetailContent> {
+    const base = await this.getPlaceDetailContent(canonicalPlaceId);
+    const rankingBoost = await this.getRankingBoost(canonicalPlaceId);
+
+    const creatorVideos = [...base.videos].sort((a, b) => {
+      const aScore = (a.qualityScore * 0.7) + Math.min(1, a.viewCount / 5000) * 0.3;
+      const bScore = (b.qualityScore * 0.7) + Math.min(1, b.viewCount / 5000) * 0.3;
+      return bScore - aScore;
+    });
+
+    const bestReviews = [...base.reviews].sort((a, b) => {
+      const aScore = (a.trustedReview ? 2 : 0) + (a.helpfulCount * 0.2) + a.qualityScore + (a.verifiedVisitScore * 0.5);
+      const bScore = (b.trustedReview ? 2 : 0) + (b.helpfulCount * 0.2) + b.qualityScore + (b.verifiedVisitScore * 0.5);
+      return bScore - aScore;
+    });
+
+    const trustedReviewCount = bestReviews.filter((item) => item.trustedReview).length;
+
+    return {
+      canonicalPlaceId,
+      heroMedia: creatorVideos.slice(0, 1),
+      creatorVideos: creatorVideos.slice(0, 16),
+      bestReviews: bestReviews.slice(0, 8),
+      galleryMedia: creatorVideos.slice(0, 12),
+      quickFacts: {
+        reviewCount: base.reviews.length,
+        creatorVideoCount: base.videos.length,
+        saveCount: base.saveCount,
+        trustedReviewCount
+      },
+      sourceSummary: {
+        descriptionSourceLabel: "Description from canonical place enrichment",
+        mediaSourceLabel: "Media mixed from first-party creator content and trusted providers",
+        attributionAvailable: true
+      },
+      trustSummary: {
+        trustedReviewCount,
+        trustedCreatorVideoCount: creatorVideos.length,
+        moderationCoverage: 1,
+        verificationNotes: ["Moderation-safe content only", "Trusted reviews ranked first"]
+      },
+      priorityRules: {
+        heroMedia: ["featured_creator_video", "first_party_photo", "curated_provider_photo", "wikidata_fallback", "no_media_placeholder"],
+        creatorVideoOrder: ["trusted", "quality", "engagement", "recency"],
+        reviewOrder: ["trusted", "helpful", "quality", "recency"],
+        relatedPlaces: ["category_similarity", "distance", "creator_affinity", "trust_score"]
+      },
+      metrics: base.metrics,
+      rankingBoost
+    };
   }
 
   async getCreatorContent(authorUserId: string): Promise<{ reviews: ReviewRecord[]; videos: CreatorVideoRecord[]; guides: GuideRecord[] }> {
