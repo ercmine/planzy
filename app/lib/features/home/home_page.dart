@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../notifications/notification_center_tab.dart';
+import 'map_discovery_tab.dart';
 import '../notifications/notification_providers.dart';
 import '../video_platform/video_models.dart';
 import '../video_platform/video_providers.dart';
@@ -24,6 +25,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final unreadCount = ref.watch(unreadNotificationCountProvider).valueOrNull ?? 0;
     final pages = [
       _FeedTab(scope: _scope, onScopeChanged: (scope) => setState(() => _scope = scope)),
+      const MapDiscoveryTab(),
       _SearchTab(scope: _scope),
       const _CreateTab(),
       const _SavedTab(),
@@ -41,6 +43,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         onDestinationSelected: (value) => setState(() => _navIndex = value),
         destinations: [
           NavigationDestination(icon: Icon(Icons.play_circle_outline), selectedIcon: Icon(Icons.play_circle), label: 'Feed'),
+          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Map'),
           NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: 'Search'),
           NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle), label: 'Create'),
           NavigationDestination(icon: Icon(Icons.bookmark_border), selectedIcon: Icon(Icons.bookmark), label: 'Saved'),

@@ -198,3 +198,50 @@ class StudioAnalyticsOverview {
     );
   }
 }
+
+class MapDiscoveryPlace {
+  const MapDiscoveryPlace({
+    required this.placeId,
+    required this.name,
+    required this.category,
+    required this.latitude,
+    required this.longitude,
+    required this.rating,
+    this.city,
+    this.region,
+    this.distanceMeters,
+    this.thumbnailUrl,
+    this.descriptionSnippet,
+    this.openNow,
+  });
+
+  final String placeId;
+  final String name;
+  final String category;
+  final String? city;
+  final String? region;
+  final double latitude;
+  final double longitude;
+  final double rating;
+  final double? distanceMeters;
+  final String? thumbnailUrl;
+  final String? descriptionSnippet;
+  final bool? openNow;
+
+  factory MapDiscoveryPlace.fromJson(Map<String, dynamic> json) {
+    return MapDiscoveryPlace(
+      placeId: (json['canonicalPlaceId'] ?? json['placeId'] ?? '').toString(),
+      name: (json['name'] ?? json['displayName'] ?? '').toString(),
+      category: (json['category'] ?? 'place').toString(),
+      city: json['city']?.toString(),
+      region: json['region']?.toString(),
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
+      rating: (json['rating'] as num?)?.toDouble() ?? 0,
+      distanceMeters: (json['distanceMeters'] as num?)?.toDouble(),
+      thumbnailUrl: json['thumbnailUrl']?.toString(),
+      descriptionSnippet: json['descriptionSnippet']?.toString(),
+      openNow: json['openNow'] as bool?,
+    );
+  }
+}

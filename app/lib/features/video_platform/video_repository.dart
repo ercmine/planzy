@@ -41,6 +41,39 @@ class VideoRepository {
     return items.whereType<Map<String, dynamic>>().map(PlaceSearchResult.fromJson).toList(growable: false);
   }
 
+
+  Future<List<MapDiscoveryPlace>> fetchMapDiscovery({
+    required double north,
+    required double south,
+    required double east,
+    required double west,
+    required double centerLat,
+    required double centerLng,
+    required double zoom,
+    List<String> categories = const [],
+    String mode = 'search_this_area',
+    int limit = 80,
+  }) async {
+    final response = await apiClient.getJson(
+      '/v1/places/map-discovery',
+      queryParameters: {
+        'north': north,
+        'south': south,
+        'east': east,
+        'west': west,
+        'centerLat': centerLat,
+        'centerLng': centerLng,
+        'zoom': zoom,
+        'categories': categories.join(','),
+        'mode': mode,
+        'limit': limit,
+      },
+    );
+    final items = response['places'];
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().map(MapDiscoveryPlace.fromJson).toList(growable: false);
+  }
+
   Future<List<StudioVideo>> fetchStudioVideos({StudioSection? section}) async {
     final response = await apiClient.getJson('/v1/studio/videos', queryParameters: {if (section != null) 'section': _sectionParam(section)});
     final items = response['items'];
