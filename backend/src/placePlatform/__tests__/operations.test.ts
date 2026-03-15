@@ -33,7 +33,7 @@ describe("open-data operational infrastructure", () => {
     const processed = await orchestrator.processNext("imports");
 
     expect(processed?.status).toBe("succeeded");
-    expect(queue.getById(job.id)?.progress.cursor).toBe("1");
+    expect(queue.getById(job.id)?.cursor).toBe("1");
     expect(observability.snapshot().counters["jobs.osm_bootstrap_import.succeeded"]).toBe(1);
   });
 

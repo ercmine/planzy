@@ -10,7 +10,7 @@ describe("createGeoHttpHandlers", () => {
       autocomplete: vi.fn(),
       placeLookup: vi.fn(),
       areaContext: vi.fn(),
-      health: vi.fn(async () => ({ ok: true, mode: "local", version: "1" }))
+      health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
     });
 
     const res = createMockResponse();
@@ -23,7 +23,7 @@ describe("createGeoHttpHandlers", () => {
       autocomplete: vi.fn(),
       placeLookup: vi.fn(),
       areaContext: vi.fn(),
-      health: vi.fn(async () => ({ ok: true, mode: "local", version: "1" }))
+      health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
     }, { authSecret: "geo-secret" });
 
     const res2 = createMockResponse();
@@ -35,10 +35,10 @@ describe("createGeoHttpHandlers", () => {
     const handlers = createGeoHttpHandlers({
       geocode: vi.fn(),
       reverseGeocode: vi.fn(),
-      autocomplete: vi.fn(async () => [{ id: "a", displayName: "Austin", lat: 1, lng: 2, relevanceScore: 0.8, source: "nominatim" }]),
+      autocomplete: vi.fn(async () => [{ id: "a", displayName: "Austin", lat: 1, lng: 2, relevanceScore: 0.8, source: "nominatim" as const }]),
       placeLookup: vi.fn(),
       areaContext: vi.fn(),
-      health: vi.fn(async () => ({ ok: true, mode: "local", version: "1" }))
+      health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
     }, { authSecret: "geo-secret" });
 
     const res = createMockResponse();

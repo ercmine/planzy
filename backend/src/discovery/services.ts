@@ -420,7 +420,7 @@ async function rankPlaces(repo: PlaceDiscoveryRepository, context: DiscoveryQuer
         distanceMeters: distance,
         reasons: [mode === "text" && ranking.components.text > 0.7 ? "strong_text_match" : `${mode}_match`, ...tuned.reasons],
         diversityBucket: `${place.primaryCategory}:${place.city ?? "global"}`,
-        explain: { score: ranking.score, contributions: ranking.components, reasonCodes: [mode] }
+        explain: { score: ranking.score, contributions: { ...ranking.components }, reasonCodes: [mode] }
       };
     })
     .filter((candidate) => !resolved || !evaluateRankingAdjustments(candidate.place, candidate.score, resolved, { city: context.city, categoryId: context.categoryId, surface: context.surface, provider: candidate.place.sourceAttribution[0] }).excluded)
