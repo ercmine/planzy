@@ -2141,6 +2141,10 @@ export function createRoutes(
           await creatorHandlers.listFollows(req, res);
           return;
         }
+        if (req.method === "GET" && normalizedPath === "/v1/creator/handles/availability") {
+          await creatorHandlers.checkHandleAvailability(req, res);
+          return;
+        }
 
         if (req.method === "GET" && normalizedPath === "/v1/creator/feed") {
           await creatorHandlers.followingFeed(req, res);
@@ -2328,6 +2332,8 @@ export function createRoutes(
       const videoPatchMatch = /^\/v1\/videos\/([^/]+)$/.exec(normalizedPath);
       const videoArchiveMatch = /^\/v1\/videos\/([^/]+)\/archive$/.exec(normalizedPath);
       const videoEventMatch = /^\/v1\/videos\/([^/]+)\/events$/.exec(normalizedPath);
+      const videoLikeMatch = /^\/v1\/videos\/([^/]+)\/likes$/.exec(normalizedPath);
+      const videoSaveMatch = /^\/v1\/videos\/([^/]+)\/save$/.exec(normalizedPath);
       const placeVideosMatch = /^\/v1\/places\/([^/]+)\/videos$/.exec(normalizedPath);
       const creatorVideosMatch = /^\/v1\/creators\/([^/]+)\/videos$/.exec(normalizedPath);
 
@@ -2382,6 +2388,30 @@ export function createRoutes(
       }
       if (videoPlatformHandlers && req.method === "POST" && videoEventMatch) {
         await videoPlatformHandlers.trackEvent(req, res, decodeURIComponent(videoEventMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "POST" && videoLikeMatch) {
+        await videoPlatformHandlers.likeVideo(req, res, decodeURIComponent(videoLikeMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "DELETE" && videoLikeMatch) {
+        await videoPlatformHandlers.unlikeVideo(req, res, decodeURIComponent(videoLikeMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "POST" && videoSaveMatch) {
+        await videoPlatformHandlers.saveVideo(req, res, decodeURIComponent(videoSaveMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "DELETE" && videoSaveMatch) {
+        await videoPlatformHandlers.unsaveVideo(req, res, decodeURIComponent(videoSaveMatch[1] ?? ""));
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "GET" && normalizedPath === "/v1/videos/saved") {
+        await videoPlatformHandlers.listSavedVideos(req, res, url.searchParams);
+        return;
+      }
+      if (videoPlatformHandlers && req.method === "GET" && normalizedPath === "/v1/videos/watch-history") {
+        await videoPlatformHandlers.listWatchHistory(req, res);
         return;
       }
       if (videoPlatformHandlers && req.method === "GET" && placeVideosMatch) {

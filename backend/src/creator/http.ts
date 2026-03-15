@@ -16,7 +16,7 @@ function mapError(res: ServerResponse, error: unknown): void {
   if (["GUIDE_QUOTA_EXCEEDED"].includes(code)) return sendJson(res, 429, { error: code });
   if (["CREATOR_NOT_FOLLOWABLE"].includes(code)) return sendJson(res, 400, { error: code });
   if (["CREATOR_CONTEXT_NOT_ALLOWED", "CREATOR_ROLE_REQUIRED", "CREATOR_PLAN_REQUIRED"].includes(code)) return sendJson(res, 403, { error: code });
-  if (["SLUG_TAKEN"].includes(code)) return sendJson(res, 409, { error: code });
+  if (["SLUG_TAKEN", "HANDLE_TAKEN"].includes(code)) return sendJson(res, 409, { error: code });
   if (error instanceof ValidationError) return sendJson(res, 400, { error: error.message, details: error.details });
   throw error;
 }
@@ -58,6 +58,18 @@ export function createCreatorHttpHandlers(service: CreatorService) {
     },
 
 
+
+    async checkHandleAvailability(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      try {
+        const search = new URL(req.url ?? "", "http://localhost").searchParams;
+        const handle = String(search.get("handle") ?? "").trim();
+        const currentProfileId = String(search.get("currentProfileId") ?? "").trim() || undefined;
+        const result = service.checkHandleAvailability(handle, currentProfileId);
+        sendJson(res, 200, result);
+      } catch (error) {
+        mapError(res, error);
+      }
+    },
 
     async listFollows(req: IncomingMessage, res: ServerResponse): Promise<void> {
       try {

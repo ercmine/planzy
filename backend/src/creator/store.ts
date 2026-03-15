@@ -4,6 +4,7 @@ import type { CreatorAnalyticsPoint, CreatorFollow, CreatorGuide } from "./types
 export interface CreatorStore {
   getProfileById(id: string): CreatorProfile | undefined;
   getProfileBySlug(slug: string): CreatorProfile | undefined;
+  getProfileByHandle(handle: string): CreatorProfile | undefined;
   saveProfile(profile: CreatorProfile): void;
   listProfiles(): CreatorProfile[];
 

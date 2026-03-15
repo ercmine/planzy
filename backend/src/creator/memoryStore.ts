@@ -5,6 +5,7 @@ import type { CreatorAnalyticsPoint, CreatorFollow, CreatorGuide } from "./types
 export class MemoryCreatorStore implements CreatorStore {
   private readonly profilesById = new Map<string, CreatorProfile>();
   private readonly profileSlugToId = new Map<string, string>();
+  private readonly profileHandleToId = new Map<string, string>();
   private readonly follows = new Map<string, CreatorFollow>();
   private readonly guides = new Map<string, CreatorGuide>();
   private readonly analytics = new Map<string, CreatorAnalyticsPoint>();
@@ -19,13 +20,18 @@ export class MemoryCreatorStore implements CreatorStore {
     return id ? this.profilesById.get(id) : undefined;
   }
 
+  getProfileByHandle(handle: string): CreatorProfile | undefined {
+    const id = this.profileHandleToId.get(handle.toLowerCase());
+    return id ? this.profilesById.get(id) : undefined;
+  }
+
   saveProfile(profile: CreatorProfile): void {
     const existing = this.profilesById.get(profile.id);
-    if (existing && existing.slug !== profile.slug) {
-      this.profileSlugToId.delete(existing.slug);
-    }
+    if (existing && existing.slug !== profile.slug) this.profileSlugToId.delete(existing.slug);
+    if (existing?.handle && existing.handle !== profile.handle) this.profileHandleToId.delete(existing.handle.toLowerCase());
     this.profilesById.set(profile.id, profile);
     this.profileSlugToId.set(profile.slug, profile.id);
+    if (profile.handle) this.profileHandleToId.set(profile.handle.toLowerCase(), profile.id);
   }
 
   listProfiles(): CreatorProfile[] {

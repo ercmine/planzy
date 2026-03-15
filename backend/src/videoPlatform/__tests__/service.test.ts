@@ -140,6 +140,31 @@ describe("VideoPlatformService lifecycle", () => {
     expect(analytics.topPlaces[0]?.placeId).toBe("place_2");
   });
 
+
+  it("persists likes, saves, and watch-history based reengagement", async () => {
+    const service = createService();
+    const draft = await service.createDraft({ userId: "creator_1", canonicalPlaceId: "place_1", title: "history" });
+    const upload = await service.requestUploadSession({ userId: "creator_1", videoId: draft.id, fileName: "review.mp4", contentType: "video/mp4", sizeBytes: 30 });
+    await service.finalizeUpload({ userId: "creator_1", videoId: draft.id, uploadSessionId: upload.id });
+    await service.processNextQueuedJob();
+    await service.applyModeration({ videoId: draft.id, status: "approved" });
+    await service.updateDraft({ userId: "creator_1", videoId: draft.id, visibility: "public" });
+    await service.publish({ userId: "creator_1", videoId: draft.id });
+
+    await service.likeVideo({ userId: "viewer_1", videoId: draft.id });
+    await service.saveVideo({ userId: "viewer_1", videoId: draft.id });
+    await service.recordVideoEvent({ videoId: draft.id, userId: "viewer_1", event: "video_viewed", progressMs: 4200 });
+
+    const saved = await service.listSavedVideos("viewer_1");
+    expect(saved.items).toHaveLength(1);
+    expect(saved.items[0]?.viewerState).toMatchObject({ isLiked: true, isSaved: true, watchProgressMs: 4200 });
+
+    const reengagement = await service.getReengagementSummary("viewer_1");
+    expect(reengagement.recentVideos[0]?.videoId).toBe(draft.id);
+    expect(reengagement.creatorAffinity[0]?.creatorUserId).toBe("creator_1");
+    expect(reengagement.placeAffinity[0]?.canonicalPlaceId).toBe("place_1");
+  });
+
   it("archives drafts", async () => {
     const service = createService();
     const draft = await service.createDraft({ userId: "u", canonicalPlaceId: "place_1", title: "to archive" });
