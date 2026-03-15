@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'spacing.dart';
+import 'tokens.dart';
 
 class PrimaryButton extends StatelessWidget {
   const PrimaryButton({
@@ -24,7 +25,7 @@ class PrimaryButton extends StatelessWidget {
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+            borderRadius: BorderRadius.circular(AppRadius.medium),
           ),
         ),
         icon: isLoading
@@ -61,7 +62,7 @@ class SecondaryButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+            borderRadius: BorderRadius.circular(AppRadius.medium),
           ),
         ),
         icon: isLoading
@@ -189,13 +190,13 @@ class AppPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 14, color: fg),
+            Icon(icon, size: AppIconSize.small, color: fg),
             const SizedBox(width: AppSpacing.xs),
           ],
           Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: fg)),
@@ -220,7 +221,7 @@ class AppIconButton extends StatelessWidget {
       icon: Icon(icon),
       style: IconButton.styleFrom(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+          borderRadius: BorderRadius.circular(AppRadius.medium),
         ),
       ),
     );
@@ -246,10 +247,11 @@ class _PressScaleState extends State<_PressScale> {
       onTapUp: (_) => setState(() => _down = false),
       onTapCancel: () => setState(() => _down = false),
       child: AnimatedScale(
-        duration: const Duration(milliseconds: 120),
+        duration: AppMotion.quick,
+        curve: AppMotion.emphasized,
         scale: _down ? 0.98 : 1,
         child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 120),
+          duration: AppMotion.quick,
           opacity: _down ? 0.94 : 1,
           child: widget.child,
         ),

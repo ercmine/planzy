@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ads/native_ad_card.dart';
-import '../../core/ads/ad_placement.dart';
 import '../../app/theme/spacing.dart';
+import '../../core/ads/ad_placement.dart';
 import '../../core/ads/native_ad_controller.dart';
+import '../../core/widgets/app_back_button.dart';
+import '../../core/widgets/state_panels.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
 import 'results_controller.dart';
 import 'results_models.dart';
 import 'results_state.dart';
 import 'widgets/results_plan_tile.dart';
-import '../../core/widgets/app_back_button.dart';
 
 class ResultsPage extends ConsumerStatefulWidget {
   const ResultsPage({required this.sessionId, super.key});
@@ -55,15 +56,17 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
     final controller = ref.read(resultsControllerProvider(widget.sessionId).notifier);
 
     return Scaffold(
-      appBar: AppBar(
-        leading: const AppBackButton(),
-        title: const Text('Results')),
+      appBar: AppBar(leading: const AppBackButton(), title: const Text('Results')),
       body: RefreshIndicator(
         onRefresh: controller.refresh,
         child: state.isLoading
-            ? _LoadingList()
+            ? const AppLoadingCardList()
             : state.feedItems.isEmpty
-                ? _EmptyResults(state: state, onRetry: controller.refresh, onEnableLocation: controller.requestLocationAndReload)
+                ? _EmptyResults(
+                    state: state,
+                    onRetry: controller.refresh,
+                    onEnableLocation: controller.requestLocationAndReload,
+                  )
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(AppSpacing.m),
@@ -125,19 +128,6 @@ class _ResultsPageState extends ConsumerState<ResultsPage> {
   }
 }
 
-class _LoadingList extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(AppSpacing.m),
-      itemCount: 4,
-      itemBuilder: (_, __) => const Card(
-        child: SizedBox(height: 240),
-      ),
-    );
-  }
-}
-
 class _EmptyResults extends StatelessWidget {
   const _EmptyResults({
     required this.state,
@@ -154,18 +144,18 @@ class _EmptyResults extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.m),
       children: [
-        const Text('No results found yet.'),
-        const SizedBox(height: AppSpacing.s),
-        const Text('Try widening your radius, changing categories, or refreshing for nearby/trending options.'),
-        const SizedBox(height: AppSpacing.s),
-        FilledButton(onPressed: onRetry, child: const Text('Retry')),
-        if (state.locationRequired) ...[
-          const SizedBox(height: AppSpacing.s),
-          FilledButton(onPressed: onEnableLocation, child: const Text('Enable location')),
-        ],
+        AppStatePanel(
+          icon: Icons.search_off,
+          title: 'No results found yet',
+          message: 'Try widening your radius, changing categories, or refreshing for nearby/trending options.',
+          actions: [
+            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            if (state.locationRequired) FilledButton(onPressed: onEnableLocation, child: const Text('Enable location')),
+          ],
+        ),
         if (state.errorMessage != null) ...[
           const SizedBox(height: AppSpacing.s),
-          Text(state.errorMessage!),
+          AppErrorPanel(message: state.errorMessage!, onRetry: onRetry),
         ],
       ],
     );

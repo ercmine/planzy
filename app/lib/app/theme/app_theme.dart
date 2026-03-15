@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'color_scheme.dart';
 import 'spacing.dart';
+import 'tokens.dart';
 import 'typography.dart';
 
 class AppTheme {
@@ -28,7 +29,7 @@ class AppTheme {
         foregroundColor: colorScheme.onSurface,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        elevation: 0,
+        elevation: AppElevation.flat,
         scrolledUnderElevation: 0,
       ),
 
@@ -40,24 +41,24 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: colorScheme.surface.withOpacity(0.92),
         indicatorColor: colorScheme.primaryContainer,
-        elevation: 0,
+        elevation: AppElevation.flat,
         labelTextStyle: WidgetStatePropertyAll(
           TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          elevation: 0,
+          elevation: AppElevation.flat,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.sm),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+            borderRadius: BorderRadius.circular(AppRadius.medium),
           ),
         ),
       ),
@@ -66,23 +67,23 @@ class AppTheme {
         backgroundColor: colorScheme.inverseSurface,
         contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+          borderRadius: BorderRadius.circular(AppRadius.medium),
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: colorScheme.surface,
         modalBackgroundColor: colorScheme.surface,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusXL)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.extraLarge)),
         ),
         showDragHandle: true,
       ),
       cardTheme: CardThemeData(
         color: colorScheme.surfaceContainerLow,
         surfaceTintColor: colorScheme.surfaceTint,
-        elevation: 0,
+        elevation: AppElevation.flat,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusL),
+          borderRadius: BorderRadius.circular(AppRadius.large),
           side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
         ),
       ),
@@ -94,15 +95,15 @@ class AppTheme {
           vertical: AppSpacing.sm,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+          borderRadius: BorderRadius.circular(AppRadius.medium),
           borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+          borderRadius: BorderRadius.circular(AppRadius.medium),
           borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusM),
+          borderRadius: BorderRadius.circular(AppRadius.medium),
           borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
         ),
       ),
