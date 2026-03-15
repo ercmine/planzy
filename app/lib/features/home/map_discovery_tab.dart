@@ -61,6 +61,8 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
       : super(const MapViewportState(centerLat: 30.2672, centerLng: -97.7431, zoom: 12));
 
   final Ref _ref;
+  int _searchRequestId = 0;
+  String? _lastSearchKey;
 
   Future<void> initialize() async {
     if (state.places.isNotEmpty) return;
@@ -93,6 +95,20 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
   }
 
   Future<void> searchThisArea({String mode = 'search_this_area'}) async {
+    final queryKey = [
+      state.north.toStringAsFixed(3),
+      state.south.toStringAsFixed(3),
+      state.east.toStringAsFixed(3),
+      state.west.toStringAsFixed(3),
+      state.zoom.toStringAsFixed(2),
+      mode,
+      state.categories.join(','),
+    ].join('|');
+    if (!state.pendingViewportSearch && _lastSearchKey == queryKey && state.places.isNotEmpty) {
+      return;
+    }
+
+    final requestId = ++_searchRequestId;
     state = state.copyWith(loading: true);
     final repo = await _ref.read(videoRepositoryProvider.future);
     final places = await repo.fetchMapDiscovery(
@@ -106,6 +122,10 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
       categories: state.categories.toList(growable: false),
       mode: mode,
     );
+    if (requestId != _searchRequestId) {
+      return;
+    }
+    _lastSearchKey = queryKey;
     state = state.copyWith(loading: false, places: places, pendingViewportSearch: false);
   }
 }

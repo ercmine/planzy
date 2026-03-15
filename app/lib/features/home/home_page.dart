@@ -43,7 +43,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       appBar: AppBar(
         title: const Text('Perbug Videos'),
       ),
-      body: AnimatedSwitcher(duration: const Duration(milliseconds: 240), child: pages[_navIndex]),
+      body: IndexedStack(index: _navIndex, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
         onDestinationSelected: (value) => setState(() => _navIndex = value),
@@ -96,6 +96,7 @@ class _FeedTab extends ConsumerWidget {
                 );
               }
               return ListView.builder(
+                cacheExtent: 800,
                 itemCount: items.length,
                 itemBuilder: (_, index) {
                   final item = items[index];
@@ -146,10 +147,15 @@ class _SearchTab extends ConsumerStatefulWidget {
   ConsumerState<_SearchTab> createState() => _SearchTabState();
 }
 
-class _SearchTabState extends ConsumerState<_SearchTab> {
+class _SearchTabState extends ConsumerState<_SearchTab> with AutomaticKeepAliveClientMixin {
   final _controller = TextEditingController();
   String _debouncedQuery = '';
   Timer? _debounce;
+
+  int _queryVersion = 0;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -160,6 +166,7 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final results = ref.watch(placeSearchProvider((query: _debouncedQuery, scope: widget.scope)));
     return Column(
       children: [
@@ -173,10 +180,15 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
               prefixIcon: Icon(Icons.search),
             ),
             onChanged: (value) {
+              final target = value.trim();
               _debounce?.cancel();
+              if (target == _debouncedQuery) {
+                return;
+              }
+              final version = ++_queryVersion;
               _debounce = Timer(const Duration(milliseconds: 220), () {
-                if (!mounted) return;
-                setState(() => _debouncedQuery = value.trim());
+                if (!mounted || version != _queryVersion) return;
+                setState(() => _debouncedQuery = target);
               });
             },
           ),
@@ -185,6 +197,7 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
           child: results.when(
             data: (items) {
               if (_debouncedQuery.isEmpty) return const Center(child: Text('Start typing to search canonical places.'));
+              if (_debouncedQuery.length < 2) return const Center(child: Text('Type at least 2 characters to search.'));
               if (items.isEmpty) return const Center(child: Text('No places found. Try another area or query.'));
               return ListView(
                 children: items
@@ -198,7 +211,7 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
               );
             },
             error: (_, __) => const Center(child: Text('Search unavailable')),
-            loading: () => _debouncedQuery.isEmpty ? const SizedBox.shrink() : const Center(child: CircularProgressIndicator()),
+            loading: () => _debouncedQuery.length < 2 ? const SizedBox.shrink() : const Center(child: CircularProgressIndicator()),
           ),
         ),
       ],
@@ -246,7 +259,7 @@ class _CreateTab extends ConsumerStatefulWidget {
   ConsumerState<_CreateTab> createState() => _CreateTabState();
 }
 
-class _CreateTabState extends ConsumerState<_CreateTab> {
+class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveClientMixin {
   String _source = 'record';
   final _titleController = TextEditingController();
   final _captionController = TextEditingController();
@@ -256,6 +269,9 @@ class _CreateTabState extends ConsumerState<_CreateTab> {
   PlaceSearchResult? _selectedPlace;
   final List<PlaceSearchResult> _recentPlaces = [];
   int _rating = 4;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -268,6 +284,7 @@ class _CreateTabState extends ConsumerState<_CreateTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final suggestions = ref.watch(placeSearchProvider((query: _searchQuery, scope: FeedScope.local)));
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -422,11 +439,15 @@ class _ProfileStudioTab extends ConsumerStatefulWidget {
   ConsumerState<_ProfileStudioTab> createState() => _ProfileStudioTabState();
 }
 
-class _ProfileStudioTabState extends ConsumerState<_ProfileStudioTab> {
+class _ProfileStudioTabState extends ConsumerState<_ProfileStudioTab> with AutomaticKeepAliveClientMixin {
   StudioSection _section = StudioSection.drafts;
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final analytics = ref.watch(studioAnalyticsProvider);
     final videos = ref.watch(studioVideosProvider(_section));
     return ListView(
