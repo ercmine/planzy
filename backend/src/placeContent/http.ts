@@ -72,9 +72,11 @@ export function createPlaceContentHttpHandlers(service: PlaceContentService): Pl
       sendJson(res, 200, { ok: true });
     },
     async placeContent(_req, res, canonicalPlaceId) {
-      const content = await service.getPlaceDetailContent(canonicalPlaceId);
-      const rankingBoost = await service.getRankingBoost(canonicalPlaceId);
-      sendJson(res, 200, { ...content, rankingBoost });
+      const [content, premium] = await Promise.all([
+        service.getPlaceDetailContent(canonicalPlaceId),
+        service.getPremiumPlaceDetailContent(canonicalPlaceId)
+      ]);
+      sendJson(res, 200, { ...content, premium });
     },
     async creatorContent(_req, res, userId) {
       sendJson(res, 200, await service.getCreatorContent(userId));

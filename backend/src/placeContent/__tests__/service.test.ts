@@ -49,4 +49,20 @@ describe("place content service", () => {
     expect(a?.canonicalPlaceId).toBe("cp_A");
     expect(b?.canonicalPlaceId).toBe("cp_B");
   });
+
+  it("builds premium place detail payload with priority and trust/source summaries", async () => {
+    const service = new PlaceContentService(new MemoryPlaceContentStore());
+    await service.createReview({ canonicalPlaceId: "cp_premium", authorUserId: "u1", body: "Excellent", trustedReview: true, qualityScore: 0.9, verifiedVisitScore: 0.9 });
+    await service.createCreatorVideo({ canonicalPlaceId: "cp_premium", authorUserId: "u2", mediaAssetId: "asset-1", qualityScore: 0.95 });
+    await service.savePlace({ userId: "u3", canonicalPlaceId: "cp_premium", sourceContext: "place_detail" });
+
+    const premium = await service.getPremiumPlaceDetailContent("cp_premium");
+    expect(premium.canonicalPlaceId).toBe("cp_premium");
+    expect(premium.quickFacts.reviewCount).toBe(1);
+    expect(premium.quickFacts.creatorVideoCount).toBe(1);
+    expect(premium.quickFacts.saveCount).toBe(1);
+    expect(premium.priorityRules.heroMedia[0]).toBe("featured_creator_video");
+    expect(premium.trustSummary.trustedReviewCount).toBe(1);
+    expect(premium.sourceSummary.attributionAvailable).toBe(true);
+  });
 });

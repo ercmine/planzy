@@ -14,6 +14,7 @@ import '../../core/ads/native_ad_controller.dart';
 import '../../core/format/formatters.dart';
 import '../../core/json_parsers.dart';
 import '../../core/validation/url.dart';
+import '../../models/telemetry.dart';
 import '../../models/place_review.dart';
 import '../../models/place_review_video.dart';
 import '../../models/plan.dart';
@@ -63,6 +64,8 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   PlaceReviewVideo? _featuredVideo;
   String? _videoCursor;
   String _videoFilter = 'all';
+  bool _isSaved = false;
+  bool _isSaveBusy = false;
 
   final _reviewFormKey = GlobalKey<FormState>();
   final _reviewTextController = TextEditingController();
@@ -75,9 +78,13 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   void initState() {
     super.initState();
     _plan = widget.plan;
+    _isSaved = _plan.metadata?['saved'] == true;
     _loadDetailsIfNeeded();
     _loadReviews();
     _loadReviewVideos();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _trackPlaceEvent('place_detail_opened', {'placeId': _plan.sourceId, 'planId': _plan.id});
+    });
   }
 
   @override
@@ -355,46 +362,30 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     final distance = _distanceLabel(plan);
 
     return Scaffold(
-      appBar: AppBar(
-        leading: const AppBackButton(),
-        title: const Text('Place details')),
+      appBar: AppBar(leading: const AppBackButton(), title: const Text('Place details')),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.m),
         children: [
-          Text(viewData.name, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: AppSpacing.s),
-          Wrap(
-            spacing: AppSpacing.s,
-            runSpacing: AppSpacing.s,
-            children: [
-              CategoryPill(category: viewData.category),
-              if (viewData.subcategory?.isNotEmpty == true) Chip(label: Text(viewData.subcategory!)),
-              if (viewData.source.trim().isNotEmpty) Chip(label: Text(viewData.source)),
-              if (viewData.openNow != null)
-                Chip(label: Text(viewData.openNow! ? 'Open now' : 'Closed now')),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.m),
           _buildPhotoGallery(context, viewData.photos, isLoading: _isLoadingDetails),
           const SizedBox(height: AppSpacing.m),
-          _Section(
-            title: 'Overview',
-            child: Wrap(
-              spacing: AppSpacing.m,
-              runSpacing: AppSpacing.s,
-              children: [
-                if (viewData.rating != null)
-                  Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text(viewData.rating!.toStringAsFixed(1)),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.star, size: 16, color: Colors.amber),
-                    if (viewData.reviewCount != null) Text(' (${viewData.reviewCount})'),
-                  ]),
-                if (viewData.priceLevel != null) Text('Price ${formatPriceLevel(viewData.priceLevel)}'),
-                if (distance != null) Text(distance),
-              ],
-            ),
+          Text(viewData.name, style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            [viewData.category, if (viewData.subcategory?.isNotEmpty == true) viewData.subcategory!, if (viewData.address?.isNotEmpty == true) viewData.address!].join(' • '),
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
+          const SizedBox(height: AppSpacing.s),
+          Wrap(spacing: AppSpacing.s, runSpacing: AppSpacing.s, children: [
+            CategoryPill(category: viewData.category),
+            if (viewData.openNow != null) Chip(label: Text(viewData.openNow! ? 'Open now' : 'Closed now')),
+            if (distance != null) Chip(label: Text(distance)),
+            if (viewData.rating != null) Chip(label: Text('${viewData.rating!.toStringAsFixed(1)} ★${viewData.reviewCount != null ? ' (${viewData.reviewCount})' : ''}')),
+            if (_videos.isNotEmpty) Chip(label: Text('${_videos.length} creator videos')),
+          ]),
+          const SizedBox(height: AppSpacing.m),
+          _buildPrimaryActions(context, viewData),
+          const SizedBox(height: AppSpacing.m),
+          _buildQuickFacts(context, viewData, distance),
           if (viewData.address?.trim().isNotEmpty == true) ...[
             const SizedBox(height: AppSpacing.m),
             _Section(
@@ -545,30 +536,16 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
           const SizedBox(height: AppSpacing.m),
           _buildReviewsSection(context),
           const SizedBox(height: AppSpacing.m),
+          _buildGallerySection(context, viewData.photos),
+          const SizedBox(height: AppSpacing.m),
           NativeAdCard(
             controller: _getDetailAdController(),
             placement: AdPlacement.placeDetailInlineBanner,
           ),
           const SizedBox(height: AppSpacing.m),
           _Section(
-            title: 'Creator and business insights',
-            child: const Text('Follow creator coverage, business updates, and reputation signals for this place.'),
-          ),
-          const SizedBox(height: AppSpacing.m),
-          Wrap(
-            spacing: AppSpacing.s,
-            runSpacing: AppSpacing.s,
-            children: [
-              FilledButton.icon(
-                onPressed: () => _openMaps(context, plan),
-                icon: const Icon(Icons.map_outlined),
-                label: const Text('Directions'),
-              ),
-              FilledButton.tonal(
-                onPressed: () => _share(plan),
-                child: const Text('Share'),
-              ),
-            ],
+            title: 'Trust and source',
+            child: Text('Top reviews and creator videos are ranked using trust, moderation, and quality signals. Source attributions are shown for external descriptions and imagery.'),
           ),
           if (_detailsError != null) ...[
             const SizedBox(height: AppSpacing.s),
@@ -577,6 +554,120 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildPrimaryActions(BuildContext context, PlaceDetailViewData viewData) {
+    return Wrap(
+      spacing: AppSpacing.s,
+      runSpacing: AppSpacing.s,
+      children: [
+        FilledButton.icon(
+          onPressed: _isSaveBusy ? null : () => _toggleSaved(),
+          icon: Icon(_isSaved ? Icons.bookmark : Icons.bookmark_border),
+          label: Text(_isSaved ? 'Saved' : 'Save'),
+        ),
+        FilledButton.tonalIcon(
+          onPressed: () {
+            _trackPlaceEvent('place_detail_share_tapped', {'placeId': _plan.sourceId});
+            _share(_plan);
+          },
+          icon: const Icon(Icons.share_outlined),
+          label: const Text('Share'),
+        ),
+        FilledButton.tonalIcon(
+          onPressed: () {
+            _trackPlaceEvent('place_detail_maps_tapped', {'placeId': _plan.sourceId});
+            _openMaps(context, _plan);
+          },
+          icon: const Icon(Icons.map_outlined),
+          label: const Text('Open in maps'),
+        ),
+        if ((viewData.phone ?? _plan.phone)?.isNotEmpty == true)
+          OutlinedButton.icon(
+            onPressed: () => _launchUri(context, Uri.tryParse('tel:${viewData.phone ?? _plan.phone}')),
+            icon: const Icon(Icons.call_outlined),
+            label: const Text('Call'),
+          ),
+        if (viewData.website?.isNotEmpty == true)
+          OutlinedButton.icon(
+            onPressed: () => _launchUri(context, Uri.tryParse(viewData.website!)),
+            icon: const Icon(Icons.language_outlined),
+            label: const Text('Website'),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildQuickFacts(BuildContext context, PlaceDetailViewData viewData, String? distance) {
+    final facts = <({IconData icon, String label, String value})>[
+      if (viewData.openNow != null) (icon: Icons.schedule, label: 'Status', value: viewData.openNow! ? 'Open now' : 'Closed now'),
+      if (viewData.priceLevel != null) (icon: Icons.payments_outlined, label: 'Price', value: formatPriceLevel(viewData.priceLevel)),
+      if (distance != null) (icon: Icons.near_me_outlined, label: 'Distance', value: distance),
+      if (viewData.reviewCount != null) (icon: Icons.reviews_outlined, label: 'Reviews', value: '${viewData.reviewCount}'),
+      (icon: Icons.video_library_outlined, label: 'Creator videos', value: '${_videos.length}${_isLoadingVideos ? '+' : ''}'),
+      (icon: Icons.verified_user_outlined, label: 'Trusted reviews', value: '${_reviews.where((r) => r.trust?.reviewTrustDesignation == 'trusted' || r.trust?.reviewTrustDesignation == 'trusted_verified').length}'),
+    ];
+
+    return _Section(
+      title: 'Quick facts',
+      child: Column(
+        children: facts
+            .map((fact) => ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: Icon(fact.icon), title: Text(fact.label), trailing: Text(fact.value)))
+            .toList(growable: false),
+      ),
+    );
+  }
+
+  Widget _buildGallerySection(BuildContext context, List<PlaceDetailPhoto> photos) {
+    if (photos.length < 2) return const SizedBox.shrink();
+    return _Section(
+      title: 'Gallery',
+      child: SizedBox(
+        height: 100,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: photos.length,
+          separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.s),
+          itemBuilder: (_, i) => AspectRatio(
+            aspectRatio: 1,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: _buildNetworkImage(photos[i].thumbUrl),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleSaved() async {
+    setState(() => _isSaveBusy = true);
+    final next = !_isSaved;
+    setState(() => _isSaved = next);
+    _trackPlaceEvent(next ? 'place_detail_save_tapped' : 'place_detail_unsave_tapped', {'placeId': _plan.sourceId});
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (mounted) {
+      setState(() => _isSaveBusy = false);
+    }
+  }
+
+  Future<void> _trackPlaceEvent(String event, Map<String, Object?> payload) async {
+    final telemetryRepository = ref.read(telemetryRepositoryProvider).valueOrNull;
+    final dispatcher = ref.read(telemetryDispatcherProvider);
+    if (telemetryRepository == null || dispatcher == null) return;
+    try {
+      await telemetryRepository.enqueueEvent(
+        widget.sessionId,
+        TelemetryEventInput.cardOpened(
+          event: event,
+          planId: _plan.id,
+          section: payload['section']?.toString(),
+          source: _plan.source,
+          clientAtISO: DateTime.now().toUtc().toIso8601String(),
+        ),
+      );
+      await dispatcher.notifyEventQueued(widget.sessionId);
+    } catch (_) {}
   }
 
   Widget _buildPhotoGallery(BuildContext context, List<PlaceDetailPhoto> photos, {required bool isLoading}) {
