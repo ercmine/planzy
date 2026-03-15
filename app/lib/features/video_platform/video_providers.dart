@@ -38,10 +38,12 @@ final studioAnalyticsProvider = FutureProvider<StudioAnalyticsOverview>((ref) as
   return repo.fetchStudioAnalytics();
 });
 
-final placeSearchProvider = FutureProvider.family<List<PlaceSearchResult>, ({String query, FeedScope scope})>((ref, arg) async {
-  if (arg.query.trim().isEmpty) {
+final placeSearchProvider = FutureProvider.autoDispose.family<List<PlaceSearchResult>, ({String query, FeedScope scope})>((ref, arg) async {
+  final normalized = arg.query.trim();
+  if (normalized.length < 2) {
     return const [];
   }
+
   final repo = await ref.watch(videoRepositoryProvider.future);
-  return repo.searchPlaces(query: arg.query, scope: arg.scope);
+  return repo.searchPlaces(query: normalized, scope: arg.scope);
 });
