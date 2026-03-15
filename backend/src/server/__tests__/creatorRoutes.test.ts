@@ -251,6 +251,27 @@ describe("creator profile routes", () => {
     expect(analyticsDenied.status).toBe(200);
   });
 
+
+  it("enforces unique handles and supports availability checks", async () => {
+    const h1 = { "x-user-id": "creator-handle-1", "content-type": "application/json" };
+    const h2 = { "x-user-id": "creator-handle-2", "content-type": "application/json" };
+    await fetch(`${baseUrl}/v1/profiles/creator`, { method: "POST", headers: h1, body: JSON.stringify({ creatorName: "Handle One" }) });
+    await fetch(`${baseUrl}/v1/profiles/creator`, { method: "POST", headers: h2, body: JSON.stringify({ creatorName: "Handle Two" }) });
+
+    const p1 = await fetch(`${baseUrl}/v1/creator/profiles`, { method: "POST", headers: h1, body: JSON.stringify({ displayName: "Handle One", handle: "food.one", slug: "handle-one" }) });
+    expect(p1.status).toBe(200);
+
+    const availability = await fetch(`${baseUrl}/v1/creator/handles/availability?handle=food.one`);
+    expect(availability.status).toBe(200);
+    await expect(availability.json()).resolves.toMatchObject({ handle: "food.one", available: false });
+
+    const taken = await fetch(`${baseUrl}/v1/creator/profiles`, { method: "POST", headers: h2, body: JSON.stringify({ displayName: "Handle Two", handle: "food.one", slug: "handle-two" }) });
+    expect(taken.status).toBe(409);
+
+    const invalid = await fetch(`${baseUrl}/v1/creator/handles/availability?handle=@@`);
+    expect(invalid.status).toBe(400);
+  });
+
   it("supports creator verification lifecycle and admin moderation", async () => {
     const creatorHeaders = { "x-user-id": "creator-verify-1", "content-type": "application/json" };
     await fetch(`${baseUrl}/v1/profiles/creator`, { method: "POST", headers: creatorHeaders, body: JSON.stringify({ creatorName: "Verify Me" }) });

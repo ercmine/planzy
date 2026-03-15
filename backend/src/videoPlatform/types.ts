@@ -237,6 +237,41 @@ export interface VideoFeedItem {
     badges: string[];
   };
   publishedAt?: string;
+  viewerState?: {
+    isLiked: boolean;
+    isSaved: boolean;
+    lastWatchedAt?: string;
+    watchProgressMs?: number;
+  };
+}
+
+export interface VideoLike {
+  videoId: string;
+  userId: string;
+  createdAt: string;
+}
+
+export interface SavedVideo {
+  videoId: string;
+  userId: string;
+  createdAt: string;
+}
+
+export interface WatchHistoryEntry {
+  id: string;
+  videoId: string;
+  userId: string;
+  creatorUserId: string;
+  canonicalPlaceId: string;
+  watchedAt: string;
+  progressMs: number;
+  completed: boolean;
+}
+
+export interface ReengagementSummary {
+  recentVideos: VideoFeedItem[];
+  creatorAffinity: Array<{ creatorUserId: string; watchEvents: number }>;
+  placeAffinity: Array<{ canonicalPlaceId: string; watchEvents: number }>;
 }
 
 export interface VideoStudioItem {

@@ -14,7 +14,8 @@ import type {
   FeedScope,
   FeedScopeRequestContext,
   PlaceFeedSignals,
-  CreatorFeedSignals
+  CreatorFeedSignals,
+  ReengagementSummary
 } from "./types.js";
 import { rankPlaceLinkedVideoFeed } from "./feedRanking.js";
 import type { VideoPlatformStore } from "./store.js";
@@ -443,15 +444,29 @@ export class VideoPlatformService {
     };
   }
 
-  async recordVideoEvent(input: { videoId: string; event: "video_viewed" | "video_liked" | "video_saved" | "video_shared" | "video_completed" }): Promise<VideoAsset> {
+  async recordVideoEvent(input: { videoId: string; userId?: string; event: "video_viewed" | "video_liked" | "video_saved" | "video_shared" | "video_completed"; progressMs?: number }): Promise<VideoAsset> {
     const video = await this.store.getVideo(input.videoId);
     if (!video) throw new Error("video_not_found");
     const engagement = video.engagement ?? { views: 0, likes: 0, saves: 0, shares: 0, completionRate: 0 };
     if (input.event === "video_viewed") engagement.views += 1;
     if (input.event === "video_liked") engagement.likes += 1;
     if (input.event === "video_saved") engagement.saves += 1;
+    if (input.userId && input.event === "video_liked") await this.store.likeVideo({ videoId: video.id, userId: input.userId, createdAt: new Date().toISOString() });
+    if (input.userId && input.event === "video_saved") await this.store.saveVideo({ videoId: video.id, userId: input.userId, createdAt: new Date().toISOString() });
     if (input.event === "video_shared") engagement.shares += 1;
     if (input.event === "video_completed") engagement.completionRate = Math.min(1, engagement.completionRate + 0.05);
+    if (input.userId && ["video_viewed", "video_completed"].includes(input.event)) {
+      await this.store.appendWatchHistory({
+        id: `wh_${randomUUID()}`,
+        videoId: video.id,
+        userId: input.userId,
+        creatorUserId: video.authorUserId,
+        canonicalPlaceId: video.canonicalPlaceId,
+        watchedAt: new Date().toISOString(),
+        progressMs: Math.max(0, input.progressMs ?? 0),
+        completed: input.event === "video_completed"
+      });
+    }
     video.engagement = engagement;
     video.lifecycle.updatedAt = new Date().toISOString();
     await this.store.updateVideo(video);
@@ -465,7 +480,7 @@ export class VideoPlatformService {
       .map((video) => this.toFeedItem(video));
   }
 
-  async listFeed(input: { scope: FeedScope; limit: number; cursor?: string; context?: FeedScopeRequestContext }): Promise<{ items: VideoFeedItem[]; nextCursor?: string; meta: Record<string, unknown> }> {
+  async listFeed(input: { scope: FeedScope; limit: number; cursor?: string; context?: FeedScopeRequestContext; userId?: string }): Promise<{ items: VideoFeedItem[]; nextCursor?: string; meta: Record<string, unknown> }> {
     const limit = Math.min(Math.max(input.limit, 1), 30);
     const videos = (await this.store.listVideos()).filter((video) => this.isVisibleVideo(video));
     const ranked = rankPlaceLinkedVideoFeed({
@@ -477,7 +492,78 @@ export class VideoPlatformService {
       placeSignalsFor: (placeId) => this.placeSignalsFor(videos, placeId, input.context),
       creatorSignalsFor: (creatorId) => this.creatorSignalsFor(videos, creatorId)
     });
-    return { items: ranked.ranked.map((row) => row.item), nextCursor: ranked.nextCursor, meta: { observability: ranked.observability } };
+    const items = await Promise.all(ranked.ranked.map(async (row) => this.withViewerState(row.item, input.userId)));
+    return { items, nextCursor: ranked.nextCursor, meta: { observability: ranked.observability } };
+  }
+
+  async likeVideo(input: { userId: string; videoId: string }): Promise<{ likes: number; isLiked: boolean }> {
+    const video = await this.store.getVideo(input.videoId);
+    if (!video) throw new Error("video_not_found");
+    const existing = await this.store.hasLikedVideo(input.videoId, input.userId);
+    if (!existing) {
+      await this.store.likeVideo({ videoId: input.videoId, userId: input.userId, createdAt: new Date().toISOString() });
+      video.engagement = { ...(video.engagement ?? { views: 0, likes: 0, saves: 0, shares: 0, completionRate: 0 }), likes: (video.engagement?.likes ?? 0) + 1 };
+      await this.store.updateVideo(video);
+    }
+    return { likes: await this.store.countLikes(input.videoId), isLiked: true };
+  }
+
+  async unlikeVideo(input: { userId: string; videoId: string }): Promise<{ likes: number; isLiked: boolean }> {
+    await this.store.unlikeVideo(input.videoId, input.userId);
+    const video = await this.store.getVideo(input.videoId);
+    if (video?.engagement) {
+      video.engagement.likes = Math.max(0, (await this.store.countLikes(input.videoId)));
+      await this.store.updateVideo(video);
+    }
+    return { likes: await this.store.countLikes(input.videoId), isLiked: false };
+  }
+
+  async saveVideo(input: { userId: string; videoId: string }): Promise<{ saves: number; isSaved: boolean }> {
+    const video = await this.store.getVideo(input.videoId);
+    if (!video) throw new Error("video_not_found");
+    if (!(await this.store.hasSavedVideo(input.videoId, input.userId))) {
+      await this.store.saveVideo({ videoId: input.videoId, userId: input.userId, createdAt: new Date().toISOString() });
+      video.engagement = { ...(video.engagement ?? { views: 0, likes: 0, saves: 0, shares: 0, completionRate: 0 }), saves: (video.engagement?.saves ?? 0) + 1 };
+      await this.store.updateVideo(video);
+    }
+    return { saves: await this.store.countSaves(input.videoId), isSaved: true };
+  }
+
+  async unsaveVideo(input: { userId: string; videoId: string }): Promise<{ saves: number; isSaved: boolean }> {
+    await this.store.unsaveVideo(input.videoId, input.userId);
+    const video = await this.store.getVideo(input.videoId);
+    if (video?.engagement) {
+      video.engagement.saves = Math.max(0, (await this.store.countSaves(input.videoId)));
+      await this.store.updateVideo(video);
+    }
+    return { saves: await this.store.countSaves(input.videoId), isSaved: false };
+  }
+
+  async listSavedVideos(userId: string, input?: { limit?: number; cursor?: string }): Promise<{ items: VideoFeedItem[]; nextCursor?: string }> {
+    const result = await this.store.listSavedVideos(userId, Math.max(1, Math.min(input?.limit ?? 20, 50)), input?.cursor);
+    const items = await Promise.all(result.items.map(async (row) => {
+      const video = await this.store.getVideo(row.videoId);
+      return video ? this.withViewerState(this.toFeedItem(video), userId) : undefined;
+    }));
+    return { items: items.filter((row): row is VideoFeedItem => Boolean(row)), nextCursor: result.nextCursor };
+  }
+
+  async getReengagementSummary(userId: string, limit = 10): Promise<ReengagementSummary> {
+    const history = await this.store.listWatchHistory(userId, Math.max(1, Math.min(limit * 10, 200)));
+    const recentVideos: VideoFeedItem[] = [];
+    for (const row of history.slice(0, limit)) {
+      const video = await this.store.getVideo(row.videoId);
+      if (video) recentVideos.push(await this.withViewerState(this.toFeedItem(video), userId));
+    }
+    const creatorAffinity = [...history.reduce((acc, row) => acc.set(row.creatorUserId, (acc.get(row.creatorUserId) ?? 0) + 1), new Map<string, number>()).entries()]
+      .map(([creatorUserId, watchEvents]) => ({ creatorUserId, watchEvents }))
+      .sort((a, b) => b.watchEvents - a.watchEvents)
+      .slice(0, 5);
+    const placeAffinity = [...history.reduce((acc, row) => acc.set(row.canonicalPlaceId, (acc.get(row.canonicalPlaceId) ?? 0) + 1), new Map<string, number>()).entries()]
+      .map(([canonicalPlaceId, watchEvents]) => ({ canonicalPlaceId, watchEvents }))
+      .sort((a, b) => b.watchEvents - a.watchEvents)
+      .slice(0, 5);
+    return { recentVideos, creatorAffinity, placeAffinity };
   }
 
   async listCreatorVideos(userId: string): Promise<VideoFeedItem[]> {
@@ -580,6 +666,20 @@ export class VideoPlatformService {
       moderationStatus: video.moderationStatus,
       trust: trust ? { trustScore: trust.trustScore, trustTier: trust.trustTier, badges: trust.badges } : undefined,
       publishedAt: video.lifecycle.publishedAt
+    };
+  }
+
+  private async withViewerState(item: VideoFeedItem, userId?: string): Promise<VideoFeedItem> {
+    if (!userId) return item;
+    const latestWatch = await this.store.getLatestWatch(item.videoId, userId);
+    return {
+      ...item,
+      viewerState: {
+        isLiked: await this.store.hasLikedVideo(item.videoId, userId),
+        isSaved: await this.store.hasSavedVideo(item.videoId, userId),
+        lastWatchedAt: latestWatch?.watchedAt,
+        watchProgressMs: latestWatch?.progressMs
+      }
     };
   }
 

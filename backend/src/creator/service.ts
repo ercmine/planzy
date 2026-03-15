@@ -14,6 +14,7 @@ import type { CreatorVerificationService } from "../creatorVerification/service.
 import type { CreatorAnalyticsSummary, CreatorFeedItem, CreatorFeedItemType, CreatorFeedResult, CreatorGuide, CreatorPlaceContentResult, FollowedCreatorSummary, GuidePlaceItem, GuideSection, PublicCreatorProfileView } from "./types.js";
 
 const RESERVED_SLUGS = new Set(["admin", "api", "creator", "creators", "settings", "support"]);
+const HANDLE_PATTERN = /^[a-z0-9._]{3,30}$/;
 const SOCIAL_HOSTS: Record<CreatorSocialPlatform, string[]> = {
   website: [],
   instagram: ["instagram.com", "www.instagram.com"],
@@ -25,6 +26,18 @@ const SOCIAL_HOSTS: Record<CreatorSocialPlatform, string[]> = {
 
 function slugify(input: string): string {
   return input.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
+}
+
+
+
+function normalizeHandle(input?: string): string | undefined {
+  if (!input) return undefined;
+  const handle = input.trim().toLowerCase().replace(/^@+/, "");
+  if (!HANDLE_PATTERN.test(handle) || handle.startsWith(".") || handle.endsWith(".")) {
+    throw new ValidationError(["handle must be 3-30 chars, lowercase letters, numbers, dots, or underscores"]);
+  }
+  if (RESERVED_SLUGS.has(handle)) throw new ValidationError(["handle is reserved"]);
+  return handle;
 }
 
 function parseUrl(input: string): URL {
@@ -166,10 +179,15 @@ export class CreatorService {
     if (!source) throw new Error("CREATOR_ROLE_REQUIRED");
     await this.ensureCreatorFeature(userId, source.id, "CREATOR_PROFILE_ENABLED");
 
-    const desiredSlug = slugify(input.slug ?? input.handle ?? input.displayName);
+    const desiredHandle = input.handle !== undefined ? normalizeHandle(input.handle) : source.handle;
+    const desiredSlug = slugify(input.slug ?? desiredHandle ?? input.displayName);
     if (!desiredSlug || RESERVED_SLUGS.has(desiredSlug)) throw new ValidationError(["slug is reserved or invalid"]);
     const existingSlug = this.store.getProfileBySlug(desiredSlug);
     if (existingSlug && existingSlug.id !== source.id) throw new Error("SLUG_TAKEN");
+    if (desiredHandle) {
+      const existingHandle = this.store.getProfileByHandle(desiredHandle);
+      if (existingHandle && existingHandle.id !== source.id) throw new Error("HANDLE_TAKEN");
+    }
 
     const now = new Date().toISOString();
     const profile: CreatorProfile = {
@@ -177,7 +195,7 @@ export class CreatorService {
       displayName: input.displayName,
       creatorName: input.displayName,
       slug: desiredSlug,
-      handle: input.handle,
+      handle: desiredHandle,
       bio: input.bio,
       tags: source.tags ?? [],
       socialLinks: source.socialLinks ?? [],
@@ -194,13 +212,26 @@ export class CreatorService {
     return profile;
   }
 
-  async updateCreatorProfile(userId: string, profileId: string, input: { bio?: string; avatarUrl?: string; coverUrl?: string; websiteUrl?: string; tags?: string[]; socialLinks?: Array<{ platform: CreatorSocialPlatform; url: string; label?: string }> }): Promise<CreatorProfile> {
+  checkHandleAvailability(handle: string, currentProfileId?: string): { handle: string; available: boolean } {
+    const normalized = normalizeHandle(handle);
+    if (!normalized) throw new ValidationError(["handle is required"]);
+    const existing = this.store.getProfileByHandle(normalized);
+    return { handle: normalized, available: !existing || existing.id === currentProfileId };
+  }
+
+  async updateCreatorProfile(userId: string, profileId: string, input: { handle?: string; bio?: string; avatarUrl?: string; coverUrl?: string; websiteUrl?: string; tags?: string[]; socialLinks?: Array<{ platform: CreatorSocialPlatform; url: string; label?: string }> }): Promise<CreatorProfile> {
     const existing = this.ensureOwner(userId, profileId);
     const now = new Date().toISOString();
     const socialLinks = input.socialLinks ? normalizeSocialLinks(input.socialLinks, now) : existing.socialLinks;
     const websiteUrl = input.websiteUrl ? parseUrl(input.websiteUrl).toString() : existing.websiteUrl;
+    const handle = input.handle === undefined ? existing.handle : normalizeHandle(input.handle);
+    if (handle) {
+      const existingHandle = this.store.getProfileByHandle(handle);
+      if (existingHandle && existingHandle.id !== existing.id) throw new Error("HANDLE_TAKEN");
+    }
     const profile: CreatorProfile = {
       ...existing,
+      handle,
       bio: input.bio ?? existing.bio,
       avatarUrl: input.avatarUrl ?? existing.avatarUrl,
       coverUrl: input.coverUrl ?? existing.coverUrl,
@@ -467,7 +498,7 @@ export class CreatorService {
   }
 
   async getPublicProfile(slug: string, viewerUserId?: string, opts?: { reviewLimit?: number; guideLimit?: number; reviewSort?: "latest" | "top" }): Promise<PublicCreatorProfileView> {
-    const profile = this.store.getProfileBySlug(slug);
+    const profile = this.store.getProfileBySlug(slug) ?? this.store.getProfileByHandle(slug.toLowerCase().replace(/^@+/, ""));
     if (!profile || !profile.isPublic || profile.status !== CreatorProfileStatus.ACTIVE) throw new Error("CREATOR_NOT_FOUND");
     const reviews = await this.listPublicReviewsByCreator(profile.id, opts?.reviewSort, opts?.reviewLimit, viewerUserId);
     const guides = this.store
@@ -625,7 +656,7 @@ export class CreatorService {
   }
 
   getGuideBySlug(slug: string, guideSlug: string, viewerUserId?: string): CreatorGuide {
-    const profile = this.store.getProfileBySlug(slug);
+    const profile = this.store.getProfileBySlug(slug) ?? this.store.getProfileByHandle(slug.toLowerCase().replace(/^@+/, ""));
     if (!profile) throw new Error("CREATOR_NOT_FOUND");
     const guide = this.store.getGuideBySlug(profile.id, guideSlug);
     if (!guide) throw new Error("GUIDE_NOT_FOUND");

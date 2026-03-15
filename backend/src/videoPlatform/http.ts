@@ -23,6 +23,12 @@ export interface VideoPlatformHttpHandlers {
   getStudioAnalytics(req: IncomingMessage, res: ServerResponse): Promise<void>;
   archiveDraft(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
   trackEvent(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
+  likeVideo(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
+  unlikeVideo(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
+  saveVideo(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
+  unsaveVideo(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
+  listSavedVideos(req: IncomingMessage, res: ServerResponse, query: URLSearchParams): Promise<void>;
+  listWatchHistory(req: IncomingMessage, res: ServerResponse): Promise<void>;
   listFeed(req: IncomingMessage, res: ServerResponse, query: URLSearchParams): Promise<void>;
   listPlaceVideos(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void>;
   listCreatorVideos(req: IncomingMessage, res: ServerResponse, userId: string): Promise<void>;
@@ -82,7 +88,7 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
     async getStudioAnalytics(req, res) {
       sendJson(res, 200, { analytics: await service.getCreatorStudioAnalytics(requireUserId(req)) });
     },
-    async listFeed(_req, res, query) {
+    async listFeed(req, res, query) {
       const limit = Number.parseInt(query.get("limit") ?? "10", 10);
       const cursor = query.get("cursor") ?? undefined;
       const rawScope = String(query.get("scope") ?? "local");
@@ -91,6 +97,7 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
       const lng = query.get("lng");
       const city = query.get("city") ?? undefined;
       const region = query.get("region") ?? undefined;
+      const viewerUserId = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
       sendJson(res, 200, await service.listFeed({
         scope,
         limit,
@@ -100,7 +107,8 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
           lng: lng ? Number(lng) : undefined,
           city,
           region
-        }
+        },
+        userId: viewerUserId
       }));
     },
     async archiveDraft(req, res, videoId) {
@@ -109,9 +117,30 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
       sendJson(res, 200, { video });
     },
     async trackEvent(req, res, videoId) {
-      const body = await parseJsonBody(req) as { event?: "video_viewed" | "video_liked" | "video_saved" | "video_shared" | "video_completed" };
+      const body = await parseJsonBody(req) as { event?: "video_viewed" | "video_liked" | "video_saved" | "video_shared" | "video_completed"; progressMs?: number };
       if (!body?.event) throw new ValidationError(["event is required"]);
-      sendJson(res, 200, { video: await service.recordVideoEvent({ videoId, event: body.event }) });
+      const uid = String(readHeader(req, "x-user-id") ?? "").trim() || undefined;
+      sendJson(res, 200, { video: await service.recordVideoEvent({ videoId, event: body.event, userId: uid, progressMs: typeof body.progressMs === "number" ? body.progressMs : undefined }) });
+    },
+    async likeVideo(req, res, videoId) {
+      sendJson(res, 200, await service.likeVideo({ userId: requireUserId(req), videoId }));
+    },
+    async unlikeVideo(req, res, videoId) {
+      sendJson(res, 200, await service.unlikeVideo({ userId: requireUserId(req), videoId }));
+    },
+    async saveVideo(req, res, videoId) {
+      sendJson(res, 200, await service.saveVideo({ userId: requireUserId(req), videoId }));
+    },
+    async unsaveVideo(req, res, videoId) {
+      sendJson(res, 200, await service.unsaveVideo({ userId: requireUserId(req), videoId }));
+    },
+    async listSavedVideos(req, res, query) {
+      const limit = Number.parseInt(query.get("limit") ?? "20", 10);
+      const cursor = query.get("cursor") ?? undefined;
+      sendJson(res, 200, await service.listSavedVideos(requireUserId(req), { limit, cursor }));
+    },
+    async listWatchHistory(req, res) {
+      sendJson(res, 200, { summary: await service.getReengagementSummary(requireUserId(req)) });
     },
     async listPlaceVideos(_req, res, placeId) {
       sendJson(res, 200, { items: await service.listPlaceVideos(placeId) });
