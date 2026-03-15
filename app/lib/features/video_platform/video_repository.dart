@@ -85,11 +85,11 @@ class VideoRepository {
             'q': normalizedQuery,
             'scope': scope.name,
             'category': category,
-            'lat': lat,
-            'lng': lng,
+            'lat': lat?.toString(),
+            'lng': lng?.toString(),
             'city': city,
             'region': region,
-            'limit': limit,
+            'limit': limit.toString(),
           },
         );
         final items = response['suggestions'] ?? response['places'];
@@ -133,16 +133,16 @@ class VideoRepository {
         final response = await apiClient.getJson(
           '/v1/places/map-discovery',
           queryParameters: {
-            'north': north,
-            'south': south,
-            'east': east,
-            'west': west,
-            'centerLat': centerLat,
-            'centerLng': centerLng,
-            'zoom': zoom,
+            'north': north.toString(),
+            'south': south.toString(),
+            'east': east.toString(),
+            'west': west.toString(),
+            'centerLat': centerLat.toString(),
+            'centerLng': centerLng.toString(),
+            'zoom': zoom.toString(),
             'categories': categories.join(','),
             'mode': mode,
-            'limit': limit,
+            'limit': limit.toString(),
           },
         );
         final items = response['places'];

@@ -267,12 +267,18 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                   left: 18,
                   right: 18,
                   child: Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.place),
-                      title: Text(selected.name),
-                      subtitle: Text('${selected.category} • ${selected.city ?? selected.region ?? 'Local'}'),
-                      trailing: Text('${((selected.distanceMeters ?? 0) / 1000).toStringAsFixed(1)} km'),
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _MapPlaceDetailPage(place: selected))),
+                    child: Builder(
+                      builder: (context) {
+                        final place = selected;
+                        if (place == null) return const SizedBox.shrink();
+                        return ListTile(
+                          leading: const Icon(Icons.place),
+                          title: Text(place.name),
+                          subtitle: Text('${place.category} • ${place.city ?? place.region ?? 'Local'}'),
+                          trailing: Text('${((place.distanceMeters ?? 0) / 1000).toStringAsFixed(1)} km'),
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _MapPlaceDetailPage(place: place))),
+                        );
+                      },
                     ),
                   ),
                 ),

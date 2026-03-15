@@ -109,8 +109,7 @@ class _FeedTab extends ConsumerWidget {
                         ),
                       ),
                       title: Text(item.caption.isEmpty ? item.placeName : item.caption),
-                      subtitle: Text('${item.placeName} • ${item.placeCategory} • ${item.regionLabel}
-${item.creatorHandle}'),
+                      subtitle: Text('${item.placeName} • ${item.placeCategory} • ${item.regionLabel}\n${item.creatorHandle}'),
                       trailing: Chip(label: Text('${item.rating}/5')),
                     ),
                   );
