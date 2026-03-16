@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import '../../api/api_client.dart';
 import 'video_models.dart';
 
@@ -32,6 +34,13 @@ class VideoRepository {
   final Map<String, Future<List<StudioVideo>>> _studioInFlight = {};
   _TimedCacheEntry<StudioAnalyticsOverview>? _studioAnalyticsCache;
   Future<StudioAnalyticsOverview>? _studioAnalyticsInFlight;
+
+  void invalidateStudioCache() {
+    _studioCache.clear();
+    _studioInFlight.clear();
+    _studioAnalyticsCache = null;
+    _studioAnalyticsInFlight = null;
+  }
 
   Future<List<PlaceVideoFeedItem>> fetchFeed({required FeedScope scope}) async {
     final cacheKey = scope.name;
@@ -236,7 +245,7 @@ class VideoRepository {
     }
   }
 
-  Future<String> createDraft({
+  Future<StudioVideo?> createDraft({
     required String placeId,
     required String title,
     required String caption,
@@ -249,8 +258,9 @@ class VideoRepository {
       'rating': rating,
     });
     final video = response['video'];
-    if (video is! Map<String, dynamic>) return '';
-    return (video['id'] ?? '').toString();
+    if (video is! Map<String, dynamic>) return null;
+    invalidateStudioCache();
+    return StudioVideo.fromJson(video);
   }
 
   Future<VideoUploadSession> requestUploadSession({
@@ -283,27 +293,55 @@ class VideoRepository {
     });
   }
 
-  Future<void> publish({required String videoId}) async {
-    await apiClient.postJson('/v1/videos/$videoId/publish', body: const {});
-  }
-
-  Future<void> submitDraft({
-    required String source,
+  Future<void> updateDraft({
+    required String videoId,
     required String placeId,
     required String title,
     required String caption,
     required int rating,
   }) async {
-    final videoId = await createDraft(placeId: placeId, title: title, caption: caption, rating: rating);
-    if (videoId.isEmpty) return;
+    await apiClient.putJson('/v1/videos/$videoId', body: {
+      'canonicalPlaceId': placeId,
+      'title': title,
+      'caption': caption,
+      'rating': rating,
+    });
+    invalidateStudioCache();
+  }
+
+  Future<void> publish({required String videoId}) async {
+    await apiClient.postJson('/v1/videos/$videoId/publish', body: const {});
+    invalidateStudioCache();
+  }
+
+  Future<void> retryUpload({required String videoId}) async {
+    await apiClient.postJson('/v1/videos/$videoId/retry-upload', body: const {});
+    invalidateStudioCache();
+  }
+
+  Future<void> retryProcessing({required String videoId}) async {
+    await apiClient.postJson('/v1/videos/$videoId/retry-processing', body: const {});
+    invalidateStudioCache();
+  }
+
+  Future<void> archiveVideo({required String videoId}) async {
+    await apiClient.postJson('/v1/videos/$videoId/archive', body: const {});
+    invalidateStudioCache();
+  }
+
+  Future<void> attachMediaFromFlow({
+    required String videoId,
+    required String source,
+  }) async {
     final upload = await requestUploadSession(
       videoId: videoId,
       fileName: source == 'record' ? 'recorded.mp4' : 'device-upload.mp4',
       contentType: 'video/mp4',
       sizeBytes: 20 * 1024 * 1024,
     );
+    developer.log('creator_hub_upload_session_created', name: 'creator_hub', error: {'videoId': videoId, 'sessionId': upload.id, 'source': source});
     await finalizeUpload(videoId: videoId, uploadSessionId: upload.id);
-    await publish(videoId: videoId);
+    invalidateStudioCache();
   }
 
   Future<void> reportVideo({

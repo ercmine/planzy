@@ -102,7 +102,7 @@ void main() {
     await tester.tap(find.text('New Draft'));
     await tester.pumpAndSettle();
 
-    final publishButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publish'));
+    final publishButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publish now'));
     expect(publishButton.onPressed, isNull);
 
     await tester.enterText(find.byType(TextField).first, 'Orbit review');
@@ -111,7 +111,7 @@ void main() {
     await tester.tap(find.text('Cafe Orbit').first);
     await tester.pumpAndSettle();
 
-    final enabledPublishButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publish'));
+    final enabledPublishButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publish now'));
     expect(enabledPublishButton.onPressed, isNotNull);
   });
 
@@ -127,6 +127,7 @@ void main() {
               title: 'Lunch draft',
               status: StudioVideoStatus.draft,
               section: StudioSection.drafts,
+              updatedAt: '2026-01-01T00:00:00Z',
             ),
             StudioVideo(
               videoId: 'failed_1',
@@ -135,6 +136,7 @@ void main() {
               title: 'Noodle upload',
               status: StudioVideoStatus.failed,
               section: StudioSection.needsAttention,
+              updatedAt: '2026-01-01T00:00:00Z',
             ),
           ],
         ),
@@ -147,7 +149,7 @@ void main() {
 
     expect(find.text('Resume Drafts'), findsOneWidget);
     expect(find.text('Lunch draft'), findsOneWidget);
-    expect(find.text('Uploads & Processing'), findsOneWidget);
+    expect(find.text('Needs Attention'), findsOneWidget);
     expect(find.text('Noodle upload'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
   });

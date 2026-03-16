@@ -313,15 +313,6 @@ class _CreateTab extends ConsumerStatefulWidget {
 }
 
 class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveClientMixin {
-  static const _lifecycleStatuses = {
-    StudioVideoStatus.awaiting_upload,
-    StudioVideoStatus.uploaded,
-    StudioVideoStatus.processing,
-    StudioVideoStatus.failed,
-    StudioVideoStatus.hidden,
-    StudioVideoStatus.rejected,
-  };
-
   bool _openedTracked = false;
 
   @override
@@ -348,25 +339,17 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
         children: [
           Text('Creator Hub', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 6),
-          const Text('Record, upload, tag a place, and publish reviews without leaving this tab.'),
+          const Text('Start, upload, recover, and publish place review videos.'),
           const SizedBox(height: 14),
           _buildPrimaryActions(),
-          const SizedBox(height: 16),
-          videos.when(
-            data: _buildDraftSection,
-            loading: () => const Card(child: Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator())),
-            error: (_, __) => const Card(child: ListTile(title: Text('Drafts unavailable'), subtitle: Text('Pull to refresh and try again.'))),
-          ),
           const SizedBox(height: 14),
           videos.when(
-            data: _buildLifecycleSection,
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            data: (items) => _buildGroupedSections(items),
+            loading: () => const Card(child: Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator())),
+            error: (_, __) => Card(child: ListTile(title: const Text('Creator data unavailable'), subtitle: const Text('Pull to refresh.'), trailing: FilledButton.tonal(onPressed: _refresh, child: const Text('Retry')))),
           ),
           const SizedBox(height: 14),
           _buildShortcuts(analytics),
-          const SizedBox(height: 14),
-          _buildGuidanceAndInsights(analytics),
         ],
       ),
     );
@@ -375,93 +358,82 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
   Widget _buildPrimaryActions() {
     return Row(
       children: [
-        Expanded(
-          child: _ActionCard(
-            icon: Icons.videocam_rounded,
-            title: 'Record Video',
-            subtitle: 'Capture a place review now',
-            onTap: () => _startFlow(CreateFlowSource.record),
-          ),
-        ),
+        Expanded(child: _ActionCard(icon: Icons.videocam_rounded, title: 'Record Video', subtitle: 'Create draft + attach recording', onTap: () => _startFlow(CreateFlowSource.record))),
         const SizedBox(width: 10),
-        Expanded(
-          child: _ActionCard(
-            icon: Icons.upload_rounded,
-            title: 'Upload Video',
-            subtitle: 'Import from your device',
-            onTap: () => _startFlow(CreateFlowSource.upload),
-          ),
-        ),
+        Expanded(child: _ActionCard(icon: Icons.upload_rounded, title: 'Upload Video', subtitle: 'Create draft + attach upload', onTap: () => _startFlow(CreateFlowSource.upload))),
         const SizedBox(width: 10),
-        Expanded(
-          child: _ActionCard(
-            icon: Icons.note_add_rounded,
-            title: 'New Draft',
-            subtitle: 'Start with place + metadata',
-            onTap: () => _startFlow(CreateFlowSource.draft),
-          ),
-        ),
+        Expanded(child: _ActionCard(icon: Icons.note_add_rounded, title: 'New Draft', subtitle: 'Metadata-first draft', onTap: () => _startFlow(CreateFlowSource.draft))),
       ],
     );
   }
 
-  Widget _buildDraftSection(List<StudioVideo> items) {
-    final drafts = items.where((item) => item.section == StudioSection.drafts || item.status == StudioVideoStatus.draft).toList(growable: false);
-    if (drafts.isEmpty) {
+  Widget _buildGroupedSections(List<StudioVideo> items) {
+    final drafts = items.where((v) => v.section == StudioSection.drafts).toList(growable: false);
+    final processing = items.where((v) => v.section == StudioSection.processing).toList(growable: false);
+    final needsAttention = items.where((v) => v.section == StudioSection.needsAttention).toList(growable: false);
+    final ready = items.where((v) => v.publishReady && v.section != StudioSection.published).toList(growable: false);
+
+    if (items.isEmpty) {
       return Card(
         child: ListTile(
           leading: const Icon(Icons.auto_awesome),
           title: const Text('Create your first place review'),
-          subtitle: const Text('Record or upload a short video, tag the canonical place, then publish.'),
+          subtitle: const Text('Start a draft, tag a canonical place, then record or upload a video.'),
           trailing: FilledButton(onPressed: () => _startFlow(CreateFlowSource.draft), child: const Text('Start')),
         ),
       );
     }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Resume Drafts', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        ...drafts.take(4).map(
-              (video) => Card(
-                child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.edit_note_rounded)),
-                  title: Text(video.title),
-                  subtitle: Text('${video.placeName} • ${video.status.name.replaceAll('_', ' ')}'),
-                  trailing: FilledButton.tonal(onPressed: () async {
-                    await _trackCreateEvent('create_draft_resumed', {'videoId': video.videoId});
-                    await _openEditor(video: video);
-                  }, child: const Text('Resume')),
-                ),
-              ),
-            ),
+        _section('Resume Drafts', drafts, empty: 'No drafts right now.'),
+        const SizedBox(height: 10),
+        _section('Processing', processing, empty: 'No uploads processing.'),
+        const SizedBox(height: 10),
+        _section('Needs Attention', needsAttention, empty: 'No failed uploads or blocked videos.'),
+        const SizedBox(height: 10),
+        _section('Ready to Publish', ready, empty: 'Nothing publishable yet.'),
       ],
     );
   }
 
-  Widget _buildLifecycleSection(List<StudioVideo> items) {
-    final lifecycle = items.where((item) => _lifecycleStatuses.contains(item.status)).toList(growable: false);
-    if (lifecycle.isEmpty) return const SizedBox.shrink();
+  Widget _section(String title, List<StudioVideo> videos, {required String empty}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Uploads & Processing', style: Theme.of(context).textTheme.titleMedium),
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-        ...lifecycle.take(5).map(
-              (video) => Card(
-                child: ListTile(
-                  title: Text(video.title),
-                  subtitle: Text('${video.placeName} • ${video.status.name.replaceAll('_', ' ')}'),
-                  trailing: video.status == StudioVideoStatus.failed
-                      ? FilledButton.tonal(onPressed: () async {
-                          await _trackCreateEvent('create_failed_upload_retry_tapped', {'videoId': video.videoId});
-                          await _startFlow(CreateFlowSource.upload, existing: video);
-                        }, child: const Text('Retry'))
-                      : const Icon(Icons.chevron_right),
-                ),
-              ),
-            ),
+        if (videos.isEmpty)
+          Card(child: ListTile(title: Text(empty)))
+        else
+          ...videos.take(5).map(_videoCard),
       ],
+    );
+  }
+
+  Widget _videoCard(StudioVideo video) {
+    return Card(
+      child: ListTile(
+        title: Text(video.title),
+        subtitle: Text('${video.placeName} • ${video.statusLabel ?? video.status.name}'),
+        onTap: () async => _openEditor(source: CreateFlowSource.draft, video: video),
+        trailing: Wrap(
+          spacing: 6,
+          children: [
+            if (video.isRetryable)
+              FilledButton.tonal(
+                onPressed: () => _retry(video),
+                child: const Text('Retry'),
+              ),
+            if (video.publishReady && video.section != StudioSection.published)
+              FilledButton(
+                onPressed: () => _publish(video),
+                child: const Text('Publish'),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -478,8 +450,8 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
               spacing: 8,
               runSpacing: 8,
               children: [
-                ActionChip(label: const Text('Open Studio'), avatar: const Icon(Icons.grid_view_rounded, size: 18), onPressed: () => _openStudio(StudioSection.drafts)),
                 ActionChip(label: const Text('Drafts'), avatar: const Icon(Icons.description_rounded, size: 18), onPressed: () => _openStudio(StudioSection.drafts)),
+                ActionChip(label: const Text('Processing'), avatar: const Icon(Icons.sync_rounded, size: 18), onPressed: () => _openStudio(StudioSection.processing)),
                 ActionChip(label: const Text('Needs Attention'), avatar: const Icon(Icons.error_outline_rounded, size: 18), onPressed: () => _openStudio(StudioSection.needsAttention)),
                 ActionChip(label: const Text('Published'), avatar: const Icon(Icons.public_rounded, size: 18), onPressed: () => _openStudio(StudioSection.published)),
                 ActionChip(label: const Text('Analytics'), avatar: const Icon(Icons.query_stats_rounded, size: 18), onPressed: () => _openAnalytics(analytics.valueOrNull)),
@@ -491,55 +463,49 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
     );
   }
 
-  Widget _buildGuidanceAndInsights(AsyncValue<StudioAnalyticsOverview> analytics) {
-    final data = analytics.valueOrNull;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('What works best on Perbug', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            const Text('• Keep reviews around 15-45 seconds.\n• Show the place clearly in the first 3 seconds.\n• Tag the correct canonical place before publishing.'),
-            if (data != null) ...[
-              const SizedBox(height: 10),
-              Text('You have ${data.totalVideosPublished} published videos and ${data.totalViews} total views.', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ],
-        ),
-      ),
-    );
+  Future<void> _retry(StudioVideo video) async {
+    final repo = await ref.read(videoRepositoryProvider.future);
+    await _trackCreateEvent('create_retry_tapped', {'videoId': video.videoId});
+    if (video.uploadProgressState == UploadProgressState.failed || video.status == StudioVideoStatus.failed) {
+      await repo.retryUpload(videoId: video.videoId);
+    } else {
+      await repo.retryProcessing(videoId: video.videoId);
+    }
+    await _refresh();
+  }
+
+  Future<void> _publish(StudioVideo video) async {
+    final repo = await ref.read(videoRepositoryProvider.future);
+    await _trackCreateEvent('create_publish_tapped', {'videoId': video.videoId});
+    await repo.publish(videoId: video.videoId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Published successfully.')));
+    await _refresh();
   }
 
   Future<void> _refresh() async {
     ref.invalidate(studioVideosProvider(null));
     ref.invalidate(studioAnalyticsProvider);
-    await Future.wait([
-      ref.read(studioVideosProvider(null).future),
-      ref.read(studioAnalyticsProvider.future),
-    ]);
+    await Future.wait([ref.read(studioVideosProvider(null).future), ref.read(studioAnalyticsProvider.future)]);
   }
 
   Future<void> _startFlow(CreateFlowSource source, {StudioVideo? existing}) async {
     await _trackCreateEvent('create_${source.name}_tapped');
     if (source == CreateFlowSource.record) {
       final status = await Permission.camera.request();
-      if (!mounted) return;
-      if (!status.isGranted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Camera permission is required to record.')));
+      if (!mounted || !status.isGranted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Camera permission is required for recording flow.')));
         return;
       }
     }
-    if (source == CreateFlowSource.upload) {
+    if (source == CreateFlowSource.upload || source == CreateFlowSource.record) {
       final status = await Permission.photos.request();
-      if (!mounted) return;
-      if (!status.isGranted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gallery permission is required to upload.')));
+      if (!mounted || !status.isGranted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photos permission is required to attach video.')));
         return;
       }
     }
-    _openEditor(source: source, video: existing);
+    await _openEditor(source: source, video: existing);
   }
 
   Future<void> _openEditor({CreateFlowSource source = CreateFlowSource.draft, StudioVideo? video}) async {
@@ -554,12 +520,11 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
   }
 
   void _openStudio(StudioSection section) {
-    _trackCreateEvent('create_studio_shortcut_tapped', {'section': section.name});
+    _trackCreateEvent('create_studio_shortcut_opened', {'section': section.name});
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _StudioSectionPage(section: section)));
   }
 
   void _openAnalytics(StudioAnalyticsOverview? analytics) {
-    _trackCreateEvent('create_analytics_shortcut_tapped');
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -567,18 +532,14 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
         padding: const EdgeInsets.all(16),
         child: analytics == null
             ? const Text('Analytics unavailable right now.')
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Creator analytics', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 8),
-                  Text('Published videos: ${analytics.totalVideosPublished}'),
-                  Text('Total views: ${analytics.totalViews}'),
-                  const SizedBox(height: 8),
-                  Text('Needs attention: ${analytics.statusCounts['needsAttention'] ?? 0}'),
-                ],
-              ),
+            : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Creator analytics', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text('Published videos: ${analytics.totalVideosPublished}'),
+                Text('Total views: ${analytics.totalViews}'),
+                const SizedBox(height: 8),
+                Text('Needs attention: ${analytics.statusCounts['needsAttention'] ?? 0}'),
+              ]),
       ),
     );
   }
@@ -588,10 +549,7 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
     final dispatcher = ref.read(telemetryDispatcherProvider);
     if (telemetryRepository == null || dispatcher == null) return;
     try {
-      await telemetryRepository.enqueueEvent(
-        'create',
-        TelemetryEventInput.fromJson({'event': event, 'source': 'create_tab', ...payload}),
-      );
+      await telemetryRepository.enqueueEvent('create', TelemetryEventInput.fromJson({'event': event, 'source': 'create_tab', ...payload}));
       await dispatcher.notifyEventQueued('create');
     } catch (_) {}
   }
@@ -615,16 +573,7 @@ class _ActionCard extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon),
-              const SizedBox(height: 8),
-              Text(title, style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 4),
-              Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon), const SizedBox(height: 8), Text(title, style: Theme.of(context).textTheme.titleSmall), const SizedBox(height: 4), Text(subtitle, style: Theme.of(context).textTheme.bodySmall)]),
         ),
       ),
     );
@@ -643,7 +592,7 @@ class _DraftEditorSheet extends ConsumerStatefulWidget {
 
 class _DraftEditorSheetState extends ConsumerState<_DraftEditorSheet> {
   late final TextEditingController _titleController;
-  final _captionController = TextEditingController();
+  late final TextEditingController _captionController;
   final _placeSearchController = TextEditingController();
   PlaceSearchResult? _selectedPlace;
   int _rating = 4;
@@ -653,7 +602,11 @@ class _DraftEditorSheetState extends ConsumerState<_DraftEditorSheet> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.video?.title ?? '');
+    _captionController = TextEditingController(text: widget.video?.caption ?? '');
     _placeSearchController.text = widget.video?.placeName ?? '';
+    if ((widget.video?.placeId ?? '').isNotEmpty && (widget.video?.placeName ?? '').isNotEmpty) {
+      _selectedPlace = PlaceSearchResult(placeId: widget.video!.placeId, name: widget.video!.placeName, category: 'Place', regionLabel: '');
+    }
   }
 
   @override
@@ -669,6 +622,7 @@ class _DraftEditorSheetState extends ConsumerState<_DraftEditorSheet> {
     final query = _placeSearchController.text.trim();
     final placeResults = ref.watch(placeSearchProvider((query: query, scope: FeedScope.local)));
     final canSave = _selectedPlace != null && _titleController.text.trim().isNotEmpty && !_saving;
+    final canPublish = canSave && widget.source != CreateFlowSource.record && widget.source != CreateFlowSource.upload;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(left: 16, right: 16, bottom: MediaQuery.of(context).viewInsets.bottom + 16, top: 10),
@@ -677,24 +631,13 @@ class _DraftEditorSheetState extends ConsumerState<_DraftEditorSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Review draft editor', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Text(widget.source == CreateFlowSource.record
-                  ? 'Recorded video attached. Finish metadata and tag a place.'
-                  : widget.source == CreateFlowSource.upload
-                      ? 'Uploaded video attached. Finish metadata and tag a place.'
-                      : 'Create your draft, then attach media and publish.'),
+              Text(widget.video == null ? 'New review draft' : 'Edit review draft', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 12),
               TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title'), onChanged: (_) => setState(() {})),
               const SizedBox(height: 8),
               TextField(controller: _captionController, decoration: const InputDecoration(labelText: 'Caption'), minLines: 2, maxLines: 4),
               const SizedBox(height: 8),
-              TextField(
-                key: const Key('place-search-field'),
-                controller: _placeSearchController,
-                decoration: const InputDecoration(labelText: 'Tag canonical place', hintText: 'Search places'),
-                onChanged: (_) => setState(() {}),
-              ),
+              TextField(key: const Key('place-search-field'), controller: _placeSearchController, decoration: const InputDecoration(labelText: 'Tag canonical place', hintText: 'Search places'), onChanged: (_) => setState(() {})),
               const SizedBox(height: 8),
               placeResults.when(
                 data: (items) => items.isEmpty
@@ -715,6 +658,7 @@ class _DraftEditorSheetState extends ConsumerState<_DraftEditorSheet> {
                                   _selectedPlace = place;
                                   _placeSearchController.text = place.name;
                                 });
+                                _trackCreateEvent('place_tagging_completed', {'placeId': place.placeId});
                               },
                             );
                           },
@@ -724,28 +668,18 @@ class _DraftEditorSheetState extends ConsumerState<_DraftEditorSheet> {
                 error: (_, __) => const Text('Place search unavailable.'),
               ),
               const SizedBox(height: 8),
-              DropdownButtonFormField<int>(
-                value: _rating,
-                items: [1, 2, 3, 4, 5].map((v) => DropdownMenuItem(value: v, child: Text('$v stars'))).toList(growable: false),
-                onChanged: (value) => setState(() => _rating = value ?? 4),
-                decoration: const InputDecoration(labelText: 'Rating / verdict'),
-              ),
+              DropdownButtonFormField<int>(value: _rating, items: [1, 2, 3, 4, 5].map((v) => DropdownMenuItem(value: v, child: Text('$v stars'))).toList(growable: false), onChanged: (value) => setState(() => _rating = value ?? 4), decoration: const InputDecoration(labelText: 'Rating / verdict')),
               const SizedBox(height: 12),
+              if (widget.video != null && !widget.video!.publishReady && widget.video!.publishMissing.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text('Not publishable yet: ${widget.video!.publishMissing.join(', ')}'),
+                ),
               Row(
                 children: [
-                  Expanded(
-                    child: FilledButton.tonal(
-                      onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Save as draft'),
-                    ),
-                  ),
+                  Expanded(child: FilledButton.tonal(onPressed: canSave ? _saveDraft : null, child: _saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Save draft'))),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: canSave ? _saveAndPublish : null,
-                      child: _saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Publish'),
-                    ),
-                  ),
+                  Expanded(child: FilledButton(onPressed: canPublish ? _publishNow : null, child: const Text('Publish now'))),
                 ],
               ),
             ],
@@ -755,35 +689,71 @@ class _DraftEditorSheetState extends ConsumerState<_DraftEditorSheet> {
     );
   }
 
-  Future<void> _saveAndPublish() async {
-    await _trackCreateEvent('create_publish_cta_tapped');
+  Future<String?> _saveDraft({bool closeOnSuccess = true}) async {
+    await _trackCreateEvent('new_draft_created', {'mode': widget.video == null ? 'create' : 'update'});
     setState(() => _saving = true);
     final repo = await ref.read(videoRepositoryProvider.future);
-    await repo.submitDraft(
-      source: widget.source.name,
-      placeId: _selectedPlace?.placeId ?? '',
-      title: _titleController.text.trim(),
-      caption: _captionController.text.trim(),
-      rating: _rating,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Draft submitted for upload and publish.')));
-    Navigator.of(context).pop();
+    final place = _selectedPlace;
+    if (place == null) {
+      setState(() => _saving = false);
+      return null;
+    }
+    try {
+      StudioVideo? created;
+      if (widget.video == null) {
+        created = await repo.createDraft(placeId: place.placeId, title: _titleController.text.trim(), caption: _captionController.text.trim(), rating: _rating);
+        if (created != null && widget.source != CreateFlowSource.draft) {
+          await repo.attachMediaFromFlow(videoId: created.videoId, source: widget.source.name);
+        }
+      } else {
+        await repo.updateDraft(videoId: widget.video!.videoId, placeId: place.placeId, title: _titleController.text.trim(), caption: _captionController.text.trim(), rating: _rating);
+        if (widget.source != CreateFlowSource.draft) {
+          await repo.attachMediaFromFlow(videoId: widget.video!.videoId, source: widget.source.name);
+        }
+      }
+      if (!mounted) return null;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Draft saved.')));
+      if (closeOnSuccess) Navigator.of(context).pop();
+      return created?.videoId ?? widget.video?.videoId;
+    } catch (err) {
+      if (!mounted) return null;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Draft save failed: $err')));
+      return null;
+    }
   }
+
+  Future<void> _publishNow() async {
+    await _trackCreateEvent('publish_tapped');
+    final videoId = await _saveDraft(closeOnSuccess: false);
+    if (!mounted || videoId == null) return;
+    final repo = await ref.read(videoRepositoryProvider.future);
+    try {
+      await repo.publish(videoId: videoId);
+      if (!mounted) return;
+      await _trackCreateEvent('publish_succeeded', {'videoId': videoId});
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Published successfully.')));
+      Navigator.of(context).pop();
+    } catch (err) {
+      if (!mounted) return;
+      await _trackCreateEvent('publish_failed', {'videoId': videoId});
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Publish failed: $err')));
+    }
+  }
+
 
   Future<void> _trackCreateEvent(String event, [Map<String, Object?> payload = const {}]) async {
     final telemetryRepository = ref.read(telemetryRepositoryProvider).valueOrNull;
     final dispatcher = ref.read(telemetryDispatcherProvider);
     if (telemetryRepository == null || dispatcher == null) return;
     try {
-      await telemetryRepository.enqueueEvent(
-        'create',
-        TelemetryEventInput.fromJson({'event': event, 'source': 'create_editor', ...payload}),
-      );
+      await telemetryRepository.enqueueEvent('create', TelemetryEventInput.fromJson({'event': event, 'source': 'create_editor', ...payload}));
       await dispatcher.notifyEventQueued('create');
     } catch (_) {}
   }
 }
+
 
 class _StudioSectionPage extends ConsumerWidget {
   const _StudioSectionPage({required this.section});
@@ -800,10 +770,31 @@ class _StudioSectionPage extends ConsumerWidget {
             ? const Center(child: Text('No items in this section yet.'))
             : ListView.builder(
                 itemCount: items.length,
-                itemBuilder: (_, index) => ListTile(
-                  title: Text(items[index].title),
-                  subtitle: Text('${items[index].placeName} • ${items[index].status.name}'),
-                ),
+                itemBuilder: (_, index) {
+                  final video = items[index];
+                  return Card(
+                    child: ListTile(
+                      title: Text(video.title),
+                      subtitle: Text('${video.placeName} • ${video.statusLabel ?? video.status.name}'),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (value) async {
+                          final repo = await ref.read(videoRepositoryProvider.future);
+                          if (value == 'publish') await repo.publish(videoId: video.videoId);
+                          if (value == 'retry_upload') await repo.retryUpload(videoId: video.videoId);
+                          if (value == 'retry_processing') await repo.retryProcessing(videoId: video.videoId);
+                          if (value == 'archive') await repo.archiveVideo(videoId: video.videoId);
+                          ref.invalidate(studioVideosProvider(section));
+                        },
+                        itemBuilder: (_) => [
+                          if (video.publishReady && section != StudioSection.published) const PopupMenuItem(value: 'publish', child: Text('Publish')),
+                          if (video.uploadProgressState == UploadProgressState.failed) const PopupMenuItem(value: 'retry_upload', child: Text('Retry upload')),
+                          if (video.processingProgressState == ProcessingProgressState.failed) const PopupMenuItem(value: 'retry_processing', child: Text('Retry processing')),
+                          const PopupMenuItem(value: 'archive', child: Text('Archive')),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
         error: (_, __) => const Center(child: Text('Unable to load studio section.')),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -880,8 +871,9 @@ class _ProfileStudioTabState extends ConsumerState<_ProfileStudioTab> with Autom
                       child: ListTile(
                         leading: const CircleAvatar(child: Icon(Icons.play_arrow_rounded)),
                         title: Text(video.title),
-                        subtitle: Text('${video.placeName} • ${video.status.name}'),
+                        subtitle: Text('${video.placeName} • ${video.statusLabel ?? video.status.name}'),
                         trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _StudioSectionPage(section: _section))),
                       ),
                     ),
                   )
