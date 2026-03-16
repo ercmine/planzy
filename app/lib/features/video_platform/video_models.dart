@@ -4,6 +4,10 @@ enum StudioVideoStatus { draft, awaiting_upload, uploaded, processing, published
 
 enum StudioSection { drafts, processing, published, needsAttention, archived }
 
+enum UploadProgressState { not_started, in_progress, completed, failed }
+
+enum ProcessingProgressState { not_started, queued, in_progress, completed, failed }
+
 class PlaceSearchResult {
   const PlaceSearchResult({
     required this.placeId,
@@ -133,6 +137,17 @@ class StudioVideo {
     required this.title,
     required this.status,
     required this.section,
+    required this.updatedAt,
+    this.caption,
+    this.statusLabel,
+    this.failureReason,
+    this.thumbnailUrl,
+    this.isRetryable = false,
+    this.uploadProgressState = UploadProgressState.not_started,
+    this.processingProgressState = ProcessingProgressState.not_started,
+    this.publishReady = false,
+    this.publishMissing = const [],
+    this.publishedAt,
     this.moderationState,
     this.moderationReason,
   });
@@ -141,17 +156,36 @@ class StudioVideo {
   final String placeId;
   final String placeName;
   final String title;
+  final String? caption;
   final StudioVideoStatus status;
   final StudioSection section;
+  final String? statusLabel;
+  final String? failureReason;
+  final String? thumbnailUrl;
+  final bool isRetryable;
+  final UploadProgressState uploadProgressState;
+  final ProcessingProgressState processingProgressState;
+  final bool publishReady;
+  final List<String> publishMissing;
+  final String updatedAt;
+  final String? publishedAt;
   final String? moderationState;
   final String? moderationReason;
 
   factory StudioVideo.fromJson(Map<String, dynamic> json) {
     final raw = (json['status'] ?? 'draft').toString();
-    final status = StudioVideoStatus.values.firstWhere(
-      (item) => item.name == raw,
-      orElse: () => StudioVideoStatus.draft,
-    );
+    final status = switch (raw) {
+      'draft' => StudioVideoStatus.draft,
+      'awaiting_upload' => StudioVideoStatus.awaiting_upload,
+      'uploading' || 'upload_received' => StudioVideoStatus.uploaded,
+      'processing_queued' || 'processing' || 'processed' || 'moderation_pending' || 'publish_pending' => StudioVideoStatus.processing,
+      'published' => StudioVideoStatus.published,
+      'failed_upload' || 'failed_processing' => StudioVideoStatus.failed,
+      'hidden' => StudioVideoStatus.hidden,
+      'rejected' => StudioVideoStatus.rejected,
+      'archived' => StudioVideoStatus.archived,
+      _ => StudioVideoStatus.draft,
+    };
     final rawSection = (json['section'] ?? 'drafts').toString();
     final section = switch (rawSection) {
       'processing' => StudioSection.processing,
@@ -165,11 +199,43 @@ class StudioVideo {
       placeId: (json['placeId'] ?? '').toString(),
       placeName: (json['placeName'] ?? json['placeId'] ?? '').toString(),
       title: (json['title'] ?? json['caption'] ?? 'Untitled draft').toString(),
+      caption: json['caption']?.toString(),
       status: status,
       section: section,
+      statusLabel: json['statusLabel']?.toString(),
+      failureReason: json['failureReason']?.toString(),
+      thumbnailUrl: json['thumbnailUrl']?.toString(),
+      isRetryable: json['isRetryable'] == true,
+      uploadProgressState: _uploadProgressFromRaw((json['uploadProgressState'] ?? 'not_started').toString()),
+      processingProgressState: _processingProgressFromRaw((json['processingProgressState'] ?? 'not_started').toString()),
+      publishReady: json['publishReadiness'] is Map && (json['publishReadiness'] as Map)['ready'] == true,
+      publishMissing: json['publishReadiness'] is Map && (json['publishReadiness'] as Map)['missing'] is List
+          ? ((json['publishReadiness'] as Map)['missing'] as List).map((item) => item.toString()).toList(growable: false)
+          : const [],
+      updatedAt: (json['updatedAt'] ?? '').toString(),
+      publishedAt: json['publishedAt']?.toString(),
       moderationState: json['moderationState']?.toString(),
       moderationReason: json['moderationReason']?.toString(),
     );
+  }
+
+  static UploadProgressState _uploadProgressFromRaw(String raw) {
+    return switch (raw) {
+      'in_progress' => UploadProgressState.in_progress,
+      'completed' => UploadProgressState.completed,
+      'failed' => UploadProgressState.failed,
+      _ => UploadProgressState.not_started,
+    };
+  }
+
+  static ProcessingProgressState _processingProgressFromRaw(String raw) {
+    return switch (raw) {
+      'queued' => ProcessingProgressState.queued,
+      'in_progress' => ProcessingProgressState.in_progress,
+      'completed' => ProcessingProgressState.completed,
+      'failed' => ProcessingProgressState.failed,
+      _ => ProcessingProgressState.not_started,
+    };
   }
 }
 
