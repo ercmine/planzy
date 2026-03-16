@@ -32,23 +32,31 @@ void main() {
     ),
   ];
 
+  List<Override> baseOverrides({
+    List<StudioVideo> studioItems = const [],
+    List<PlaceSearchResult> placeResults = const [],
+  }) {
+    return [
+      videoFeedProvider(FeedScope.local).overrideWith((ref) async => localItems),
+      videoFeedProvider(FeedScope.regional).overrideWith((ref) async => [localItems.first.copyWith(scope: FeedScope.regional, caption: 'Regional favorite')]),
+      videoFeedProvider(FeedScope.global).overrideWith((ref) async => [localItems.first.copyWith(scope: FeedScope.global, caption: 'Global highlight')]),
+      placeSearchProvider((query: '', scope: FeedScope.local)).overrideWith((ref) async => const []),
+      placeSearchProvider((query: 'Cafe', scope: FeedScope.local)).overrideWith((ref) async => placeResults),
+      placeSearchProvider((query: 'cafe', scope: FeedScope.local)).overrideWith((ref) async => placeResults),
+      studioVideosProvider.overrideWith((ref) async => studioItems),
+      studioAnalyticsProvider.overrideWith(
+        (ref) async => const StudioAnalyticsOverview(
+          totalVideosPublished: 12,
+          totalViews: 3456,
+          statusCounts: {'drafts': 2, 'needsAttention': 1},
+          topPlaces: [],
+        ),
+      ),
+    ];
+  }
+
   testWidgets('Feed tab switches Local/Regional/Global with real provider scopes', (tester) async {
-    await tester.pumpWidget(
-      buildApp([
-        videoFeedProvider(FeedScope.local).overrideWith((ref) async => localItems),
-        videoFeedProvider(FeedScope.regional).overrideWith((ref) async => [
-              localItems.first.copyWith(scope: FeedScope.regional, caption: 'Regional favorite'),
-            ]),
-        videoFeedProvider(FeedScope.global).overrideWith((ref) async => [
-              localItems.first.copyWith(scope: FeedScope.global, caption: 'Global highlight'),
-            ]),
-        placeSearchProvider((query: '', scope: FeedScope.local)).overrideWith((ref) async => const []),
-        placeSearchProvider((query: 'Cafe', scope: FeedScope.local)).overrideWith((ref) async => const [
-              PlaceSearchResult(placeId: 'place_123', name: 'Cafe Orbit', category: 'Cafe', regionLabel: 'Downtown'),
-            ]),
-        studioVideosProvider.overrideWith((ref) async => const []),
-      ]),
-    );
+    await tester.pumpWidget(buildApp(baseOverrides()));
     await tester.pumpAndSettle();
 
     expect(find.text('Best espresso near station'), findsOneWidget);
@@ -62,88 +70,99 @@ void main() {
     expect(find.text('Global highlight'), findsOneWidget);
   });
 
-  testWidgets('Create flow requires canonical place selection before save', (tester) async {
+  testWidgets('Create tab shows polished empty state for new creators', (tester) async {
+    await tester.pumpWidget(buildApp(baseOverrides()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Creator Hub'), findsOneWidget);
+    expect(find.text('Record Video'), findsOneWidget);
+    expect(find.text('Upload Video'), findsOneWidget);
+    expect(find.text('New Draft'), findsOneWidget);
+    expect(find.text('Create your first place review'), findsOneWidget);
+  });
+
+  testWidgets('Create flow enforces canonical place tagging before publish', (tester) async {
     await tester.pumpWidget(
-      buildApp([
-        videoFeedProvider(FeedScope.local).overrideWith((ref) async => localItems),
-        videoFeedProvider(FeedScope.regional).overrideWith((ref) async => const []),
-        videoFeedProvider(FeedScope.global).overrideWith((ref) async => const []),
-        placeSearchProvider((query: '', scope: FeedScope.local)).overrideWith((ref) async => const []),
-        placeSearchProvider((query: 'Cafe', scope: FeedScope.local)).overrideWith((ref) async => const [
-              PlaceSearchResult(placeId: 'place_123', name: 'Cafe Orbit', category: 'Cafe', regionLabel: 'Downtown'),
-            ]),
-        studioVideosProvider.overrideWith((ref) async => const []),
-      ]),
+      buildApp(
+        baseOverrides(
+          placeResults: const [
+            PlaceSearchResult(placeId: 'place_123', name: 'Cafe Orbit', category: 'Cafe', regionLabel: 'Downtown'),
+          ],
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Open Recorder'), findsOneWidget);
-    await tester.tap(find.text('Upload from device'));
+    await tester.tap(find.text('New Draft'));
     await tester.pumpAndSettle();
-    expect(find.text('Open Media Picker'), findsOneWidget);
 
-    final saveButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save Draft'));
-    expect(saveButton.onPressed, isNull);
+    final publishButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publish'));
+    expect(publishButton.onPressed, isNull);
 
+    await tester.enterText(find.byType(TextField).first, 'Orbit review');
     await tester.enterText(find.byKey(const Key('place-search-field')), 'Cafe');
-    await tester.pump(const Duration(milliseconds: 260));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cafe Orbit').first);
     await tester.pumpAndSettle();
 
-    final enabledSaveButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save Draft'));
-    expect(enabledSaveButton.onPressed, isNotNull);
+    final enabledPublishButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publish'));
+    expect(enabledPublishButton.onPressed, isNotNull);
   });
 
-  testWidgets('Search tab renders advanced place search results', (tester) async {
+  testWidgets('Create tab renders drafts and needs-attention upload states', (tester) async {
     await tester.pumpWidget(
-      buildApp([
-        videoFeedProvider(FeedScope.local).overrideWith((ref) async => localItems),
-        videoFeedProvider(FeedScope.regional).overrideWith((ref) async => const []),
-        videoFeedProvider(FeedScope.global).overrideWith((ref) async => const []),
-        placeSearchProvider((query: 'cafe', scope: FeedScope.local)).overrideWith((ref) async => const [
-              PlaceSearchResult(placeId: 'p1', name: 'Cafe Orbit', category: 'Cafe', regionLabel: 'Downtown', distanceKm: 1.2),
-            ]),
-        placeSearchProvider((query: 'c', scope: FeedScope.local)).overrideWith((ref) async => const []),
-        placeSearchProvider((query: 'ca', scope: FeedScope.local)).overrideWith((ref) async => const []),
-        placeSearchProvider((query: 'caf', scope: FeedScope.local)).overrideWith((ref) async => const []),
-        studioVideosProvider.overrideWith((ref) async => const []),
-      ]),
+      buildApp(
+        baseOverrides(
+          studioItems: const [
+            StudioVideo(
+              videoId: 'draft_1',
+              placeId: 'p1',
+              placeName: 'Cafe Orbit',
+              title: 'Lunch draft',
+              status: StudioVideoStatus.draft,
+              section: StudioSection.drafts,
+            ),
+            StudioVideo(
+              videoId: 'failed_1',
+              placeId: 'p2',
+              placeName: 'Noodle Spot',
+              title: 'Noodle upload',
+              status: StudioVideoStatus.failed,
+              section: StudioSection.needsAttention,
+            ),
+          ],
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Search'));
+    await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).first, 'cafe');
-    await tester.pumpAndSettle();
-    expect(find.text('Cafe Orbit'), findsOneWidget);
+
+    expect(find.text('Resume Drafts'), findsOneWidget);
+    expect(find.text('Lunch draft'), findsOneWidget);
+    expect(find.text('Uploads & Processing'), findsOneWidget);
+    expect(find.text('Noodle upload'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
   });
 
-  testWidgets('Studio tab renders creator videos and statuses', (tester) async {
-    await tester.pumpWidget(
-      buildApp([
-        videoFeedProvider(FeedScope.local).overrideWith((ref) async => localItems),
-        videoFeedProvider(FeedScope.regional).overrideWith((ref) async => const []),
-        videoFeedProvider(FeedScope.global).overrideWith((ref) async => const []),
-        placeSearchProvider((query: '', scope: FeedScope.local)).overrideWith((ref) async => const []),
-        placeSearchProvider((query: 'Cafe', scope: FeedScope.local)).overrideWith((ref) async => const [
-              PlaceSearchResult(placeId: 'place_123', name: 'Cafe Orbit', category: 'Cafe', regionLabel: 'Downtown'),
-            ]),
-        studioVideosProvider.overrideWith((ref) async => const [
-              StudioVideo(videoId: 'v2', placeId: 'p1', placeName: 'Cafe Orbit', title: 'Cafe Orbit review', status: StudioVideoStatus.processing),
-            ]),
-      ]),
-    );
+  testWidgets('Create tab shortcut opens studio section page', (tester) async {
+    await tester.pumpWidget(buildApp(baseOverrides()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Studio'));
+    await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Cafe Orbit review'), findsOneWidget);
-    expect(find.textContaining('processing'), findsOneWidget);
+    await tester.tap(find.text('Published'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('published videos'), findsOneWidget);
   });
 
   testWidgets('Place detail page shows place-linked video section', (tester) async {
