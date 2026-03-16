@@ -165,7 +165,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
           child: Row(
             children: [
               Expanded(
@@ -176,7 +176,10 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                 ),
               ),
               const SizedBox(width: 8),
-              IconButton(onPressed: () => controller.searchThisArea(mode: 'nearby'), icon: const Icon(Icons.my_location)),
+              IconButton.filledTonal(
+                onPressed: () => controller.searchThisArea(mode: 'nearby'),
+                icon: const Icon(Icons.my_location),
+              ),
             ],
           ),
         ),
@@ -186,131 +189,98 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             children: _categories
-                .map((category) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(category),
-                        selected: state.categories.contains(category),
-                        onSelected: (_) => controller.toggleCategory(category),
-                      ),
-                    ))
+                .map(
+                  (category) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip.elevated(
+                      label: Text(category),
+                      selected: state.categories.contains(category),
+                      onSelected: (_) => controller.toggleCategory(category),
+                    ),
+                  ),
+                )
                 .toList(growable: false),
           ),
         ),
+        const SizedBox(height: 12),
         Expanded(
           child: Stack(
             children: [
-              GestureDetector(
-                onPanUpdate: (details) => controller.pan(-details.delta.dy * 0.00012, details.delta.dx * 0.00012),
-                onDoubleTap: () => controller.zoom(1),
-                child: Container(
-                  margin: const EdgeInsets.all(12),
+              Positioned.fill(
+                child: DecoratedBox(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    gradient: const LinearGradient(colors: [Color(0xFF1D2A44), Color(0xFF2A4E8A)]),
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFF1F2A4F), Color(0xFF0A1026)],
+                    ),
+                    border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.35)),
                   ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return Stack(
-                        children: [
-                          for (final place in state.places)
-                            Positioned(
-                              left: ((place.longitude - state.west) / (state.east - state.west) * constraints.maxWidth).clamp(8, constraints.maxWidth - 40),
-                              top: ((state.north - place.latitude) / (state.north - state.south) * constraints.maxHeight).clamp(8, constraints.maxHeight - 40),
-                              child: GestureDetector(
-                                onTap: () => controller.selectPlace(place.placeId),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: state.selectedPlaceId == place.placeId ? Colors.orange : Colors.white,
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(place.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
-                                ),
-                              ),
-                            ),
-                          if (state.loading) const Center(child: CircularProgressIndicator()),
-                        ],
-                      );
-                    },
+                  child: Center(
+                    child: Text(
+                      'Map Preview\n${state.centerLat.toStringAsFixed(3)}, ${state.centerLng.toStringAsFixed(3)}\nZoom ${state.zoom.toStringAsFixed(1)}',
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ),
               ),
+              if (state.loading) const Positioned(top: 12, left: 12, right: 12, child: LinearProgressIndicator()),
               Positioned(
-                top: 22,
-                right: 20,
+                right: 16,
+                bottom: 16,
                 child: Column(
                   children: [
-                    FloatingActionButton.small(heroTag: 'zoom-in', onPressed: () => controller.zoom(1), child: const Icon(Icons.add)),
+                    FloatingActionButton.small(
+                      heroTag: 'zoom-in',
+                      onPressed: () => controller.zoom(1),
+                      child: const Icon(Icons.add),
+                    ),
                     const SizedBox(height: 8),
-                    FloatingActionButton.small(heroTag: 'zoom-out', onPressed: () => controller.zoom(-1), child: const Icon(Icons.remove)),
+                    FloatingActionButton.small(
+                      heroTag: 'zoom-out',
+                      onPressed: () => controller.zoom(-1),
+                      child: const Icon(Icons.remove),
+                    ),
                   ],
                 ),
               ),
-              if (state.pendingViewportSearch)
-                Positioned(
-                  top: 22,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: FilledButton.icon(
-                      onPressed: () => controller.searchThisArea(),
-                      icon: const Icon(Icons.travel_explore),
-                      label: const Text('Search this area'),
-                    ),
-                  ),
-                ),
-              if (selected != null)
-                Positioned(
-                  bottom: 18,
-                  left: 18,
-                  right: 18,
-                  child: Card(
-                    child: Builder(
-                      builder: (context) {
-                        final place = selected;
-                        if (place == null) return const SizedBox.shrink();
-                        return ListTile(
-                          leading: const Icon(Icons.place),
-                          title: Text(place.name),
-                          subtitle: Text('${place.category} • ${place.city ?? place.region ?? 'Local'}'),
-                          trailing: Text('${((place.distanceMeters ?? 0) / 1000).toStringAsFixed(1)} km'),
-                          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _MapPlaceDetailPage(place: place))),
-                        );
-                      },
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonalIcon(
+            onPressed: state.pendingViewportSearch || state.loading ? null : () => controller.searchThisArea(),
+            icon: const Icon(Icons.travel_explore),
+            label: const Text('Search this area'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 150,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: state.places.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final place = state.places[index];
+              return SizedBox(
+                width: 230,
+                child: Card(
+                  color: selected?.placeId == place.placeId ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.35) : null,
+                  child: ListTile(
+                    onTap: () => controller.selectPlace(place.placeId),
+                    title: Text(place.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text('${place.category} • ${place.city ?? place.region ?? 'Nearby'}\n⭐ ${place.rating.toStringAsFixed(1)}'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ],
-    );
-  }
-}
-
-class _MapPlaceDetailPage extends StatelessWidget {
-  const _MapPlaceDetailPage({required this.place});
-
-  final MapDiscoveryPlace place;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(place.name)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(place.name, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text('${place.category} • ${place.city ?? place.region ?? 'Local area'}'),
-          const SizedBox(height: 12),
-          Text(place.descriptionSnippet ?? 'Creator-reviewed place detail is available from the canonical place profile.'),
-          const SizedBox(height: 18),
-          FilledButton.icon(onPressed: () {}, icon: const Icon(Icons.bookmark_border), label: const Text('Save place')),
-        ],
-      ),
     );
   }
 }

@@ -23,9 +23,9 @@ class PrimaryButton extends StatelessWidget {
       child: FilledButton.icon(
         onPressed: isLoading ? null : onPressed,
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size.fromHeight(54),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
+            borderRadius: BorderRadius.circular(AppRadius.large),
           ),
         ),
         icon: isLoading
@@ -60,9 +60,9 @@ class SecondaryButton extends StatelessWidget {
       child: OutlinedButton.icon(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size.fromHeight(54),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
+            borderRadius: BorderRadius.circular(AppRadius.large),
           ),
         ),
         icon: isLoading
@@ -85,8 +85,14 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.large),
+        color: colorScheme.surfaceContainerLow.withOpacity(0.82),
+        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.45)),
+        boxShadow: AppElevation.card(colorScheme.shadow),
+      ),
       child: Padding(
         padding: padding ?? const EdgeInsets.all(AppSpacing.m),
         child: child,
@@ -113,31 +119,26 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const backgroundGradient = LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        Color(0xFF1E3A8A),
-        Color(0xFF020617),
-      ],
-    );
-
     return Scaffold(
       appBar: appBar,
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: bottomNavigationBar,
       body: DecoratedBox(
-        decoration: const BoxDecoration(gradient: backgroundGradient),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF161B33),
+              Color(0xFF0A0E1F),
+              Color(0xFF070A16),
+            ],
+          ),
+        ),
         child: SafeArea(
-          child: DefaultTextStyle.merge(
-            style: const TextStyle(color: Colors.white),
-            child: IconTheme.merge(
-              data: const IconThemeData(color: Colors.white),
-              child: Padding(
-                padding: padding,
-                child: body,
-              ),
-            ),
+          child: Padding(
+            padding: padding,
+            child: body,
           ),
         ),
       ),
@@ -187,7 +188,7 @@ class AppPill extends StatelessWidget {
     final fg = foregroundColor ?? scheme.onSecondaryContainer;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 7),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -238,23 +239,19 @@ class _PressScale extends StatefulWidget {
 }
 
 class _PressScaleState extends State<_PressScale> {
-  var _down = false;
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) => setState(() => _down = true),
-      onTapUp: (_) => setState(() => _down = false),
-      onTapCancel: () => setState(() => _down = false),
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) => setState(() => _pressed = false),
       child: AnimatedScale(
+        scale: _pressed ? 0.98 : 1,
         duration: AppMotion.quick,
         curve: AppMotion.emphasized,
-        scale: _down ? 0.98 : 1,
-        child: AnimatedOpacity(
-          duration: AppMotion.quick,
-          opacity: _down ? 0.94 : 1,
-          child: widget.child,
-        ),
+        child: widget.child,
       ),
     );
   }

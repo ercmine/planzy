@@ -32,7 +32,6 @@ class AppTheme {
         elevation: AppElevation.flat,
         scrolledUnderElevation: 0,
       ),
-
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
@@ -40,17 +39,16 @@ class AppTheme {
         },
       ),
       chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-        ),
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
+        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.45)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: colorScheme.surface.withOpacity(0.92),
-        indicatorColor: colorScheme.primaryContainer,
+        backgroundColor: colorScheme.surface.withOpacity(0.86),
+        indicatorColor: colorScheme.primaryContainer.withOpacity(0.72),
         elevation: AppElevation.flat,
+        height: 72,
         labelTextStyle: WidgetStatePropertyAll(
-          TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600),
+          TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -58,8 +56,14 @@ class AppTheme {
           elevation: AppElevation.flat,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.sm),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
+            borderRadius: BorderRadius.circular(AppRadius.large),
           ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: colorScheme.outlineVariant),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
@@ -67,7 +71,7 @@ class AppTheme {
         backgroundColor: colorScheme.inverseSurface,
         contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
+          borderRadius: BorderRadius.circular(AppRadius.large),
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
@@ -80,31 +84,28 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: colorScheme.surfaceContainerLow,
-        surfaceTintColor: colorScheme.surfaceTint,
+        surfaceTintColor: Colors.transparent,
         elevation: AppElevation.flat,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.large),
-          side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.6)),
+          side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colorScheme.surfaceContainerLow,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.m,
-          vertical: AppSpacing.sm,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.sm),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
+          borderRadius: BorderRadius.circular(AppRadius.large),
           borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
+          borderRadius: BorderRadius.circular(AppRadius.large),
           borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+          borderRadius: BorderRadius.circular(AppRadius.large),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
         ),
       ),
     );

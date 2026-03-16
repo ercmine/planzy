@@ -35,14 +35,14 @@ class _OnboardingLocationPageState extends ConsumerState<OnboardingLocationPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Set your discovery location', style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
+          Text('Set your discovery city', style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.s),
-          Text('Use your current location or choose a city manually. This powers Local and Regional ranking.', textAlign: TextAlign.center),
+          Text('Pick live location or set a city manually so Local + Regional ranking feels relevant from day one.', textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.l),
           SegmentedButton<bool>(
             segments: const [
-              ButtonSegment(value: true, label: Text('Use current location')),
-              ButtonSegment(value: false, label: Text('Choose city manually')),
+              ButtonSegment(value: true, icon: Icon(Icons.my_location), label: Text('Live location')),
+              ButtonSegment(value: false, icon: Icon(Icons.location_city), label: Text('Manual city')),
             ],
             selected: {useCurrentLocation},
             onSelectionChanged: (v) => ref.read(onboardingControllerProvider.notifier).updateLocationMode(v.first),
@@ -50,9 +50,9 @@ class _OnboardingLocationPageState extends ConsumerState<OnboardingLocationPage>
           const SizedBox(height: AppSpacing.m),
           if (useCurrentLocation)
             PrimaryButton(
-              label: 'Enable location',
+              label: 'Enable location access',
               onPressed: () => ref.read(locationControllerProvider.notifier).requestPermissionAndLoad(),
-              icon: const Icon(Icons.my_location),
+              icon: const Icon(Icons.near_me_rounded),
             )
           else ...[
             TextField(

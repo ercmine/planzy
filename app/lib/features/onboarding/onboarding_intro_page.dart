@@ -16,16 +16,16 @@ class OnboardingIntroPage extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Center(child: PerbugLogo(size: 92, variant: PerbugLogoVariant.withWordmark)),
+          const Center(child: PerbugLogo(size: 96, variant: PerbugLogoVariant.withWordmark)),
           const SizedBox(height: AppSpacing.l),
           Text(
-            'Discover great places, tuned to you.',
+            'Your city, told by creators who actually go.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: AppSpacing.s),
           Text(
-            'Set your city, interests, and discovery style to unlock a personalized Local, Regional, and Global feed.',
+            'Perbug blends local discovery + social momentum so every place feels worth visiting, saving, and sharing.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge,
           ),
@@ -34,15 +34,15 @@ class OnboardingIntroPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                OnboardingBenefit(text: 'Choose your home city or current location.'),
-                OnboardingBenefit(text: 'Pick interests that shape ranking.'),
-                OnboardingBenefit(text: 'Start in Local, Regional, or Global based on your style.'),
+                OnboardingBenefit(text: 'Tune your city and vibe in under a minute.'),
+                OnboardingBenefit(text: 'Get local, regional, and global creator coverage.'),
+                OnboardingBenefit(text: 'Build a profile that makes your reviews look premium.'),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.l),
           PrimaryButton(
-            label: 'Get Started',
+            label: 'Start Discovering',
             onPressed: () => context.go('/onboarding/location'),
             icon: const Icon(Icons.arrow_forward_rounded),
           ),
