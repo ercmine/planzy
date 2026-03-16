@@ -22,13 +22,13 @@ class OnboardingInterestsPage extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'What are you in the mood for?',
+            'Choose your taste profile',
             style: Theme.of(context).textTheme.headlineSmall,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.s),
           Text(
-            'Choose interests to personalize discovery and recommendations.',
+            'This drives what appears first in feed, map previews, and your creator recommendations.',
             style: Theme.of(context).textTheme.bodyMedium,
             textAlign: TextAlign.center,
           ),
@@ -38,11 +38,10 @@ class OnboardingInterestsPage extends ConsumerWidget {
             runSpacing: AppSpacing.s,
             children: Category.values
                 .map(
-                  (category) => FilterChip(
+                  (category) => FilterChip.elevated(
                     label: Text(categoryLabel(category)),
                     selected: selected.contains(category.name),
-                    onSelected: (_) =>
-                        ref.read(onboardingControllerProvider.notifier).toggleCategory(category.name),
+                    onSelected: (_) => ref.read(onboardingControllerProvider.notifier).toggleCategory(category.name),
                   ),
                 )
                 .toList(growable: false),

@@ -1,13 +1,12 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../notifications/notification_center_tab.dart';
-import 'map_discovery_tab.dart';
 import '../notifications/notification_providers.dart';
 import '../video_platform/video_models.dart';
 import '../video_platform/video_providers.dart';
+import 'map_discovery_tab.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -29,6 +28,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _scope = bootstrap.defaultScope;
       _scopeInitialized = true;
     }
+
     final pages = [
       _FeedTab(scope: _scope, onScopeChanged: (scope) => setState(() => _scope = scope)),
       const MapDiscoveryTab(),
@@ -40,21 +40,23 @@ class _HomePageState extends ConsumerState<HomePage> {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Perbug Videos'),
-      ),
-      body: IndexedStack(index: _navIndex, children: pages),
+      appBar: AppBar(title: const Text('Perbug')),
+      body: AnimatedSwitcher(duration: const Duration(milliseconds: 280), child: IndexedStack(key: ValueKey(_navIndex), index: _navIndex, children: pages)),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
         onDestinationSelected: (value) => setState(() => _navIndex = value),
         destinations: [
-          NavigationDestination(icon: Icon(Icons.play_circle_outline), selectedIcon: Icon(Icons.play_circle), label: 'Feed'),
-          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Map'),
-          NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: 'Search'),
-          NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle), label: 'Create'),
-          NavigationDestination(icon: Icon(Icons.bookmark_border), selectedIcon: Icon(Icons.bookmark), label: 'Saved'),
-          NavigationDestination(icon: Badge(isLabelVisible: unreadCount > 0, label: Text(unreadCount > 99 ? '99+' : '$unreadCount'), child: const Icon(Icons.notifications_none)), selectedIcon: const Icon(Icons.notifications), label: 'Alerts'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Studio'),
+          const NavigationDestination(icon: Icon(Icons.play_circle_outline), selectedIcon: Icon(Icons.play_circle), label: 'Feed'),
+          const NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Map'),
+          const NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: 'Search'),
+          const NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle), label: 'Create'),
+          const NavigationDestination(icon: Icon(Icons.bookmark_border), selectedIcon: Icon(Icons.bookmark), label: 'Saved'),
+          NavigationDestination(
+            icon: Badge(isLabelVisible: unreadCount > 0, label: Text(unreadCount > 99 ? '99+' : '$unreadCount'), child: const Icon(Icons.notifications_none)),
+            selectedIcon: const Icon(Icons.notifications),
+            label: 'Alerts',
+          ),
+          const NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Studio'),
         ],
       ),
     );
@@ -71,18 +73,23 @@ class _FeedTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final bootstrap = ref.watch(feedBootstrapProvider);
     final feed = ref.watch(videoFeedProvider(scope));
+
     return Column(
       children: [
         const SizedBox(height: 8),
-        SegmentedButton<FeedScope>(
-          segments: const [
-            ButtonSegment(value: FeedScope.local, label: Text('Local')),
-            ButtonSegment(value: FeedScope.regional, label: Text('Regional')),
-            ButtonSegment(value: FeedScope.global, label: Text('Global')),
-          ],
-          selected: {scope},
-          onSelectionChanged: (value) => onScopeChanged(value.first),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: SegmentedButton<FeedScope>(
+            segments: const [
+              ButtonSegment(value: FeedScope.local, icon: Icon(Icons.place_outlined), label: Text('Local')),
+              ButtonSegment(value: FeedScope.regional, icon: Icon(Icons.public), label: Text('Regional')),
+              ButtonSegment(value: FeedScope.global, icon: Icon(Icons.flight_takeoff), label: Text('Global')),
+            ],
+            selected: {scope},
+            onSelectionChanged: (value) => onScopeChanged(value.first),
+          ),
         ),
+        const SizedBox(height: 8),
         Expanded(
           child: bootstrap.when(
             data: (boot) {
@@ -96,24 +103,10 @@ class _FeedTab extends ConsumerWidget {
                 );
               }
               return ListView.builder(
-                cacheExtent: 800,
+                cacheExtent: 1000,
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
                 itemCount: items.length,
-                itemBuilder: (_, index) {
-                  final item = items[index];
-                  return Card(
-                    margin: const EdgeInsets.all(12),
-                    child: ListTile(
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => PlaceVideoDetailPage(placeId: item.placeId, placeName: item.placeName),
-                        ),
-                      ),
-                      title: Text(item.caption.isEmpty ? item.placeName : item.caption),
-                      subtitle: Text('${item.placeName} • ${item.placeCategory} • ${item.regionLabel}\n${item.creatorHandle}'),
-                      trailing: Chip(label: Text('${item.rating}/5')),
-                    ),
-                  );
-                },
+                itemBuilder: (_, index) => _FeedVideoCard(item: items[index]),
               );
             },
             error: (_, __) => feed.when(
@@ -121,10 +114,7 @@ class _FeedTab extends ConsumerWidget {
                   ? const _FeedEmptyState(title: 'No content yet', body: 'Try another scope or update preferences in settings.')
                   : ListView.builder(
                       itemCount: items.length,
-                      itemBuilder: (_, index) => Card(
-                        margin: const EdgeInsets.all(12),
-                        child: ListTile(title: Text(items[index].caption.isEmpty ? items[index].placeName : items[index].caption)),
-                      ),
+                      itemBuilder: (_, index) => _FeedVideoCard(item: items[index]),
                     ),
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Feed unavailable: $e')),
@@ -133,6 +123,88 @@ class _FeedTab extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _FeedVideoCard extends StatelessWidget {
+  const _FeedVideoCard({required this.item});
+
+  final PlaceVideoFeedItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => PlaceVideoDetailPage(placeId: item.placeId, placeName: item.placeName),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 190,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Theme.of(context).colorScheme.primaryContainer.withOpacity(0.45),
+                    Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ],
+                ),
+              ),
+              child: Stack(
+                children: [
+                  const Positioned.fill(child: Icon(Icons.play_circle_fill_rounded, size: 72)),
+                  Positioned(
+                    left: 12,
+                    top: 12,
+                    child: Chip(
+                      label: Text(item.placeCategory),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  Positioned(
+                    right: 12,
+                    top: 12,
+                    child: Chip(
+                      avatar: const Icon(Icons.star_rounded, size: 16),
+                      label: Text('${item.rating}/5'),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.caption.isEmpty ? item.placeName : item.caption, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  Text('${item.placeName} • ${item.regionLabel}', style: Theme.of(context).textTheme.bodyMedium),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      CircleAvatar(radius: 12, child: Text((item.creatorHandle.isNotEmpty ? item.creatorHandle[0] : '?').toUpperCase())),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(item.creatorHandle, style: Theme.of(context).textTheme.labelLarge)),
+                      IconButton(onPressed: () {}, icon: const Icon(Icons.bookmark_border)),
+                      IconButton(onPressed: () {}, icon: const Icon(Icons.ios_share_rounded)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -147,77 +219,58 @@ class _SearchTab extends ConsumerStatefulWidget {
 }
 
 class _SearchTabState extends ConsumerState<_SearchTab> with AutomaticKeepAliveClientMixin {
-  final _controller = TextEditingController();
-  String _debouncedQuery = '';
-  Timer? _debounce;
-
-  int _queryVersion = 0;
+  final _searchController = TextEditingController();
 
   @override
   bool get wantKeepAlive => true;
 
   @override
   void dispose() {
-    _debounce?.cancel();
-    _controller.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final results = ref.watch(placeSearchProvider((query: _debouncedQuery, scope: widget.scope)));
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: TextField(
-            controller: _controller,
-            decoration: const InputDecoration(
-              labelText: 'Search places',
-              hintText: 'Type a place name, category, or neighborhood',
-              prefixIcon: Icon(Icons.search),
+    final query = _searchController.text.trim();
+    final results = ref.watch(placeSearchProvider((query: query, scope: widget.scope)));
+
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search places and neighborhoods'),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: results.when(
+              data: (items) {
+                if (query.isEmpty) return const Center(child: Text('Search for a place to discover creator reviews.'));
+                if (items.isEmpty) return const Center(child: Text('No results yet. Try another query.'));
+                return ListView.builder(
+                  itemCount: items.length,
+                  itemBuilder: (_, index) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      title: Text(items[index].name),
+                      subtitle: Text('${items[index].category} • ${items[index].regionLabel}'),
+                    ),
+                  ),
+                );
+              },
+              error: (_, __) => const Center(child: Text('Place suggestions unavailable right now.')),
+              loading: () => query.isEmpty ? const SizedBox.shrink() : const Center(child: CircularProgressIndicator()),
             ),
-            onChanged: (value) {
-              final target = value.trim();
-              _debounce?.cancel();
-              if (target == _debouncedQuery) {
-                return;
-              }
-              final version = ++_queryVersion;
-              _debounce = Timer(const Duration(milliseconds: 220), () {
-                if (!mounted || version != _queryVersion) return;
-                setState(() => _debouncedQuery = target);
-              });
-            },
           ),
-        ),
-        Expanded(
-          child: results.when(
-            data: (items) {
-              if (_debouncedQuery.isEmpty) return const Center(child: Text('Start typing to search canonical places.'));
-              if (_debouncedQuery.length < 2) return const Center(child: Text('Type at least 2 characters to search.'));
-              if (items.isEmpty) return const Center(child: Text('No places found. Try another area or query.'));
-              return ListView(
-                children: items
-                    .map((item) => ListTile(
-                          leading: const Icon(Icons.place_outlined),
-                          title: Text(item.name),
-                          subtitle: Text('${item.category} • ${item.regionLabel}${item.addressSnippet == null ? '' : '\n${item.addressSnippet}'}'),
-                          trailing: item.distanceKm == null ? null : Text('${item.distanceKm!.toStringAsFixed(1)} km'),
-                        ))
-                    .toList(growable: false),
-              );
-            },
-            error: (_, __) => const Center(child: Text('Search unavailable')),
-            loading: () => _debouncedQuery.length < 2 ? const SizedBox.shrink() : const Center(child: CircularProgressIndicator()),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
-
 
 class _FeedEmptyState extends StatelessWidget {
   const _FeedEmptyState({required this.title, required this.body, this.suggestions = const []});
@@ -230,20 +283,19 @@ class _FeedEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Icon(Icons.ondemand_video_outlined, size: 52),
+            const SizedBox(height: 12),
             Text(title, style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(body, textAlign: TextAlign.center),
             if (suggestions.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ...suggestions.map((s) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text('• $s', textAlign: TextAlign.center),
-                  )),
-            ]
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: suggestions.map((e) => Chip(label: Text(e))).toList(growable: false)),
+            ],
           ],
         ),
       ),
@@ -258,135 +310,45 @@ class _CreateTab extends ConsumerStatefulWidget {
   ConsumerState<_CreateTab> createState() => _CreateTabState();
 }
 
-class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveClientMixin {
-  String _source = 'record';
+class _CreateTabState extends ConsumerState<_CreateTab> {
   final _titleController = TextEditingController();
   final _captionController = TextEditingController();
-  final _placeSearchController = TextEditingController();
-  Timer? _searchDebounce;
-  String _searchQuery = '';
   PlaceSearchResult? _selectedPlace;
-  final List<PlaceSearchResult> _recentPlaces = [];
   int _rating = 4;
-
-  @override
-  bool get wantKeepAlive => true;
+  FeedScope _source = FeedScope.local;
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
     _titleController.dispose();
     _captionController.dispose();
-    _placeSearchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
-    final suggestions = ref.watch(placeSearchProvider((query: _searchQuery, scope: FeedScope.local)));
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       children: [
-        const Text('Creator Studio Flow', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        const Text('Record or upload, add metadata, attach canonical place, then save as draft.'),
-        const SizedBox(height: 16),
-        SegmentedButton<String>(
+        Text('Create a review', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        SegmentedButton<FeedScope>(
           segments: const [
-            ButtonSegment(value: 'record', label: Text('Record in-app')),
-            ButtonSegment(value: 'upload', label: Text('Upload from device')),
+            ButtonSegment(value: FeedScope.local, label: Text('Local')),
+            ButtonSegment(value: FeedScope.regional, label: Text('Regional')),
+            ButtonSegment(value: FeedScope.global, label: Text('Global')),
           ],
           selected: {_source},
           onSelectionChanged: (value) => setState(() => _source = value.first),
         ),
         const SizedBox(height: 12),
-        ElevatedButton(
-          onPressed: _source == 'record' ? _requestCamera : _requestStorage,
-          child: Text(_source == 'record' ? 'Open Recorder' : 'Open Media Picker'),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          key: const Key('place-search-field'),
-          controller: _placeSearchController,
-          decoration: InputDecoration(
-            labelText: 'Tag reviewed place',
-            hintText: 'Search for the canonical place',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: _selectedPlace == null
-                ? null
-                : IconButton(
-                    onPressed: () => setState(() => _selectedPlace = null),
-                    icon: const Icon(Icons.edit_location_alt_outlined),
-                    tooltip: 'Change place',
-                  ),
-          ),
-          onChanged: (value) {
-            _searchDebounce?.cancel();
-            _searchDebounce = Timer(const Duration(milliseconds: 220), () {
-              if (!mounted) return;
-              setState(() => _searchQuery = value.trim());
-            });
-          },
-        ),
+        FilledButton.tonalIcon(onPressed: _requestCamera, icon: const Icon(Icons.videocam_outlined), label: const Text('Enable camera')),
         const SizedBox(height: 8),
-        if (_selectedPlace != null)
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.verified),
-              title: Text(_selectedPlace!.name),
-              subtitle: Text('${_selectedPlace!.category} • ${_selectedPlace!.regionLabel}\nCanonical: ${_selectedPlace!.placeId}'),
-            ),
-          )
-        else ...[
-          if (_recentPlaces.isNotEmpty)
-            Wrap(
-              spacing: 8,
-              children: _recentPlaces
-                  .map((item) => ActionChip(
-                        label: Text(item.name),
-                        onPressed: () => setState(() => _selectedPlace = item),
-                      ))
-                  .toList(growable: false),
-            ),
-          suggestions.when(
-            data: (items) {
-              if (_searchQuery.isEmpty) return const SizedBox.shrink();
-              if (items.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No matching place found. Try a nearby area or different keywords.'),
-                );
-              }
-              return Column(
-                children: items
-                    .map((item) => ListTile(
-                          title: Text(item.name),
-                          subtitle: Text('${item.category} • ${item.regionLabel}'),
-                          trailing: item.distanceKm == null ? null : Text('${item.distanceKm!.toStringAsFixed(1)} km'),
-                          onTap: () => setState(() {
-                            _selectedPlace = item;
-                            _placeSearchController.text = item.name;
-                            if (_recentPlaces.every((entry) => entry.placeId != item.placeId)) {
-                              _recentPlaces.insert(0, item);
-                              if (_recentPlaces.length > 4) {
-                                _recentPlaces.removeLast();
-                              }
-                            }
-                          }),
-                        ))
-                    .toList(growable: false),
-              );
-            },
-            error: (_, __) => const Text('Place suggestions unavailable right now.'),
-            loading: () => _searchQuery.isEmpty ? const SizedBox.shrink() : const Padding(
-              padding: EdgeInsets.all(8),
-              child: LinearProgressIndicator(),
-            ),
-          ),
-        ],
+        FilledButton.tonalIcon(onPressed: _requestStorage, icon: const Icon(Icons.photo_library_outlined), label: const Text('Enable gallery access')),
+        const SizedBox(height: 12),
         TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title')),
+        const SizedBox(height: 8),
         TextField(controller: _captionController, decoration: const InputDecoration(labelText: 'Caption')),
+        const SizedBox(height: 8),
         DropdownButtonFormField<int>(
           value: _rating,
           items: [1, 2, 3, 4, 5].map((v) => DropdownMenuItem(value: v, child: Text('$v stars'))).toList(),
@@ -395,21 +357,19 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
         ),
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: _selectedPlace == null
-              ? null
-              : () async {
-                  final repo = await ref.read(videoRepositoryProvider.future);
-                  await repo.submitDraft(
-                    source: _source,
-                    placeId: _selectedPlace!.placeId,
-                    title: _titleController.text,
-                    caption: _captionController.text,
-                    rating: _rating,
-                  );
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Draft saved for ${_selectedPlace!.name}')));
-                },
-          child: const Text('Save Draft'),
+          onPressed: () async {
+            final repo = await ref.read(videoRepositoryProvider.future);
+            await repo.submitDraft(
+              source: _source,
+              placeId: _selectedPlace?.placeId ?? 'manual',
+              title: _titleController.text,
+              caption: _captionController.text,
+              rating: _rating,
+            );
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Draft saved.')));
+          },
+          child: const Text('Save draft'),
         ),
       ],
     );
@@ -452,7 +412,7 @@ class _ProfileStudioTabState extends ConsumerState<_ProfileStudioTab> with Autom
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        const Text('Creator Studio', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        Text('Creator Studio', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 12),
         analytics.when(
           data: (a) => Wrap(
@@ -486,12 +446,18 @@ class _ProfileStudioTabState extends ConsumerState<_ProfileStudioTab> with Autom
               return const Card(child: ListTile(title: Text('No items yet'), subtitle: Text('Start a place review draft to populate your studio.')));
             }
             return Column(
-              children: items.map((video) => Card(
-                child: ListTile(
-                  title: Text(video.title),
-                  subtitle: Text('${video.placeName} • ${video.status.name}'),
-                ),
-              )).toList(growable: false),
+              children: items
+                  .map(
+                    (video) => Card(
+                      child: ListTile(
+                        leading: const CircleAvatar(child: Icon(Icons.play_arrow_rounded)),
+                        title: Text(video.title),
+                        subtitle: Text('${video.placeName} • ${video.status.name}'),
+                        trailing: const Icon(Icons.chevron_right),
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
             );
           },
           error: (_, __) => const Center(child: Text('Studio unavailable')),
@@ -511,11 +477,11 @@ class _ProfileStudioTabState extends ConsumerState<_ProfileStudioTab> with Autom
 
   Widget _metricCard(String label, String value) {
     return SizedBox(
-      width: 150,
+      width: 152,
       child: Card(
         child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label), Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))]),
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label), Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700))]),
         ),
       ),
     );
@@ -537,9 +503,20 @@ class PlaceVideoDetailPage extends ConsumerWidget {
         data: (items) {
           final placeVideos = items.where((item) => item.placeId == placeId).toList(growable: false);
           return ListView(
+            padding: const EdgeInsets.all(12),
             children: [
-              ListTile(title: Text(placeName), subtitle: const Text('Place review video coverage')),
-              ...placeVideos.map((video) => ListTile(title: Text(video.caption), subtitle: Text(video.creatorHandle))),
+              Text(placeName, style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 6),
+              const Text('Place review video coverage'),
+              const SizedBox(height: 12),
+              ...placeVideos.map(
+                (video) => Card(
+                  child: ListTile(
+                    title: Text(video.caption),
+                    subtitle: Text(video.creatorHandle),
+                  ),
+                ),
+              ),
             ],
           );
         },
