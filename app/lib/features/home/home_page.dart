@@ -360,7 +360,7 @@ class _CreateTabState extends ConsumerState<_CreateTab> {
           onPressed: () async {
             final repo = await ref.read(videoRepositoryProvider.future);
             await repo.submitDraft(
-              source: _source,
+              source: _source.name,
               placeId: _selectedPlace?.placeId ?? 'manual',
               title: _titleController.text,
               caption: _captionController.text,
