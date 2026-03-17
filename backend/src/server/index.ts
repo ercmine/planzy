@@ -59,6 +59,7 @@ import { rolloutSeedForLocalDev, RolloutService } from "../rollouts/service.js";
 import { MemoryVideoPlatformStore, VideoPlatformService } from "../videoPlatform/index.js";
 import { createOnboardingHttpHandlers, MemoryOnboardingStore, OnboardingService } from "../onboarding/index.js";
 import { TrustSafetyService } from "../trustSafety/index.js";
+import { AccomplishmentsService, MemoryAccomplishmentsStore } from "../accomplishments/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -207,6 +208,7 @@ export function createServer(options?: CreateServerOptions) {
 
 
   const onboardingService = new OnboardingService(new MemoryOnboardingStore(), videoPlatformService);
+  const accomplishmentsService = new AccomplishmentsService(new MemoryAccomplishmentsStore(), analyticsService, notificationService);
 
   return createHttpServer(service, merchantService, {
     deckHandler,
@@ -249,7 +251,8 @@ export function createServer(options?: CreateServerOptions) {
     rolloutService,
     geoGateway: geoGateway ?? undefined,
     videoPlatformService,
-    onboardingHandlers: createOnboardingHttpHandlers(onboardingService)
+    onboardingHandlers: createOnboardingHttpHandlers(onboardingService),
+    accomplishmentsService
   });
 }
 

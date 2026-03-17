@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/spacing.dart';
+import '../accomplishments/accomplishment_models.dart';
 import '../../app/theme/widgets.dart';
 import '../../core/identity/identity_provider.dart';
 import '../../core/widgets/app_back_button.dart';
@@ -17,6 +18,12 @@ final _activityCategoriesProvider = FutureProvider<List<String>>((ref) async {
   return store.getOnboardingCategories();
 });
 
+
+final _accomplishmentSummaryProvider = FutureProvider<AccomplishmentSummary?>((ref) async {
+  final repo = await ref.watch(accomplishmentRepositoryProvider.future);
+  return repo.fetchSummary();
+});
+
 class ActivityPage extends ConsumerWidget {
   const ActivityPage({super.key});
 
@@ -24,6 +31,7 @@ class ActivityPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sessions = ref.watch(_activitySessionsProvider);
     final categories = ref.watch(_activityCategoriesProvider);
+    final accomplishmentSummary = ref.watch(_accomplishmentSummaryProvider).valueOrNull;
 
     return AppScaffold(
       appBar: AppBar(leading: const AppBackButton(), title: const Text('Following & activity')),
@@ -42,6 +50,13 @@ class ActivityPage extends ConsumerWidget {
                   ? 'No interests selected yet. Update onboarding preferences to personalize discovery.'
                   : 'Personalized for: ${categoryData.join(', ')}',
               'icon': Icons.tune_rounded,
+            },
+            {
+              'title': 'Accomplishments showcase',
+              'desc': accomplishmentSummary == null
+                  ? 'Start reviewing, saving, and posting to unlock your first collectible milestone.'
+                  : 'Earned ${accomplishmentSummary.earnedCount} accomplishments. Next: ${accomplishmentSummary.nextMilestones.join(', ')}',
+              'icon': Icons.military_tech_outlined,
             },
           ];
 

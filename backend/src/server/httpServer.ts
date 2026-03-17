@@ -33,6 +33,7 @@ import type { GeoGateway } from "../geo/gateway.js";
 import type { VideoPlatformService } from "../videoPlatform/service.js";
 import type { TrustSafetyService } from "../trustSafety/service.js";
 import type { OnboardingHttpHandlers } from "../onboarding/http.js";
+import type { AccomplishmentsService } from "../accomplishments/service.js";
 import { createRoutes } from "./routes.js";
 
 export function matchPath(pattern: string, pathname: string): Record<string, string> | null {
@@ -99,6 +100,7 @@ export function createHttpServer(
     geoGateway?: GeoGateway;
     videoPlatformService?: VideoPlatformService;
     onboardingHandlers?: OnboardingHttpHandlers;
+    accomplishmentsService?: AccomplishmentsService;
   }
 ): Server {
   const route = createRoutes(service, merchantService, deps);
