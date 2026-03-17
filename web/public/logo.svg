@@ -1,5 +1,15 @@
-<svg width="160" height="42" viewBox="0 0 160 42" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="42" height="42" rx="12" fill="#2588FF"/>
-  <path d="M11 27V15H22.5C26.0899 15 29 17.9101 29 21.5C29 25.0899 26.0899 28 22.5 28H16.25V27H11ZM16.25 24.5H22.5C24.7091 24.5 26.5 22.7091 26.5 20.5C26.5 18.2909 24.7091 16.5 22.5 16.5H16.25V24.5Z" fill="white"/>
-  <text x="52" y="28" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Perbug</text>
+<svg width="240" height="64" viewBox="0 0 240 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="markGradient" x1="10" y1="9" x2="54" y2="55" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#27C7FF"/>
+      <stop offset="1" stop-color="#FFAB2E"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#060A14"/>
+  <path d="M10 33A22 22 0 0 1 54 33" stroke="url(#markGradient)" stroke-width="7" stroke-linecap="round"/>
+  <path d="M19 33A13 13 0 0 1 45 33A13 13 0 0 1 19 33" stroke="url(#markGradient)" stroke-width="7" stroke-linecap="round"/>
+  <path d="M19 38A19 19 0 1 0 50 38" stroke="url(#markGradient)" stroke-width="7" stroke-linecap="round"/>
+  <path d="M18 46V24" stroke="url(#markGradient)" stroke-width="7" stroke-linecap="round"/>
+  <path d="M27 30H33A6 6 0 0 1 33 42H27" stroke="url(#markGradient)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="76" y="43" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="700">Perbug</text>
 </svg>
