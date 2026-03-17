@@ -20,10 +20,10 @@ describe("challenge routes", () => {
 
   it("lists, progresses, and reads challenge details", async () => {
     const headers = { "x-user-id": "challenge-user", "content-type": "application/json" };
-    const listRes = await fetch(`${baseUrl}/v1/challenges?cityId=city-minneapolis`, { headers: { "x-user-id": "challenge-user" } });
+    const listRes = await fetch(`${baseUrl}/v1/challenges?cityId=city-minneapolis&cadence=weekly`, { headers: { "x-user-id": "challenge-user" } });
     expect(listRes.status).toBe(200);
     const list = await listRes.json() as { challenges: Array<{ id: string }> };
-    expect(list.challenges.length).toBeGreaterThan(0);
+    expect(list.challenges.some((item) => item.id === "weekly-coffee-explorer")).toBe(true);
 
     const eventRes = await fetch(`${baseUrl}/v1/challenges/events`, {
       method: "POST",
@@ -38,12 +38,46 @@ describe("challenge routes", () => {
     });
     expect(eventRes.status).toBe(200);
 
-    const detailRes = await fetch(`${baseUrl}/v1/challenges/city-coffee-explorer`, { headers: { "x-user-id": "challenge-user" } });
+    const detailRes = await fetch(`${baseUrl}/v1/challenges/weekly-coffee-explorer`, { headers: { "x-user-id": "challenge-user" } });
     expect(detailRes.status).toBe(200);
     const detail = await detailRes.json() as { progress: { criteria: Array<{ current: number }> } };
     expect(detail.progress.criteria[0]?.current).toBe(1);
 
     const summaryRes = await fetch(`${baseUrl}/v1/challenges/summary`, { headers: { "x-user-id": "challenge-user" } });
     expect(summaryRes.status).toBe(200);
+  });
+
+  it("returns quest hub and allows admin live-ops upsert", async () => {
+    const hubRes = await fetch(`${baseUrl}/v1/challenges/quest-hub?cityId=city-minneapolis`, { headers: { "x-user-id": "challenge-user" } });
+    expect(hubRes.status).toBe(200);
+    const hub = await hubRes.json() as { weekly: unknown[]; seasonal: unknown[]; upcoming: unknown[] };
+    expect(hub.weekly.length).toBeGreaterThan(0);
+    expect(hub.seasonal.length).toBeGreaterThan(0);
+
+    const upsertRes = await fetch(`${baseUrl}/v1/admin/challenges`, {
+      method: "PUT",
+      headers: { "x-admin-user-id": "ops-admin", "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "weekly-neighborhood-run",
+        slug: "weekly-neighborhood-run",
+        name: "This Week: Neighborhood Run",
+        description: "Open 3 hidden gems in North Loop",
+        cadence: "weekly",
+        track: "explorer",
+        scopeType: "neighborhood",
+        scope: { cityIds: ["city-minneapolis"], neighborhoodIds: ["neighborhood-north-loop"], categoryIds: ["hidden_gems"] },
+        status: "active",
+        startsAt: new Date(Date.now() - 3600_000).toISOString(),
+        endsAt: new Date(Date.now() + 3 * 24 * 3600_000).toISOString(),
+        timezone: "UTC",
+        visibility: "public",
+        criteria: [{ id: "open-hidden-gems", eventType: "place_opened", target: 3, distinctPlacesOnly: true }],
+        reward: { xp: 180 },
+        liveOps: { owner: "ops" },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+    });
+    expect(upsertRes.status).toBe(200);
   });
 });

@@ -1,15 +1,19 @@
 export type ChallengeTrack = "explorer" | "creator" | "mixed";
-export type ChallengeStatus = "draft" | "active" | "paused" | "expired";
-export type ChallengeScopeType = "city" | "neighborhood" | "category" | "mixed" | "hotspot";
+export type ChallengeStatus = "draft" | "scheduled" | "active" | "paused" | "expired" | "retired";
+export type ChallengeScopeType = "city" | "neighborhood" | "category" | "mixed" | "hotspot" | "global";
 export type ChallengeEventType = "place_saved" | "review_created" | "video_published" | "place_opened";
+export type ChallengeCadence = "weekly" | "seasonal" | "event";
 
 export interface ChallengeReward {
   xp: number;
+  bonusXp?: number;
   badgeId?: string;
   profileShowcaseItem?: string;
+  achievementProgress?: { id: string; amount: number }[];
 }
 
 export interface ChallengeScope {
+  marketIds?: string[];
   cityIds?: string[];
   neighborhoodIds?: string[];
   categoryIds?: string[];
@@ -28,24 +32,43 @@ export interface ChallengeCriterion {
   scope?: ChallengeScope;
 }
 
+export interface ChallengeRotation {
+  poolKey: string;
+  priority?: number;
+  maxAppearancesPerWindow?: number;
+}
+
 export interface ChallengeDefinition {
   id: string;
   slug: string;
   name: string;
   description: string;
+  cadence: ChallengeCadence;
+  track: ChallengeTrack;
+  scopeType: ChallengeScopeType;
+  scope: ChallengeScope;
+  status: ChallengeStatus;
   cityLabel?: string;
   neighborhoodLabel?: string;
   categoryLabels?: string[];
   hotspotLabel?: string;
-  scopeType: ChallengeScopeType;
-  track: ChallengeTrack;
-  status: ChallengeStatus;
+  marketLabel?: string;
+  seasonKey?: string;
+  eventTheme?: string;
+  startsAt: string;
+  endsAt: string;
+  timezone: "UTC";
+  visibility: "public" | "invite_only";
   criteria: ChallengeCriterion[];
   reward: ChallengeReward;
-  startsAt?: string;
-  endsAt?: string;
-  visibility: "public" | "invite_only";
-  curation: { owner: string; notes?: string; tags?: string[] };
+  liveOps: {
+    owner: string;
+    notes?: string;
+    tags?: string[];
+    segmentIds?: string[];
+    previewOnly?: boolean;
+  };
+  rotation?: ChallengeRotation;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +79,7 @@ export interface ChallengeEvent {
   type: ChallengeEventType;
   occurredAt?: string;
   canonicalPlaceId: string;
+  marketId?: string;
   cityId?: string;
   neighborhoodId?: string;
   categoryIds?: string[];
@@ -71,6 +95,8 @@ export interface ChallengeProgress {
   completedAt?: string;
   criteria: Array<{ criterionId: string; current: number; target: number; remaining: number }>;
   qualifyingActions: number;
+  rewardState: "locked" | "ready" | "granted";
+  window: { startsAt: string; endsAt: string; secondsRemaining: number };
 }
 
 export interface UserChallengeState {
@@ -79,6 +105,15 @@ export interface UserChallengeState {
     progressByCriterionId: Record<string, number>;
     canonicalPlaceIdsByCriterionId: Record<string, string[]>;
     completedAt?: string;
+    rewardGrantedAt?: string;
     eventCountByDayByCriterionId: Record<string, Record<string, number>>;
   }>;
+}
+
+export interface QuestHubResponse {
+  generatedAt: string;
+  timezone: "UTC";
+  weekly: Array<ChallengeDefinition & { progress: ChallengeProgress }>;
+  seasonal: Array<ChallengeDefinition & { progress: ChallengeProgress }>;
+  upcoming: Array<Pick<ChallengeDefinition, "id" | "name" | "description" | "cadence" | "startsAt" | "endsAt" | "eventTheme">>;
 }

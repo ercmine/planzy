@@ -612,6 +612,16 @@ export function createRoutes(
         return;
       }
 
+      if (req.method === "GET" && normalizedPath === "/v1/challenges/quest-hub" && challengesHandlers) {
+        await challengesHandlers.questHub(req, res, url);
+        return;
+      }
+
+      if (req.method === "PUT" && normalizedPath === "/v1/admin/challenges" && challengesHandlers) {
+        await challengesHandlers.upsert(req, res);
+        return;
+      }
+
       if (req.method === "POST" && normalizedPath === "/v1/challenges/events" && challengesHandlers) {
         await challengesHandlers.recordEvent(req, res);
         return;

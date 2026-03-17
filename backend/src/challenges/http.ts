@@ -3,12 +3,18 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { ValidationError } from "../plans/errors.js";
 import { parseJsonBody, readHeader, sendJson } from "../venues/claims/http.js";
 import type { ChallengesService } from "./service.js";
-import type { ChallengeEvent } from "./types.js";
+import type { ChallengeDefinition, ChallengeEvent } from "./types.js";
 
 function requireUserId(req: IncomingMessage): string {
   const userId = readHeader(req, "x-user-id");
   if (!userId) throw new ValidationError(["x-user-id header required"]);
   return userId;
+}
+
+function requireAdmin(req: IncomingMessage): string {
+  const adminUserId = readHeader(req, "x-admin-user-id");
+  if (!adminUserId) throw new ValidationError(["x-admin-user-id header required"]);
+  return adminUserId;
 }
 
 export function createChallengesHttpHandlers(service: ChallengesService) {
@@ -17,12 +23,22 @@ export function createChallengesHttpHandlers(service: ChallengesService) {
       const userId = requireUserId(req);
       const track = url.searchParams.get("track") ?? undefined;
       const cityId = url.searchParams.get("cityId") ?? undefined;
+      const marketId = url.searchParams.get("marketId") ?? undefined;
       const neighborhoodId = url.searchParams.get("neighborhoodId") ?? undefined;
       const categoryId = url.searchParams.get("categoryId") ?? undefined;
-      sendJson(res, 200, { challenges: service.listAvailable(userId, { track: track ?? undefined, cityId, neighborhoodId, categoryId }) });
+      const cadence = url.searchParams.get("cadence") ?? undefined;
+      sendJson(res, 200, { challenges: service.listAvailable(userId, { track, cityId, marketId, neighborhoodId, categoryId, cadence }) });
     },
     summary: async (req: IncomingMessage, res: ServerResponse) => {
       sendJson(res, 200, service.getSummary(requireUserId(req)));
+    },
+    questHub: async (req: IncomingMessage, res: ServerResponse, url: URL) => {
+      const userId = requireUserId(req);
+      const cityId = url.searchParams.get("cityId") ?? undefined;
+      const marketId = url.searchParams.get("marketId") ?? undefined;
+      const categoryId = url.searchParams.get("categoryId") ?? undefined;
+      const track = url.searchParams.get("track") ?? undefined;
+      sendJson(res, 200, service.getQuestHub(userId, { cityId, marketId, categoryId, track }));
     },
     detail: async (req: IncomingMessage, res: ServerResponse, challengeId: string) => {
       const detail = service.getChallengeDetail(requireUserId(req), challengeId);
@@ -31,6 +47,12 @@ export function createChallengesHttpHandlers(service: ChallengesService) {
         return;
       }
       sendJson(res, 200, detail);
+    },
+    upsert: async (req: IncomingMessage, res: ServerResponse) => {
+      requireAdmin(req);
+      const payload = await parseJsonBody(req);
+      if (typeof payload !== "object" || payload === null) throw new ValidationError(["challenge payload required"]);
+      sendJson(res, 200, service.upsertDefinition(payload as ChallengeDefinition));
     },
     recordEvent: async (req: IncomingMessage, res: ServerResponse) => {
       const userId = requireUserId(req);
@@ -46,6 +68,7 @@ export function createChallengesHttpHandlers(service: ChallengesService) {
         type: type as ChallengeEvent["type"],
         canonicalPlaceId,
         occurredAt: payload.occurredAt == null ? undefined : String(payload.occurredAt),
+        marketId: payload.marketId == null ? undefined : String(payload.marketId),
         cityId: payload.cityId == null ? undefined : String(payload.cityId),
         neighborhoodId: payload.neighborhoodId == null ? undefined : String(payload.neighborhoodId),
         categoryIds: Array.isArray(payload.categoryIds) ? payload.categoryIds.map((item) => String(item)) : [],
