@@ -62,6 +62,7 @@ import { TrustSafetyService } from "../trustSafety/index.js";
 import { AccomplishmentsService, MemoryAccomplishmentsStore } from "../accomplishments/index.js";
 import { ChallengesService, MemoryChallengesStore } from "../challenges/index.js";
 import { LeaderboardsService, MemoryLeaderboardsStore } from "../leaderboards/index.js";
+import { CollectionsService, MemoryCollectionStore } from "../collections/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -213,6 +214,7 @@ export function createServer(options?: CreateServerOptions) {
   const accomplishmentsService = new AccomplishmentsService(new MemoryAccomplishmentsStore(), analyticsService, notificationService);
   const challengesService = new ChallengesService(new MemoryChallengesStore(), analyticsService, notificationService);
   const leaderboardsService = new LeaderboardsService(new MemoryLeaderboardsStore(), analyticsService, notificationService);
+  const collectionsService = new CollectionsService(new MemoryCollectionStore(), analyticsService, notificationService);
 
   return createHttpServer(service, merchantService, {
     deckHandler,
@@ -258,7 +260,8 @@ export function createServer(options?: CreateServerOptions) {
     onboardingHandlers: createOnboardingHttpHandlers(onboardingService),
     accomplishmentsService,
     challengesService,
-    leaderboardsService
+    leaderboardsService,
+    collectionsService
   });
 }
 
