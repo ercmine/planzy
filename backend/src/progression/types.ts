@@ -110,6 +110,7 @@ export interface ProgressionConfig {
   actionCooldownMs: Partial<Record<ProgressionActionType, number>>;
   milestones: MilestoneDefinition[];
   trustMultipliers: Record<"low" | "developing" | "trusted" | "high", number>;
+  rewardFeedback: RewardFeedbackTuning;
 }
 
 export interface ProgressionEventResult {
@@ -117,10 +118,103 @@ export interface ProgressionEventResult {
   profile: ProgressionProfile;
   levelUps: ProgressionTrack[];
   milestoneUnlocks: MilestoneDefinition[];
+  rewardFeedback: RewardFeedbackEnvelope;
 }
 
 export interface ProgressionAdminSnapshot {
   config: ProgressionConfig;
   eventCount: number;
   suppressionCounts: Partial<Record<SuppressionReason, number>>;
+  rewardSurfaceCounters: RewardSurfaceCounters;
+}
+
+export type RewardFeedbackIntensity = "micro" | "milestone" | "major";
+
+export type RewardSurfaceContext =
+  | "post_save"
+  | "post_review"
+  | "post_publish"
+  | "collection_hub"
+  | "quest_hub"
+  | "profile"
+  | "creator_studio"
+  | "discovery_home"
+  | "city_page";
+
+export type UnlockState = "locked" | "in_progress" | "unlocked" | "completed" | "featured";
+
+export interface RewardSurfaceCounters {
+  microShown: number;
+  celebrationShown: number;
+  shareCardReady: number;
+  trophyShelfViewed: number;
+}
+
+export interface RewardFeedbackTuning {
+  microMinXp: number;
+  majorLevelStep: number;
+  celebrationCooldownMs: number;
+  maxFeaturedTrophies: number;
+  contextPriority: RewardSurfaceContext[];
+}
+
+export interface RewardFeedbackEvent {
+  kind: "xp" | "level_up" | "milestone_unlock";
+  intensity: RewardFeedbackIntensity;
+  title: string;
+  body: string;
+  xpDelta: number;
+  relatedTrack?: ProgressionTrack;
+  relatedMilestoneId?: string;
+  shareCardEligible: boolean;
+}
+
+export interface UnlockStateItem {
+  id: string;
+  title: string;
+  state: UnlockState;
+  progress: number;
+  total: number;
+  justUnlocked: boolean;
+}
+
+export interface NextGoalCard {
+  id: string;
+  title: string;
+  subtitle: string;
+  progressPct: number;
+  current: number;
+  target: number;
+}
+
+export interface TrophyDisplayItem {
+  id: string;
+  title: string;
+  variant: "badge" | "collection" | "milestone" | "prestige";
+  unlockedAt?: string;
+  featured: boolean;
+}
+
+export interface RewardSurfaceModule {
+  context: RewardSurfaceContext;
+  loading: boolean;
+  empty: boolean;
+  nextGoal?: NextGoalCard;
+  unlockStates: UnlockStateItem[];
+  recentRewards: RewardFeedbackEvent[];
+}
+
+export interface ProfileTrophyShowcase {
+  userId: string;
+  loading: boolean;
+  empty: boolean;
+  featured: TrophyDisplayItem[];
+  libraryCount: number;
+}
+
+export interface RewardFeedbackEnvelope {
+  events: RewardFeedbackEvent[];
+  celebrationQueue: RewardFeedbackEvent[];
+  modules: RewardSurfaceModule[];
+  profileShowcase: ProfileTrophyShowcase;
 }

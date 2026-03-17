@@ -5,14 +5,24 @@ import type {
   LevelProgress,
   MilestoneDefinition,
   MilestoneProgress,
+  NextGoalCard,
+  ProfileTrophyShowcase,
   ProgressionActionInput,
   ProgressionAdminSnapshot,
   ProgressionConfig,
   ProgressionEventResult,
   ProgressionProfile,
   ProgressionTrack,
+  RewardFeedbackEnvelope,
+  RewardFeedbackEvent,
+  RewardSurfaceContext,
+  RewardSurfaceCounters,
+  RewardSurfaceModule,
   StreakState,
   SuppressionReason,
+  TrophyDisplayItem,
+  UnlockState,
+  UnlockStateItem,
   XpLedgerEvent
 } from "./types.js";
 
@@ -37,6 +47,22 @@ const TRACK_BY_ACTION: Record<string, ProgressionTrack[]> = {
   creator_daily_publish: ["creator"]
 };
 
+const CONTEXT_BY_ACTION: Record<string, RewardSurfaceContext> = {
+  explorer_place_saved_first: "post_save",
+  explorer_place_open_meaningful: "discovery_home",
+  explorer_review_submitted: "post_review",
+  explorer_new_category: "city_page",
+  explorer_new_city: "city_page",
+  explorer_daily_active: "discovery_home",
+  creator_draft_created: "creator_studio",
+  creator_metadata_completed: "creator_studio",
+  creator_video_published: "post_publish",
+  creator_review_published: "post_publish",
+  creator_quality_engagement: "creator_studio",
+  creator_new_coverage: "creator_studio",
+  creator_daily_publish: "creator_studio"
+};
+
 const FIRST_ACTION_ENTITY_REQUIRED = new Set([
   "explorer_place_saved_first",
   "explorer_place_open_meaningful",
@@ -54,6 +80,13 @@ export class ProgressionService {
   private readonly lastEventByKey = new Map<string, number>();
   private readonly rewardedEntityKeys = new Set<string>();
   private readonly suppressionCounts = new Map<SuppressionReason, number>();
+  private readonly rewardSurfaceCounters: RewardSurfaceCounters = {
+    microShown: 0,
+    celebrationShown: 0,
+    shareCardReady: 0,
+    trophyShelfViewed: 0
+  };
+  private readonly lastCelebrationByUser = new Map<string, number>();
 
   constructor(config: Partial<ProgressionConfig> = {}) {
     this.config = {
@@ -63,6 +96,7 @@ export class ProgressionService {
       actionDailyCaps: { ...DEFAULT_PROGRESSION_CONFIG.actionDailyCaps, ...(config.actionDailyCaps ?? {}) },
       actionCooldownMs: { ...DEFAULT_PROGRESSION_CONFIG.actionCooldownMs, ...(config.actionCooldownMs ?? {}) },
       trustMultipliers: { ...DEFAULT_PROGRESSION_CONFIG.trustMultipliers, ...(config.trustMultipliers ?? {}) },
+      rewardFeedback: { ...DEFAULT_PROGRESSION_CONFIG.rewardFeedback, ...(config.rewardFeedback ?? {}) },
       milestones: config.milestones ?? DEFAULT_PROGRESSION_CONFIG.milestones,
       explorerLevelThresholds: config.explorerLevelThresholds ?? DEFAULT_PROGRESSION_CONFIG.explorerLevelThresholds,
       creatorLevelThresholds: config.creatorLevelThresholds ?? DEFAULT_PROGRESSION_CONFIG.creatorLevelThresholds
@@ -73,7 +107,9 @@ export class ProgressionService {
     const occurredAt = input.occurredAt ?? new Date();
     const profile = this.getOrCreateProfile(input.userId);
     const tracks = TRACK_BY_ACTION[input.type] ?? ["explorer"];
-    const dedupeKey = input.dedupeKey ?? `${input.userId}:${input.type}:${input.targetEntityType ?? "none"}:${input.targetEntityId ?? "none"}:${input.canonicalPlaceId ?? "none"}:${this.dayKey(occurredAt)}`;
+    const dedupeKey =
+      input.dedupeKey ??
+      `${input.userId}:${input.type}:${input.targetEntityType ?? "none"}:${input.targetEntityId ?? "none"}:${input.canonicalPlaceId ?? "none"}:${this.dayKey(occurredAt)}`;
 
     let suppressionReason: SuppressionReason | undefined;
 
@@ -150,12 +186,37 @@ export class ProgressionService {
     const levelUps: ProgressionTrack[] = [];
     if (snapshot.explorerLevel.level > previousExplorerLevel) levelUps.push("explorer");
     if (snapshot.creatorLevel.level > previousCreatorLevel) levelUps.push("creator");
+    const rewardFeedback = this.buildRewardFeedback(input.userId, event, snapshot, levelUps, milestoneUnlocks, occurredAt);
 
-    return { event, profile: snapshot, levelUps, milestoneUnlocks };
+    return { event, profile: snapshot, levelUps, milestoneUnlocks, rewardFeedback };
   }
 
   getProgressionProfile(userId: string): ProgressionProfile {
     return this.snapshotProfile(this.getOrCreateProfile(userId));
+  }
+
+  getRewardFeedback(userId: string, context?: RewardSurfaceContext): RewardFeedbackEnvelope {
+    const profile = this.getProgressionProfile(userId);
+    const history = this.getRecentXpHistory(userId, 10);
+    const recentRewards = history
+      .filter((entry) => entry.status === "awarded")
+      .slice(0, 4)
+      .map((entry) => this.toXpRewardEvent(entry));
+    const modules = this.buildModules(profile, recentRewards, context);
+    return {
+      events: recentRewards,
+      celebrationQueue: [],
+      modules,
+      profileShowcase: this.buildProfileShowcase(profile)
+    };
+  }
+
+  getProfileTrophyShowcase(userId: string): ProfileTrophyShowcase {
+    return this.buildProfileShowcase(this.getProgressionProfile(userId));
+  }
+
+  markTrophyShelfViewed(): void {
+    this.rewardSurfaceCounters.trophyShelfViewed += 1;
   }
 
   getRecentXpHistory(userId: string, limit = 20): XpLedgerEvent[] {
@@ -168,7 +229,179 @@ export class ProgressionService {
     return {
       config: this.config,
       eventCount: Array.from(this.ledgerByUser.values()).reduce((acc, items) => acc + items.length, 0),
-      suppressionCounts
+      suppressionCounts,
+      rewardSurfaceCounters: { ...this.rewardSurfaceCounters }
+    };
+  }
+
+  private buildRewardFeedback(
+    userId: string,
+    event: XpLedgerEvent,
+    profile: ProgressionProfile,
+    levelUps: ProgressionTrack[],
+    milestoneUnlocks: MilestoneDefinition[],
+    occurredAt: Date
+  ): RewardFeedbackEnvelope {
+    if (event.status === "suppressed") {
+      return {
+        events: [],
+        celebrationQueue: [],
+        modules: this.buildModules(profile, [], CONTEXT_BY_ACTION[event.type]),
+        profileShowcase: this.buildProfileShowcase(profile)
+      };
+    }
+
+    const events: RewardFeedbackEvent[] = [];
+    if (event.xpAwarded >= this.config.rewardFeedback.microMinXp) {
+      this.rewardSurfaceCounters.microShown += 1;
+      events.push(this.toXpRewardEvent(event));
+    }
+
+    for (const track of levelUps) {
+      const level = track === "explorer" ? profile.explorerLevel.level : profile.creatorLevel.level;
+      const major = level % this.config.rewardFeedback.majorLevelStep === 0;
+      const levelEvent: RewardFeedbackEvent = {
+        kind: "level_up",
+        intensity: major ? "major" : "milestone",
+        title: `${track === "explorer" ? "Explorer" : "Creator"} level ${level}`,
+        body: `You unlocked level ${level}. Keep momentum toward the next threshold.`,
+        xpDelta: 0,
+        relatedTrack: track,
+        shareCardEligible: major
+      };
+      events.push(levelEvent);
+      if (major) this.rewardSurfaceCounters.shareCardReady += 1;
+    }
+
+    for (const milestone of milestoneUnlocks) {
+      events.push({
+        kind: "milestone_unlock",
+        intensity: "major",
+        title: milestone.title,
+        body: "Milestone completed and now available in your trophy showcase.",
+        xpDelta: 0,
+        relatedTrack: milestone.track === "both" ? undefined : milestone.track,
+        relatedMilestoneId: milestone.id,
+        shareCardEligible: true
+      });
+      this.rewardSurfaceCounters.shareCardReady += 1;
+    }
+
+    const celebrationQueue = this.filterCelebrationQueue(userId, events, occurredAt);
+    if (celebrationQueue.length > 0) this.rewardSurfaceCounters.celebrationShown += celebrationQueue.length;
+
+    return {
+      events,
+      celebrationQueue,
+      modules: this.buildModules(profile, events, CONTEXT_BY_ACTION[event.type]),
+      profileShowcase: this.buildProfileShowcase(profile)
+    };
+  }
+
+  private filterCelebrationQueue(userId: string, events: RewardFeedbackEvent[], occurredAt: Date): RewardFeedbackEvent[] {
+    const queue = events.filter((entry) => entry.intensity !== "micro");
+    const last = this.lastCelebrationByUser.get(userId) ?? 0;
+    if (queue.length === 0 || occurredAt.getTime() - last >= this.config.rewardFeedback.celebrationCooldownMs) {
+      if (queue.length > 0) this.lastCelebrationByUser.set(userId, occurredAt.getTime());
+      return queue;
+    }
+    return [];
+  }
+
+  private buildModules(profile: ProgressionProfile, events: RewardFeedbackEvent[], focusContext?: RewardSurfaceContext): RewardSurfaceModule[] {
+    const contexts = this.config.rewardFeedback.contextPriority;
+    return contexts
+      .filter((context) => !focusContext || context === focusContext || context === "profile" || context === "creator_studio")
+      .slice(0, 3)
+      .map((context) => ({
+        context,
+        loading: false,
+        empty: events.length === 0 && profile.lifetimeXp === 0,
+        nextGoal: this.nextGoalForContext(profile, context),
+        unlockStates: this.unlockStatesForContext(profile, context),
+        recentRewards: events.slice(0, 3)
+      }));
+  }
+
+  private nextGoalForContext(profile: ProgressionProfile, context: RewardSurfaceContext): NextGoalCard | undefined {
+    if (context === "creator_studio" || context === "post_publish") {
+      return {
+        id: "creator_level",
+        title: "Creator level progress",
+        subtitle: `Next at ${profile.creatorLevel.nextLevelXp} XP`,
+        progressPct: profile.creatorLevel.progressPct,
+        current: profile.creatorLevel.currentXp,
+        target: profile.creatorLevel.nextLevelXp
+      };
+    }
+    return {
+      id: "explorer_level",
+      title: "Explorer level progress",
+      subtitle: `Next at ${profile.explorerLevel.nextLevelXp} XP`,
+      progressPct: profile.explorerLevel.progressPct,
+      current: profile.explorerLevel.currentXp,
+      target: profile.explorerLevel.nextLevelXp
+    };
+  }
+
+  private unlockStatesForContext(profile: ProgressionProfile, context: RewardSurfaceContext): UnlockStateItem[] {
+    const states: UnlockStateItem[] = [];
+    for (const milestone of this.config.milestones.slice(0, 4)) {
+      const progress = profile.milestones.find((entry) => entry.milestoneId === milestone.id)?.progress ?? 0;
+      const completedAt = profile.milestones.find((entry) => entry.milestoneId === milestone.id)?.completedAt;
+      const state: UnlockState = completedAt ? "completed" : progress > 0 ? "in_progress" : "locked";
+      states.push({
+        id: milestone.id,
+        title: milestone.title,
+        state,
+        progress,
+        total: milestone.threshold,
+        justUnlocked: Boolean(completedAt && this.dayKey(new Date(completedAt)) === this.dayKey(new Date()))
+      });
+    }
+    if (context === "profile" && states.length > 0) {
+      states[0] = { ...states[0], state: states[0].state === "completed" ? "featured" : states[0].state };
+    }
+    return states;
+  }
+
+  private buildProfileShowcase(profile: ProgressionProfile): ProfileTrophyShowcase {
+    const trophies: TrophyDisplayItem[] = profile.milestones
+      .filter((entry) => entry.completedAt)
+      .map((entry) => {
+        const def = this.config.milestones.find((milestone) => milestone.id === entry.milestoneId);
+        return {
+          id: entry.milestoneId,
+          title: def?.title ?? entry.milestoneId,
+          variant: def?.track === "creator" ? "prestige" : "milestone",
+          unlockedAt: entry.completedAt,
+          featured: false
+        };
+      });
+
+    const featured = trophies
+      .sort((a, b) => Date.parse(b.unlockedAt ?? "1970-01-01") - Date.parse(a.unlockedAt ?? "1970-01-01"))
+      .slice(0, this.config.rewardFeedback.maxFeaturedTrophies)
+      .map((entry) => ({ ...entry, featured: true }));
+
+    return {
+      userId: profile.userId,
+      loading: false,
+      empty: featured.length === 0,
+      featured,
+      libraryCount: trophies.length
+    };
+  }
+
+  private toXpRewardEvent(event: XpLedgerEvent): RewardFeedbackEvent {
+    return {
+      kind: "xp",
+      intensity: "micro",
+      title: `+${event.xpAwarded} XP`,
+      body: "Progress recorded toward your next level.",
+      xpDelta: event.xpAwarded,
+      relatedTrack: event.tracks[0],
+      shareCardEligible: false
     };
   }
 

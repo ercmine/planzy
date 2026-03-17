@@ -44,5 +44,12 @@ export const DEFAULT_PROGRESSION_CONFIG: ProgressionConfig = {
     developing: 0.6,
     trusted: 1,
     high: 1.1
-  }
+  },
+  rewardFeedback: {
+    microMinXp: 10,
+    majorLevelStep: 1,
+    celebrationCooldownMs: 15_000,
+    maxFeaturedTrophies: 4,
+    contextPriority: ["post_publish", "post_review", "post_save", "creator_studio", "profile", "discovery_home", "collection_hub", "quest_hub", "city_page"]
+  },
 };
