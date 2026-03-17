@@ -8,9 +8,13 @@ export class MemoryNotificationStore implements NotificationStore {
   private readonly preferencesByUser = new Map<string, Map<string, NotificationPreference>>();
   private readonly deliveryAttemptsByNotification = new Map<string, NotificationDeliveryAttempt[]>();
   private readonly deviceTokensByUser = new Map<string, Map<string, DeviceTokenRegistration>>();
+  private readonly createdOrder = new Map<string, number>();
+  private sequence = 0;
 
   async create(notification: Notification): Promise<void> {
     this.notifications.push(notification);
+    this.sequence += 1;
+    this.createdOrder.set(notification.id, this.sequence);
     if (notification.dedupeKey) this.dedupeIndex.set(`${notification.recipientUserId}:${notification.dedupeKey}`, notification);
   }
 
@@ -23,7 +27,10 @@ export class MemoryNotificationStore implements NotificationStore {
       .filter((item) => item.recipientUserId === recipientUserId)
       .filter((item) => !opts.category || item.category === opts.category)
       .filter((item) => !opts.type || item.type === opts.type)
-      .sort((a, b) => (a.createdAt === b.createdAt ? b.id.localeCompare(a.id) : b.createdAt.localeCompare(a.createdAt)));
+      .sort((a, b) => {
+        if (a.createdAt !== b.createdAt) return b.createdAt.localeCompare(a.createdAt);
+        return (this.createdOrder.get(b.id) ?? 0) - (this.createdOrder.get(a.id) ?? 0);
+      });
     let offset = 0;
     try {
       offset = decodeOffsetCursor(opts.cursor);

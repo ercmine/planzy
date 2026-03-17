@@ -127,3 +127,5 @@ export * from "./geocoding/index.js";
 export * from "./geo/index.js";
 
 export * from "./placeContent/index.js";
+
+export * from "./accomplishments/index.js";

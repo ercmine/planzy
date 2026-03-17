@@ -72,6 +72,8 @@ import { createVideoPlatformHttpHandlers } from "../videoPlatform/http.js";
 import type { VideoPlatformService } from "../videoPlatform/service.js";
 import type { TrustSafetyService } from "../trustSafety/service.js";
 import type { OnboardingHttpHandlers } from "../onboarding/http.js";
+import { createAccomplishmentsHttpHandlers } from "../accomplishments/http.js";
+import type { AccomplishmentsService } from "../accomplishments/service.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
@@ -151,6 +153,7 @@ export function createRoutes(
     geoGateway?: GeoGateway;
     videoPlatformService?: VideoPlatformService;
     onboardingHandlers?: OnboardingHttpHandlers;
+    accomplishmentsService?: AccomplishmentsService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -176,6 +179,7 @@ export function createRoutes(
   const analyticsHandlers = deps?.analyticsService && deps?.analyticsQueryService ? createAnalyticsHttpHandlers(deps.analyticsService, deps.analyticsQueryService) : null;
   const videoPlatformHandlers = deps?.videoPlatformService ? createVideoPlatformHttpHandlers(deps.videoPlatformService) : null;
   const onboardingHandlers = deps?.onboardingHandlers ?? null;
+  const accomplishmentsHandlers = deps?.accomplishmentsService ? createAccomplishmentsHttpHandlers(deps.accomplishmentsService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -572,6 +576,27 @@ export function createRoutes(
         await adminHandlers.reinstateUser(req, res, reinstateUserMatch[1] ?? "");
         return;
       }
+
+      if (req.method === "GET" && normalizedPath === "/v1/accomplishments/catalog" && accomplishmentsHandlers) {
+        await accomplishmentsHandlers.catalog(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/accomplishments/summary" && accomplishmentsHandlers) {
+        await accomplishmentsHandlers.summary(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/accomplishments/events" && accomplishmentsHandlers) {
+        await accomplishmentsHandlers.recordEvent(req, res);
+        return;
+      }
+
+      if (req.method === "PUT" && normalizedPath === "/v1/accomplishments/featured" && accomplishmentsHandlers) {
+        await accomplishmentsHandlers.updateFeatured(req, res);
+        return;
+      }
+
       if (req.method === "GET" && normalizedPath === "/v1/notifications" && notificationHandlers) {
         await notificationHandlers.list(req, res);
         return;
