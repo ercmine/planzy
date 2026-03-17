@@ -11,6 +11,7 @@ class OnboardingPreferences {
     this.lat,
     this.lng,
     this.locationSource = 'unknown',
+    this.locationPermissionOutcome,
   });
 
   final bool onboardingCompleted;
@@ -19,6 +20,7 @@ class OnboardingPreferences {
   final double? lat;
   final double? lng;
   final String locationSource;
+  final String? locationPermissionOutcome;
   final List<String> interestCategoryIds;
   final DiscoveryMode discoveryMode;
   final String creatorContentMode;
@@ -32,6 +34,7 @@ class OnboardingPreferences {
         'lat': lat,
         'lng': lng,
         'source': locationSource,
+        'permissionOutcome': locationPermissionOutcome,
       },
       'interestCategoryIds': interestCategoryIds,
       'discoveryMode': switch (discoveryMode) {

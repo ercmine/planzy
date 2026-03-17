@@ -17,6 +17,8 @@ class OnboardingState {
     required this.region,
     required this.useCurrentLocation,
     required this.discoveryMode,
+    required this.isFinishing,
+    this.errorMessage,
   });
 
   factory OnboardingState.initial() {
@@ -28,6 +30,7 @@ class OnboardingState {
       region: '',
       useCurrentLocation: true,
       discoveryMode: DiscoveryMode.balanced,
+      isFinishing: false,
     );
   }
 
@@ -38,6 +41,8 @@ class OnboardingState {
   final String region;
   final bool useCurrentLocation;
   final DiscoveryMode discoveryMode;
+  final bool isFinishing;
+  final String? errorMessage;
 
   OnboardingState copyWith({
     OnboardingStep? step,
@@ -47,6 +52,9 @@ class OnboardingState {
     String? region,
     bool? useCurrentLocation,
     DiscoveryMode? discoveryMode,
+    bool? isFinishing,
+    String? errorMessage,
+    bool clearError = false,
   }) {
     return OnboardingState(
       step: step ?? this.step,
@@ -56,6 +64,8 @@ class OnboardingState {
       region: region ?? this.region,
       useCurrentLocation: useCurrentLocation ?? this.useCurrentLocation,
       discoveryMode: discoveryMode ?? this.discoveryMode,
+      isFinishing: isFinishing ?? this.isFinishing,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }
 }
