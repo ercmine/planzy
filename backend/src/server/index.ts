@@ -64,6 +64,7 @@ import { ChallengesService, MemoryChallengesStore } from "../challenges/index.js
 import { LeaderboardsService, MemoryLeaderboardsStore } from "../leaderboards/index.js";
 import { CollectionsService, MemoryCollectionStore } from "../collections/index.js";
 import { MemorySocialGamificationStore, SocialGamificationService } from "../socialGamification/index.js";
+import { GamificationControlService, MemoryGamificationControlStore } from "../gamificationControl/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -217,6 +218,8 @@ export function createServer(options?: CreateServerOptions) {
   const leaderboardsService = new LeaderboardsService(new MemoryLeaderboardsStore(), analyticsService, notificationService);
   const collectionsService = new CollectionsService(new MemoryCollectionStore(), analyticsService, notificationService);
   const socialGamificationService = new SocialGamificationService(new MemorySocialGamificationStore(), analyticsService, notificationService);
+  const gamificationControlService = new GamificationControlService(new MemoryGamificationControlStore(), analyticsService);
+  gamificationControlService.seedInitialRules("system");
 
   return createHttpServer(service, merchantService, {
     deckHandler,
@@ -264,7 +267,8 @@ export function createServer(options?: CreateServerOptions) {
     challengesService,
     leaderboardsService,
     collectionsService,
-    socialGamificationService
+    socialGamificationService,
+    gamificationControlService
   });
 }
 
