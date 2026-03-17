@@ -60,6 +60,7 @@ import { MemoryVideoPlatformStore, VideoPlatformService } from "../videoPlatform
 import { createOnboardingHttpHandlers, MemoryOnboardingStore, OnboardingService } from "../onboarding/index.js";
 import { TrustSafetyService } from "../trustSafety/index.js";
 import { AccomplishmentsService, MemoryAccomplishmentsStore } from "../accomplishments/index.js";
+import { ChallengesService, MemoryChallengesStore } from "../challenges/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -209,6 +210,7 @@ export function createServer(options?: CreateServerOptions) {
 
   const onboardingService = new OnboardingService(new MemoryOnboardingStore(), videoPlatformService);
   const accomplishmentsService = new AccomplishmentsService(new MemoryAccomplishmentsStore(), analyticsService, notificationService);
+  const challengesService = new ChallengesService(new MemoryChallengesStore(), analyticsService, notificationService);
 
   return createHttpServer(service, merchantService, {
     deckHandler,
@@ -252,7 +254,8 @@ export function createServer(options?: CreateServerOptions) {
     geoGateway: geoGateway ?? undefined,
     videoPlatformService,
     onboardingHandlers: createOnboardingHttpHandlers(onboardingService),
-    accomplishmentsService
+    accomplishmentsService,
+    challengesService
   });
 }
 

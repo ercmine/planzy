@@ -38,6 +38,7 @@ import '../features/results/results_controller.dart';
 import '../features/results/results_state.dart';
 import '../features/settings/settings_controller.dart';
 import '../features/accomplishments/accomplishment_repository.dart';
+import '../features/challenges/challenge_repository.dart';
 import '../features/settings/settings_state.dart';
 import '../features/sessions/create_session/create_session_controller.dart';
 import '../features/sessions/join_session/join_session_controller.dart';
@@ -206,6 +207,12 @@ final reviewsRepositoryProvider = FutureProvider<ReviewsRepository>((ref) async 
 final accomplishmentRepositoryProvider = FutureProvider<AccomplishmentRepository>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);
   return AccomplishmentRepository(apiClient: apiClient);
+});
+
+
+final challengeRepositoryProvider = FutureProvider<ChallengeRepository>((ref) async {
+  final apiClient = await ref.watch(apiClientProvider.future);
+  return ChallengeRepository(apiClient: apiClient);
 });
 
 final telemetryQueueStoreProvider = FutureProvider<TelemetryQueueStore>((ref) async {

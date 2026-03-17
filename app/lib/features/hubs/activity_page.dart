@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/spacing.dart';
 import '../accomplishments/accomplishment_models.dart';
+import '../challenges/challenge_models.dart';
 import '../../app/theme/widgets.dart';
 import '../../core/identity/identity_provider.dart';
 import '../../core/widgets/app_back_button.dart';
@@ -24,6 +25,11 @@ final _accomplishmentSummaryProvider = FutureProvider<AccomplishmentSummary?>((r
   return repo.fetchSummary();
 });
 
+final _challengeSummaryProvider = FutureProvider<ChallengeSummary?>((ref) async {
+  final repo = await ref.watch(challengeRepositoryProvider.future);
+  return repo.fetchSummary();
+});
+
 class ActivityPage extends ConsumerWidget {
   const ActivityPage({super.key});
 
@@ -32,6 +38,7 @@ class ActivityPage extends ConsumerWidget {
     final sessions = ref.watch(_activitySessionsProvider);
     final categories = ref.watch(_activityCategoriesProvider);
     final accomplishmentSummary = ref.watch(_accomplishmentSummaryProvider).valueOrNull;
+    final challengeSummary = ref.watch(_challengeSummaryProvider).valueOrNull;
 
     return AppScaffold(
       appBar: AppBar(leading: const AppBackButton(), title: const Text('Following & activity')),
@@ -57,6 +64,13 @@ class ActivityPage extends ConsumerWidget {
                   ? 'Start reviewing, saving, and posting to unlock your first collectible milestone.'
                   : 'Earned ${accomplishmentSummary.earnedCount} accomplishments. Next: ${accomplishmentSummary.nextMilestones.join(', ')}',
               'icon': Icons.military_tech_outlined,
+            },
+            {
+              'title': 'Local challenges',
+              'desc': challengeSummary == null
+                  ? 'City and neighborhood missions unlock as you save, review, and post from canonical places.'
+                  : '${challengeSummary.inProgress} active missions • ${challengeSummary.completed} completed • Areas: ${challengeSummary.featuredLocales.join(', ')}',
+              'icon': Icons.explore_outlined,
             },
           ];
 
