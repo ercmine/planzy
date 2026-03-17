@@ -314,6 +314,81 @@ class Plan {
       };
 }
 
+abstract class $PlanCopyWith<$Res> {
+  factory $PlanCopyWith(Plan value, $Res Function(Plan) then) = _$PlanCopyWithImpl<$Res>;
+
+  $Res call({
+    String? id,
+    String? source,
+    String? sourceId,
+    String? title,
+    String? category,
+    PlanLocation? location,
+    String? description,
+    double? distanceMeters,
+    PlanHours? hours,
+    List<String>? openingHoursText,
+    String? phone,
+    PlanDeepLinks? deepLinks,
+    List<PlanPhoto>? photos,
+    int? priceLevel,
+    double? rating,
+    int? reviewCount,
+    Map<String, dynamic>? metadata,
+  });
+}
+
+class _$PlanCopyWithImpl<$Res> implements $PlanCopyWith<$Res> {
+  _$PlanCopyWithImpl(this._value, this._then);
+
+  final Plan _value;
+  final $Res Function(Plan) _then;
+
+  @override
+  $Res call({
+    Object? id = null,
+    Object? source = null,
+    Object? sourceId = null,
+    Object? title = null,
+    Object? category = null,
+    Object? location = null,
+    Object? description = null,
+    Object? distanceMeters = null,
+    Object? hours = null,
+    Object? openingHoursText = null,
+    Object? phone = null,
+    Object? deepLinks = null,
+    Object? photos = null,
+    Object? priceLevel = null,
+    Object? rating = null,
+    Object? reviewCount = null,
+    Object? metadata = null,
+  }) {
+    return _then(
+      _value.copyWith(
+        id: id == null ? _value.id : id as String,
+        source: source == null ? _value.source : source as String,
+        sourceId: sourceId == null ? _value.sourceId : sourceId as String,
+        title: title == null ? _value.title : title as String,
+        category: category == null ? _value.category : category as String,
+        location: location == null ? _value.location : location as PlanLocation,
+        description: description == null ? _value.description : description as String?,
+        distanceMeters: distanceMeters == null ? _value.distanceMeters : distanceMeters as double?,
+        hours: hours == null ? _value.hours : hours as PlanHours?,
+        openingHoursText:
+            openingHoursText == null ? _value.openingHoursText : openingHoursText as List<String>?,
+        phone: phone == null ? _value.phone : phone as String?,
+        deepLinks: deepLinks == null ? _value.deepLinks : deepLinks as PlanDeepLinks?,
+        photos: photos == null ? _value.photos : photos as List<PlanPhoto>?,
+        priceLevel: priceLevel == null ? _value.priceLevel : priceLevel as int?,
+        rating: rating == null ? _value.rating : rating as double?,
+        reviewCount: reviewCount == null ? _value.reviewCount : reviewCount as int?,
+        metadata: metadata == null ? _value.metadata : metadata as Map<String, dynamic>?,
+      ),
+    );
+  }
+}
+
 Map<String, dynamic>? _normalizeMetadata(Object? value) {
   if (value is Map<String, dynamic>) return value;
   if (value is Map) return value.map((key, item) => MapEntry(key.toString(), item));
