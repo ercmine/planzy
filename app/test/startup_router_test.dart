@@ -35,4 +35,20 @@ void main() {
     router.dispose();
     container.dispose();
   });
+
+  test('routes completed onboarding away from onboarding pages to home', () {
+    final container = ProviderContainer(
+      overrides: [
+        onboardingCompletedProvider.overrideWith((ref) async => true),
+      ],
+    );
+
+    final router = container.read(routerProvider);
+    router.go('/onboarding/discovery');
+    expect(router.routeInformationProvider.value.uri.path, '/');
+
+    router.dispose();
+    container.dispose();
+  });
 }
+

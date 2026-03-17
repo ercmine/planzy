@@ -16,8 +16,17 @@ class OnboardingDiscoveryPage extends ConsumerWidget {
     final onboarding = ref.watch(onboardingControllerProvider);
 
     Future<void> finish() async {
-      await ref.read(onboardingControllerProvider.notifier).finish();
-      if (context.mounted) context.go('/');
+      final result = await ref.read(onboardingControllerProvider.notifier).finishAndBootstrapFeed();
+      if (!context.mounted) {
+        return;
+      }
+      if (result.isSuccess) {
+        context.go('/');
+      } else if (result.message != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.message!)),
+        );
+      }
     }
 
     return OnboardingScaffold(
@@ -31,26 +40,40 @@ class OnboardingDiscoveryPage extends ConsumerWidget {
           RadioListTile<DiscoveryMode>(
             value: DiscoveryMode.mostlyLocal,
             groupValue: onboarding.discoveryMode,
-            onChanged: (value) => ref.read(onboardingControllerProvider.notifier).setDiscoveryMode(value ?? DiscoveryMode.mostlyLocal),
+            onChanged: onboarding.isFinishing
+                ? null
+                : (value) => ref.read(onboardingControllerProvider.notifier).setDiscoveryMode(value ?? DiscoveryMode.mostlyLocal),
             title: const Text('Mostly Local'),
             subtitle: const Text('Nearby places first, with minimal expansion.'),
           ),
           RadioListTile<DiscoveryMode>(
             value: DiscoveryMode.balanced,
             groupValue: onboarding.discoveryMode,
-            onChanged: (value) => ref.read(onboardingControllerProvider.notifier).setDiscoveryMode(value ?? DiscoveryMode.balanced),
+            onChanged: onboarding.isFinishing
+                ? null
+                : (value) => ref.read(onboardingControllerProvider.notifier).setDiscoveryMode(value ?? DiscoveryMode.balanced),
             title: const Text('Balanced Local + Regional'),
             subtitle: const Text('Strong local relevance with nearby market fallback.'),
           ),
           RadioListTile<DiscoveryMode>(
             value: DiscoveryMode.globalInspiration,
             groupValue: onboarding.discoveryMode,
-            onChanged: (value) => ref.read(onboardingControllerProvider.notifier).setDiscoveryMode(value ?? DiscoveryMode.globalInspiration),
+            onChanged: onboarding.isFinishing
+                ? null
+                : (value) => ref.read(onboardingControllerProvider.notifier).setDiscoveryMode(value ?? DiscoveryMode.globalInspiration),
             title: const Text('Global Inspiration'),
             subtitle: const Text('Best content globally when local supply is thin.'),
           ),
+          if (onboarding.errorMessage != null) ...[
+            const SizedBox(height: AppSpacing.s),
+            Text(
+              onboarding.errorMessage!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              textAlign: TextAlign.center,
+            ),
+          ],
           const Spacer(),
-          PrimaryButton(label: 'Finish and open my feed', onPressed: finish),
+          PrimaryButton(label: 'Finish and open my feed', onPressed: onboarding.isFinishing ? null : finish, isLoading: onboarding.isFinishing),
         ],
       ),
     );
