@@ -82,6 +82,8 @@ import { createSocialGamificationHttpHandlers } from "../socialGamification/http
 import type { ChallengesService } from "../challenges/service.js";
 import type { CollectionsService } from "../collections/service.js";
 import type { SocialGamificationService } from "../socialGamification/service.js";
+import { createGamificationControlHttpHandlers } from "../gamificationControl/http.js";
+import type { GamificationControlService } from "../gamificationControl/service.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
@@ -166,6 +168,7 @@ export function createRoutes(
     leaderboardsService?: LeaderboardsService;
     collectionsService?: CollectionsService;
     socialGamificationService?: SocialGamificationService;
+    gamificationControlService?: GamificationControlService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -196,6 +199,7 @@ export function createRoutes(
   const leaderboardHandlers = deps?.leaderboardsService ? createLeaderboardHttpHandlers(deps.leaderboardsService) : null;
   const collectionsHandlers = deps?.collectionsService ? createCollectionsHttpHandlers(deps.collectionsService) : null;
   const socialGamificationHandlers = deps?.socialGamificationService ? createSocialGamificationHttpHandlers(deps.socialGamificationService) : null;
+  const gamificationControlHandlers = deps?.gamificationControlService ? createGamificationControlHttpHandlers(deps.gamificationControlService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -695,6 +699,41 @@ export function createRoutes(
 
       if (req.method === "PUT" && normalizedPath === "/v1/accomplishments/featured" && accomplishmentsHandlers) {
         await accomplishmentsHandlers.updateFeatured(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/gamification/summary" && gamificationControlHandlers) {
+        await gamificationControlHandlers.summary(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/gamification/events" && gamificationControlHandlers) {
+        await gamificationControlHandlers.processEvent(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/admin/gamification/rules/draft" && gamificationControlHandlers) {
+        await gamificationControlHandlers.createDraft(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/admin/gamification/rules/publish" && gamificationControlHandlers) {
+        await gamificationControlHandlers.publish(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/admin/gamification/recompute" && gamificationControlHandlers) {
+        await gamificationControlHandlers.recompute(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/gamification/snapshot" && gamificationControlHandlers) {
+        await gamificationControlHandlers.adminSnapshot(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/admin/gamification/explain" && gamificationControlHandlers) {
+        await gamificationControlHandlers.explainDecision(req, res);
         return;
       }
 
