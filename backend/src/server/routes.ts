@@ -78,8 +78,10 @@ import type { LeaderboardsService } from "../leaderboards/service.js";
 import { createChallengesHttpHandlers } from "../challenges/http.js";
 import { createLeaderboardHttpHandlers } from "../leaderboards/http.js";
 import { createCollectionsHttpHandlers } from "../collections/http.js";
+import { createSocialGamificationHttpHandlers } from "../socialGamification/http.js";
 import type { ChallengesService } from "../challenges/service.js";
 import type { CollectionsService } from "../collections/service.js";
+import type { SocialGamificationService } from "../socialGamification/service.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
@@ -163,6 +165,7 @@ export function createRoutes(
     challengesService?: ChallengesService;
     leaderboardsService?: LeaderboardsService;
     collectionsService?: CollectionsService;
+    socialGamificationService?: SocialGamificationService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -192,6 +195,7 @@ export function createRoutes(
   const challengesHandlers = deps?.challengesService ? createChallengesHttpHandlers(deps.challengesService) : null;
   const leaderboardHandlers = deps?.leaderboardsService ? createLeaderboardHttpHandlers(deps.leaderboardsService) : null;
   const collectionsHandlers = deps?.collectionsService ? createCollectionsHttpHandlers(deps.collectionsService) : null;
+  const socialGamificationHandlers = deps?.socialGamificationService ? createSocialGamificationHttpHandlers(deps.socialGamificationService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -226,6 +230,32 @@ export function createRoutes(
 
     try {
 
+
+
+      if (req.method === "GET" && normalizedPath === "/v1/social-gamification/feed" && socialGamificationHandlers) {
+        await socialGamificationHandlers.feed(req, res, url);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/social-gamification/privacy" && socialGamificationHandlers) {
+        await socialGamificationHandlers.privacy(req, res);
+        return;
+      }
+
+      if (req.method === "PUT" && normalizedPath === "/v1/social-gamification/privacy" && socialGamificationHandlers) {
+        await socialGamificationHandlers.updatePrivacy(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/social-gamification/actions" && socialGamificationHandlers) {
+        await socialGamificationHandlers.recordAction(req, res);
+        return;
+      }
+
+      if (req.method === "PUT" && normalizedPath === "/v1/admin/social-gamification/goals" && socialGamificationHandlers) {
+        await socialGamificationHandlers.upsertGoal(req, res);
+        return;
+      }
 
       if (req.method === "GET" && normalizedPath === "/v1/collections" && collectionsHandlers) {
         await collectionsHandlers.list(req, res);
