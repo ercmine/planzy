@@ -74,7 +74,9 @@ import type { TrustSafetyService } from "../trustSafety/service.js";
 import type { OnboardingHttpHandlers } from "../onboarding/http.js";
 import { createAccomplishmentsHttpHandlers } from "../accomplishments/http.js";
 import type { AccomplishmentsService } from "../accomplishments/service.js";
+import type { LeaderboardsService } from "../leaderboards/service.js";
 import { createChallengesHttpHandlers } from "../challenges/http.js";
+import { createLeaderboardHttpHandlers } from "../leaderboards/http.js";
 import type { ChallengesService } from "../challenges/service.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 
@@ -157,6 +159,7 @@ export function createRoutes(
     onboardingHandlers?: OnboardingHttpHandlers;
     accomplishmentsService?: AccomplishmentsService;
     challengesService?: ChallengesService;
+    leaderboardsService?: LeaderboardsService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -184,6 +187,7 @@ export function createRoutes(
   const onboardingHandlers = deps?.onboardingHandlers ?? null;
   const accomplishmentsHandlers = deps?.accomplishmentsService ? createAccomplishmentsHttpHandlers(deps.accomplishmentsService) : null;
   const challengesHandlers = deps?.challengesService ? createChallengesHttpHandlers(deps.challengesService) : null;
+  const leaderboardHandlers = deps?.leaderboardsService ? createLeaderboardHttpHandlers(deps.leaderboardsService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -578,6 +582,44 @@ export function createRoutes(
       const reinstateUserMatch = /^\/v1\/admin\/users\/([^/]+)\/reinstate$/.exec(normalizedPath);
       if (reinstateUserMatch && req.method === "POST" && adminHandlers) {
         await adminHandlers.reinstateUser(req, res, reinstateUserMatch[1] ?? "");
+        return;
+      }
+
+
+      if (req.method === "GET" && normalizedPath === "/v1/leaderboards/families" && leaderboardHandlers) {
+        await leaderboardHandlers.families(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/leaderboards" && leaderboardHandlers) {
+        await leaderboardHandlers.list(req, res, url);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/leaderboards/me" && leaderboardHandlers) {
+        await leaderboardHandlers.me(req, res, url);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/leaderboards/events" && leaderboardHandlers) {
+        await leaderboardHandlers.record(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/leaderboards/formulas" && leaderboardHandlers) {
+        await leaderboardHandlers.formulas(req, res);
+        return;
+      }
+
+      const leaderboardInspectMatch = /^\/v1\/admin\/leaderboards\/([^/]+)\/entities\/([^/]+)$/.exec(normalizedPath);
+      if (leaderboardInspectMatch && req.method === "GET" && leaderboardHandlers) {
+        await leaderboardHandlers.inspect(req, res, leaderboardInspectMatch[1] ?? "", decodeURIComponent(leaderboardInspectMatch[2] ?? ""), url);
+        return;
+      }
+
+      const leaderboardFormulaMatch = /^\/v1\/admin\/leaderboards\/([^/]+)\/formula$/.exec(normalizedPath);
+      if (leaderboardFormulaMatch && req.method === "PUT" && leaderboardHandlers) {
+        await leaderboardHandlers.tune(req, res, leaderboardFormulaMatch[1] ?? "");
         return;
       }
 

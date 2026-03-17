@@ -131,3 +131,5 @@ export * from "./placeContent/index.js";
 export * from "./accomplishments/index.js";
 
 export * from "./challenges/index.js";
+
+export * from "./leaderboards/index.js";
