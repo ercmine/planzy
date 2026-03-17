@@ -142,4 +142,81 @@ describe("ProgressionService", () => {
     expect(admin.eventCount).toBeGreaterThanOrEqual(4);
     expect(admin.suppressionCounts.duplicate_dedupe_key).toBe(1);
   });
+
+  it("builds micro feedback and contextual modules for meaningful actions", () => {
+    const service = new ProgressionService();
+
+    const result = service.recordAction({
+      userId: "u-feedback",
+      type: "explorer_review_submitted",
+      targetEntityType: "review",
+      targetEntityId: "rv-1",
+      canonicalPlaceId: "place-a"
+    });
+
+    expect(result.rewardFeedback.events.some((entry) => entry.kind === "xp")).toBe(true);
+    expect(result.rewardFeedback.modules[0]?.context).toBe("post_review");
+    expect(result.rewardFeedback.modules[0]?.nextGoal?.id).toBe("explorer_level");
+  });
+
+  it("queues major celebrations for level ups and milestone unlocks", () => {
+    const service = new ProgressionService({
+      milestones: [{ id: "m_one", track: "explorer", metric: "reviews_submitted", threshold: 1, title: "First review" }]
+    });
+
+    const result = service.recordAction({
+      userId: "u-major",
+      type: "explorer_review_submitted",
+      targetEntityType: "review",
+      targetEntityId: "rv-2",
+      canonicalPlaceId: "place-b"
+    });
+
+    expect(result.rewardFeedback.celebrationQueue.some((entry) => entry.kind === "level_up" || entry.kind === "milestone_unlock")).toBe(true);
+    expect(result.rewardFeedback.events.some((entry) => entry.shareCardEligible)).toBe(true);
+  });
+
+  it("returns trophy showcase and empty state for new users", () => {
+    const service = new ProgressionService({
+      milestones: [{ id: "m_show", track: "creator", metric: "published_videos", threshold: 1, title: "First publish" }]
+    });
+
+    const emptyShowcase = service.getProfileTrophyShowcase("u-new");
+    expect(emptyShowcase.empty).toBe(true);
+
+    service.recordAction({ userId: "u-new", type: "creator_video_published", targetEntityType: "video", targetEntityId: "vid-1" });
+    const showcase = service.getProfileTrophyShowcase("u-new");
+
+    expect(showcase.empty).toBe(false);
+    expect(showcase.featured).toHaveLength(1);
+    expect(showcase.featured[0]?.featured).toBe(true);
+  });
+
+  it("suppressed moderation events do not create reward feedback celebrations", () => {
+    const service = new ProgressionService();
+
+    const result = service.recordAction({
+      userId: "u-safe",
+      type: "creator_video_published",
+      targetEntityType: "video",
+      targetEntityId: "vid-hidden",
+      moderationState: "removed"
+    });
+
+    expect(result.event.status).toBe("suppressed");
+    expect(result.rewardFeedback.events).toHaveLength(0);
+    expect(result.rewardFeedback.celebrationQueue).toHaveLength(0);
+  });
+
+  it("tracks admin-facing reward surface analytics counters", () => {
+    const service = new ProgressionService();
+
+    service.recordAction({ userId: "u-admin", type: "explorer_review_submitted", targetEntityType: "review", targetEntityId: "ra" });
+    service.markTrophyShelfViewed();
+    const admin = service.getAdminSnapshot();
+
+    expect(admin.rewardSurfaceCounters.microShown).toBeGreaterThan(0);
+    expect(admin.rewardSurfaceCounters.trophyShelfViewed).toBe(1);
+  });
+
 });
