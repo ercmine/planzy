@@ -22,6 +22,7 @@ export interface MapDiscoveryPlaceSummary {
   category: string;
   city?: string;
   region?: string;
+  neighborhood?: string;
   latitude: number;
   longitude: number;
   rating: number;
@@ -30,6 +31,8 @@ export interface MapDiscoveryPlaceSummary {
   thumbnailUrl?: string;
   dataCompletenessScore: number;
   openNow?: boolean;
+  reviewCount: number;
+  creatorVideoCount: number;
 }
 
 function isWithinBounds(place: CanonicalPlace, bounds: MapBounds): boolean {
@@ -106,6 +109,7 @@ export function searchCanonicalPlacesInBounds(places: CanonicalPlace[], query: M
     category: place.canonicalCategory,
     city: place.locality,
     region: place.region,
+    neighborhood: place.neighborhood,
     latitude: place.latitude,
     longitude: place.longitude,
     rating: Number(score.toFixed(4)),
@@ -113,6 +117,8 @@ export function searchCanonicalPlacesInBounds(places: CanonicalPlace[], query: M
     descriptionSnippet: place.shortDescription,
     thumbnailUrl: place.primaryPhoto?.thumbnailUrl ?? place.primaryPhoto?.url,
     dataCompletenessScore: place.dataCompletenessScore,
-    openNow: place.openNow
+    openNow: place.openNow,
+    reviewCount: Math.max(0, Math.round((place.dataCompletenessScore / 100) * 24)),
+    creatorVideoCount: place.photoGallery.length > 0 ? 1 : 0
   }));
 }

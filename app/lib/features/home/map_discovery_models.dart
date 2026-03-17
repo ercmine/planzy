@@ -47,6 +47,11 @@ class MapPin {
     required this.rating,
     this.city,
     this.region,
+    this.neighborhood,
+    this.distanceMeters,
+    this.thumbnailUrl,
+    this.hasCreatorMedia = false,
+    this.hasReviews = false,
     this.descriptionSnippet,
   });
 
@@ -58,7 +63,15 @@ class MapPin {
   final double rating;
   final String? city;
   final String? region;
+  final String? neighborhood;
+  final double? distanceMeters;
+  final String? thumbnailUrl;
+  final bool hasCreatorMedia;
+  final bool hasReviews;
   final String? descriptionSnippet;
+
+  String get categoryLabel => category.replaceAll('-', ' ');
+  String get neighborhoodLabel => neighborhood ?? city ?? region ?? 'Nearby';
 }
 
 class PlacePreviewSummary {

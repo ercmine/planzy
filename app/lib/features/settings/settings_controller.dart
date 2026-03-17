@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/logging/log_settings.dart';
 import '../../core/permissions/permission_service.dart';
+import '../home/review_prompt_service.dart';
 import 'settings_state.dart';
 
 class SettingsController extends StateNotifier<SettingsState> {
@@ -11,9 +12,11 @@ class SettingsController extends StateNotifier<SettingsState> {
     required PermissionService permissionService,
     required SharedPreferences preferences,
     required LogSettingsController logSettingsController,
+    required ReviewPromptService reviewPromptService,
   })  : _permissionService = permissionService,
         _preferences = preferences,
         _logSettingsController = logSettingsController,
+        _reviewPromptService = reviewPromptService,
         super(SettingsState.initial()) {
     Future<void>.microtask(load);
   }
@@ -23,6 +26,7 @@ class SettingsController extends StateNotifier<SettingsState> {
   final PermissionService _permissionService;
   final SharedPreferences _preferences;
   final LogSettingsController _logSettingsController;
+  final ReviewPromptService _reviewPromptService;
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true, clearError: true);
@@ -39,22 +43,18 @@ class SettingsController extends StateNotifier<SettingsState> {
         contactsPermission: contactsPermission,
         notificationsEnabled: notificationsEnabled,
         diagnosticsLoggingEnabled: _logSettingsController.state,
+        reviewPromptsEnabled: _reviewPromptService.isOptedIn,
+        reviewPromptBackgroundEnabled: _preferences.getBool(ReviewPromptService.backgroundModeKey) ?? false,
       );
     } catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.toString(),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
     }
   }
 
   Future<void> refreshPermissions() async {
     final locationPermission = await _permissionService.checkLocation();
     final contactsPermission = await _permissionService.checkContacts();
-    state = state.copyWith(
-      locationPermission: locationPermission,
-      contactsPermission: contactsPermission,
-    );
+    state = state.copyWith(locationPermission: locationPermission, contactsPermission: contactsPermission);
   }
 
   Future<void> setNotificationsEnabled(bool enabled) async {
@@ -65,5 +65,15 @@ class SettingsController extends StateNotifier<SettingsState> {
   Future<void> setDiagnosticsLoggingEnabled(bool enabled) async {
     await _logSettingsController.setDiagnosticsLoggingEnabled(enabled);
     state = state.copyWith(diagnosticsLoggingEnabled: enabled);
+  }
+
+  Future<void> setReviewPromptsEnabled(bool enabled) async {
+    await _reviewPromptService.setOptIn(enabled);
+    state = state.copyWith(reviewPromptsEnabled: enabled);
+  }
+
+  Future<void> setReviewPromptBackgroundEnabled(bool enabled) async {
+    await _reviewPromptService.setBackgroundMode(enabled);
+    state = state.copyWith(reviewPromptBackgroundEnabled: enabled);
   }
 }

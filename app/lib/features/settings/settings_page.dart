@@ -136,11 +136,29 @@ class SettingsPage extends ConsumerWidget {
           AppSectionCard(
             title: 'Notifications',
             icon: Icons.notifications_none,
-            child: SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Notify me when matches are found'),
-              value: state.notificationsEnabled,
-              onChanged: controller.setNotificationsEnabled,
+            child: Column(
+              children: [
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Notify me when matches are found'),
+                  value: state.notificationsEnabled,
+                  onChanged: controller.setNotificationsEnabled,
+                ),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Prompt me to review places I visit'),
+                  subtitle: const Text('Opt-in only. Uses location to detect nearby canonical places with cooldown protections.'),
+                  value: state.reviewPromptsEnabled,
+                  onChanged: controller.setReviewPromptsEnabled,
+                ),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Allow background visit detection'),
+                  subtitle: const Text('Only enable if you want passive reminders. You can disable anytime.'),
+                  value: state.reviewPromptBackgroundEnabled,
+                  onChanged: state.reviewPromptsEnabled ? controller.setReviewPromptBackgroundEnabled : null,
+                ),
+              ],
             ),
           ),
           if (kShowDebugUi)
@@ -176,7 +194,9 @@ class SettingsPage extends ConsumerWidget {
               children: [
                 Text('Ads may be shown. We do not sell personal info.'),
                 SizedBox(height: AppSpacing.xs),
-                Text('You can adjust ad and privacy controls in your device settings.'),
+                Text('Location-aware review prompts are explicit opt-in and can be disabled at any time.'),
+                SizedBox(height: AppSpacing.xs),
+                Text('Perbug matches on-device location to canonical places and suppresses ambiguous dense-area prompts.'),
               ],
             ),
           ),

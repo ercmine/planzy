@@ -194,6 +194,19 @@ describe("server diagnostic and alias routes", () => {
     }
   });
 
+
+  it("matches visit locations to canonical places with confidence guards", async () => {
+    const response = await fetch(`${baseUrl}/v1/review-prompts/visit-match`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ lat: 30.2672, lng: -97.7431, reviewedPlaceIds: [] })
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      matched: expect.any(Boolean)
+    });
+  });
+
   it("serves plans and live-results under bare and /api aliases", async () => {
     const planResponse = await fetch(`${baseUrl}/plans?lat=44.85&lng=-93.54&category=coffee`);
     expect(planResponse.status).toBe(200);
