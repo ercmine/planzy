@@ -108,9 +108,16 @@ class OnboardingController extends Notifier<OnboardingState> {
 
       debugPrint('[OnboardingFinish] Persisting onboarding payload: ${payload.toJson()}');
       await identityStore.setOnboardingCategories(state.selectedCategories);
-      await onboardingRepository.savePreferences(payload);
       await identityStore.setOnboardingCompleted(true);
-      debugPrint('[OnboardingFinish] Backend and local onboarding completion persisted.');
+
+      try {
+        await onboardingRepository.savePreferences(payload);
+        debugPrint('[OnboardingFinish] Backend and local onboarding completion persisted.');
+      } catch (error, stackTrace) {
+        debugPrint(
+          '[OnboardingFinish] Backend onboarding save failed but local completion is persisted; continuing to feed: $error\n$stackTrace',
+        );
+      }
 
       state = state.copyWith(
         step: OnboardingStep.done,

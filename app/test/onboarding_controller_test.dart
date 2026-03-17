@@ -107,7 +107,7 @@ void main() {
     container.dispose();
   });
 
-  test('finish returns visible failure when backend save fails', () async {
+  test('finish still succeeds locally when backend save fails', () async {
     SharedPreferences.setMockInitialValues({});
 
     final apiClient = ApiClient(
@@ -134,8 +134,11 @@ void main() {
 
     final result = await notifier.finishAndBootstrapFeed();
 
-    expect(result.isSuccess, isFalse);
-    expect(result.message, isNotEmpty);
+    expect(result.isSuccess, isTrue);
+    expect(result.message, isNull);
+    final prefs = await SharedPreferences.getInstance();
+    final identity = IdentityStore(sharedPreferences: prefs);
+    expect(await identity.isOnboardingCompleted(), isTrue);
     expect(container.read(onboardingControllerProvider).isFinishing, isFalse);
 
     container.dispose();
