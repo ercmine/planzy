@@ -182,11 +182,16 @@ describe("server diagnostic and alias routes", () => {
   it("serves map discovery results using viewport bounds", async () => {
     const response = await fetch(`${baseUrl}/v1/places/map-discovery?north=30.35&south=30.2&east=-97.65&west=-97.8&zoom=13&categories=food,coffee&mode=search_this_area`);
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    const payload = await response.json();
+    expect(payload).toMatchObject({
       mode: "search_this_area",
       categories: ["food", "coffee"],
       places: expect.any(Array)
     });
+    for (const place of payload.places as Array<Record<string, unknown>>) {
+      expect(typeof place.canonicalPlaceId).toBe("string");
+      expect(place.canonicalPlaceId).not.toHaveLength(0);
+    }
   });
 
   it("serves plans and live-results under bare and /api aliases", async () => {
