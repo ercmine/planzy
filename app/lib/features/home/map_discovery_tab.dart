@@ -216,7 +216,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
           place: selected,
           proximityState: proximityFor(selected),
           distanceMeters: _distanceMeters(location?.lat, location?.lng, selected.latitude, selected.longitude),
-          onOpenDetails: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Open detail and review flow for ${selected.name}.'))),
+          onOpenDetails: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Open detail and review flow for ${selected?.name ?? 'this place'}.'))),
           onOpenMaps: () {},
           onSave: () {},
           onShare: () {},
@@ -266,7 +266,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Looks like you're at ${match.placeName ?? 'this place'} — want to leave a quick review?'),
+        content: Text("Looks like you're at ${match.placeName ?? 'this place'} — want to leave a quick review?"),
         action: SnackBarAction(label: 'Review', onPressed: () {}),
       ),
     );
