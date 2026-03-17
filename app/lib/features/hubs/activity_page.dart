@@ -30,6 +30,11 @@ final _challengeSummaryProvider = FutureProvider<ChallengeSummary?>((ref) async 
   return repo.fetchSummary();
 });
 
+final _questHubProvider = FutureProvider<QuestHubResponse?>((ref) async {
+  final repo = await ref.watch(challengeRepositoryProvider.future);
+  return repo.fetchQuestHub(cityId: 'city-minneapolis');
+});
+
 class ActivityPage extends ConsumerWidget {
   const ActivityPage({super.key});
 
@@ -39,6 +44,7 @@ class ActivityPage extends ConsumerWidget {
     final categories = ref.watch(_activityCategoriesProvider);
     final accomplishmentSummary = ref.watch(_accomplishmentSummaryProvider).valueOrNull;
     final challengeSummary = ref.watch(_challengeSummaryProvider).valueOrNull;
+    final questHub = ref.watch(_questHubProvider).valueOrNull;
 
     return AppScaffold(
       appBar: AppBar(leading: const AppBackButton(), title: const Text('Following & activity')),
@@ -69,8 +75,15 @@ class ActivityPage extends ConsumerWidget {
               'title': 'Local challenges',
               'desc': challengeSummary == null
                   ? 'City and neighborhood missions unlock as you save, review, and post from canonical places.'
-                  : '${challengeSummary.inProgress} active missions • ${challengeSummary.completed} completed • Areas: ${challengeSummary.featuredLocales.join(', ')}',
+                  : '${challengeSummary.weeklyActive} weekly • ${challengeSummary.seasonalActive} seasonal live now • ${challengeSummary.completed} completed',
               'icon': Icons.explore_outlined,
+            },
+            {
+              'title': 'Quest hub',
+              'desc': questHub == null
+                  ? 'Weekly and seasonal quests are loading...'
+                  : '${questHub.weekly.length} weekly, ${questHub.seasonal.length} seasonal, ${questHub.upcoming.length} upcoming limited-time quests',
+              'icon': Icons.event_available_outlined,
             },
           ];
 

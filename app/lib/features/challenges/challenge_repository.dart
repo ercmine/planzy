@@ -11,4 +11,11 @@ class ChallengeRepository {
     if (response == null) return null;
     return ChallengeSummary.fromJson(response);
   }
+
+  Future<QuestHubResponse?> fetchQuestHub({String? cityId}) async {
+    final path = cityId == null ? '/v1/challenges/quest-hub' : '/v1/challenges/quest-hub?cityId=$cityId';
+    final response = await apiClient.getJsonOrNull(path);
+    if (response == null) return null;
+    return QuestHubResponse.fromJson(response);
+  }
 }
