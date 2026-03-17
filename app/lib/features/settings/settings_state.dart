@@ -7,6 +7,8 @@ class SettingsState {
     required this.contactsPermission,
     required this.notificationsEnabled,
     required this.diagnosticsLoggingEnabled,
+    required this.reviewPromptsEnabled,
+    required this.reviewPromptBackgroundEnabled,
     required this.appVersion,
     this.errorMessage,
   });
@@ -18,6 +20,8 @@ class SettingsState {
       contactsPermission: PermissionState.unknown,
       notificationsEnabled: false,
       diagnosticsLoggingEnabled: false,
+      reviewPromptsEnabled: false,
+      reviewPromptBackgroundEnabled: false,
       appVersion: 'Unknown',
     );
   }
@@ -27,6 +31,8 @@ class SettingsState {
   final PermissionState contactsPermission;
   final bool notificationsEnabled;
   final bool diagnosticsLoggingEnabled;
+  final bool reviewPromptsEnabled;
+  final bool reviewPromptBackgroundEnabled;
   final String appVersion;
   final String? errorMessage;
 
@@ -36,6 +42,8 @@ class SettingsState {
     PermissionState? contactsPermission,
     bool? notificationsEnabled,
     bool? diagnosticsLoggingEnabled,
+    bool? reviewPromptsEnabled,
+    bool? reviewPromptBackgroundEnabled,
     String? appVersion,
     String? errorMessage,
     bool clearError = false,
@@ -47,6 +55,8 @@ class SettingsState {
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       diagnosticsLoggingEnabled:
           diagnosticsLoggingEnabled ?? this.diagnosticsLoggingEnabled,
+      reviewPromptsEnabled: reviewPromptsEnabled ?? this.reviewPromptsEnabled,
+      reviewPromptBackgroundEnabled: reviewPromptBackgroundEnabled ?? this.reviewPromptBackgroundEnabled,
       appVersion: appVersion ?? this.appVersion,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );

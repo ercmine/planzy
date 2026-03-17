@@ -67,6 +67,7 @@ import { AdminService } from "../admin/service.js";
 import type { PlaceNormalizationService } from "../places/service.js";
 import { autocompleteCanonicalPlaces } from "../places/autocomplete.js";
 import { searchCanonicalPlacesInBounds } from "../places/mapDiscovery.js";
+import { matchVisitToCanonicalPlace } from "../places/visitMatcher.js";
 import { createRolloutHttpHandlers } from "../rollouts/http.js";
 import { createVideoPlatformHttpHandlers } from "../videoPlatform/http.js";
 import type { VideoPlatformService } from "../videoPlatform/service.js";
@@ -279,6 +280,35 @@ export function createRoutes(
 
       if (req.method === "POST" && normalizedPath === "/v1/admin/collections" && collectionsHandlers) {
         await collectionsHandlers.upsert(req, res);
+        return;
+      }
+
+
+      if (req.method === "POST" && normalizedPath === "/v1/review-prompts/visit-match") {
+        const payload = await parseJsonBody(req) as { lat?: number; lng?: number; reviewedPlaceIds?: string[] };
+        const lat = Number(payload.lat);
+        const lng = Number(payload.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          throw new ValidationError(["lat and lng are required numbers"]);
+        }
+        const places = deps?.placeService?.listCanonicalPlaces() ?? [];
+        const match = matchVisitToCanonicalPlace(places, {
+          lat,
+          lng,
+          reviewedPlaceIds: Array.isArray(payload.reviewedPlaceIds)
+            ? payload.reviewedPlaceIds.map((entry) => String(entry)).filter(Boolean)
+            : []
+        });
+
+        await track({
+          type: "review_prompt_visit_match_checked",
+          matched: match.matched,
+          canonicalPlaceId: match.canonicalPlaceId,
+          reason: match.reason,
+          confidence: match.confidence
+        });
+
+        sendJson(res, 200, match);
         return;
       }
 

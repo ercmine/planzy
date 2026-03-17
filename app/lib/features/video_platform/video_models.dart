@@ -275,10 +275,13 @@ class MapDiscoveryPlace {
     required this.rating,
     this.city,
     this.region,
+    this.neighborhood,
     this.distanceMeters,
     this.thumbnailUrl,
     this.descriptionSnippet,
     this.openNow,
+    this.reviewCount = 0,
+    this.creatorVideoCount = 0,
   });
 
   final String placeId;
@@ -286,6 +289,7 @@ class MapDiscoveryPlace {
   final String category;
   final String? city;
   final String? region;
+  final String? neighborhood;
   final double latitude;
   final double longitude;
   final double rating;
@@ -293,6 +297,8 @@ class MapDiscoveryPlace {
   final String? thumbnailUrl;
   final String? descriptionSnippet;
   final bool? openNow;
+  final int reviewCount;
+  final int creatorVideoCount;
 
   factory MapDiscoveryPlace.fromJson(Map<String, dynamic> json) {
     return MapDiscoveryPlace(
@@ -301,6 +307,7 @@ class MapDiscoveryPlace {
       category: (json['category'] ?? 'place').toString(),
       city: json['city']?.toString(),
       region: json['region']?.toString(),
+      neighborhood: json['neighborhood']?.toString(),
       latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
       longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
@@ -308,6 +315,8 @@ class MapDiscoveryPlace {
       thumbnailUrl: json['thumbnailUrl']?.toString(),
       descriptionSnippet: json['descriptionSnippet']?.toString(),
       openNow: json['openNow'] as bool?,
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
+      creatorVideoCount: (json['creatorVideoCount'] as num?)?.toInt() ?? 0,
     );
   }
 }

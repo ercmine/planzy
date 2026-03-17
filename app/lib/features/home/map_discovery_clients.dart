@@ -79,6 +79,11 @@ class BackendPlaceDiscoveryClient implements PlaceDiscoveryClient {
       city: place.city,
       region: place.region,
       descriptionSnippet: place.descriptionSnippet,
+      neighborhood: place.neighborhood,
+      distanceMeters: place.distanceMeters,
+      thumbnailUrl: place.thumbnailUrl,
+      hasCreatorMedia: place.creatorVideoCount > 0,
+      hasReviews: place.reviewCount > 0,
     );
   }
 }

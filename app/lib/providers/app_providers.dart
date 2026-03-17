@@ -37,6 +37,7 @@ import '../features/premium/premium_repository.dart';
 import '../features/results/results_controller.dart';
 import '../features/results/results_state.dart';
 import '../features/settings/settings_controller.dart';
+import '../features/home/review_prompt_service.dart';
 import '../features/accomplishments/accomplishment_repository.dart';
 import '../features/challenges/challenge_repository.dart';
 import '../features/settings/settings_state.dart';
@@ -279,6 +280,16 @@ final connectivityControllerProvider =
   return ConnectivityController();
 });
 
+
+final reviewPromptServiceProvider = Provider<ReviewPromptService>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider).valueOrNull;
+  final apiClient = ref.watch(apiClientProvider).valueOrNull;
+  if (prefs == null || apiClient == null) {
+    throw StateError('Review prompt dependencies are not ready yet.');
+  }
+  return ReviewPromptService(apiClient: apiClient, preferences: prefs);
+});
+
 final settingsControllerProvider =
     StateNotifierProvider<SettingsController, SettingsState>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider).valueOrNull;
@@ -290,6 +301,7 @@ final settingsControllerProvider =
     permissionService: ref.watch(permissionServiceProvider),
     preferences: prefs,
     logSettingsController: ref.watch(logSettingsControllerProvider.notifier),
+    reviewPromptService: ref.watch(reviewPromptServiceProvider),
   );
 });
 
