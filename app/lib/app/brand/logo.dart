@@ -68,53 +68,43 @@ class _PerbugLogoPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    final topArc = Path()
-      ..moveTo(size.width * 0.15, size.height * 0.52)
-      ..arcToPoint(
-        Offset(size.width * 0.85, size.height * 0.52),
-        radius: Radius.circular(size.width * 0.35),
-        clockwise: false,
-      );
-    canvas.drawPath(topArc, stroke);
-
-    final middleArc = Path()
-      ..moveTo(size.width * 0.30, size.height * 0.52)
-      ..arcToPoint(
-        Offset(size.width * 0.70, size.height * 0.52),
-        radius: Radius.circular(size.width * 0.20),
-        clockwise: false,
-      )
-      ..arcToPoint(
-        Offset(size.width * 0.30, size.height * 0.52),
-        radius: Radius.circular(size.width * 0.20),
-        clockwise: false,
-      );
-    canvas.drawPath(middleArc, stroke);
-
-    final lowerArc = Path()
-      ..moveTo(size.width * 0.30, size.height * 0.68)
-      ..arcToPoint(
-        Offset(size.width * 0.78, size.height * 0.68),
-        radius: Radius.circular(size.width * 0.25),
-        clockwise: true,
-      );
-    canvas.drawPath(lowerArc, stroke);
-
     canvas.drawLine(
-      Offset(size.width * 0.28, size.height * 0.77),
-      Offset(size.width * 0.28, size.height * 0.36),
+      Offset(size.width * 0.30, size.height * 0.84),
+      Offset(size.width * 0.30, size.height * 0.16),
       stroke,
     );
 
-    final pCounter = Path()
-      ..moveTo(size.width * 0.46, size.height * 0.47)
-      ..lineTo(size.width * 0.58, size.height * 0.47)
+    final bowl = Path()
+      ..moveTo(size.width * 0.30, size.height * 0.20)
       ..arcToPoint(
-        Offset(size.width * 0.58, size.height * 0.64),
-        radius: Radius.circular(size.width * 0.09),
+        Offset(size.width * 0.74, size.height * 0.20),
+        radius: Radius.circular(size.width * 0.24),
+        clockwise: false,
       )
-      ..lineTo(size.width * 0.46, size.height * 0.64);
-    canvas.drawPath(pCounter, stroke);
+      ..arcToPoint(
+        Offset(size.width * 0.74, size.height * 0.56),
+        radius: Radius.circular(size.width * 0.21),
+        clockwise: false,
+      )
+      ..lineTo(size.width * 0.30, size.height * 0.56);
+    canvas.drawPath(bowl, stroke);
+
+    final innerCounter = Path()
+      ..moveTo(size.width * 0.44, size.height * 0.33)
+      ..arcToPoint(
+        Offset(size.width * 0.60, size.height * 0.33),
+        radius: Radius.circular(size.width * 0.10),
+        clockwise: false,
+      )
+      ..arcToPoint(
+        Offset(size.width * 0.60, size.height * 0.47),
+        radius: Radius.circular(size.width * 0.08),
+        clockwise: false,
+      )
+      ..lineTo(size.width * 0.44, size.height * 0.47);
+    canvas.drawPath(innerCounter, stroke);
+
+    canvas.drawCircle(Offset(size.width * 0.30, size.height * 0.84), size.width * 0.03, Paint()..shader = gradient);
   }
 
   @override
