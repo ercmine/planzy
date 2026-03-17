@@ -129,3 +129,5 @@ export * from "./geo/index.js";
 export * from "./placeContent/index.js";
 
 export * from "./accomplishments/index.js";
+
+export * from "./challenges/index.js";

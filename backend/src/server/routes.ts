@@ -74,6 +74,8 @@ import type { TrustSafetyService } from "../trustSafety/service.js";
 import type { OnboardingHttpHandlers } from "../onboarding/http.js";
 import { createAccomplishmentsHttpHandlers } from "../accomplishments/http.js";
 import type { AccomplishmentsService } from "../accomplishments/service.js";
+import { createChallengesHttpHandlers } from "../challenges/http.js";
+import type { ChallengesService } from "../challenges/service.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
@@ -154,6 +156,7 @@ export function createRoutes(
     videoPlatformService?: VideoPlatformService;
     onboardingHandlers?: OnboardingHttpHandlers;
     accomplishmentsService?: AccomplishmentsService;
+    challengesService?: ChallengesService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -180,6 +183,7 @@ export function createRoutes(
   const videoPlatformHandlers = deps?.videoPlatformService ? createVideoPlatformHttpHandlers(deps.videoPlatformService) : null;
   const onboardingHandlers = deps?.onboardingHandlers ?? null;
   const accomplishmentsHandlers = deps?.accomplishmentsService ? createAccomplishmentsHttpHandlers(deps.accomplishmentsService) : null;
+  const challengesHandlers = deps?.challengesService ? createChallengesHttpHandlers(deps.challengesService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -594,6 +598,28 @@ export function createRoutes(
 
       if (req.method === "PUT" && normalizedPath === "/v1/accomplishments/featured" && accomplishmentsHandlers) {
         await accomplishmentsHandlers.updateFeatured(req, res);
+        return;
+      }
+
+
+      if (req.method === "GET" && normalizedPath === "/v1/challenges" && challengesHandlers) {
+        await challengesHandlers.list(req, res, url);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/challenges/summary" && challengesHandlers) {
+        await challengesHandlers.summary(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/challenges/events" && challengesHandlers) {
+        await challengesHandlers.recordEvent(req, res);
+        return;
+      }
+
+      const challengeDetailMatch = /^\/v1\/challenges\/([^/]+)$/.exec(normalizedPath);
+      if (challengeDetailMatch && req.method === "GET" && challengesHandlers) {
+        await challengesHandlers.detail(req, res, decodeURIComponent(challengeDetailMatch[1] ?? ""));
         return;
       }
 
