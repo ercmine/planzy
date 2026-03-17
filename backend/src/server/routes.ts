@@ -77,7 +77,9 @@ import type { AccomplishmentsService } from "../accomplishments/service.js";
 import type { LeaderboardsService } from "../leaderboards/service.js";
 import { createChallengesHttpHandlers } from "../challenges/http.js";
 import { createLeaderboardHttpHandlers } from "../leaderboards/http.js";
+import { createCollectionsHttpHandlers } from "../collections/http.js";
 import type { ChallengesService } from "../challenges/service.js";
+import type { CollectionsService } from "../collections/service.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
@@ -160,6 +162,7 @@ export function createRoutes(
     accomplishmentsService?: AccomplishmentsService;
     challengesService?: ChallengesService;
     leaderboardsService?: LeaderboardsService;
+    collectionsService?: CollectionsService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -188,6 +191,7 @@ export function createRoutes(
   const accomplishmentsHandlers = deps?.accomplishmentsService ? createAccomplishmentsHttpHandlers(deps.accomplishmentsService) : null;
   const challengesHandlers = deps?.challengesService ? createChallengesHttpHandlers(deps.challengesService) : null;
   const leaderboardHandlers = deps?.leaderboardsService ? createLeaderboardHttpHandlers(deps.leaderboardsService) : null;
+  const collectionsHandlers = deps?.collectionsService ? createCollectionsHttpHandlers(deps.collectionsService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -222,6 +226,27 @@ export function createRoutes(
 
     try {
 
+
+      if (req.method === "GET" && normalizedPath === "/v1/collections" && collectionsHandlers) {
+        await collectionsHandlers.list(req, res);
+        return;
+      }
+
+      const collectionDetailMatch = /^\/v1\/collections\/([^/]+)$/.exec(normalizedPath);
+      if (req.method === "GET" && collectionDetailMatch && collectionsHandlers) {
+        await collectionsHandlers.detail(req, res, decodeURIComponent(collectionDetailMatch[1]));
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/collections/events" && collectionsHandlers) {
+        await collectionsHandlers.recordEvent(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/admin/collections" && collectionsHandlers) {
+        await collectionsHandlers.upsert(req, res);
+        return;
+      }
 
       if (req.method === "GET" && (normalizedPath === "/v1/places/map-discovery" || normalizedPath === "/places/map-discovery")) {
         const north = Number(url.searchParams.get("north"));

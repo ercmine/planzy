@@ -36,6 +36,7 @@ import type { OnboardingHttpHandlers } from "../onboarding/http.js";
 import type { AccomplishmentsService } from "../accomplishments/service.js";
 import type { ChallengesService } from "../challenges/service.js";
 import type { LeaderboardsService } from "../leaderboards/service.js";
+import type { CollectionsService } from "../collections/service.js";
 import { createRoutes } from "./routes.js";
 
 export function matchPath(pattern: string, pathname: string): Record<string, string> | null {
@@ -105,6 +106,7 @@ export function createHttpServer(
     accomplishmentsService?: AccomplishmentsService;
     challengesService?: ChallengesService;
     leaderboardsService?: LeaderboardsService;
+    collectionsService?: CollectionsService;
   }
 ): Server {
   const route = createRoutes(service, merchantService, deps);
