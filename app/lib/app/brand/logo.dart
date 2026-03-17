@@ -16,15 +16,10 @@ class PerbugLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final bright = brightness ?? Theme.of(context).brightness;
     final mark = CustomPaint(
       size: Size.square(size),
-      painter: _PerbugLogoPainter(
-        primary: scheme.primary,
-        secondary: scheme.secondary,
-        background: bright == Brightness.dark ? scheme.surfaceContainerHighest : scheme.surface,
-      ),
+      painter: _PerbugLogoPainter(background: bright == Brightness.dark ? const Color(0xFF060A14) : null),
     );
 
     if (variant == PerbugLogoVariant.markOnly) {
@@ -46,64 +41,84 @@ class PerbugLogo extends StatelessWidget {
 }
 
 class _PerbugLogoPainter extends CustomPainter {
-  _PerbugLogoPainter({
-    required this.primary,
-    required this.secondary,
-    required this.background,
-  });
+  _PerbugLogoPainter({this.background});
 
-  final Color primary;
-  final Color secondary;
-  final Color background;
+  final Color? background;
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(size.width * 0.28));
+    if (background != null) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(size.width * 0.22)),
+        Paint()..color = background!,
+      );
+    }
 
-    canvas.drawRRect(
-      rrect,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [primary, secondary],
-        ).createShader(rect),
-    );
+    final gradient = const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF27C7FF), Color(0xFFFFAB2E)],
+    ).createShader(rect);
 
-    final pPaint = Paint()
+    final stroke = Paint()
+      ..shader = gradient
       ..style = PaintingStyle.stroke
-      ..strokeWidth = size.width * 0.14
+      ..strokeWidth = size.width * 0.11
       ..strokeCap = StrokeCap.round
-      ..color = background;
+      ..strokeJoin = StrokeJoin.round;
 
-    final pPath = Path()
-      ..moveTo(size.width * 0.34, size.height * 0.24)
-      ..lineTo(size.width * 0.34, size.height * 0.76)
-      ..moveTo(size.width * 0.34, size.height * 0.28)
-      ..quadraticBezierTo(size.width * 0.78, size.height * 0.30, size.width * 0.70, size.height * 0.50)
-      ..quadraticBezierTo(size.width * 0.62, size.height * 0.63, size.width * 0.34, size.height * 0.60);
-    canvas.drawPath(pPath, pPaint);
+    final topArc = Path()
+      ..moveTo(size.width * 0.15, size.height * 0.52)
+      ..arcToPoint(
+        Offset(size.width * 0.85, size.height * 0.52),
+        radius: Radius.circular(size.width * 0.35),
+        clockwise: false,
+      );
+    canvas.drawPath(topArc, stroke);
 
-    canvas.drawCircle(
-      Offset(size.width * 0.76, size.height * 0.18),
-      size.width * 0.06,
-      Paint()..color = background,
-    );
+    final middleArc = Path()
+      ..moveTo(size.width * 0.30, size.height * 0.52)
+      ..arcToPoint(
+        Offset(size.width * 0.70, size.height * 0.52),
+        radius: Radius.circular(size.width * 0.20),
+        clockwise: false,
+      )
+      ..arcToPoint(
+        Offset(size.width * 0.30, size.height * 0.52),
+        radius: Radius.circular(size.width * 0.20),
+        clockwise: false,
+      );
+    canvas.drawPath(middleArc, stroke);
+
+    final lowerArc = Path()
+      ..moveTo(size.width * 0.30, size.height * 0.68)
+      ..arcToPoint(
+        Offset(size.width * 0.78, size.height * 0.68),
+        radius: Radius.circular(size.width * 0.25),
+        clockwise: true,
+      );
+    canvas.drawPath(lowerArc, stroke);
+
     canvas.drawLine(
-      Offset(size.width * 0.68, size.height * 0.24),
-      Offset(size.width * 0.74, size.height * 0.20),
-      Paint()
-        ..color = background
-        ..strokeWidth = size.width * 0.035
-        ..strokeCap = StrokeCap.round,
+      Offset(size.width * 0.28, size.height * 0.77),
+      Offset(size.width * 0.28, size.height * 0.36),
+      stroke,
     );
+
+    final pCounter = Path()
+      ..moveTo(size.width * 0.46, size.height * 0.47)
+      ..lineTo(size.width * 0.58, size.height * 0.47)
+      ..arcToPoint(
+        Offset(size.width * 0.58, size.height * 0.64),
+        radius: Radius.circular(size.width * 0.09),
+      )
+      ..lineTo(size.width * 0.46, size.height * 0.64);
+    canvas.drawPath(pCounter, stroke);
   }
 
   @override
   bool shouldRepaint(covariant _PerbugLogoPainter oldDelegate) {
-    return oldDelegate.primary != primary ||
-        oldDelegate.secondary != secondary ||
-        oldDelegate.background != background;
+    return oldDelegate.background != background;
   }
 }

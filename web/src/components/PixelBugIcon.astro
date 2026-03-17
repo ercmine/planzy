@@ -6,11 +6,16 @@ interface Props {
 const { class: className = 'h-6 w-6' } = Astro.props;
 ---
 
-<svg viewBox="0 0 32 32" class={className} fill="none" aria-hidden="true">
-  <rect x="12" y="10" width="8" height="8" rx="2" fill="currentColor" />
-  <rect x="8" y="14" width="4" height="4" rx="1" fill="currentColor" />
-  <rect x="20" y="14" width="4" height="4" rx="1" fill="currentColor" />
-  <rect x="13" y="18" width="2" height="4" rx="1" fill="currentColor" />
-  <rect x="17" y="18" width="2" height="4" rx="1" fill="currentColor" />
-  <path d="M12 11 9 8m11 3 3-3" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+<svg viewBox="0 0 128 128" class={className} fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="perbugMarkGradient" x1="20" y1="22" x2="108" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#27C7FF" />
+      <stop offset="1" stop-color="#FFAB2E" />
+    </linearGradient>
+  </defs>
+  <path d="M20 66A44 44 0 0 1 108 66" stroke="url(#perbugMarkGradient)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M37 66A27 27 0 0 1 91 66A27 27 0 0 1 37 66" stroke="url(#perbugMarkGradient)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M37 76A37 37 0 1 0 100 76" stroke="url(#perbugMarkGradient)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M36 92V47" stroke="url(#perbugMarkGradient)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M54 60H67A12 12 0 0 1 67 84H54" stroke="url(#perbugMarkGradient)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

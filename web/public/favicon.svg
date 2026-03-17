@@ -1,4 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="24" fill="#2588FF"/>
-  <path d="M28 68V32H54C62.8366 32 70 39.1634 70 48C70 56.8366 62.8366 64 54 64H40V68H28ZM40 56H54C58.4183 56 62 52.4183 62 48C62 43.5817 58.4183 40 54 40H40V56Z" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="g" x1="20" y1="22" x2="108" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#27C7FF"/>
+      <stop offset="1" stop-color="#FFAB2E"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#060A14"/>
+  <path d="M20 66A44 44 0 0 1 108 66" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M37 66A27 27 0 0 1 91 66A27 27 0 0 1 37 66" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M37 76A37 37 0 1 0 100 76" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M36 92V47" stroke="url(#g)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M54 60H67A12 12 0 0 1 67 84H54" stroke="url(#g)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
