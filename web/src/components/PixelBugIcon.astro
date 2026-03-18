@@ -1,21 +1,11 @@
 ---
 interface Props {
   class?: string;
+  src?: string;
+  alt?: string;
 }
 
-const { class: className = 'h-6 w-6' } = Astro.props;
+const { class: className = 'h-6 w-6', src = '/perbug1.svg', alt = 'Perbug logo' } = Astro.props;
 ---
 
-<svg viewBox="0 0 128 128" class={className} fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="perbugMarkGradient" x1="20" y1="22" x2="108" y2="104" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#27C7FF" />
-      <stop offset="1" stop-color="#FFAB2E" />
-    </linearGradient>
-  </defs>
-  <path d="M20 66A44 44 0 0 1 108 66" stroke="url(#perbugMarkGradient)" stroke-width="14" stroke-linecap="round"/>
-  <path d="M37 66A27 27 0 0 1 91 66A27 27 0 0 1 37 66" stroke="url(#perbugMarkGradient)" stroke-width="14" stroke-linecap="round"/>
-  <path d="M37 76A37 37 0 1 0 100 76" stroke="url(#perbugMarkGradient)" stroke-width="14" stroke-linecap="round"/>
-  <path d="M36 92V47" stroke="url(#perbugMarkGradient)" stroke-width="14" stroke-linecap="round"/>
-  <path d="M54 60H67A12 12 0 0 1 67 84H54" stroke="url(#perbugMarkGradient)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+<img src={src} alt={alt} class={className} loading="lazy" />
