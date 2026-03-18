@@ -11,7 +11,7 @@ export const defaultDescription =
 
 export function createSeo({ title, description, path = '/' }: SeoInput) {
   const canonical = new URL(path, publicConfig.PERBUG_SITE_URL).toString();
-  const ogImage = new URL('/social-card.svg', publicConfig.PERBUG_SITE_URL).toString();
+  const ogImage = new URL('/perbug.svg', publicConfig.PERBUG_SITE_URL).toString();
 
   return {
     title: `${title} | Perbug`,
