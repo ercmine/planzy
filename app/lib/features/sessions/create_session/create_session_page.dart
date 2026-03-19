@@ -48,6 +48,9 @@ class _CreateSessionPageState extends ConsumerState<CreateSessionPage> {
           AppCard(
             child: TextField(
               controller: _titleController,
+              keyboardType: TextInputType.text,
+              textInputAction: TextInputAction.done,
+              maxLines: 1,
               decoration: const InputDecoration(labelText: 'Title', hintText: 'Friday night ideas'),
               onChanged: (value) => ref.read(createSessionControllerProvider.notifier).setTitle(value),
             ),
