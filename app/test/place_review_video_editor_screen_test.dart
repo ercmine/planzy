@@ -8,9 +8,10 @@ import 'package:perbug/core/ads/ads_config.dart';
 import 'package:perbug/core/cache/local_store.dart';
 import 'package:perbug/core/env/env.dart';
 import 'package:perbug/features/place_review_editor/data/place_review_draft_store.dart';
-import 'package:perbug/features/place_review_editor/place_review_video_editor_screen.dart';
 import 'package:perbug/features/place_review_editor/place_review_editor_controller.dart';
+import 'package:perbug/features/place_review_editor/place_review_video_editor_screen.dart';
 import 'package:perbug/features/place_review_editor/services/place_review_upload_service.dart';
+import 'package:perbug/features/video_platform/video_models.dart';
 import 'package:perbug/features/video_platform/video_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -49,7 +50,7 @@ void main() {
     );
   });
 
-  Widget buildSubject() {
+  Widget buildSubject({PlaceSearchResult? initialPlace}) {
     return ProviderScope(
       overrides: [
         placeReviewDraftStoreProvider.overrideWith((ref) async => draftStore),
@@ -57,7 +58,7 @@ void main() {
       ],
       child: MaterialApp(
         theme: AppTheme.light(),
-        home: const PlaceReviewVideoEditorScreen(),
+        home: PlaceReviewVideoEditorScreen(initialPlace: initialPlace),
       ),
     );
   }
@@ -83,5 +84,23 @@ void main() {
 
     final whatToOrderTextField = tester.widget<TextField>(whatToOrderField);
     expect(whatToOrderTextField.controller!.text, 'Friesandshake');
+  });
+
+  testWidgets('attached place details hide empty separators on create review screen', (tester) async {
+    await tester.pumpWidget(
+      buildSubject(
+        initialPlace: const PlaceSearchResult(
+          placeId: 'place-1',
+          name: 'Cafe Orbit',
+          category: '',
+          regionLabel: 'Downtown',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cafe Orbit'), findsOneWidget);
+    expect(find.text('Downtown'), findsOneWidget);
+    expect(find.textContaining('•'), findsNothing);
   });
 }

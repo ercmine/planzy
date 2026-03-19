@@ -442,6 +442,19 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
     );
   }
 
+  String _placeAttachmentLabel(PlaceSearchResult? place) {
+    if (place == null) {
+      return 'Search for the exact location you visited.';
+    }
+
+    final details = [place.category, place.regionLabel]
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+
+    return details.isEmpty ? 'Place details unavailable' : details.join(' • ');
+  }
+
   Widget _buildReviewMetadata(PlaceReviewEditorState state, PlaceReviewEditorController controller) {
     final metadata = state.draft.metadata;
     return AppSectionCard(
@@ -476,7 +489,7 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
                     children: [
                       Text(metadata.place?.name ?? 'Attach a place'),
                       const SizedBox(height: 4),
-                      Text(metadata.place == null ? 'Search for the exact location you visited.' : '${metadata.place!.category} • ${metadata.place!.regionLabel}'),
+                      Text(_placeAttachmentLabel(metadata.place)),
                     ],
                   ),
                 ),
