@@ -17,3 +17,8 @@ final onboardingCompletedProvider = FutureProvider<bool>((ref) async {
   final identityStore = await ref.watch(identityStoreProvider.future);
   return identityStore.isOnboardingCompleted();
 });
+
+final localUserProfileProvider = FutureProvider<LocalUserProfile>((ref) async {
+  final identityStore = await ref.watch(identityStoreProvider.future);
+  return identityStore.getOrCreateProfile();
+});

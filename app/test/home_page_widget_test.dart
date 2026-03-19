@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:perbug/core/identity/identity_provider.dart';
+import 'package:perbug/core/identity/identity_store.dart';
+import 'package:perbug/features/accomplishments/accomplishment_models.dart';
+import 'package:perbug/features/challenges/challenge_models.dart';
+import 'package:perbug/features/collections/collection_models.dart';
 import 'package:perbug/features/home/home_page.dart';
+import 'package:perbug/features/home/place_video_detail_page.dart';
 import 'package:perbug/features/video_platform/video_models.dart';
 import 'package:perbug/features/video_platform/video_providers.dart';
 
@@ -37,6 +43,35 @@ void main() {
     List<PlaceSearchResult> placeResults = const [],
   }) {
     return [
+      localUserProfileProvider.overrideWith((ref) async => const LocalUserProfile(
+            userId: 'user_1',
+            displayName: 'Pat Local',
+            username: 'pat_local',
+            bio: 'Finding the best local spots one review at a time.',
+          )),
+      profileCollectionsProvider.overrideWith((ref) async => const [
+            CollectionCardModel(
+              id: 'col_1',
+              title: 'Downtown saves',
+              type: 'saved_places',
+              totalItems: 8,
+              completedItems: 3,
+              status: 'active',
+            ),
+          ]),
+      profileAccomplishmentSummaryProvider.overrideWith((ref) async => AccomplishmentSummary(
+            earnedCount: 2,
+            featured: const ['Trusted Reviewer'],
+            nextMilestones: const ['publish_10_reviews'],
+          )),
+      profileChallengeSummaryProvider.overrideWith((ref) async => ChallengeSummary(
+            totalAvailable: 4,
+            inProgress: 1,
+            completed: 2,
+            weeklyActive: 1,
+            seasonalActive: 0,
+            featuredLocales: const ['Downtown'],
+          )),
       videoFeedProvider(FeedScope.local).overrideWith((ref) async => localItems),
       videoFeedProvider(FeedScope.regional).overrideWith((ref) async => [localItems.first.copyWith(scope: FeedScope.regional, caption: 'Regional favorite')]),
       videoFeedProvider(FeedScope.global).overrideWith((ref) async => [localItems.first.copyWith(scope: FeedScope.global, caption: 'Global highlight')]),
@@ -154,7 +189,7 @@ void main() {
     expect(find.text('Retry'), findsOneWidget);
   });
 
-  testWidgets('Create tab shortcut opens studio section page', (tester) async {
+  testWidgets('Create tab shortcut opens profile review library page', (tester) async {
     await tester.pumpWidget(buildApp(baseOverrides()));
     await tester.pumpAndSettle();
 
@@ -162,9 +197,43 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Published'));
+
     await tester.pumpAndSettle();
 
-    expect(find.text('published videos'), findsOneWidget);
+    expect(find.text('Published reviews'), findsOneWidget);
+  });
+
+
+  testWidgets('Profile tab renders profile details and settings entry points', (tester) async {
+    await tester.pumpWidget(
+      buildApp(
+        baseOverrides(
+          studioItems: const [
+            StudioVideo(
+              videoId: 'published_1',
+              placeId: 'p3',
+              placeName: 'Taco Terrace',
+              title: 'Taco Terrace review',
+              status: StudioVideoStatus.published,
+              section: StudioSection.published,
+              updatedAt: '2026-01-01T00:00:00Z',
+              publishedAt: '2026-01-02T00:00:00Z',
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit profile'), findsOneWidget);
+    expect(find.text('Posts & reviews'), findsOneWidget);
+    expect(find.text('Drafted reviews & videos'), findsOneWidget);
+    expect(find.text('Saved places & collections'), findsOneWidget);
+    expect(find.text('Profile tools'), findsOneWidget);
+    expect(find.text('Log out'), findsOneWidget);
   });
 
   testWidgets('Place detail page shows place-linked video section', (tester) async {

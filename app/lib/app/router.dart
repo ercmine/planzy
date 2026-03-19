@@ -99,6 +99,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const HomePage(),
       ),
       GoRoute(
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => const HomePage(initialTab: HomeTab.profile),
+      ),
+      GoRoute(
+        path: '/studio',
+        redirect: (_, __) => '/profile',
+      ),
+      GoRoute(
         path: '/reviews/create',
         name: 'place-review-editor',
         builder: (context, state) => const PlaceReviewVideoEditorScreen(recoverLatestDraft: true),

@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/identity/identity_provider.dart';
+import '../../core/identity/identity_store.dart';
+import '../../features/accomplishments/accomplishment_models.dart';
+import '../../features/challenges/challenge_models.dart';
+import '../../features/collections/collection_models.dart';
+import '../../features/collections/collection_repository.dart';
 import '../../models/telemetry.dart';
 import '../../providers/app_providers.dart';
 import '../notifications/notification_center_tab.dart';
@@ -13,8 +20,28 @@ import '../video_platform/video_providers.dart';
 import 'map_discovery_tab.dart';
 import 'place_video_detail_page.dart';
 
+enum HomeTab { feed, map, search, create, saved, ranks, alerts, profile }
+
+final profileCollectionsProvider = FutureProvider<List<CollectionCardModel>>((ref) async {
+  final apiClient = await ref.watch(apiClientProvider.future);
+  final repository = CollectionRepository(apiClient);
+  return repository.fetchCollections();
+});
+
+final profileAccomplishmentSummaryProvider = FutureProvider<AccomplishmentSummary?>((ref) async {
+  final repository = await ref.watch(accomplishmentRepositoryProvider.future);
+  return repository.fetchSummary();
+});
+
+final profileChallengeSummaryProvider = FutureProvider<ChallengeSummary?>((ref) async {
+  final repository = await ref.watch(challengeRepositoryProvider.future);
+  return repository.fetchSummary();
+});
+
 class HomePage extends ConsumerStatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.initialTab = HomeTab.feed});
+
+  final HomeTab initialTab;
 
   @override
   ConsumerState<HomePage> createState() => _HomePageState();
@@ -24,6 +51,12 @@ class _HomePageState extends ConsumerState<HomePage> {
   int _navIndex = 0;
   FeedScope _scope = FeedScope.local;
   bool _scopeInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _navIndex = widget.initialTab.index;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +75,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       const _SavedTab(),
       const LeaderboardTab(),
       const NotificationCenterTab(),
-      const _ProfileStudioTab(),
+      const _ProfileTab(),
     ];
 
     return Scaffold(
@@ -63,7 +96,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             selectedIcon: const Icon(Icons.notifications),
             label: 'Alerts',
           ),
-          const NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Studio'),
+          const NavigationDestination(icon: Icon(Icons.account_circle_outlined), selectedIcon: Icon(Icons.account_circle), label: 'Profile'),
         ],
       ),
     );
@@ -533,7 +566,7 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
   }
 
   void _openStudio(StudioSection section) {
-    _trackCreateEvent('create_studio_shortcut_opened', {'section': section.name});
+    _trackCreateEvent('create_profile_shortcut_opened', {'section': section.name});
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _StudioSectionPage(section: section)));
   }
 
@@ -777,10 +810,10 @@ class _StudioSectionPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final videos = ref.watch(studioVideosProvider(section));
     return Scaffold(
-      appBar: AppBar(title: Text('${section.name} videos')),
+      appBar: AppBar(title: Text('${_sectionTitle(section)} reviews')),
       body: videos.when(
         data: (items) => items.isEmpty
-            ? const Center(child: Text('No items in this section yet.'))
+            ? const Center(child: Text('No reviews in this section yet.'))
             : ListView.builder(
                 itemCount: items.length,
                 itemBuilder: (_, index) {
@@ -809,11 +842,22 @@ class _StudioSectionPage extends ConsumerWidget {
                   );
                 },
               ),
-        error: (_, __) => const Center(child: Text('Unable to load studio section.')),
+        error: (_, __) => const Center(child: Text('Unable to load this profile section.')),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );
   }
+}
+
+
+String _sectionTitle(StudioSection section) {
+  return switch (section) {
+    StudioSection.drafts => 'Drafts',
+    StudioSection.processing => 'Processing',
+    StudioSection.published => 'Published',
+    StudioSection.needsAttention => 'Needs Attention',
+    StudioSection.archived => 'Archived',
+  };
 }
 
 class _SavedTab extends StatelessWidget {
@@ -823,15 +867,15 @@ class _SavedTab extends StatelessWidget {
   Widget build(BuildContext context) => const Center(child: Text('Saved places/videos'));
 }
 
-class _ProfileStudioTab extends ConsumerStatefulWidget {
-  const _ProfileStudioTab();
+class _ProfileTab extends ConsumerStatefulWidget {
+  const _ProfileTab();
 
   @override
-  ConsumerState<_ProfileStudioTab> createState() => _ProfileStudioTabState();
+  ConsumerState<_ProfileTab> createState() => _ProfileTabState();
 }
 
-class _ProfileStudioTabState extends ConsumerState<_ProfileStudioTab> with AutomaticKeepAliveClientMixin {
-  StudioSection _section = StudioSection.drafts;
+class _ProfileTabState extends ConsumerState<_ProfileTab> with AutomaticKeepAliveClientMixin {
+  StudioSection _section = StudioSection.published;
 
   @override
   bool get wantKeepAlive => true;
@@ -839,65 +883,480 @@ class _ProfileStudioTabState extends ConsumerState<_ProfileStudioTab> with Autom
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final profile = ref.watch(localUserProfileProvider);
     final analytics = ref.watch(studioAnalyticsProvider);
-    final videos = ref.watch(studioVideosProvider(_section));
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        Text('Creator Studio', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 12),
-        analytics.when(
-          data: (a) => Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _metricCard('Published', a.totalVideosPublished.toString()),
-              _metricCard('Views', a.totalViews.toString()),
-              _metricCard('Drafts', (a.statusCounts['drafts'] ?? 0).toString()),
-              _metricCard('Needs attention', (a.statusCounts['needsAttention'] ?? 0).toString()),
-            ],
+    final publishedVideos = ref.watch(studioVideosProvider(StudioSection.published));
+    final draftVideos = ref.watch(studioVideosProvider(StudioSection.drafts));
+    final needsAttentionVideos = ref.watch(studioVideosProvider(StudioSection.needsAttention));
+    final archivedVideos = ref.watch(studioVideosProvider(StudioSection.archived));
+    final collections = ref.watch(profileCollectionsProvider);
+    final accomplishments = ref.watch(profileAccomplishmentSummaryProvider);
+    final challenges = ref.watch(profileChallengeSummaryProvider);
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+        children: [
+          profile.when(
+            data: (user) => _buildHeader(context, user, analytics),
+            loading: () => const Card(child: Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator())),
+            error: (_, __) => const Card(child: ListTile(title: Text('Profile unavailable'), subtitle: Text('Pull to refresh and try again.'))),
           ),
-          error: (_, __) => const Text('Analytics unavailable right now.'),
-          loading: () => const LinearProgressIndicator(),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 6,
+          const SizedBox(height: 12),
+          _buildInsightsRow(analytics, collections, accomplishments, challenges),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            context,
+            title: 'Posts & reviews',
+            subtitle: 'Your published place reviews and profile-ready content.',
+            child: publishedVideos.when(
+              data: (items) => items.isEmpty
+                  ? const _ProfileEmptyState(
+                      icon: Icons.rate_review_outlined,
+                      title: 'No published reviews yet',
+                      subtitle: 'Publish your first place review from Create to build your public profile.',
+                    )
+                  : Column(
+                      children: items.take(6).map((video) => _ProfileReviewTile(video: video)).toList(growable: false),
+                    ),
+              loading: () => const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator()),
+              error: (_, __) => const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('Published reviews are temporarily unavailable.'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            context,
+            title: 'Drafted reviews & videos',
+            subtitle: 'Keep unfinished content moving and fix anything blocked before publish.',
+            child: Column(
+              children: [
+                _profileSubsection(
+                  title: 'Drafts',
+                  asyncVideos: draftVideos,
+                  emptyTitle: 'No active drafts',
+                  emptySubtitle: 'Start a draft in Create when you are ready to review a new spot.',
+                ),
+                const SizedBox(height: 12),
+                _profileSubsection(
+                  title: 'Needs attention',
+                  asyncVideos: needsAttentionVideos,
+                  emptyTitle: 'Nothing needs attention',
+                  emptySubtitle: 'Upload retries and moderation fixes will appear here.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            context,
+            title: 'Saved places & collections',
+            subtitle: 'Quick access to the places and collection progress you care about most.',
+            child: collections.when(
+              data: (items) => items.isEmpty
+                  ? const _ProfileEmptyState(
+                      icon: Icons.bookmark_outline,
+                      title: 'No saved collections yet',
+                      subtitle: 'Saved places and curated collections will surface here as soon as they are available.',
+                    )
+                  : Column(
+                      children: items.take(4).map((collection) => _CollectionTile(collection: collection)).toList(growable: false),
+                    ),
+              loading: () => const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator()),
+              error: (_, __) => const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('Saved collections are temporarily unavailable.'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            context,
+            title: 'Achievements & progress',
+            subtitle: 'Badges earned, milestone progress, and challenge momentum across Perbug.',
+            child: _buildAchievementContent(accomplishments, challenges),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            context,
+            title: 'Profile tools',
+            subtitle: 'Manage your account, privacy, notifications, and sign-out flow.',
+            child: Column(
+              children: [
+                _SettingsEntry(
+                  icon: Icons.settings_outlined,
+                  title: 'Open settings',
+                  subtitle: 'Notifications, permissions, support, and privacy controls.',
+                  onTap: () => context.push('/settings'),
+                ),
+                const Divider(height: 1),
+                _SettingsEntry(
+                  icon: Icons.logout_rounded,
+                  title: 'Log out',
+                  subtitle: 'Clear this local profile and return to onboarding.',
+                  onTap: _confirmLogout,
+                  destructive: true,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSectionCard(
+            context,
+            title: 'Library filters',
+            subtitle: 'Jump into another profile content bucket.',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _sectionChip('Published', StudioSection.published),
+                    _sectionChip('Drafts', StudioSection.drafts),
+                    _sectionChip('Processing', StudioSection.processing),
+                    _sectionChip('Needs Attention', StudioSection.needsAttention),
+                    _sectionChip('Archived', StudioSection.archived),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => _StudioSectionPage(section: _section)),
+                    ),
+                    icon: const Icon(Icons.grid_view_rounded),
+                    label: Text('Open ${_sectionTitle(_section)} library'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                archivedVideos.when(
+                  data: (items) => Text(
+                    'Archived content: ${items.length}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, LocalUserProfile user, AsyncValue<StudioAnalyticsOverview> analytics) {
+    final overview = analytics.valueOrNull;
+    final publishedCount = overview?.totalVideosPublished ?? 0;
+    const int? followerCount = null;
+    const int? followingCount = null;
+    final draftCount = overview?.statusCounts['drafts'] ?? 0;
+    final needsAttention = overview?.statusCounts['needsAttention'] ?? 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionChip('Drafts', StudioSection.drafts),
-            _sectionChip('Processing', StudioSection.processing),
-            _sectionChip('Published', StudioSection.published),
-            _sectionChip('Needs Attention', StudioSection.needsAttention),
-            _sectionChip('Archived', StudioSection.archived),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 34,
+                  child: Text(user.initials, style: Theme.of(context).textTheme.titleLarge),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(user.displayName, style: Theme.of(context).textTheme.headlineSmall),
+                      const SizedBox(height: 2),
+                      Text('@${user.username}', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.primary)),
+                      const SizedBox(height: 8),
+                      Text(user.bio),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _metricCard('Reviews', '$publishedCount'),
+                _metricCard('Drafts', '$draftCount'),
+                _metricCard('Needs fixes', '$needsAttention'),
+                _metricCard('Followers', followerCount == null ? '—' : '$followerCount', caption: followerCount == null ? 'Unavailable' : null),
+                _metricCard('Following', followingCount == null ? '—' : '$followingCount', caption: followingCount == null ? 'Unavailable' : null),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => _showEditProfile(user),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit profile'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push('/settings'),
+                    icon: const Icon(Icons.tune_rounded),
+                    label: const Text('Settings'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
-        const SizedBox(height: 12),
-        videos.when(
-          data: (items) {
-            if (items.isEmpty) {
-              return const Card(child: ListTile(title: Text('No items yet'), subtitle: Text('Start a place review draft to populate your studio.')));
-            }
-            return Column(
-              children: items
-                  .map(
-                    (video) => Card(
-                      child: ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.play_arrow_rounded)),
-                        title: Text(video.title),
-                        subtitle: Text('${video.placeName} • ${video.statusLabel ?? video.status.name}'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _StudioSectionPage(section: _section))),
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
-            );
-          },
-          error: (_, __) => const Center(child: Text('Studio unavailable')),
-          loading: () => const Center(child: CircularProgressIndicator()),
-        )
+      ),
+    );
+  }
+
+  Widget _buildInsightsRow(
+    AsyncValue<StudioAnalyticsOverview> analytics,
+    AsyncValue<List<CollectionCardModel>> collections,
+    AsyncValue<AccomplishmentSummary?> accomplishments,
+    AsyncValue<ChallengeSummary?> challenges,
+  ) {
+    final collectionCount = collections.valueOrNull?.length ?? 0;
+    final accomplishmentCount = accomplishments.valueOrNull?.earnedCount ?? 0;
+    final challengeCount = challenges.valueOrNull?.inProgress ?? 0;
+    final totalViews = analytics.valueOrNull?.totalViews ?? 0;
+
+    return Row(
+      children: [
+        Expanded(child: _metricCard('Views', '$totalViews')),
+        const SizedBox(width: 8),
+        Expanded(child: _metricCard('Collections', '$collectionCount')),
+        const SizedBox(width: 8),
+        Expanded(child: _metricCard('Badges', '$accomplishmentCount')),
+        const SizedBox(width: 8),
+        Expanded(child: _metricCard('Active quests', '$challengeCount')),
       ],
     );
+  }
+
+  Widget _buildAchievementContent(
+    AsyncValue<AccomplishmentSummary?> accomplishments,
+    AsyncValue<ChallengeSummary?> challenges,
+  ) {
+    if (accomplishments.isLoading || challenges.isLoading) {
+      return const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator());
+    }
+    if (accomplishments.hasError && challenges.hasError) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text('Achievements and challenge progress are temporarily unavailable.'),
+      );
+    }
+
+    final accomplishmentSummary = accomplishments.valueOrNull;
+    final challengeSummary = challenges.valueOrNull;
+    final badges = accomplishmentSummary?.featured ?? const <String>[];
+    final nextMilestones = accomplishmentSummary?.nextMilestones ?? const <String>[];
+    final featuredLocales = challengeSummary?.featuredLocales ?? const <String>[];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (badges.isNotEmpty) ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: badges.map((badge) => Chip(avatar: const Icon(Icons.verified_rounded, size: 18), label: Text(badge))).toList(growable: false),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (nextMilestones.isNotEmpty)
+          ...nextMilestones.map(
+            (milestone) => ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.flag_outlined),
+              title: Text(milestone.replaceAll('_', ' ')),
+              subtitle: const Text('Next milestone on your profile journey.'),
+            ),
+          ),
+        if (featuredLocales.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: featuredLocales.map((locale) => Chip(label: Text(locale))).toList(growable: false),
+            ),
+          ),
+        if (badges.isEmpty && nextMilestones.isEmpty && featuredLocales.isEmpty)
+          const _ProfileEmptyState(
+            icon: Icons.emoji_events_outlined,
+            title: 'No achievements to show yet',
+            subtitle: 'Your earned badges and challenge progress will appear here once available.',
+          ),
+      ],
+    );
+  }
+
+  Widget _profileSubsection({
+    required String title,
+    required AsyncValue<List<StudioVideo>> asyncVideos,
+    required String emptyTitle,
+    required String emptySubtitle,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        asyncVideos.when(
+          data: (items) => items.isEmpty
+              ? _ProfileEmptyState(
+                  icon: Icons.edit_note_rounded,
+                  title: emptyTitle,
+                  subtitle: emptySubtitle,
+                )
+              : Column(children: items.take(3).map((video) => _ProfileReviewTile(video: video)).toList(growable: false)),
+          loading: () => const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator()),
+          error: (_, __) => const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('This profile section is temporarily unavailable.'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionCard(BuildContext context, {required String title, required String subtitle, required Widget child}) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showEditProfile(LocalUserProfile user) async {
+    final displayNameController = TextEditingController(text: user.displayName);
+    final usernameController = TextEditingController(text: user.username);
+    final bioController = TextEditingController(text: user.bio);
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 12,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Edit profile', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            TextField(controller: displayNameController, decoration: const InputDecoration(labelText: 'Display name')),
+            const SizedBox(height: 8),
+            TextField(controller: usernameController, decoration: const InputDecoration(prefixText: '@', labelText: 'Username')),
+            const SizedBox(height: 8),
+            TextField(controller: bioController, decoration: const InputDecoration(labelText: 'Bio'), minLines: 3, maxLines: 5),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () async {
+                  final store = await ref.read(identityStoreProvider.future);
+                  await store.updateProfile(
+                    displayName: displayNameController.text,
+                    username: usernameController.text,
+                    bio: bioController.text,
+                  );
+                  if (!mounted) return;
+                  ref.invalidate(localUserProfileProvider);
+                  Navigator.of(context).pop(true);
+                },
+                child: const Text('Save changes'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    displayNameController.dispose();
+    usernameController.dispose();
+    bioController.dispose();
+
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated.')));
+    }
+  }
+
+  Future<void> _confirmLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('This clears the current local profile from this device and sends you back to onboarding.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Log out')),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+    final store = await ref.read(identityStoreProvider.future);
+    await store.resetIdentity();
+    ref.invalidate(localUserProfileProvider);
+    ref.invalidate(userIdProvider);
+    ref.invalidate(onboardingCompletedProvider);
+    if (!mounted) return;
+    context.go('/onboarding');
+  }
+
+  Future<void> _refresh() async {
+    ref.invalidate(localUserProfileProvider);
+    ref.invalidate(studioAnalyticsProvider);
+    ref.invalidate(studioVideosProvider(StudioSection.published));
+    ref.invalidate(studioVideosProvider(StudioSection.drafts));
+    ref.invalidate(studioVideosProvider(StudioSection.needsAttention));
+    ref.invalidate(studioVideosProvider(StudioSection.archived));
+    ref.invalidate(profileCollectionsProvider);
+    ref.invalidate(profileAccomplishmentSummaryProvider);
+    ref.invalidate(profileChallengeSummaryProvider);
+    await Future.wait([
+      ref.read(localUserProfileProvider.future),
+      ref.read(studioAnalyticsProvider.future),
+      ref.read(studioVideosProvider(StudioSection.published).future),
+      ref.read(studioVideosProvider(StudioSection.drafts).future),
+      ref.read(studioVideosProvider(StudioSection.needsAttention).future),
+      ref.read(studioVideosProvider(StudioSection.archived).future),
+      ref.read(profileCollectionsProvider.future),
+      ref.read(profileAccomplishmentSummaryProvider.future),
+      ref.read(profileChallengeSummaryProvider.future),
+    ]);
   }
 
   Widget _sectionChip(String label, StudioSection section) {
@@ -908,15 +1367,146 @@ class _ProfileStudioTabState extends ConsumerState<_ProfileStudioTab> with Autom
     );
   }
 
-  Widget _metricCard(String label, String value) {
+  Widget _metricCard(String label, String value, {String? caption}) {
     return SizedBox(
-      width: 152,
+      width: 132,
       child: Card(
+        margin: EdgeInsets.zero,
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label), Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700))]),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label),
+              Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              if (caption != null) ...[
+                const SizedBox(height: 4),
+                Text(caption, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _ProfileReviewTile extends StatelessWidget {
+  const _ProfileReviewTile({required this.video});
+
+  final StudioVideo video;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        leading: CircleAvatar(
+          child: Icon(
+            video.section == StudioSection.published ? Icons.public_rounded : Icons.play_circle_outline_rounded,
+          ),
+        ),
+        title: Text(video.title),
+        subtitle: Text('${video.placeName} • ${video.statusLabel ?? video.status.name}'),
+        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+}
+
+class _CollectionTile extends StatelessWidget {
+  const _CollectionTile({required this.collection});
+
+  final CollectionCardModel collection;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.collections_bookmark_outlined),
+                const SizedBox(width: 8),
+                Expanded(child: Text(collection.title, style: Theme.of(context).textTheme.titleMedium)),
+                Text(collection.status.replaceAll('_', ' ')),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text('${collection.completedItems}/${collection.totalItems} saved • ${collection.type}'),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(value: collection.progress),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileEmptyState extends StatelessWidget {
+  const _ProfileEmptyState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon),
+          const SizedBox(height: 8),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(subtitle),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsEntry extends StatelessWidget {
+  const _SettingsEntry({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive ? Theme.of(context).colorScheme.error : null;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: color),
+      title: Text(title, style: TextStyle(color: color)),
+      subtitle: Text(subtitle),
+      trailing: Icon(Icons.chevron_right, color: color),
+      onTap: onTap,
     );
   }
 }
