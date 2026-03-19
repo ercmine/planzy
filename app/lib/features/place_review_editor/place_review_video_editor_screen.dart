@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
@@ -15,6 +17,7 @@ import 'models/place_review_video_draft.dart';
 import 'place_review_editor_controller.dart';
 import 'services/place_review_export_service.dart';
 import 'services/place_review_upload_service.dart';
+import 'video_source_support.dart';
 import 'widgets/place_picker_sheet.dart';
 import 'widgets/trim_timeline.dart';
 
@@ -634,8 +637,24 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
       ),
     );
     if (action == null) return;
+    final isRecording = action == _VideoSourceAction.record;
+    if (!supportsNativeVideoPicker(
+      isWeb: kIsWeb,
+      platform: defaultTargetPlatform,
+    )) {
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        videoSourceUnavailableMessage(isRecording: isRecording),
+        isError: true,
+      );
+      return;
+    }
     try {
-      final file = await _imagePicker.pickVideo(source: action == _VideoSourceAction.record ? ImageSource.camera : ImageSource.gallery, maxDuration: const Duration(seconds: 60));
+      final file = await _imagePicker.pickVideo(
+        source: isRecording ? ImageSource.camera : ImageSource.gallery,
+        maxDuration: const Duration(seconds: 60),
+      );
       if (file == null) return;
       final tempController = VideoPlayerController.file(File(file.path));
       await tempController.initialize();
@@ -651,7 +670,19 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
       ]);
       await tempController.dispose();
       if (!mounted) return;
-      AppSnackbar.show(context, action == _VideoSourceAction.record ? 'Recording attached to your review draft' : 'Video imported into the editor');
+      AppSnackbar.show(
+        context,
+        isRecording
+            ? 'Recording attached to your review draft'
+            : 'Video imported into the editor',
+      );
+    } on MissingPluginException {
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        videoSourceUnavailableMessage(isRecording: isRecording),
+        isError: true,
+      );
     } catch (error) {
       if (!mounted) return;
       AppSnackbar.show(context, 'Unable to open video source: $error', isError: true);
