@@ -448,7 +448,21 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
       title: 'Review details',
       icon: Icons.edit_note_rounded,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            'Give viewers the essentials at a glance.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          _ReviewDetailsHelperList(
+            items: const [
+              'Attach the exact place you visited.',
+              'Add ratings plus a quick summary of the experience.',
+              'Call out what to order, when to go, and who it is best with.',
+            ],
+          ),
+          const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1004,6 +1018,45 @@ class _PlaceCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReviewDetailsHelperList extends StatelessWidget {
+  const _ReviewDetailsHelperList({required this.items});
+
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textStyle = theme.textTheme.bodySmall;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.75),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: Text(item, style: textStyle)),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
