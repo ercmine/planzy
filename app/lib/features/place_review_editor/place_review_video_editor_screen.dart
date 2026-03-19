@@ -42,6 +42,13 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
   final _bestTimeController = TextEditingController();
   final _companionsController = TextEditingController();
   final _hashtagsController = TextEditingController();
+  final _titleFocusNode = FocusNode();
+  final _captionFocusNode = FocusNode();
+  final _summaryFocusNode = FocusNode();
+  final _whatToOrderFocusNode = FocusNode();
+  final _bestTimeFocusNode = FocusNode();
+  final _companionsFocusNode = FocusNode();
+  final _hashtagsFocusNode = FocusNode();
   final _imagePicker = ImagePicker();
 
   PlaceReviewEditorController? _controller;
@@ -69,6 +76,13 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
     _bestTimeController.dispose();
     _companionsController.dispose();
     _hashtagsController.dispose();
+    _titleFocusNode.dispose();
+    _captionFocusNode.dispose();
+    _summaryFocusNode.dispose();
+    _whatToOrderFocusNode.dispose();
+    _bestTimeFocusNode.dispose();
+    _companionsFocusNode.dispose();
+    _hashtagsFocusNode.dispose();
     super.dispose();
   }
 
@@ -105,13 +119,22 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
   }
 
   void _syncControllers(PlaceReviewMetadata metadata) {
-    if (_titleController.text != metadata.title) _titleController.text = metadata.title;
-    if (_captionController.text != metadata.caption) _captionController.text = metadata.caption;
-    if (_summaryController.text != metadata.reviewSummary) _summaryController.text = metadata.reviewSummary;
-    if (_whatToOrderController.text != metadata.whatToOrder) _whatToOrderController.text = metadata.whatToOrder;
-    if (_bestTimeController.text != metadata.bestTimeToGo) _bestTimeController.text = metadata.bestTimeToGo;
-    if (_companionsController.text != metadata.companions.join(', ')) _companionsController.text = metadata.companions.join(', ');
-    if (_hashtagsController.text != metadata.hashtags.join(' ')) _hashtagsController.text = metadata.hashtags.join(' ');
+    _syncControllerValue(_titleController, _titleFocusNode, metadata.title);
+    _syncControllerValue(_captionController, _captionFocusNode, metadata.caption);
+    _syncControllerValue(_summaryController, _summaryFocusNode, metadata.reviewSummary);
+    _syncControllerValue(_whatToOrderController, _whatToOrderFocusNode, metadata.whatToOrder);
+    _syncControllerValue(_bestTimeController, _bestTimeFocusNode, metadata.bestTimeToGo);
+    _syncControllerValue(_companionsController, _companionsFocusNode, metadata.companions.join(', '));
+    _syncControllerValue(_hashtagsController, _hashtagsFocusNode, metadata.hashtags.join(' '));
+  }
+
+  void _syncControllerValue(TextEditingController controller, FocusNode focusNode, String value) {
+    if (focusNode.hasFocus || controller.text == value) return;
+    controller.value = controller.value.copyWith(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+      composing: TextRange.empty,
+    );
   }
 
   @override
@@ -422,9 +445,26 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             subtitle: Text(metadata.place == null ? 'Search for the exact location you visited.' : '${metadata.place!.category} • ${metadata.place!.regionLabel}'),
             trailing: FilledButton.tonal(onPressed: _pickPlace, child: Text(metadata.place == null ? 'Select' : 'Change')),
           ),
-          TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Review title'), onChanged: (value) => controller.updateMetadata(metadata.copyWith(title: value))),
+          TextField(
+            controller: _titleController,
+            focusNode: _titleFocusNode,
+            keyboardType: TextInputType.text,
+            textInputAction: TextInputAction.next,
+            maxLines: 1,
+            decoration: const InputDecoration(labelText: 'Review title'),
+            onChanged: (value) => controller.updateMetadata(metadata.copyWith(title: value)),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: _captionController, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Caption'), onChanged: (value) => controller.updateMetadata(metadata.copyWith(caption: value))),
+          TextField(
+            controller: _captionController,
+            focusNode: _captionFocusNode,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(labelText: 'Caption'),
+            onChanged: (value) => controller.updateMetadata(metadata.copyWith(caption: value)),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -453,20 +493,53 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             contentPadding: EdgeInsets.zero,
             onChanged: (value) => controller.updateMetadata(metadata.copyWith(rating: metadata.rating.copyWith(recommend: value))),
           ),
-          TextField(controller: _whatToOrderController, decoration: const InputDecoration(labelText: 'What to order'), onChanged: (value) => controller.updateMetadata(metadata.copyWith(whatToOrder: value))),
+          TextField(
+            controller: _whatToOrderController,
+            focusNode: _whatToOrderFocusNode,
+            keyboardType: TextInputType.text,
+            textInputAction: TextInputAction.next,
+            maxLines: 1,
+            decoration: const InputDecoration(labelText: 'What to order'),
+            onChanged: (value) => controller.updateMetadata(metadata.copyWith(whatToOrder: value)),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: _bestTimeController, decoration: const InputDecoration(labelText: 'Best time to go'), onChanged: (value) => controller.updateMetadata(metadata.copyWith(bestTimeToGo: value))),
+          TextField(
+            controller: _bestTimeController,
+            focusNode: _bestTimeFocusNode,
+            keyboardType: TextInputType.text,
+            textInputAction: TextInputAction.next,
+            maxLines: 1,
+            decoration: const InputDecoration(labelText: 'Best time to go'),
+            onChanged: (value) => controller.updateMetadata(metadata.copyWith(bestTimeToGo: value)),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: _summaryController, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Review summary'), onChanged: (value) => controller.updateMetadata(metadata.copyWith(reviewSummary: value))),
+          TextField(
+            controller: _summaryController,
+            focusNode: _summaryFocusNode,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(labelText: 'Review summary'),
+            onChanged: (value) => controller.updateMetadata(metadata.copyWith(reviewSummary: value)),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _companionsController,
+            focusNode: _companionsFocusNode,
+            keyboardType: TextInputType.text,
+            textInputAction: TextInputAction.next,
+            maxLines: 1,
             decoration: const InputDecoration(labelText: 'Companions / group context', hintText: 'Friends, family, coworkers'),
             onChanged: (value) => controller.updateMetadata(metadata.copyWith(companions: value.split(',').map((item) => item.trim()).where((item) => item.isNotEmpty).toList(growable: false))),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _hashtagsController,
+            focusNode: _hashtagsFocusNode,
+            keyboardType: TextInputType.text,
+            textInputAction: TextInputAction.done,
+            maxLines: 1,
             decoration: const InputDecoration(labelText: 'Hashtags / categories', hintText: '#brunch #nightlife'),
             onChanged: (value) => controller.updateMetadata(metadata.copyWith(hashtags: value.split(RegExp(r'\s+')).where((item) => item.isNotEmpty).toList(growable: false))),
           ),

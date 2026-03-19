@@ -720,11 +720,33 @@ class _DraftEditorSheetState extends ConsumerState<_DraftEditorSheet> {
             children: [
               Text(widget.video == null ? 'New review draft' : 'Edit review draft', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 12),
-              TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title'), onChanged: (_) => setState(() {})),
+              TextField(
+                controller: _titleController,
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.next,
+                maxLines: 1,
+                decoration: const InputDecoration(labelText: 'Title'),
+                onChanged: (_) => setState(() {}),
+              ),
               const SizedBox(height: 8),
-              TextField(controller: _captionController, decoration: const InputDecoration(labelText: 'Caption'), minLines: 2, maxLines: 4),
+              TextField(
+                controller: _captionController,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
+                decoration: const InputDecoration(labelText: 'Caption'),
+                minLines: 2,
+                maxLines: 4,
+              ),
               const SizedBox(height: 8),
-              TextField(key: const Key('place-search-field'), controller: _placeSearchController, decoration: const InputDecoration(labelText: 'Tag canonical place', hintText: 'Search places'), onChanged: (_) => setState(() {})),
+              TextField(
+                key: const Key('place-search-field'),
+                controller: _placeSearchController,
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.search,
+                maxLines: 1,
+                decoration: const InputDecoration(labelText: 'Tag canonical place', hintText: 'Search places'),
+                onChanged: (_) => setState(() {}),
+              ),
               const SizedBox(height: 8),
               placeResults.when(
                 data: (items) => items.isEmpty
