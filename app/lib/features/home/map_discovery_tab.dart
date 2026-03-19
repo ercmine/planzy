@@ -5,6 +5,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../app/theme/spacing.dart';
+import '../../app/theme/widgets.dart';
 import '../../core/connectivity/connectivity_state.dart';
 import '../../core/links/link_launcher.dart';
 import '../../core/links/link_types.dart';
@@ -279,31 +281,42 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    hintText: 'Search neighborhood or place',
-                    suffixIcon: IconButton(
-                      tooltip: 'Search map',
-                      onPressed: state.loading ? null : () => _searchForLocation(controller),
-                      icon: const Icon(Icons.arrow_forward_rounded),
-                    ),
-                  ),
-                  onSubmitted: state.loading ? null : (_) => _searchForLocation(controller),
+          child: BrandHeroCard(
+            child: Column(
+              children: [
+                const AppSectionHeader(
+                  title: 'Map discovery',
+                  subtitle: 'Pulse through nearby places, creator clips, and real-world momentum.',
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filledTonal(
-                tooltip: 'Center on my location',
-                onPressed: () => _handleCenterOnUserLocation(locationState, permissionService),
-                icon: const Icon(Icons.my_location),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.s),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        textInputAction: TextInputAction.search,
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search),
+                          hintText: 'Search neighborhood or place',
+                          suffixIcon: IconButton(
+                            tooltip: 'Search map',
+                            onPressed: state.loading ? null : () => _searchForLocation(controller),
+                            icon: const Icon(Icons.arrow_forward_rounded),
+                          ),
+                        ),
+                        onSubmitted: state.loading ? null : (_) => _searchForLocation(controller),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    AppIconButton(
+                      tooltip: 'Center on my location',
+                      onPressed: () => _handleCenterOnUserLocation(locationState, permissionService),
+                      icon: Icons.my_location,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
         if (state.areaLabel != null || state.geoStatus != null)
@@ -471,8 +484,16 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
               final distance = _distanceMeters(location?.lat, location?.lng, place.latitude, place.longitude);
               return SizedBox(
                 width: 240,
-                child: Card(
-                  color: selected?.canonicalPlaceId == place.canonicalPlaceId ? theme.colorScheme.primaryContainer.withOpacity(0.35) : null,
+                child: AppCard(
+                  glow: selected?.canonicalPlaceId == place.canonicalPlaceId,
+                  gradient: selected?.canonicalPlaceId == place.canonicalPlaceId
+                      ? LinearGradient(
+                          colors: [
+                            theme.colorScheme.primary.withOpacity(0.16),
+                            theme.colorScheme.secondary.withOpacity(0.12),
+                          ],
+                        )
+                      : null,
                   child: ListTile(
                     onTap: () {
                       controller.selectPlace(place.canonicalPlaceId);

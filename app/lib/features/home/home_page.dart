@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../app/theme/spacing.dart';
+import '../../app/theme/widgets.dart';
 import '../../core/identity/identity_provider.dart';
 import '../../core/identity/identity_store.dart';
 import '../../features/accomplishments/accomplishment_models.dart';
@@ -78,8 +80,17 @@ class _HomePageState extends ConsumerState<HomePage> {
       const _ProfileTab(),
     ];
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Perbug')),
+    return AppScaffold(
+      padding: EdgeInsets.zero,
+      appBar: AppBar(
+        title: const Text('Perbug'),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: AppSpacing.m),
+            child: AppPill(label: 'LIVE', icon: Icons.bolt_rounded),
+          ),
+        ],
+      ),
       body: AnimatedSwitcher(duration: const Duration(milliseconds: 280), child: IndexedStack(key: ValueKey(_navIndex), index: _navIndex, children: pages)),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
@@ -116,20 +127,30 @@ class _FeedTab extends ConsumerWidget {
 
     return Column(
       children: [
-        const SizedBox(height: 8),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: SegmentedButton<FeedScope>(
-            segments: const [
-              ButtonSegment(value: FeedScope.local, icon: Icon(Icons.place_outlined), label: Text('Local')),
-              ButtonSegment(value: FeedScope.regional, icon: Icon(Icons.public), label: Text('Regional')),
-              ButtonSegment(value: FeedScope.global, icon: Icon(Icons.flight_takeoff), label: Text('Global')),
-            ],
-            selected: {scope},
-            onSelectionChanged: (value) => onScopeChanged(value.first),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          child: BrandHeroCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const AppSectionHeader(
+                  title: 'Feed',
+                  subtitle: 'Creator-led local discovery tuned to your current exploration scope.',
+                ),
+                const SizedBox(height: AppSpacing.s),
+                SegmentedButton<FeedScope>(
+                  segments: const [
+                    ButtonSegment(value: FeedScope.local, icon: Icon(Icons.place_outlined), label: Text('Local')),
+                    ButtonSegment(value: FeedScope.regional, icon: Icon(Icons.public), label: Text('Regional')),
+                    ButtonSegment(value: FeedScope.global, icon: Icon(Icons.flight_takeoff), label: Text('Global')),
+                  ],
+                  selected: {scope},
+                  onSelectionChanged: (value) => onScopeChanged(value.first),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 8),
         Expanded(
           child: bootstrap.when(
             data: (boot) {
@@ -156,10 +177,10 @@ class _FeedTab extends ConsumerWidget {
                       itemCount: items.length,
                       itemBuilder: (_, index) => _FeedVideoCard(item: items[index]),
                     ),
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: AppSkeleton(height: 220)),
               error: (e, _) => Center(child: Text('Feed unavailable: $e')),
             ),
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const Center(child: AppSkeleton(height: 220)),
           ),
         ),
       ],
@@ -174,75 +195,73 @@ class _FeedVideoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => PlaceVideoDetailPage(placeId: item.placeId, placeName: item.placeName),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppCard(
+        glow: true,
+        padding: EdgeInsets.zero,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PlaceVideoDetailPage(placeId: item.placeId, placeName: item.placeName),
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 190,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Theme.of(context).colorScheme.primaryContainer.withOpacity(0.45),
-                    Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 210,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Theme.of(context).colorScheme.primary.withOpacity(0.55),
+                      Theme.of(context).colorScheme.secondary.withOpacity(0.50),
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
+                    ],
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    const Positioned.fill(child: Icon(Icons.play_circle_fill_rounded, size: 72)),
+                    Positioned(
+                      left: 12,
+                      top: 12,
+                      child: AppPill(label: item.placeCategory, icon: Icons.place_outlined),
+                    ),
+                    Positioned(
+                      right: 12,
+                      top: 12,
+                      child: AppPill(label: '${item.rating}/5', icon: Icons.star_rounded),
+                    ),
                   ],
                 ),
               ),
-              child: Stack(
-                children: [
-                  const Positioned.fill(child: Icon(Icons.play_circle_fill_rounded, size: 72)),
-                  Positioned(
-                    left: 12,
-                    top: 12,
-                    child: Chip(
-                      label: Text(item.placeCategory),
-                      visualDensity: VisualDensity.compact,
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.caption.isEmpty ? item.placeName : item.caption, style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    Text('${item.placeName} • ${item.regionLabel}', style: Theme.of(context).textTheme.bodyMedium),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        CircleAvatar(radius: 12, child: Text((item.creatorHandle.isNotEmpty ? item.creatorHandle[0] : '?').toUpperCase())),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(item.creatorHandle, style: Theme.of(context).textTheme.labelLarge)),
+                        AppIconButton(onPressed: () {}, icon: Icons.bookmark_border),
+                        const SizedBox(width: 6),
+                        AppIconButton(onPressed: () {}, icon: Icons.ios_share_rounded),
+                      ],
                     ),
-                  ),
-                  Positioned(
-                    right: 12,
-                    top: 12,
-                    child: Chip(
-                      avatar: const Icon(Icons.star_rounded, size: 16),
-                      label: Text('${item.rating}/5'),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.caption.isEmpty ? item.placeName : item.caption, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 6),
-                  Text('${item.placeName} • ${item.regionLabel}', style: Theme.of(context).textTheme.bodyMedium),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      CircleAvatar(radius: 12, child: Text((item.creatorHandle.isNotEmpty ? item.creatorHandle[0] : '?').toUpperCase())),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(item.creatorHandle, style: Theme.of(context).textTheme.labelLarge)),
-                      IconButton(onPressed: () {}, icon: const Icon(Icons.bookmark_border)),
-                      IconButton(onPressed: () {}, icon: const Icon(Icons.ios_share_rounded)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -280,6 +299,13 @@ class _SearchTabState extends ConsumerState<_SearchTab> with AutomaticKeepAliveC
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
+          const BrandHeroCard(
+            child: AppSectionHeader(
+              title: 'Search',
+              subtitle: 'Find places, neighborhoods, and new social momentum.',
+            ),
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _searchController,
             decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search places and neighborhoods'),
@@ -289,21 +315,33 @@ class _SearchTabState extends ConsumerState<_SearchTab> with AutomaticKeepAliveC
           Expanded(
             child: results.when(
               data: (items) {
-                if (query.isEmpty) return const Center(child: Text('Search for a place to discover creator reviews.'));
-                if (items.isEmpty) return const Center(child: Text('No results yet. Try another query.'));
+                if (query.isEmpty) {
+                  return const Center(
+                    child: BrandHeroCard(
+                      child: AppSectionHeader(
+                        title: 'Search the city',
+                        subtitle: 'Type a place or neighborhood to unlock creator-led discovery.',
+                      ),
+                    ),
+                  );
+                }
+                if (items.isEmpty) return const Center(child: AppCard(glow: true, child: Text('No results yet. Try another query.')));
                 return ListView.builder(
                   itemCount: items.length,
-                  itemBuilder: (_, index) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      title: Text(items[index].name),
-                      subtitle: Text('${items[index].category} • ${items[index].regionLabel}'),
+                  itemBuilder: (_, index) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: AppCard(
+                      glow: index == 0,
+                      child: ListTile(
+                        title: Text(items[index].name),
+                        subtitle: Text('${items[index].category} • ${items[index].regionLabel}'),
+                      ),
                     ),
                   ),
                 );
               },
               error: (_, __) => const Center(child: Text('Place suggestions unavailable right now.')),
-              loading: () => query.isEmpty ? const SizedBox.shrink() : const Center(child: CircularProgressIndicator()),
+              loading: () => query.isEmpty ? const SizedBox.shrink() : const Center(child: AppSkeleton(height: 160)),
             ),
           ),
         ],
@@ -327,14 +365,14 @@ class _FeedEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.ondemand_video_outlined, size: 52),
+            const AppPill(label: 'Fresh feed', icon: Icons.ondemand_video_outlined),
             const SizedBox(height: 12),
             Text(title, style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
             const SizedBox(height: 6),
             Text(body, textAlign: TextAlign.center),
             if (suggestions.isNotEmpty) ...[
               const SizedBox(height: 10),
-              Wrap(spacing: 8, runSpacing: 8, children: suggestions.map((e) => Chip(label: Text(e))).toList(growable: false)),
+              Wrap(spacing: 8, runSpacing: 8, children: suggestions.map((e) => AppPill(label: e)).toList(growable: false)),
             ],
           ],
         ),
@@ -375,9 +413,12 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
       child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
         children: [
-          Text('Creator Hub', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 6),
-          const Text('Start, upload, recover, and publish place review videos.'),
+          const BrandHeroCard(
+            child: AppSectionHeader(
+              title: 'Creator Hub',
+              subtitle: 'Start, upload, recover, and publish vivid place review videos with branded momentum.',
+            ),
+          ),
           const SizedBox(height: 14),
           _buildPrimaryActions(),
           const SizedBox(height: 14),

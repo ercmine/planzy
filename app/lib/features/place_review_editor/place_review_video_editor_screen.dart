@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../app/theme/widgets.dart';
 import '../../core/widgets/app_snackbar.dart';
 import '../../core/widgets/section_card.dart';
 import '../video_platform/video_models.dart';
@@ -117,10 +118,9 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
   Widget build(BuildContext context) {
     final state = _state;
     if (_loadingDeps || state == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: AppSkeleton(height: 240)));
     }
     final theme = Theme.of(context);
-    final draft = state.draft;
     final controller = _controller!;
 
     return WillPopScope(
@@ -128,67 +128,77 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
         await _confirmDiscard();
         return false;
       },
-      child: Scaffold(
+      child: AppScaffold(
         appBar: AppBar(
           leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _confirmDiscard),
           title: const Text('Place Review Video Editor'),
           actions: [
             TextButton.icon(
-              onPressed: state.isSavingDraft ? null : () async {
-                await controller.saveDraft();
-                if (!mounted) return;
-                AppSnackbar.show(context, 'Draft saved');
-              },
-              icon: state.isSavingDraft ? const SizedBox.square(dimension: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save_alt_rounded),
+              onPressed: state.isSavingDraft
+                  ? null
+                  : () async {
+                      await controller.saveDraft();
+                      if (!mounted) return;
+                      AppSnackbar.show(context, 'Draft saved');
+                    },
+              icon: state.isSavingDraft
+                  ? const SizedBox.square(dimension: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.save_alt_rounded),
               label: const Text('Save draft'),
             ),
           ],
         ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-                  children: [
-                    _buildPreviewCard(theme, state, controller),
-                    const SizedBox(height: 16),
-                    if (state.hasRecoveredDraft)
-                      const Card(
-                        child: ListTile(
-                          leading: Icon(Icons.history),
-                          title: Text('Recovered your unfinished draft'),
-                          subtitle: Text('Perbug restored your last draft after an interruption.'),
-                        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                children: [
+                  const BrandHeroCard(
+                    child: AppSectionHeader(
+                      title: 'Create a vivid place review',
+                      subtitle: 'Edit, polish, and publish with premium Perbug motion and progress states.',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildPreviewCard(theme, state, controller),
+                  const SizedBox(height: 16),
+                  if (state.hasRecoveredDraft)
+                    const AppCard(
+                      glow: true,
+                      child: ListTile(
+                        leading: Icon(Icons.history),
+                        title: Text('Recovered your unfinished draft'),
+                        subtitle: Text('Perbug restored your last draft after an interruption.'),
                       ),
-                    if (state.lastError != null)
-                      Card(
-                        color: theme.colorScheme.errorContainer,
-                        child: ListTile(
-                          leading: const Icon(Icons.error_outline),
-                          title: const Text('Editor issue'),
-                          subtitle: Text(state.lastError!),
-                        ),
+                    ),
+                  if (state.lastError != null)
+                    Card(
+                      color: theme.colorScheme.errorContainer,
+                      child: ListTile(
+                        leading: const Icon(Icons.error_outline),
+                        title: const Text('Editor issue'),
+                        subtitle: Text(state.lastError!),
                       ),
-                    if (state.unsupportedMessage != null)
-                      Card(
-                        child: ListTile(
-                          leading: const Icon(Icons.warning_amber_rounded),
-                          title: const Text('Clip unavailable'),
-                          subtitle: Text(state.unsupportedMessage!),
-                        ),
+                    ),
+                  if (state.unsupportedMessage != null)
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.warning_amber_rounded),
+                        title: const Text('Clip unavailable'),
+                        subtitle: Text(state.unsupportedMessage!),
                       ),
-                    _buildClipLibrary(state, controller),
-                    const SizedBox(height: 16),
-                    _buildToolTray(state, controller),
-                    const SizedBox(height: 16),
-                    _buildReviewMetadata(state, controller),
-                  ],
-                ),
+                    ),
+                  _buildClipLibrary(state, controller),
+                  const SizedBox(height: 16),
+                  _buildToolTray(state, controller),
+                  const SizedBox(height: 16),
+                  _buildReviewMetadata(state, controller),
+                ],
               ),
-              _buildStickyFooter(state, controller),
-            ],
-          ),
+            ),
+            _buildStickyFooter(state, controller),
+          ],
         ),
       ),
     );

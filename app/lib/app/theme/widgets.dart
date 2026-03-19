@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
+import 'color_scheme.dart';
 import 'spacing.dart';
 import 'tokens.dart';
 
@@ -20,21 +23,29 @@ class PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _PressScale(
-      child: FilledButton.icon(
-        onPressed: isLoading ? null : onPressed,
-        style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(54),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.large),
-          ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: AppColors.brandGradient,
+          borderRadius: BorderRadius.circular(AppRadius.large),
+          boxShadow: AppElevation.card(Theme.of(context).colorScheme.shadow, glow: true),
         ),
-        icon: isLoading
-            ? const SizedBox.square(
-                dimension: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : icon ?? const SizedBox.shrink(),
-        label: Text(label),
+        child: FilledButton.icon(
+          onPressed: isLoading ? null : onPressed,
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(56),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
+          ),
+          icon: isLoading
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : icon ?? const SizedBox.shrink(),
+          label: Text(label),
+        ),
       ),
     );
   }
@@ -56,19 +67,20 @@ class SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return _PressScale(
       child: OutlinedButton.icon(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
+          backgroundColor: scheme.surfaceContainerHigh.withOpacity(0.46),
+          side: BorderSide(color: scheme.primary.withOpacity(0.24)),
           minimumSize: const Size.fromHeight(54),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.large),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
         ),
         icon: isLoading
-            ? const SizedBox.square(
+            ? SizedBox.square(
                 dimension: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(strokeWidth: 2, color: scheme.primary),
               )
             : icon ?? const SizedBox.shrink(),
         label: Text(label),
@@ -78,10 +90,18 @@ class SecondaryButton extends StatelessWidget {
 }
 
 class AppCard extends StatelessWidget {
-  const AppCard({required this.child, this.padding, super.key});
+  const AppCard({
+    required this.child,
+    this.padding,
+    this.glow = false,
+    this.gradient,
+    super.key,
+  });
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
+  final bool glow;
+  final Gradient? gradient;
 
   @override
   Widget build(BuildContext context) {
@@ -89,9 +109,10 @@ class AppCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.large),
-        color: colorScheme.surfaceContainerLow.withOpacity(0.82),
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.45)),
-        boxShadow: AppElevation.card(colorScheme.shadow),
+        gradient: gradient,
+        color: gradient == null ? colorScheme.surfaceContainerLow.withOpacity(0.84) : null,
+        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.38)),
+        boxShadow: AppElevation.card(colorScheme.shadow, glow: glow),
       ),
       child: Padding(
         padding: padding ?? const EdgeInsets.all(AppSpacing.m),
@@ -120,26 +141,23 @@ class AppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       appBar: appBar,
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: bottomNavigationBar,
       body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF161B33),
-              Color(0xFF0A0E1F),
-              Color(0xFF070A16),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: padding,
-            child: body,
-          ),
+        decoration: const BoxDecoration(gradient: AppColors.brandSurfaceGradient),
+        child: Stack(
+          children: [
+            const Positioned(top: -80, left: -40, child: _GlowOrb(size: 220, color: AppColors.electricBlue)),
+            const Positioned(top: 180, right: -60, child: _GlowOrb(size: 200, color: AppColors.vividOrange)),
+            SafeArea(
+              child: Padding(
+                padding: padding,
+                child: body,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -147,21 +165,30 @@ class AppScaffold extends StatelessWidget {
 }
 
 class AppSectionHeader extends StatelessWidget {
-  const AppSectionHeader({required this.title, this.subtitle, super.key});
+  const AppSectionHeader({required this.title, this.subtitle, this.trailing, super.key});
 
   final String title;
   final String? subtitle;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
-        if (subtitle != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Text(subtitle!, style: Theme.of(context).textTheme.bodyMedium),
-        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              if (subtitle != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(subtitle!, style: Theme.of(context).textTheme.bodyMedium),
+              ],
+            ],
+          ),
+        ),
+        if (trailing != null) trailing!,
       ],
     );
   }
@@ -173,6 +200,7 @@ class AppPill extends StatelessWidget {
     this.icon,
     this.backgroundColor,
     this.foregroundColor,
+    this.outlined = false,
     super.key,
   });
 
@@ -180,18 +208,22 @@ class AppPill extends StatelessWidget {
   final IconData? icon;
   final Color? backgroundColor;
   final Color? foregroundColor;
+  final bool outlined;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final bg = backgroundColor ?? scheme.secondaryContainer;
-    final fg = foregroundColor ?? scheme.onSecondaryContainer;
+    final bg = backgroundColor ?? scheme.primaryContainer.withOpacity(0.8);
+    final fg = foregroundColor ?? scheme.onPrimaryContainer;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 7),
+    return AnimatedContainer(
+      duration: AppMotion.standard,
+      curve: AppMotion.emphasized,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 8),
       decoration: BoxDecoration(
-        color: bg,
+        color: outlined ? Colors.transparent : bg,
         borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: outlined ? fg.withOpacity(0.28) : bg.withOpacity(0.6)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -216,13 +248,143 @@ class AppIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton.filledTonal(
-      onPressed: onPressed,
-      tooltip: tooltip,
-      icon: Icon(icon),
-      style: IconButton.styleFrom(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.medium),
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.medium),
+        gradient: LinearGradient(
+          colors: [scheme.primary.withOpacity(0.18), scheme.secondary.withOpacity(0.14)],
+        ),
+      ),
+      child: IconButton(
+        onPressed: onPressed,
+        tooltip: tooltip,
+        icon: Icon(icon),
+        style: IconButton.styleFrom(
+          backgroundColor: scheme.surface.withOpacity(0.74),
+          foregroundColor: scheme.onSurface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.medium)),
+        ),
+      ),
+    );
+  }
+}
+
+class AppSkeleton extends StatefulWidget {
+  const AppSkeleton({
+    required this.height,
+    this.width = double.infinity,
+    this.radius = AppRadius.medium,
+    super.key,
+  });
+
+  final double height;
+  final double width;
+  final double radius;
+
+  @override
+  State<AppSkeleton> createState() => _AppSkeletonState();
+}
+
+class _AppSkeletonState extends State<AppSkeleton> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(vsync: this, duration: AppMotion.extraSlow)..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final alignment = Alignment(-1 + (_controller.value * 2), 0);
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.radius),
+            gradient: LinearGradient(
+              begin: alignment,
+              end: Alignment(alignment.x + 1.1, 0),
+              colors: [
+                scheme.surfaceContainerHighest.withOpacity(0.42),
+                scheme.primary.withOpacity(0.14),
+                scheme.secondary.withOpacity(0.16),
+                scheme.surfaceContainerHighest.withOpacity(0.42),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class BrandHeroCard extends StatelessWidget {
+  const BrandHeroCard({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      glow: true,
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Theme.of(context).colorScheme.primary.withOpacity(0.16),
+          Theme.of(context).colorScheme.surface.withOpacity(0.90),
+          Theme.of(context).colorScheme.secondary.withOpacity(0.16),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class BrandedModalContainer extends StatelessWidget {
+  const BrandedModalContainer({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(gradient: AppColors.brandSurfaceGradient),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.m),
+          child: AppCard(glow: true, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlowOrb extends StatelessWidget {
+  const _GlowOrb({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [color.withOpacity(0.22), color.withOpacity(0.04), Colors.transparent],
+            stops: const [0, 0.42, 1],
+          ),
         ),
       ),
     );
@@ -247,10 +409,14 @@ class _PressScaleState extends State<_PressScale> {
       onTapDown: (_) => setState(() => _pressed = true),
       onTapCancel: () => setState(() => _pressed = false),
       onTapUp: (_) => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.98 : 1,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 1, end: _pressed ? 0.975 : 1),
         duration: AppMotion.quick,
-        curve: AppMotion.emphasized,
+        curve: AppMotion.spring,
+        builder: (context, value, child) => Transform.scale(
+          scale: value,
+          child: Transform.rotate(angle: _pressed ? -0.0025 * math.pi : 0, child: child),
+        ),
         child: widget.child,
       ),
     );

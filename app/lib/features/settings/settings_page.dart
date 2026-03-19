@@ -37,9 +37,22 @@ class SettingsPage extends ConsumerWidget {
           onPressed: () => _handleBackPressed(context, ref),
         ),
         title: const Text('Profile & settings'),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: AppSpacing.m),
+            child: AppPill(label: 'Perbug', icon: Icons.palette_outlined),
+          ),
+        ],
       ),
       body: ListView(
         children: [
+          const BrandHeroCard(
+            child: AppSectionHeader(
+              title: 'Tune your experience',
+              subtitle: 'Everything from permissions to privacy now sits inside the premium Perbug system.',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.m),
           AppSectionCard(
             title: 'Account',
             icon: Icons.person_outline,
