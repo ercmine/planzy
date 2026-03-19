@@ -11,6 +11,7 @@ class CollectionsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     if (collections.isEmpty) {
       return Center(
         child: Padding(
@@ -40,8 +41,9 @@ class CollectionsPage extends StatelessWidget {
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.m),
       itemBuilder: (context, index) {
         final collection = collections[index];
+        final rewardUnlocked = collection.progress >= 1;
         return AppCard(
-          glow: collection.progress >= 1,
+          glow: rewardUnlocked,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -49,7 +51,11 @@ class CollectionsPage extends StatelessWidget {
                 children: [
                   const AppPill(label: 'Collection', icon: Icons.auto_awesome_rounded),
                   const Spacer(),
-                  AppPill(label: collection.status.replaceAll('_', ' '), icon: Icons.bolt_rounded),
+                  AppPill(
+                    label: collection.status.replaceAll('_', ' '),
+                    icon: rewardUnlocked ? Icons.workspace_premium_rounded : Icons.bolt_rounded,
+                    backgroundColor: rewardUnlocked ? scheme.secondary.withOpacity(0.16) : null,
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.s),
@@ -59,7 +65,11 @@ class CollectionsPage extends StatelessWidget {
               const SizedBox(height: AppSpacing.m),
               ClipRRect(
                 borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(value: collection.progress, minHeight: 10),
+                child: LinearProgressIndicator(
+                  value: collection.progress,
+                  minHeight: 10,
+                  valueColor: AlwaysStoppedAnimation<Color>(rewardUnlocked ? scheme.secondary : scheme.primary),
+                ),
               ),
             ],
           ),

@@ -22,12 +22,20 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return _PressScale(
       child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: AppColors.brandGradient,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              scheme.primary.withOpacity(0.94),
+              scheme.secondary.withOpacity(0.86),
+            ],
+          ),
           borderRadius: BorderRadius.circular(AppRadius.large),
-          boxShadow: AppElevation.card(Theme.of(context).colorScheme.shadow, glow: true),
+          boxShadow: AppElevation.card(scheme.shadow, glow: true),
         ),
         child: FilledButton.icon(
           onPressed: isLoading ? null : onPressed,
@@ -72,8 +80,9 @@ class SecondaryButton extends StatelessWidget {
       child: OutlinedButton.icon(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: scheme.surfaceContainerHigh.withOpacity(0.46),
-          side: BorderSide(color: scheme.primary.withOpacity(0.24)),
+          backgroundColor: scheme.surfaceContainerHigh.withOpacity(0.38),
+          side: BorderSide(color: scheme.outlineVariant.withOpacity(0.8)),
+          foregroundColor: scheme.onSurface,
           minimumSize: const Size.fromHeight(54),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
         ),
@@ -110,8 +119,8 @@ class AppCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.large),
         gradient: gradient,
-        color: gradient == null ? colorScheme.surfaceContainerLow.withOpacity(0.84) : null,
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.38)),
+        color: gradient == null ? colorScheme.surfaceContainerLow.withOpacity(0.92) : null,
+        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.44)),
         boxShadow: AppElevation.card(colorScheme.shadow, glow: glow),
       ),
       child: Padding(
@@ -149,8 +158,23 @@ class AppScaffold extends StatelessWidget {
         decoration: const BoxDecoration(gradient: AppColors.brandSurfaceGradient),
         child: Stack(
           children: [
-            const Positioned(top: -80, left: -40, child: _GlowOrb(size: 220, color: AppColors.electricBlue)),
-            const Positioned(top: 180, right: -60, child: _GlowOrb(size: 200, color: AppColors.vividOrange)),
+            const Positioned(top: -96, right: -60, child: _GlowOrb(size: 220, color: AppColors.electricBlue)),
+            const Positioned(bottom: -120, left: -70, child: _GlowOrb(size: 240, color: AppColors.vividOrange)),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withOpacity(0.02),
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.10),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             SafeArea(
               child: Padding(
                 padding: padding,
@@ -213,8 +237,8 @@ class AppPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final bg = backgroundColor ?? scheme.primaryContainer.withOpacity(0.8);
-    final fg = foregroundColor ?? scheme.onPrimaryContainer;
+    final bg = backgroundColor ?? scheme.surfaceContainerHigh.withOpacity(0.86);
+    final fg = foregroundColor ?? scheme.onSurface;
 
     return AnimatedContainer(
       duration: AppMotion.standard,
@@ -223,7 +247,7 @@ class AppPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: outlined ? Colors.transparent : bg,
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: outlined ? fg.withOpacity(0.28) : bg.withOpacity(0.6)),
+        border: Border.all(color: outlined ? fg.withOpacity(0.22) : bg.withOpacity(0.92)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -252,16 +276,14 @@ class AppIconButton extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.medium),
-        gradient: LinearGradient(
-          colors: [scheme.primary.withOpacity(0.18), scheme.secondary.withOpacity(0.14)],
-        ),
+        border: Border.all(color: scheme.outlineVariant.withOpacity(0.5)),
       ),
       child: IconButton(
         onPressed: onPressed,
         tooltip: tooltip,
         icon: Icon(icon),
         style: IconButton.styleFrom(
-          backgroundColor: scheme.surface.withOpacity(0.74),
+          backgroundColor: scheme.surfaceContainerHigh.withOpacity(0.72),
           foregroundColor: scheme.onSurface,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.medium)),
         ),
@@ -311,10 +333,10 @@ class _AppSkeletonState extends State<AppSkeleton> with SingleTickerProviderStat
               begin: alignment,
               end: Alignment(alignment.x + 1.1, 0),
               colors: [
-                scheme.surfaceContainerHighest.withOpacity(0.42),
-                scheme.primary.withOpacity(0.14),
-                scheme.secondary.withOpacity(0.16),
-                scheme.surfaceContainerHighest.withOpacity(0.42),
+                scheme.surfaceContainerHighest.withOpacity(0.34),
+                scheme.primary.withOpacity(0.08),
+                scheme.secondary.withOpacity(0.06),
+                scheme.surfaceContainerHighest.withOpacity(0.34),
               ],
             ),
           ),
@@ -331,16 +353,19 @@ class BrandHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return AppCard(
-      glow: true,
+      glow: false,
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Theme.of(context).colorScheme.primary.withOpacity(0.16),
-          Theme.of(context).colorScheme.surface.withOpacity(0.90),
-          Theme.of(context).colorScheme.secondary.withOpacity(0.16),
+          scheme.surfaceContainerHigh.withOpacity(0.96),
+          scheme.surface.withOpacity(0.94),
+          scheme.primary.withOpacity(0.08),
+          scheme.secondary.withOpacity(0.06),
         ],
+        stops: const [0, 0.56, 0.82, 1],
       ),
       child: child,
     );
@@ -360,7 +385,7 @@ class BrandedModalContainer extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.m),
-          child: AppCard(glow: true, child: child),
+          child: AppCard(child: child),
         ),
       ),
     );
@@ -382,8 +407,8 @@ class _GlowOrb extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: RadialGradient(
-            colors: [color.withOpacity(0.22), color.withOpacity(0.04), Colors.transparent],
-            stops: const [0, 0.42, 1],
+            colors: [color.withOpacity(0.08), color.withOpacity(0.02), Colors.transparent],
+            stops: const [0, 0.40, 1],
           ),
         ),
       ),
@@ -410,12 +435,12 @@ class _PressScaleState extends State<_PressScale> {
       onTapCancel: () => setState(() => _pressed = false),
       onTapUp: (_) => setState(() => _pressed = false),
       child: TweenAnimationBuilder<double>(
-        tween: Tween<double>(begin: 1, end: _pressed ? 0.975 : 1),
+        tween: Tween<double>(begin: 1, end: _pressed ? 0.982 : 1),
         duration: AppMotion.quick,
-        curve: AppMotion.spring,
+        curve: AppMotion.emphasized,
         builder: (context, value, child) => Transform.scale(
           scale: value,
-          child: Transform.rotate(angle: _pressed ? -0.0025 * math.pi : 0, child: child),
+          child: Transform.rotate(angle: _pressed ? -0.0015 * math.pi : 0, child: child),
         ),
         child: widget.child,
       ),

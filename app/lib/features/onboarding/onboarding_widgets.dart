@@ -31,7 +31,7 @@ class OnboardingScaffold extends StatelessWidget {
                 height: 180,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [Color(0x6628C9FF), Colors.transparent]),
+                  gradient: RadialGradient(colors: [Color(0x1F5BAFD6), Colors.transparent]),
                 ),
               ),
             ),
@@ -43,7 +43,7 @@ class OnboardingScaffold extends StatelessWidget {
                 height: 220,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [Color(0x55FF8A1F), Colors.transparent]),
+                  gradient: RadialGradient(colors: [Color(0x18C9894A), Colors.transparent]),
                 ),
               ),
             ),
@@ -66,7 +66,7 @@ class OnboardingScaffold extends StatelessWidget {
                           Text(
                             'Blue for discovery. Orange for energy.',
                             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  color: scheme.secondary,
+                                  color: scheme.onSurfaceVariant,
                                 ),
                           ),
                         ],
@@ -122,14 +122,13 @@ class PermissionInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      glow: true,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppPill(
             label: '',
             icon: icon,
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.12),
           ),
           const SizedBox(width: AppSpacing.s),
           Expanded(

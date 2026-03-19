@@ -18,7 +18,7 @@ void main() {
   });
 
   test('brand palette centers electric blue and vivid orange', () {
-    expect(AppColors.darkColorScheme.primary, const Color(0xFF44D4FF));
-    expect(AppColors.darkColorScheme.secondary, const Color(0xFFFFA447));
+    expect(AppColors.darkColorScheme.primary, const Color(0xFF6BA8C6));
+    expect(AppColors.darkColorScheme.secondary, const Color(0xFFC08A54));
   });
 }
