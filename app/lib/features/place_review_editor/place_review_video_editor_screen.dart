@@ -449,12 +449,27 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
       icon: Icons.edit_note_rounded,
       child: Column(
         children: [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const CircleAvatar(child: Icon(Icons.place)),
-            title: Text(metadata.place?.name ?? 'Attach a place'),
-            subtitle: Text(metadata.place == null ? 'Search for the exact location you visited.' : '${metadata.place!.category} • ${metadata.place!.regionLabel}'),
-            trailing: FilledButton.tonal(onPressed: _pickPlace, child: Text(metadata.place == null ? 'Select' : 'Change')),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const CircleAvatar(child: Icon(Icons.place)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(metadata.place?.name ?? 'Attach a place'),
+                      const SizedBox(height: 4),
+                      Text(metadata.place == null ? 'Search for the exact location you visited.' : '${metadata.place!.category} • ${metadata.place!.regionLabel}'),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.tonal(onPressed: _pickPlace, child: Text(metadata.place == null ? 'Select' : 'Change')),
+            ],
           ),
           TextField(
             controller: _titleController,
