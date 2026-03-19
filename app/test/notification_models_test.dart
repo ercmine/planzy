@@ -11,14 +11,14 @@ void main() {
       'createdAt': '2026-03-09T10:00:00.000Z',
       'readAt': null,
       'route': {
-        'name': 'studio-video',
+        'name': 'profile-video',
         'params': {'videoId': 'v1'},
       }
     });
 
     expect(model.id, 'n1');
     expect(model.isRead, false);
-    expect(model.routeName, 'studio-video');
+    expect(model.routeName, 'profile-video');
     expect(model.routeParams['videoId'], 'v1');
   });
 }
