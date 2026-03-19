@@ -26,16 +26,6 @@ class AppSectionCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.m),
       child: AppCard(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            scheme.surfaceContainerHigh.withOpacity(0.94),
-            scheme.surface.withOpacity(0.92),
-            scheme.primary.withOpacity(0.05),
-          ],
-          stops: const [0, 0.74, 1],
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../app/theme/color_scheme.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import '../../core/widgets/app_back_button.dart';
@@ -20,30 +19,34 @@ class OnboardingScaffold extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: DecoratedBox(
-        decoration: const BoxDecoration(gradient: AppColors.brandSurfaceGradient),
+        decoration: BoxDecoration(color: scheme.surface),
         child: Stack(
           children: [
             Positioned(
-              top: -30,
-              left: -20,
+              top: 0,
+              left: 0,
+              right: 72,
               child: Container(
-                width: 180,
-                height: 180,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [Color(0x1F5BAFD6), Colors.transparent]),
+                height: 140,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withOpacity(0.05),
+                  borderRadius: const BorderRadius.only(
+                    bottomRight: Radius.circular(120),
+                  ),
                 ),
               ),
             ),
             Positioned(
-              bottom: 20,
-              right: -20,
+              bottom: 0,
+              left: 72,
+              right: 0,
               child: Container(
-                width: 220,
-                height: 220,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [Color(0x18C9894A), Colors.transparent]),
+                height: 120,
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHigh.withOpacity(0.5),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(120),
+                  ),
                 ),
               ),
             ),
@@ -64,7 +67,7 @@ class OnboardingScaffold extends StatelessWidget {
                           Expanded(child: child),
                           const SizedBox(height: AppSpacing.s),
                           Text(
-                            'Blue for discovery. Orange for energy.',
+                            'Focused planning with a calmer, cleaner palette.',
                             style: Theme.of(context).textTheme.labelMedium?.copyWith(
                                   color: scheme.onSurfaceVariant,
                                 ),

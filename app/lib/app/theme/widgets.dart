@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'color_scheme.dart';
 import 'spacing.dart';
 import 'tokens.dart';
 
@@ -24,35 +23,62 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return _PressScale(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              scheme.primary.withOpacity(0.94),
-              scheme.secondary.withOpacity(0.86),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(AppRadius.large),
-          boxShadow: AppElevation.card(scheme.shadow, glow: true),
+      child: FilledButton.icon(
+        onPressed: isLoading ? null : onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: scheme.primary,
+          shadowColor: scheme.shadow,
+          foregroundColor: scheme.onPrimary,
+          elevation: 0,
+          minimumSize: const Size.fromHeight(56),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
+        ).copyWith(
+          overlayColor: WidgetStatePropertyAll(scheme.onPrimary.withOpacity(0.08)),
         ),
-        child: FilledButton.icon(
-          onPressed: isLoading ? null : onPressed,
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            minimumSize: const Size.fromHeight(56),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
+        icon: isLoading
+            ? SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary),
+              )
+            : icon ?? const SizedBox.shrink(),
+        label: Text(label),
+      ),
+    );
+  }
+}
+
+BoxDecoration _appScaffoldDecoration(ColorScheme scheme) {
+  return BoxDecoration(
+    color: scheme.surface,
+    border: Border(
+      top: BorderSide(color: scheme.outlineVariant.withOpacity(0.18)),
+    ),
+  );
+}
+
+class _SurfaceAccent extends StatelessWidget {
+  const _SurfaceAccent({
+    required this.alignment,
+    required this.color,
+  });
+
+  final Alignment alignment;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Align(
+        alignment: alignment,
+        child: FractionallySizedBox(
+          widthFactor: 0.72,
+          heightFactor: 0.36,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(120),
+            ),
           ),
-          icon: isLoading
-              ? const SizedBox.square(
-                  dimension: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : icon ?? const SizedBox.shrink(),
-          label: Text(label),
         ),
       ),
     );
@@ -149,29 +175,38 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       extendBody: true,
       appBar: appBar,
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: bottomNavigationBar,
       body: DecoratedBox(
-        decoration: const BoxDecoration(gradient: AppColors.brandSurfaceGradient),
+        decoration: _appScaffoldDecoration(scheme),
         child: Stack(
           children: [
-            const Positioned(top: -96, right: -60, child: _GlowOrb(size: 220, color: AppColors.electricBlue)),
-            const Positioned(bottom: -120, left: -70, child: _GlowOrb(size: 240, color: AppColors.vividOrange)),
+            Positioned(
+              top: -56,
+              right: -72,
+              left: 80,
+              child: _SurfaceAccent(
+                alignment: Alignment.topRight,
+                color: scheme.primary.withOpacity(0.05),
+              ),
+            ),
+            Positioned(
+              bottom: -72,
+              left: -48,
+              right: 120,
+              child: _SurfaceAccent(
+                alignment: Alignment.bottomLeft,
+                color: scheme.surfaceContainerHighest.withOpacity(0.30),
+              ),
+            ),
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withOpacity(0.02),
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.10),
-                    ],
-                  ),
+                  color: scheme.surface.withOpacity(0.16),
                 ),
               ),
             ),
@@ -323,21 +358,16 @@ class _AppSkeletonState extends State<AppSkeleton> with SingleTickerProviderStat
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
-        final alignment = Alignment(-1 + (_controller.value * 2), 0);
+        final pulse = 0.24 + (_controller.value * 0.10);
         return Container(
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(widget.radius),
-            gradient: LinearGradient(
-              begin: alignment,
-              end: Alignment(alignment.x + 1.1, 0),
-              colors: [
-                scheme.surfaceContainerHighest.withOpacity(0.34),
-                scheme.primary.withOpacity(0.08),
-                scheme.secondary.withOpacity(0.06),
-                scheme.surfaceContainerHighest.withOpacity(0.34),
-              ],
+            color: Color.lerp(
+              scheme.surfaceContainerHighest.withOpacity(0.30),
+              scheme.primary.withOpacity(0.12),
+              pulse,
             ),
           ),
         );
@@ -353,20 +383,8 @@ class BrandHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return AppCard(
       glow: false,
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          scheme.surfaceContainerHigh.withOpacity(0.96),
-          scheme.surface.withOpacity(0.94),
-          scheme.primary.withOpacity(0.08),
-          scheme.secondary.withOpacity(0.06),
-        ],
-        stops: const [0, 0.56, 0.82, 1],
-      ),
       child: child,
     );
   }
@@ -379,37 +397,14 @@ class BrandedModalContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return DecoratedBox(
-      decoration: const BoxDecoration(gradient: AppColors.brandSurfaceGradient),
+      decoration: _appScaffoldDecoration(scheme),
       child: SafeArea(
         top: false,
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.m),
           child: AppCard(child: child),
-        ),
-      ),
-    );
-  }
-}
-
-class _GlowOrb extends StatelessWidget {
-  const _GlowOrb({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color.withOpacity(0.08), color.withOpacity(0.02), Colors.transparent],
-            stops: const [0, 0.40, 1],
-          ),
         ),
       ),
     );
