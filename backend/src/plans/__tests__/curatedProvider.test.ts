@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { validatePlanArray } from "../planValidation.js";
 import { CuratedProvider } from "../curated/curatedProvider.js";
+import { buildLocalSuggestions } from "../curated/suggestions.js";
 
 describe("CuratedProvider", () => {
   const baseInput = {
@@ -24,6 +25,24 @@ describe("CuratedProvider", () => {
 
     expect(result.plans.length).toBeGreaterThan(0);
     expect(result.plans.every((plan) => plan.sourceId.startsWith("suggestion:"))).toBe(true);
+  });
+
+  it("copies the curated template description into local suggestions", () => {
+    const [suggestion] = buildLocalSuggestions(
+      baseInput,
+      [
+        {
+          id: "coffee-walk",
+          title: "Coffee Walk",
+          description: "Pick up coffee to go and take a scenic neighborhood walk.",
+          category: "coffee",
+          keywords: ["coffee", "walk"]
+        }
+      ],
+      { maxSuggestions: 1 }
+    );
+
+    expect(suggestion?.description).toBe("Pick up coffee to go and take a scenic neighborhood walk.");
   });
 
   it("biases results toward requested categories", async () => {

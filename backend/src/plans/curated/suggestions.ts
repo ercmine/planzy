@@ -98,7 +98,7 @@ export function buildLocalSuggestions(
       source: "curated",
       sourceId,
       title: `Find ${template.title} nearby`,
-      description: "Search near you in Maps.",
+      description: template.description,
       category: template.category,
       location: {
         lat: input.location.lat,
