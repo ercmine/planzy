@@ -74,4 +74,24 @@ class LocalStore {
   String? loadLastSeenDeckKey(String sessionId) {
     return _prefs.getString('$_deckKeyPrefix$sessionId');
   }
+
+  Future<void> saveJson(String key, Map<String, dynamic> value) {
+    return _prefs.setString(key, jsonEncode(value));
+  }
+
+  Map<String, dynamic>? loadJson(String key) {
+    final raw = _prefs.getString(key);
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> remove(String key) => _prefs.remove(key);
 }

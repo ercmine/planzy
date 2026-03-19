@@ -15,6 +15,7 @@ import '../features/onboarding/onboarding_intro_page.dart';
 import '../features/onboarding/onboarding_interests_page.dart';
 import '../features/onboarding/onboarding_location_page.dart';
 import '../features/onboarding/onboarding_discovery_page.dart';
+import '../features/place_review_editor/place_review_video_editor_screen.dart';
 import '../features/results/results_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/sessions/create_session/create_session_page.dart';
@@ -96,6 +97,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/',
         name: 'home',
         builder: (context, state) => const HomePage(),
+      ),
+      GoRoute(
+        path: '/reviews/create',
+        name: 'place-review-editor',
+        builder: (context, state) => const PlaceReviewVideoEditorScreen(recoverLatestDraft: true),
       ),
       GoRoute(
         path: '/invite/:code',
