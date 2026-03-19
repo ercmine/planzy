@@ -462,11 +462,38 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
 
     if (items.isEmpty) {
       return Card(
-        child: ListTile(
-          leading: const Icon(Icons.auto_awesome),
-          title: const Text('Create your first place review'),
-          subtitle: const Text('Start a draft, tag a canonical place, then record or upload a video.'),
-          trailing: FilledButton(onPressed: () => _startFlow(CreateFlowSource.draft), child: const Text('Start')),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Icon(Icons.auto_awesome),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Create your first place review'),
+                        SizedBox(height: 4),
+                        Text('Start a draft, tag a canonical place, then record or upload a video.'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => _startFlow(CreateFlowSource.draft),
+                child: const Text('Start'),
+              ),
+            ],
+          ),
         ),
       );
     }
