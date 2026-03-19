@@ -16,6 +16,7 @@ import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
 import 'place_preview_card.dart';
 import 'place_video_detail_page.dart';
+import '../video_platform/video_providers.dart';
 
 class MapViewportState {
   const MapViewportState({
@@ -444,8 +445,8 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
             place: selected,
             proximityState: proximityFor(selected),
             distanceMeters: _distanceMeters(location?.lat, location?.lng, selected.latitude, selected.longitude),
-            onOpenDetails: () => _openPlaceDetails(selected),
-            onOpenMaps: () => _openPlaceInMaps(linkLauncher, selected),
+            onOpenDetails: () => _openPlaceDetails(selected!),
+            onOpenMaps: () => _openPlaceInMaps(linkLauncher, selected!),
             onSave: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${selected!.name} saved.'))),
             onShare: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Share ${selected!.name} from the place detail flow.'))),
           ),
