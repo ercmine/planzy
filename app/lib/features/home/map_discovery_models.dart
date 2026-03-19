@@ -1,3 +1,5 @@
+import 'package:latlong2/latlong.dart';
+
 class MapViewport {
   const MapViewport({
     required this.centerLat,
@@ -23,6 +25,8 @@ class MapViewport {
       zoom: zoom ?? this.zoom,
     );
   }
+
+  LatLng toLatLng() => LatLng(centerLat, centerLng);
 }
 
 class SearchAreaContext {
