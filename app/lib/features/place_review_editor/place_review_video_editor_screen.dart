@@ -140,6 +140,14 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
     );
   }
 
+  PlaceReviewMetadata get _currentMetadata => _state?.draft.metadata ?? _controller?.state.draft.metadata ?? const PlaceReviewMetadata();
+
+  void _updateMetadata(PlaceReviewMetadata Function(PlaceReviewMetadata current) transform) {
+    final controller = _controller;
+    if (controller == null) return;
+    controller.updateMetadata(transform(_currentMetadata));
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = _state;
@@ -454,8 +462,9 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
             maxLines: 1,
+            inputFormatters: const [FilteringTextInputFormatter.singleLineFormatter],
             decoration: const InputDecoration(labelText: 'Review title'),
-            onChanged: (value) => controller.updateMetadata(metadata.copyWith(title: value)),
+            onChanged: (value) => _updateMetadata((current) => current.copyWith(title: value)),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -466,26 +475,26 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             minLines: 2,
             maxLines: 4,
             decoration: const InputDecoration(labelText: 'Caption'),
-            onChanged: (value) => controller.updateMetadata(metadata.copyWith(caption: value)),
+            onChanged: (value) => _updateMetadata((current) => current.copyWith(caption: value)),
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _ratingInput('Overall', metadata.rating.overall, (value) => controller.updateMetadata(metadata.copyWith(rating: metadata.rating.copyWith(overall: value))))),
+              Expanded(child: _ratingInput('Overall', metadata.rating.overall, (value) => _updateMetadata((current) => current.copyWith(rating: current.rating.copyWith(overall: value))))),
               const SizedBox(width: 8),
-              Expanded(child: _ratingInput('Food', metadata.rating.food, (value) => controller.updateMetadata(metadata.copyWith(rating: metadata.rating.copyWith(food: value))))),
+              Expanded(child: _ratingInput('Food', metadata.rating.food, (value) => _updateMetadata((current) => current.copyWith(rating: current.rating.copyWith(food: value))))),
               const SizedBox(width: 8),
-              Expanded(child: _ratingInput('Drinks', metadata.rating.drinks, (value) => controller.updateMetadata(metadata.copyWith(rating: metadata.rating.copyWith(drinks: value))))),
+              Expanded(child: _ratingInput('Drinks', metadata.rating.drinks, (value) => _updateMetadata((current) => current.copyWith(rating: current.rating.copyWith(drinks: value))))),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: _ratingInput('Service', metadata.rating.service, (value) => controller.updateMetadata(metadata.copyWith(rating: metadata.rating.copyWith(service: value))))),
+              Expanded(child: _ratingInput('Service', metadata.rating.service, (value) => _updateMetadata((current) => current.copyWith(rating: current.rating.copyWith(service: value))))),
               const SizedBox(width: 8),
-              Expanded(child: _ratingInput('Vibe', metadata.rating.vibe, (value) => controller.updateMetadata(metadata.copyWith(rating: metadata.rating.copyWith(vibe: value))))),
+              Expanded(child: _ratingInput('Vibe', metadata.rating.vibe, (value) => _updateMetadata((current) => current.copyWith(rating: current.rating.copyWith(vibe: value))))),
               const SizedBox(width: 8),
-              Expanded(child: _ratingInput('Value', metadata.rating.value, (value) => controller.updateMetadata(metadata.copyWith(rating: metadata.rating.copyWith(value: value))))),
+              Expanded(child: _ratingInput('Value', metadata.rating.value, (value) => _updateMetadata((current) => current.copyWith(rating: current.rating.copyWith(value: value))))),
             ],
           ),
           const SizedBox(height: 12),
@@ -494,7 +503,7 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             title: const Text('Recommend this place'),
             subtitle: const Text('Flip off to mark this as not recommended.'),
             contentPadding: EdgeInsets.zero,
-            onChanged: (value) => controller.updateMetadata(metadata.copyWith(rating: metadata.rating.copyWith(recommend: value))),
+            onChanged: (value) => _updateMetadata((current) => current.copyWith(rating: current.rating.copyWith(recommend: value))),
           ),
           TextField(
             controller: _whatToOrderController,
@@ -502,8 +511,9 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
             maxLines: 1,
+            inputFormatters: const [FilteringTextInputFormatter.singleLineFormatter],
             decoration: const InputDecoration(labelText: 'What to order'),
-            onChanged: (value) => controller.updateMetadata(metadata.copyWith(whatToOrder: value)),
+            onChanged: (value) => _updateMetadata((current) => current.copyWith(whatToOrder: value)),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -512,8 +522,9 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
             maxLines: 1,
+            inputFormatters: const [FilteringTextInputFormatter.singleLineFormatter],
             decoration: const InputDecoration(labelText: 'Best time to go'),
-            onChanged: (value) => controller.updateMetadata(metadata.copyWith(bestTimeToGo: value)),
+            onChanged: (value) => _updateMetadata((current) => current.copyWith(bestTimeToGo: value)),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -524,7 +535,7 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             minLines: 2,
             maxLines: 4,
             decoration: const InputDecoration(labelText: 'Review summary'),
-            onChanged: (value) => controller.updateMetadata(metadata.copyWith(reviewSummary: value)),
+            onChanged: (value) => _updateMetadata((current) => current.copyWith(reviewSummary: value)),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -533,8 +544,9 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
             maxLines: 1,
+            inputFormatters: const [FilteringTextInputFormatter.singleLineFormatter],
             decoration: const InputDecoration(labelText: 'Companions / group context', hintText: 'Friends, family, coworkers'),
-            onChanged: (value) => controller.updateMetadata(metadata.copyWith(companions: value.split(',').map((item) => item.trim()).where((item) => item.isNotEmpty).toList(growable: false))),
+            onChanged: (value) => _updateMetadata((current) => current.copyWith(companions: value.split(',').map((item) => item.trim()).where((item) => item.isNotEmpty).toList(growable: false))),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -543,8 +555,9 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.done,
             maxLines: 1,
+            inputFormatters: const [FilteringTextInputFormatter.singleLineFormatter],
             decoration: const InputDecoration(labelText: 'Hashtags / categories', hintText: '#brunch #nightlife'),
-            onChanged: (value) => controller.updateMetadata(metadata.copyWith(hashtags: value.split(RegExp(r'\s+')).where((item) => item.isNotEmpty).toList(growable: false))),
+            onChanged: (value) => _updateMetadata((current) => current.copyWith(hashtags: value.split(RegExp(r'\s+')).where((item) => item.isNotEmpty).toList(growable: false))),
           ),
           const SizedBox(height: 12),
           Row(
@@ -554,7 +567,7 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
                   onPressed: () async {
                     final picked = await showDatePicker(context: context, firstDate: DateTime(2020), lastDate: DateTime.now(), initialDate: metadata.visitDate ?? DateTime.now());
                     if (picked != null) {
-                      controller.updateMetadata(metadata.copyWith(visitDate: picked));
+                      _updateMetadata((current) => current.copyWith(visitDate: picked));
                     }
                   },
                   icon: const Icon(Icons.calendar_today_outlined),
@@ -567,7 +580,7 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
                   value: metadata.currentlyHere,
                   title: const Text('Currently here'),
                   contentPadding: EdgeInsets.zero,
-                  onChanged: (value) => controller.updateMetadata(metadata.copyWith(currentlyHere: value)),
+                  onChanged: (value) => _updateMetadata((current) => current.copyWith(currentlyHere: value)),
                 ),
               ),
             ],
