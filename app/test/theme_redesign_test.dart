@@ -17,8 +17,8 @@ void main() {
     expect(theme.navigationBarTheme.height, 76);
   });
 
-  test('brand palette centers electric blue and vivid orange', () {
-    expect(AppColors.darkColorScheme.primary, const Color(0xFF6BA8C6));
-    expect(AppColors.darkColorScheme.secondary, const Color(0xFFC08A54));
+  test('brand palette uses restrained accent colors', () {
+    expect(AppColors.darkColorScheme.primary, const Color(0xFF8EA8BA));
+    expect(AppColors.darkColorScheme.secondary, const Color(0xFFA2AAB1));
   });
 }
