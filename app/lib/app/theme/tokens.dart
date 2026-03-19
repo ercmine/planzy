@@ -45,20 +45,21 @@ class AppElevation {
   static List<BoxShadow> card(Color shadowColor, {bool glow = false}) {
     return <BoxShadow>[
       BoxShadow(
-        color: shadowColor.withOpacity(0.30),
-        blurRadius: 32,
-        offset: const Offset(0, 18),
+        color: shadowColor.withOpacity(0.16),
+        blurRadius: 28,
+        offset: const Offset(0, 16),
       ),
       if (glow)
         BoxShadow(
-          color: AppColors.electricBlue.withOpacity(0.10),
-          blurRadius: 36,
-          spreadRadius: 2,
+          color: AppColors.electricBlue.withOpacity(0.05),
+          blurRadius: 24,
+          spreadRadius: -2,
+          offset: const Offset(0, 8),
         ),
       BoxShadow(
-        color: shadowColor.withOpacity(0.12),
-        blurRadius: 12,
-        offset: const Offset(0, 4),
+        color: shadowColor.withOpacity(0.08),
+        blurRadius: 10,
+        offset: const Offset(0, 3),
       ),
     ];
   }

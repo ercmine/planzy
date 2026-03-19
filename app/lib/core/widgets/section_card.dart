@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../app/theme/color_scheme.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/tokens.dart';
 import '../../app/theme/widgets.dart';
@@ -23,18 +22,19 @@ class AppSectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.m),
       child: AppCard(
-        glow: true,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Theme.of(context).colorScheme.surface.withOpacity(0.92),
-            Theme.of(context).colorScheme.primary.withOpacity(0.08),
-            AppColors.vividOrange.withOpacity(0.08),
+            scheme.surfaceContainerHigh.withOpacity(0.94),
+            scheme.surface.withOpacity(0.92),
+            scheme.primary.withOpacity(0.05),
           ],
+          stops: const [0, 0.74, 1],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,14 +45,10 @@ class AppSectionCard extends StatelessWidget {
                   padding: const EdgeInsets.all(AppSpacing.s),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(AppRadius.medium),
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.primary.withOpacity(0.20),
-                        Theme.of(context).colorScheme.secondary.withOpacity(0.18),
-                      ],
-                    ),
+                    color: scheme.primary.withOpacity(0.10),
+                    border: Border.all(color: scheme.primary.withOpacity(0.14)),
                   ),
-                  child: Icon(icon, size: AppIconSize.medium),
+                  child: Icon(icon, size: AppIconSize.medium, color: scheme.onSurface),
                 ),
                 const SizedBox(width: AppSpacing.s),
                 Expanded(

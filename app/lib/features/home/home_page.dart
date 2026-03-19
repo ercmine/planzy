@@ -198,7 +198,6 @@ class _FeedVideoCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: AppCard(
-        glow: true,
         padding: EdgeInsets.zero,
         child: InkWell(
           onTap: () => Navigator.of(context).push(
@@ -216,10 +215,11 @@ class _FeedVideoCard extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Theme.of(context).colorScheme.primary.withOpacity(0.55),
-                      Theme.of(context).colorScheme.secondary.withOpacity(0.50),
-                      Theme.of(context).colorScheme.surfaceContainerHighest,
+                      Theme.of(context).colorScheme.surfaceContainerHigh,
+                      Theme.of(context).colorScheme.primary.withOpacity(0.16),
+                      Theme.of(context).colorScheme.secondary.withOpacity(0.12),
                     ],
+                    stops: const [0, 0.68, 1],
                   ),
                 ),
                 child: Stack(
@@ -325,13 +325,13 @@ class _SearchTabState extends ConsumerState<_SearchTab> with AutomaticKeepAliveC
                     ),
                   );
                 }
-                if (items.isEmpty) return const Center(child: AppCard(glow: true, child: Text('No results yet. Try another query.')));
+                if (items.isEmpty) return const Center(child: AppCard(child: Text('No results yet. Try another query.')));
                 return ListView.builder(
                   itemCount: items.length,
                   itemBuilder: (_, index) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: AppCard(
-                      glow: index == 0,
+                      glow: false,
                       child: ListTile(
                         title: Text(items[index].name),
                         subtitle: Text('${items[index].category} • ${items[index].regionLabel}'),

@@ -43,22 +43,22 @@ class AppTheme {
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
         side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.45)),
-        backgroundColor: colorScheme.surfaceContainerHighest.withOpacity(0.65),
-        selectedColor: colorScheme.primaryContainer.withOpacity(0.92),
+        backgroundColor: colorScheme.surfaceContainerHighest.withOpacity(0.55),
+        selectedColor: colorScheme.primaryContainer.withOpacity(0.78),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s, vertical: AppSpacing.xs),
         labelStyle: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: colorScheme.surface.withOpacity(isDark ? 0.86 : 0.92),
-        indicatorColor: colorScheme.primaryContainer.withOpacity(0.74),
+        backgroundColor: colorScheme.surface.withOpacity(isDark ? 0.94 : 0.97),
+        indicatorColor: colorScheme.primary.withOpacity(0.14),
         surfaceTintColor: Colors.transparent,
         shadowColor: colorScheme.shadow,
-        elevation: 10,
+        elevation: 8,
         height: 76,
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
             color: states.contains(WidgetState.selected) ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w800,
+            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w700,
             fontSize: 11.5,
           ),
         ),
@@ -104,15 +104,15 @@ class AppTheme {
         elevation: AppElevation.flat,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.large),
-          side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.45)),
+          side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.42)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colorScheme.surfaceContainerHigh.withOpacity(isDark ? 0.56 : 0.88),
+        fillColor: colorScheme.surfaceContainerHigh.withOpacity(isDark ? 0.44 : 0.84),
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.sm),
-        prefixIconColor: colorScheme.primary,
-        suffixIconColor: colorScheme.secondary,
+        prefixIconColor: colorScheme.primary.withOpacity(0.9),
+        suffixIconColor: colorScheme.onSurfaceVariant,
         hintStyle: TextStyle(color: colorScheme.onSurfaceVariant.withOpacity(0.9)),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.large),
@@ -124,7 +124,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.large),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.7),
+          borderSide: BorderSide(color: colorScheme.primary.withOpacity(0.7), width: 1.5),
         ),
       ),
     );

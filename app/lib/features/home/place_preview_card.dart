@@ -45,7 +45,6 @@ class PlacePreviewCard extends StatelessWidget {
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
       child: AppCard(
-        glow: true,
         padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,9 +60,20 @@ class PlacePreviewCard extends StatelessWidget {
                         : Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [theme.colorScheme.primary.withOpacity(0.65), theme.colorScheme.secondary.withOpacity(0.65)],
+                                colors: [
+                                  theme.colorScheme.surfaceContainerHigh,
+                                  theme.colorScheme.primary.withOpacity(0.18),
+                                  theme.colorScheme.secondary.withOpacity(0.12),
+                                ],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                Icons.place_outlined,
+                                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                size: 34,
                               ),
                             ),
                           ),
@@ -101,7 +111,12 @@ class PlacePreviewCard extends StatelessWidget {
                     children: [
                       AppPill(label: '★ ${place.rating.toStringAsFixed(1)} trust', icon: Icons.star_rounded),
                       if (distanceLabel != null) AppPill(label: distanceLabel, icon: Icons.route_rounded, outlined: true),
-                      if (place.hasReviews) const AppPill(label: 'Fresh reviews', icon: Icons.flash_on_rounded),
+                      if (place.hasReviews)
+                        AppPill(
+                          label: 'Fresh reviews',
+                          icon: Icons.flash_on_rounded,
+                          backgroundColor: theme.colorScheme.secondary.withOpacity(0.14),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 8),

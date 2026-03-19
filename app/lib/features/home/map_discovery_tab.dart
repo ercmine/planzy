@@ -485,13 +485,14 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
               return SizedBox(
                 width: 240,
                 child: AppCard(
-                  glow: selected?.canonicalPlaceId == place.canonicalPlaceId,
+                  glow: false,
                   gradient: selected?.canonicalPlaceId == place.canonicalPlaceId
                       ? LinearGradient(
                           colors: [
-                            theme.colorScheme.primary.withOpacity(0.16),
-                            theme.colorScheme.secondary.withOpacity(0.12),
+                            theme.colorScheme.surfaceContainerHigh,
+                            theme.colorScheme.primary.withOpacity(0.10),
                           ],
+                          stops: const [0, 1],
                         )
                       : null,
                   child: ListTile(
