@@ -7,6 +7,7 @@ import '../../providers/app_providers.dart';
 import '../notifications/notification_center_tab.dart';
 import '../leaderboards/leaderboard_tab.dart';
 import '../notifications/notification_providers.dart';
+import '../place_review_editor/place_review_video_editor_screen.dart';
 import '../video_platform/video_models.dart';
 import '../video_platform/video_providers.dart';
 import 'map_discovery_tab.dart';
@@ -362,13 +363,21 @@ class _CreateTabState extends ConsumerState<_CreateTab> with AutomaticKeepAliveC
   Widget _buildPrimaryActions() {
     return Row(
       children: [
-        Expanded(child: _ActionCard(icon: Icons.videocam_rounded, title: 'Record Video', subtitle: 'Create draft + attach recording', onTap: () => _startFlow(CreateFlowSource.record))),
+        Expanded(child: _ActionCard(icon: Icons.videocam_rounded, title: 'Record Video', subtitle: 'Open the full review editor', onTap: () => _launchEditor())),
         const SizedBox(width: 10),
-        Expanded(child: _ActionCard(icon: Icons.upload_rounded, title: 'Upload Video', subtitle: 'Create draft + attach upload', onTap: () => _startFlow(CreateFlowSource.upload))),
+        Expanded(child: _ActionCard(icon: Icons.upload_rounded, title: 'Upload Video', subtitle: 'Import a clip into the editor', onTap: () => _launchEditor())),
         const SizedBox(width: 10),
-        Expanded(child: _ActionCard(icon: Icons.note_add_rounded, title: 'New Draft', subtitle: 'Metadata-first draft', onTap: () => _startFlow(CreateFlowSource.draft))),
+        Expanded(child: _ActionCard(icon: Icons.note_add_rounded, title: 'New Draft', subtitle: 'Build a place review from scratch', onTap: () => _launchEditor())),
       ],
     );
+  }
+
+  Future<void> _launchEditor() async {
+    await _trackCreateEvent('place_review_editor_opened');
+    if (!mounted) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PlaceReviewVideoEditorScreen(recoverLatestDraft: true)));
+    if (!mounted) return;
+    await _refresh();
   }
 
   Widget _buildGroupedSections(List<StudioVideo> items) {
