@@ -476,27 +476,65 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const CircleAvatar(child: Icon(Icons.place)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(metadata.place?.name ?? 'Attach a place'),
-                      const SizedBox(height: 4),
-                      Text(_placeAttachmentLabel(metadata.place)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.tonal(onPressed: _pickPlace, child: Text(metadata.place == null ? 'Select' : 'Change')),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 420;
+              final action = FilledButton.tonal(
+                onPressed: _pickPlace,
+                child: Text(metadata.place == null ? 'Select' : 'Change'),
+              );
+
+              return isCompact
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const CircleAvatar(child: Icon(Icons.place)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(metadata.place?.name ?? 'Attach a place'),
+                                    const SizedBox(height: 4),
+                                    Text(_placeAttachmentLabel(metadata.place)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        action,
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const CircleAvatar(child: Icon(Icons.place)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(metadata.place?.name ?? 'Attach a place'),
+                                const SizedBox(height: 4),
+                                Text(_placeAttachmentLabel(metadata.place)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        action,
+                      ],
+                    );
+            },
           ),
           TextField(
             controller: _titleController,
