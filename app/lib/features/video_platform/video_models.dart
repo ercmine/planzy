@@ -210,7 +210,6 @@ class PlaceStreamItem {
     bool? isPassed,
     String? socialProof,
   }) {
-    final firstReview = reviews.isEmpty ? null : reviews.first;
     return PlaceStreamItem(
       placeId: placeId,
       placeName: placeName,
@@ -255,6 +254,7 @@ class PlaceStreamItem {
           ),
         )
         .toList(growable: false);
+    final firstReview = reviews.isEmpty ? null : reviews.first;
 
     return PlaceStreamItem(
       placeId: placeId,
