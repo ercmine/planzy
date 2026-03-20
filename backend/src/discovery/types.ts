@@ -249,9 +249,41 @@ export interface DiscoveryFeedCardAd {
 
 export type DiscoveryFeedCard = DiscoveryFeedCardPlace | DiscoveryFeedCardAd;
 
+export interface PlaceStreamReviewSummary {
+  reviewId: string;
+  creatorId?: string;
+  creatorName?: string;
+  creatorHandle?: string;
+  caption?: string;
+  rating?: number;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+}
+
+export interface PlaceStreamItem {
+  canonicalPlaceId: string;
+  place: PlaceResultItem;
+  hero: {
+    mediaType: "video" | "image" | "fallback";
+    autoplayEligible: boolean;
+    imageUrl?: string;
+    videoUrl?: string;
+  };
+  reviewStack: {
+    totalReviews: number;
+    currentReviewIndex: number;
+    reviews: PlaceStreamReviewSummary[];
+  };
+  decisionState: {
+    saved: boolean;
+    passed: boolean;
+  };
+}
+
 export interface DiscoveryFeedResponse {
   mode: DiscoveryFeedMode;
   items: DiscoveryFeedCard[];
+  placeStreamItems?: PlaceStreamItem[];
   nextCursor?: string;
 }
 

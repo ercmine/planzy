@@ -28,6 +28,11 @@ final videoFeedProvider = FutureProvider.family<List<PlaceVideoFeedItem>, FeedSc
   return repo.fetchFeed(scope: scope);
 });
 
+final placeStreamProvider = FutureProvider.family<List<PlaceStreamItem>, FeedScope>((ref, scope) async {
+  final repo = await ref.watch(videoRepositoryProvider.future);
+  return repo.fetchPlaceStream(scope: scope);
+});
+
 final studioVideosProvider = FutureProvider.family<List<StudioVideo>, StudioSection?>((ref, section) async {
   final repo = await ref.watch(videoRepositoryProvider.future);
   return repo.fetchStudioVideos(section: section);

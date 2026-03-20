@@ -7,6 +7,7 @@ import type {
   DiscoveryFeedCard,
   DiscoveryFeedMode,
   DiscoveryFeedResponse,
+  PlaceStreamItem,
   DiscoveryQueryContext,
   NearbyResponse,
   PlaceDiscoveryRepository,
@@ -673,9 +674,28 @@ export class DiscoveryFeedService {
 
     const organicCards: DiscoveryFeedCard[] = organicItems.map((item) => ({ type: "place", id: item.placeId, place: item }));
     const cards = this.adService.insertEveryTen(organicCards);
+    const placeStreamItems: PlaceStreamItem[] = organicItems.map((item) => ({
+      canonicalPlaceId: item.placeId,
+      place: item,
+      hero: {
+        mediaType: item.coverImageUrl ? "image" : "fallback",
+        autoplayEligible: false,
+        imageUrl: item.coverImageUrl
+      },
+      reviewStack: {
+        totalReviews: item.rating?.reviewCount ?? 0,
+        currentReviewIndex: 0,
+        reviews: []
+      },
+      decisionState: {
+        saved: item.userContext?.saved ?? false,
+        passed: false
+      }
+    }));
     return {
       mode,
       items: cards,
+      placeStreamItems,
       nextCursor: undefined
     };
   }

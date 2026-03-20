@@ -26,6 +26,8 @@ class VideoRepository {
 
   final Map<String, _TimedCacheEntry<List<PlaceVideoFeedItem>>> _feedCache = {};
   final Map<String, Future<List<PlaceVideoFeedItem>>> _feedInFlight = {};
+  final Map<String, _TimedCacheEntry<List<PlaceStreamItem>>> _placeStreamCache = {};
+  final Map<String, Future<List<PlaceStreamItem>>> _placeStreamInFlight = {};
   final Map<String, _TimedCacheEntry<List<PlaceSearchResult>>> _searchCache = {};
   final Map<String, Future<List<PlaceSearchResult>>> _searchInFlight = {};
   final Map<String, _TimedCacheEntry<List<MapDiscoveryPlace>>> _mapCache = {};
@@ -54,6 +56,29 @@ class VideoRepository {
         final items = response['items'];
         if (items is! List) return const [];
         return items.whereType<Map<String, dynamic>>().map((item) => PlaceVideoFeedItem.fromJson(item, scope)).toList(growable: false);
+      },
+    );
+  }
+
+  Future<List<PlaceStreamItem>> fetchPlaceStream({required FeedScope scope}) async {
+    final cacheKey = scope.name;
+    return _loadCachedList(
+      cache: _placeStreamCache,
+      inFlight: _placeStreamInFlight,
+      key: cacheKey,
+      ttl: _feedCacheTtl,
+      loader: () async {
+        final feedItems = await fetchFeed(scope: scope);
+        if (feedItems.isEmpty) return const [];
+
+        final grouped = <String, List<PlaceVideoFeedItem>>{};
+        for (final item in feedItems) {
+          grouped.putIfAbsent(item.placeId, () => <PlaceVideoFeedItem>[]).add(item);
+        }
+
+        return grouped.entries
+            .map((entry) => PlaceStreamItem.fromFeedItems(placeId: entry.key, scope: scope, items: entry.value))
+            .toList(growable: false);
       },
     );
   }

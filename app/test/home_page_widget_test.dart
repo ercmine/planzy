@@ -37,6 +37,52 @@ void main() {
       rating: 5,
     ),
   ];
+  final localStreamItems = [
+    PlaceStreamItem.fromFeedItems(placeId: 'p1', scope: FeedScope.local, items: localItems),
+    PlaceStreamItem.fromFeedItems(
+      placeId: 'p2',
+      scope: FeedScope.local,
+      items: const [
+        PlaceVideoFeedItem(
+          videoId: 'v2',
+          placeId: 'p2',
+          placeName: 'Noodle Night',
+          placeCategory: 'Ramen',
+          regionLabel: 'East Side',
+          scope: FeedScope.local,
+          creatorName: 'Ari',
+          creatorHandle: '@ari',
+          caption: 'Late-night broth run',
+          videoUrl: 'https://cdn/video-2.mp4',
+          rating: 4,
+        ),
+        PlaceVideoFeedItem(
+          videoId: 'v3',
+          placeId: 'p2',
+          placeName: 'Noodle Night',
+          placeCategory: 'Ramen',
+          regionLabel: 'East Side',
+          scope: FeedScope.local,
+          creatorName: 'Bo',
+          creatorHandle: '@bo',
+          caption: 'Go extra spicy',
+          videoUrl: 'https://cdn/video-3.mp4',
+          rating: 5,
+        ),
+      ],
+    ),
+    const PlaceStreamItem(
+      placeId: 'p3',
+      placeName: 'Gallery Noon',
+      placeCategory: 'Gallery',
+      regionLabel: 'Warehouse District',
+      scope: FeedScope.local,
+      reviewCount: 0,
+      selectedHero: 0,
+      heroImageUrl: 'https://cdn/gallery.jpg',
+      socialProof: 'Image-first fallback',
+    ),
+  ];
 
   List<Override> baseOverrides({
     List<StudioVideo> studioItems = const [],
@@ -75,6 +121,9 @@ void main() {
       videoFeedProvider(FeedScope.local).overrideWith((ref) async => localItems),
       videoFeedProvider(FeedScope.regional).overrideWith((ref) async => [localItems.first.copyWith(scope: FeedScope.regional, caption: 'Regional favorite')]),
       videoFeedProvider(FeedScope.global).overrideWith((ref) async => [localItems.first.copyWith(scope: FeedScope.global, caption: 'Global highlight')]),
+      placeStreamProvider(FeedScope.local).overrideWith((ref) async => localStreamItems),
+      placeStreamProvider(FeedScope.regional).overrideWith((ref) async => [localStreamItems.first.copyWith(socialProof: 'Regional place stream')]),
+      placeStreamProvider(FeedScope.global).overrideWith((ref) async => [localStreamItems.first.copyWith(socialProof: 'Global place stream')]),
       placeSearchProvider((query: '', scope: FeedScope.local)).overrideWith((ref) async => const []),
       placeSearchProvider((query: 'Cafe', scope: FeedScope.local)).overrideWith((ref) async => placeResults),
       placeSearchProvider((query: 'cafe', scope: FeedScope.local)).overrideWith((ref) async => placeResults),
@@ -94,15 +143,64 @@ void main() {
     await tester.pumpWidget(buildApp(baseOverrides()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Best espresso near station'), findsOneWidget);
+    expect(find.text('Cafe Orbit'), findsOneWidget);
 
     await tester.tap(find.text('Regional'));
     await tester.pumpAndSettle();
-    expect(find.text('Regional favorite'), findsOneWidget);
+    expect(find.text('Regional place stream'), findsOneWidget);
 
     await tester.tap(find.text('Global'));
     await tester.pumpAndSettle();
-    expect(find.text('Global highlight'), findsOneWidget);
+    expect(find.text('Global place stream'), findsOneWidget);
+  });
+
+  testWidgets('Unified place stream supports save/pass, review switching, and depth actions', (tester) async {
+    await tester.pumpWidget(buildApp(baseOverrides()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Swipe right save • left pass'), findsOneWidget);
+    expect(find.text('Want to go'), findsOneWidget);
+
+    await tester.drag(find.byKey(const ValueKey('place-stream-p1')), const Offset(180, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Saved Cafe Orbit'), findsOneWidget);
+
+    await tester.fling(find.byType(PageView).first, const Offset(0, -400), 1200);
+    await tester.pumpAndSettle();
+    expect(find.text('Noodle Night'), findsOneWidget);
+
+    await tester.tap(find.text('@bo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Go extra spicy'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.account_circle_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Creator profile'), findsOneWidget);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.map_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Map preview'), findsOneWidget);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.open_in_new_rounded));
+    await tester.pumpAndSettle();
+    expect(find.byType(PlaceVideoDetailPage), findsOneWidget);
+  });
+
+  testWidgets('Sparse-media place renders gracefully in the place stream', (tester) async {
+    await tester.pumpWidget(buildApp(baseOverrides()));
+    await tester.pumpAndSettle();
+
+    await tester.fling(find.byType(PageView).first, const Offset(0, -900), 1200);
+    await tester.pumpAndSettle();
+    await tester.fling(find.byType(PageView).first, const Offset(0, -900), 1200);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gallery Noon'), findsOneWidget);
+    expect(find.text('Image-first fallback'), findsOneWidget);
   });
 
   testWidgets('Create tab shows polished empty state for new creators', (tester) async {
