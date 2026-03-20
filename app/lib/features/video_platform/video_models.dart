@@ -129,6 +129,149 @@ class PlaceVideoFeedItem {
   }
 }
 
+enum PlaceHeroMediaType { video, image, fallback }
+
+class PlaceStreamReview {
+  const PlaceStreamReview({
+    required this.reviewId,
+    required this.videoId,
+    required this.creatorName,
+    required this.creatorHandle,
+    required this.caption,
+    required this.rating,
+    this.videoUrl,
+    this.thumbnailUrl,
+    this.coverUrl,
+    this.trustTier,
+    this.trustBadges = const [],
+  });
+
+  final String reviewId;
+  final String videoId;
+  final String creatorName;
+  final String creatorHandle;
+  final String caption;
+  final String? videoUrl;
+  final String? thumbnailUrl;
+  final String? coverUrl;
+  final String? trustTier;
+  final List<String> trustBadges;
+  final int rating;
+}
+
+class PlaceStreamItem {
+  const PlaceStreamItem({
+    required this.placeId,
+    required this.placeName,
+    required this.placeCategory,
+    required this.regionLabel,
+    required this.scope,
+    required this.reviewCount,
+    required this.selectedHero,
+    this.cityName,
+    this.neighborhood,
+    this.distanceKm,
+    this.socialProof,
+    this.heroImageUrl,
+    this.heroVideoUrl,
+    this.isSaved = false,
+    this.isPassed = false,
+    this.reviews = const [],
+  });
+
+  final String placeId;
+  final String placeName;
+  final String placeCategory;
+  final String regionLabel;
+  final String? cityName;
+  final String? neighborhood;
+  final FeedScope scope;
+  final double? distanceKm;
+  final String? socialProof;
+  final String? heroImageUrl;
+  final String? heroVideoUrl;
+  final int reviewCount;
+  final int selectedHero;
+  final bool isSaved;
+  final bool isPassed;
+  final List<PlaceStreamReview> reviews;
+
+  PlaceHeroMediaType get heroType {
+    if ((heroVideoUrl ?? '').isNotEmpty) return PlaceHeroMediaType.video;
+    if ((heroImageUrl ?? '').isNotEmpty) return PlaceHeroMediaType.image;
+    return PlaceHeroMediaType.fallback;
+  }
+
+  PlaceStreamReview? get activeReview => reviews.isEmpty ? null : reviews[selectedHero.clamp(0, reviews.length - 1)];
+
+  PlaceStreamItem copyWith({
+    int? selectedHero,
+    bool? isSaved,
+    bool? isPassed,
+    String? socialProof,
+  }) {
+    final firstReview = reviews.isEmpty ? null : reviews.first;
+    return PlaceStreamItem(
+      placeId: placeId,
+      placeName: placeName,
+      placeCategory: placeCategory,
+      regionLabel: regionLabel,
+      cityName: cityName,
+      neighborhood: neighborhood,
+      scope: scope,
+      distanceKm: distanceKm,
+      socialProof: socialProof ?? this.socialProof,
+      heroImageUrl: heroImageUrl,
+      heroVideoUrl: heroVideoUrl,
+      reviewCount: reviewCount,
+      selectedHero: selectedHero ?? this.selectedHero,
+      isSaved: isSaved ?? this.isSaved,
+      isPassed: isPassed ?? this.isPassed,
+      reviews: reviews,
+    );
+  }
+
+  factory PlaceStreamItem.fromFeedItems({
+    required String placeId,
+    required FeedScope scope,
+    required List<PlaceVideoFeedItem> items,
+    String? fallbackImageUrl,
+  }) {
+    final lead = items.first;
+    final reviews = items
+        .map(
+          (item) => PlaceStreamReview(
+            reviewId: item.videoId,
+            videoId: item.videoId,
+            creatorName: item.creatorName,
+            creatorHandle: item.creatorHandle,
+            caption: item.caption,
+            videoUrl: item.videoUrl.isEmpty ? null : item.videoUrl,
+            thumbnailUrl: item.thumbnailUrl,
+            coverUrl: item.coverUrl,
+            trustTier: item.trustTier,
+            trustBadges: item.trustBadges,
+            rating: item.rating,
+          ),
+        )
+        .toList(growable: false);
+
+    return PlaceStreamItem(
+      placeId: placeId,
+      placeName: lead.placeName,
+      placeCategory: lead.placeCategory,
+      regionLabel: lead.regionLabel,
+      scope: scope,
+      reviewCount: reviews.length,
+      selectedHero: 0,
+      heroImageUrl: firstReview?.thumbnailUrl ?? firstReview?.coverUrl ?? fallbackImageUrl,
+      heroVideoUrl: firstReview?.videoUrl,
+      socialProof: reviews.length > 1 ? '${reviews.length} reviews here' : 'Creator review',
+      reviews: reviews,
+    );
+  }
+}
+
 class StudioVideo {
   const StudioVideo({
     required this.videoId,

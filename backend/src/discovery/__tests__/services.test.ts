@@ -180,6 +180,9 @@ describe("discovery services", () => {
     const mixedFeed = await feed.feed("u1", "for_you", { city: "austin", pageSize: 10 });
     expect(mixedFeed.items.length).toBeGreaterThan(0);
     expect(mixedFeed.items.every((item) => item.type === "place" || item.type === "ad")).toBe(true);
+    expect((mixedFeed.placeStreamItems?.length ?? 0)).toBeGreaterThan(0);
+    expect(mixedFeed.placeStreamItems?.map((item) => item.canonicalPlaceId)).toContain(mixedFeed.placeStreamItems?.[0]?.canonicalPlaceId);
+    expect(mixedFeed.placeStreamItems?.[0]?.decisionState.saved).toBeTypeOf("boolean");
   });
 
 

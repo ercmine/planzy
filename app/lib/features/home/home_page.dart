@@ -114,16 +114,80 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 }
 
-class _FeedTab extends ConsumerWidget {
+class _FeedTab extends ConsumerStatefulWidget {
   const _FeedTab({required this.scope, required this.onScopeChanged});
 
   final FeedScope scope;
   final ValueChanged<FeedScope> onScopeChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_FeedTab> createState() => _FeedTabState();
+}
+
+class _FeedTabState extends ConsumerState<_FeedTab> {
+  late final PageController _pageController;
+  int _activeIndex = 0;
+  final Map<String, PlaceStreamItem> _decisions = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(viewportFraction: 0.92);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _track(String event, Map<String, dynamic> payload) async {
+    final telemetryRepository = ref.read(telemetryRepositoryProvider).valueOrNull;
+    if (telemetryRepository == null) return;
+    await telemetryRepository.enqueueEvent(
+      'place_stream',
+      TelemetryEventInput.fromJson({'event': event, 'source': 'place_stream', ...payload}),
+    );
+  }
+
+  void _applyDecision(PlaceStreamItem item, bool saved) {
+    setState(() {
+      _decisions[item.placeId] = item.copyWith(isSaved: saved, isPassed: !saved);
+    });
+    _track(
+      saved ? 'swipe' : 'swipe',
+      {'planId': item.placeId, 'action': saved ? 'yes' : 'no', 'section': 'place_stream'},
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(saved ? 'Saved ${item.placeName}' : 'Passed ${item.placeName}'),
+        action: saved
+            ? SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  setState(() {
+                    _decisions[item.placeId] = item.copyWith(isSaved: false, isPassed: false);
+                  });
+                },
+              )
+            : null,
+      ),
+    );
+  }
+
+  void _openPlace(PlaceStreamItem item) {
+    _track('card_opened', {'planId': item.placeId, 'section': 'place_detail'});
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PlaceVideoDetailPage(placeId: item.placeId, placeName: item.placeName),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final bootstrap = ref.watch(feedBootstrapProvider);
-    final feed = ref.watch(videoFeedProvider(scope));
+    final stream = ref.watch(placeStreamProvider(widget.scope));
 
     return Column(
       children: [
@@ -134,8 +198,8 @@ class _FeedTab extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const AppSectionHeader(
-                  title: 'Feed',
-                  subtitle: 'Creator-led local discovery tuned to your current exploration scope.',
+                  title: 'Place stream',
+                  subtitle: 'Swipe vertically between places, swipe horizontally to save or pass, and tap into the place story.',
                 ),
                 const SizedBox(height: AppSpacing.s),
                 SegmentedButton<FeedScope>(
@@ -144,8 +208,8 @@ class _FeedTab extends ConsumerWidget {
                     ButtonSegment(value: FeedScope.regional, icon: Icon(Icons.public), label: Text('Regional')),
                     ButtonSegment(value: FeedScope.global, icon: Icon(Icons.flight_takeoff), label: Text('Global')),
                   ],
-                  selected: {scope},
-                  onSelectionChanged: (value) => onScopeChanged(value.first),
+                  selected: {widget.scope},
+                  onSelectionChanged: (value) => widget.onScopeChanged(value.first),
                 ),
               ],
             ),
@@ -154,28 +218,96 @@ class _FeedTab extends ConsumerWidget {
         Expanded(
           child: bootstrap.when(
             data: (boot) {
-              final seeded = boot.itemsByScope[scope] ?? const [];
-              final items = seeded.isNotEmpty ? seeded : feed.valueOrNull ?? const [];
+              final seeded = (boot.itemsByScope[widget.scope] ?? const [])
+                  .fold<Map<String, List<PlaceVideoFeedItem>>>({}, (acc, item) {
+                acc.putIfAbsent(item.placeId, () => <PlaceVideoFeedItem>[]).add(item);
+                return acc;
+              })
+                  .values
+                  .map((group) => PlaceStreamItem.fromFeedItems(placeId: group.first.placeId, scope: widget.scope, items: group))
+                  .toList(growable: false);
+              final items = (seeded.isNotEmpty ? seeded : stream.valueOrNull ?? const [])
+                  .map((item) => _decisions[item.placeId] ?? item)
+                  .toList(growable: false);
               if (items.isEmpty) {
                 return _FeedEmptyState(
-                  title: boot.emptyTitle ?? 'No nearby videos yet',
-                  body: boot.emptyBody ?? 'Try switching to Regional or Global and broaden your interests.',
+                  title: boot.emptyTitle ?? 'No nearby places yet',
+                  body: boot.emptyBody ?? 'Try switching to Regional or Global to discover more places in the stream.',
                   suggestions: boot.suggestions,
                 );
               }
-              return ListView.builder(
-                cacheExtent: 1000,
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+              if (_activeIndex >= items.length) {
+                _activeIndex = items.length - 1;
+              }
+              return PageView.builder(
+                key: ValueKey(widget.scope),
+                controller: _pageController,
+                scrollDirection: Axis.vertical,
+                onPageChanged: (index) {
+                  setState(() => _activeIndex = index);
+                  final item = items[index];
+                  _track('card_viewed', {'planId': item.placeId, 'position': index, 'section': 'place_stream'});
+                },
                 itemCount: items.length,
-                itemBuilder: (_, index) => _FeedVideoCard(item: items[index]),
+                itemBuilder: (_, index) => Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                  child: _PlaceStreamCard(
+                    key: ValueKey('place-stream-${items[index].placeId}'),
+                    item: items[index],
+                    isActive: index == _activeIndex,
+                    onSave: () => _applyDecision(items[index], true),
+                    onPass: () => _applyDecision(items[index], false),
+                    onOpenPlace: () => _openPlace(items[index]),
+                    onOpenMap: () {
+                      _track('outbound_link_clicked', {'planId': items[index].placeId, 'linkType': 'maps'});
+                      showModalBottomSheet<void>(
+                        context: context,
+                        builder: (context) => _ContextSheet(
+                          title: items[index].placeName,
+                          subtitle: 'Map preview',
+                          body: 'Map context opens here without breaking your place stream position.',
+                          icon: Icons.map_outlined,
+                        ),
+                      );
+                    },
+                    onOpenCreator: () {
+                      final review = items[index].activeReview;
+                      _track('card_opened', {'planId': items[index].placeId, 'section': 'creator_profile'});
+                      showModalBottomSheet<void>(
+                        context: context,
+                        builder: (context) => _ContextSheet(
+                          title: review?.creatorHandle ?? '@creator',
+                          subtitle: review?.creatorName ?? 'Creator profile',
+                          body: 'Creator profile opens as a light-weight depth layer from the place stream.',
+                          icon: Icons.account_circle_outlined,
+                        ),
+                      );
+                    },
+                    onReviewChanged: (reviewIndex) {
+                      final updated = items[index].copyWith(selectedHero: reviewIndex);
+                      setState(() => _decisions[updated.placeId] = updated);
+                      _track('card_opened', {'planId': updated.placeId, 'section': 'review_switch', 'position': reviewIndex});
+                    },
+                  ),
+                ),
               );
             },
-            error: (_, __) => feed.when(
+            error: (_, __) => stream.when(
               data: (items) => items.isEmpty
                   ? const _FeedEmptyState(title: 'No content yet', body: 'Try another scope or update preferences in settings.')
-                  : ListView.builder(
+                  : PageView.builder(
+                      scrollDirection: Axis.vertical,
                       itemCount: items.length,
-                      itemBuilder: (_, index) => _FeedVideoCard(item: items[index]),
+                      itemBuilder: (_, index) => _PlaceStreamCard(
+                        item: items[index],
+                        isActive: index == 0,
+                        onSave: () {},
+                        onPass: () {},
+                        onOpenPlace: () {},
+                        onOpenMap: () {},
+                        onOpenCreator: () {},
+                        onReviewChanged: (_) {},
+                      ),
                     ),
               loading: () => const Center(child: AppSkeleton(height: 220)),
               error: (e, _) => Center(child: Text('Feed unavailable: $e')),
@@ -188,74 +320,206 @@ class _FeedTab extends ConsumerWidget {
   }
 }
 
-class _FeedVideoCard extends StatelessWidget {
-  const _FeedVideoCard({required this.item});
+class _PlaceStreamCard extends StatefulWidget {
+  const _PlaceStreamCard({
+    super.key,
+    required this.item,
+    required this.isActive,
+    required this.onSave,
+    required this.onPass,
+    required this.onOpenPlace,
+    required this.onOpenMap,
+    required this.onOpenCreator,
+    required this.onReviewChanged,
+  });
 
-  final PlaceVideoFeedItem item;
+  final PlaceStreamItem item;
+  final bool isActive;
+  final VoidCallback onSave;
+  final VoidCallback onPass;
+  final VoidCallback onOpenPlace;
+  final VoidCallback onOpenMap;
+  final VoidCallback onOpenCreator;
+  final ValueChanged<int> onReviewChanged;
+
+  @override
+  State<_PlaceStreamCard> createState() => _PlaceStreamCardState();
+}
+
+class _PlaceStreamCardState extends State<_PlaceStreamCard> {
+  double _dragDx = 0;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: AppCard(
-        padding: EdgeInsets.zero,
-        child: InkWell(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => PlaceVideoDetailPage(placeId: item.placeId, placeName: item.placeName),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final item = widget.item;
+    final review = item.activeReview;
+    final swipeIntent = _dragDx > 40 ? 'Save' : (_dragDx < -40 ? 'Pass' : null);
+    final swipeColor = _dragDx > 40
+        ? Colors.greenAccent.shade400
+        : (_dragDx < -40 ? Colors.redAccent.shade200 : Colors.transparent);
+
+    return GestureDetector(
+      onHorizontalDragUpdate: (details) => setState(() => _dragDx += details.delta.dx),
+      onHorizontalDragEnd: (_) {
+        final delta = _dragDx;
+        setState(() => _dragDx = 0);
+        if (delta > 100) widget.onSave();
+        if (delta < -100) widget.onPass();
+      },
+      child: Transform.translate(
+        offset: Offset(_dragDx * 0.16, 0),
+        child: AppCard(
+          padding: EdgeInsets.zero,
+          child: Stack(
             children: [
               Container(
-                height: 210,
                 decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Theme.of(context).colorScheme.surfaceContainerHigh,
-                      Theme.of(context).colorScheme.primary.withOpacity(0.16),
-                      Theme.of(context).colorScheme.secondary.withOpacity(0.12),
+                      Colors.black,
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
+                      Theme.of(context).colorScheme.primary.withOpacity(0.25),
                     ],
-                    stops: const [0, 0.68, 1],
                   ),
                 ),
-                child: Stack(
-                  children: [
-                    const Positioned.fill(child: Icon(Icons.play_circle_fill_rounded, size: 72)),
-                    Positioned(
-                      left: 12,
-                      top: 12,
-                      child: AppPill(label: item.placeCategory, icon: Icons.place_outlined),
-                    ),
-                    Positioned(
-                      right: 12,
-                      top: 12,
-                      child: AppPill(label: '${item.rating}/5', icon: Icons.star_rounded),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(14),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.caption.isEmpty ? item.placeName : item.caption, style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 6),
-                    Text('${item.placeName} • ${item.regionLabel}', style: Theme.of(context).textTheme.bodyMedium),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        CircleAvatar(radius: 12, child: Text((item.creatorHandle.isNotEmpty ? item.creatorHandle[0] : '?').toUpperCase())),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(item.creatorHandle, style: Theme.of(context).textTheme.labelLarge)),
-                        AppIconButton(onPressed: () {}, icon: Icons.bookmark_border),
-                        const SizedBox(width: 6),
-                        AppIconButton(onPressed: () {}, icon: Icons.ios_share_rounded),
-                      ],
+                    Expanded(
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _PlaceHero(item: item, review: review),
+                          Positioned(
+                            left: 18,
+                            top: 18,
+                            child: Wrap(
+                              spacing: 8,
+                              children: [
+                                AppPill(label: item.placeCategory, icon: Icons.place_outlined),
+                                AppPill(
+                                  label: item.heroType == PlaceHeroMediaType.video ? 'Review video' : 'Place hero',
+                                  icon: item.heroType == PlaceHeroMediaType.video ? Icons.play_circle_fill_rounded : Icons.image_outlined,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (swipeIntent != null)
+                            Positioned(
+                              top: 22,
+                              right: 22,
+                              child: Chip(
+                                backgroundColor: swipeColor,
+                                label: Text(swipeIntent),
+                                avatar: Icon(_dragDx > 0 ? Icons.bookmark_added_outlined : Icons.do_not_disturb_alt_outlined),
+                              ),
+                            ),
+                          Positioned(
+                            left: 18,
+                            right: 18,
+                            bottom: 18,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.52),
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(18),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: widget.onOpenPlace,
+                                      child: Text(item.placeName, style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(item.regionLabel, style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white70)),
+                                    const SizedBox(height: 10),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        if (review != null) _ActionChip(icon: Icons.star_rounded, label: '${review.rating}/5'),
+                                        if (item.socialProof != null) _ActionChip(icon: Icons.layers_outlined, label: item.socialProof!),
+                                        _ActionChip(icon: Icons.swipe_rounded, label: 'Swipe right save • left pass'),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 14),
+                                    Row(
+                                      children: [
+                                        InkWell(
+                                          onTap: widget.onOpenCreator,
+                                          child: Row(
+                                            children: [
+                                              CircleAvatar(radius: 16, child: Text(_creatorInitial(review?.creatorHandle))),
+                                              const SizedBox(width: 10),
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(review?.creatorHandle ?? '@creator', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                                  Text(review?.caption.isNotEmpty == true ? review!.caption : 'No review caption yet', style: const TextStyle(color: Colors.white70)),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        IconButton(onPressed: widget.onOpenMap, icon: const Icon(Icons.map_outlined, color: Colors.white)),
+                                        IconButton(onPressed: widget.onOpenPlace, icon: const Icon(Icons.open_in_new_rounded, color: Colors.white)),
+                                      ],
+                                    ),
+                                    if (item.reviews.length > 1) ...[
+                                      const SizedBox(height: 12),
+                                      SizedBox(
+                                        height: 42,
+                                        child: ListView.separated(
+                                          scrollDirection: Axis.horizontal,
+                                          itemCount: item.reviews.length,
+                                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                          itemBuilder: (_, index) {
+                                            final option = item.reviews[index];
+                                            final selected = index == item.selectedHero;
+                                            return ChoiceChip(
+                                              selected: selected,
+                                              label: Text(option.creatorHandle),
+                                              avatar: CircleAvatar(radius: 10, child: Text('${index + 1}')),
+                                              onSelected: (_) => widget.onReviewChanged(index),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: widget.onPass,
+                              icon: const Icon(Icons.close_rounded),
+                              label: const Text('Pass'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: widget.onSave,
+                              icon: Icon(item.isSaved ? Icons.bookmark_added_rounded : Icons.bookmark_add_outlined),
+                              label: Text(item.isSaved ? 'Saved' : 'Want to go'),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -266,6 +530,114 @@ class _FeedVideoCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PlaceHero extends StatelessWidget {
+  const _PlaceHero({required this.item, required this.review});
+
+  final PlaceStreamItem item;
+  final PlaceStreamReview? review;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            colorScheme.primary.withOpacity(item.heroType == PlaceHeroMediaType.video ? 0.55 : 0.3),
+            colorScheme.secondary.withOpacity(0.2),
+            Colors.black87,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              item.heroType == PlaceHeroMediaType.video
+                  ? Icons.play_circle_fill_rounded
+                  : item.heroType == PlaceHeroMediaType.image
+                      ? Icons.photo_library_outlined
+                      : Icons.place_rounded,
+              size: 88,
+              color: Colors.white.withOpacity(0.92),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              review?.caption.isNotEmpty == true ? review!.caption : item.placeName,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionChip extends StatelessWidget {
+  const _ActionChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(999)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(color: Colors.white)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContextSheet extends StatelessWidget {
+  const _ContextSheet({required this.title, required this.subtitle, required this.body, required this.icon});
+
+  final String title;
+  final String subtitle;
+  final String body;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [Icon(icon), const SizedBox(width: 10), Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge))]),
+            const SizedBox(height: 8),
+            Text(subtitle, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(body),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _creatorInitial(String? handle) {
+  final normalized = (handle ?? '').replaceAll('@', '').trim();
+  if (normalized.isEmpty) return 'C';
+  return normalized[0].toUpperCase();
 }
 
 class _SearchTab extends ConsumerStatefulWidget {

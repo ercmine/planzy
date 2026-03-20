@@ -32,4 +32,44 @@ void main() {
 
     expect(video.status, StudioVideoStatus.processing);
   });
+
+  test('groups review videos into a unified place stream item', () {
+    final streamItem = PlaceStreamItem.fromFeedItems(
+      placeId: 'place_abc',
+      scope: FeedScope.local,
+      items: const [
+        PlaceVideoFeedItem(
+          videoId: 'vid_1',
+          placeId: 'place_abc',
+          placeName: 'Sushi Spot',
+          placeCategory: 'Restaurant',
+          regionLabel: 'Austin, TX',
+          scope: FeedScope.local,
+          creatorName: 'Mia',
+          creatorHandle: '@mia',
+          caption: 'Worth the wait',
+          videoUrl: 'https://cdn/vid.mp4',
+          rating: 5,
+        ),
+        PlaceVideoFeedItem(
+          videoId: 'vid_2',
+          placeId: 'place_abc',
+          placeName: 'Sushi Spot',
+          placeCategory: 'Restaurant',
+          regionLabel: 'Austin, TX',
+          scope: FeedScope.local,
+          creatorName: 'Lee',
+          creatorHandle: '@lee',
+          caption: 'Get the omakase',
+          videoUrl: 'https://cdn/vid-2.mp4',
+          rating: 4,
+        ),
+      ],
+    );
+
+    expect(streamItem.placeId, 'place_abc');
+    expect(streamItem.reviewCount, 2);
+    expect(streamItem.activeReview?.creatorHandle, '@mia');
+    expect(streamItem.heroType, PlaceHeroMediaType.video);
+  });
 }
