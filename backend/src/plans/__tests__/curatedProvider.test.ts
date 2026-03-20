@@ -8,7 +8,8 @@ describe("CuratedProvider", () => {
   const baseInput = {
     location: { lat: 37.775, lng: -122.418 },
     radiusMeters: 10_000,
-    limit: 20
+    limit: 20,
+    cursor: null
   };
 
   it("returns templates when includeTemplates is true", async () => {
