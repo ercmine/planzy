@@ -286,7 +286,7 @@ class SettingsPage extends ConsumerWidget {
 
   Future<void> _emailSupport(BuildContext context, String appVersion) async {
     final subject = Uri.encodeComponent('Perbug support ($appVersion)');
-    final uri = Uri.parse('mailto:support@perbug.com?subject=$subject');
+    final uri = Uri.parse('mailto:alex@perbug.com?subject=$subject');
     final launched = await launchUrl(uri);
     if (!launched && context.mounted) {
       AppSnackbar.show(context, 'Could not open email client.', isError: true);
