@@ -486,12 +486,10 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                                 )
                               : CollapsibleMapOverlay(
                                   title: 'Search area',
+                                  icon: Icons.travel_explore_rounded,
+                                  iconOnlyWhenCollapsed: true,
                                   isCollapsed: _searchAreaOverlayCollapsed,
                                   onToggle: () => setState(() => _searchAreaOverlayCollapsed = !_searchAreaOverlayCollapsed),
-                                  collapsedChild: Text(
-                                    showSearchArea ? 'Search this area ready' : 'No pending map changes',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                                  ),
                                   child: Padding(
                                     padding: const EdgeInsets.only(top: 6),
                                     child: SearchAreaButton(
@@ -505,12 +503,10 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                           const SizedBox(height: 12),
                           CollapsibleMapOverlay(
                             title: 'Map insights',
+                            icon: Icons.insights_rounded,
+                            iconOnlyWhenCollapsed: true,
                             isCollapsed: _statsOverlayCollapsed,
                             onToggle: () => setState(() => _statsOverlayCollapsed = !_statsOverlayCollapsed),
-                            collapsedChild: Text(
-                              '${visiblePlaces.length} places • ${world.districts.length} districts',
-                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                            ),
                             child: Padding(
                               padding: const EdgeInsets.only(top: 6),
                               child: Column(
@@ -584,12 +580,10 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
             width: overlayWidth,
             child: CollapsibleMapOverlay(
               title: 'Discovery controls',
+              icon: Icons.tune_rounded,
+              iconOnlyWhenCollapsed: true,
               isCollapsed: _topOverlayCollapsed,
               onToggle: () => setState(() => _topOverlayCollapsed = !_topOverlayCollapsed),
-              collapsedChild: Text(
-                state.areaLabel ?? state.geoStatus ?? 'Search, filter, and recenter the map.',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
               child: Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Column(

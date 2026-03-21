@@ -16,6 +16,8 @@ class CollapsibleMapOverlay extends StatelessWidget {
     this.collapsedChild,
     this.trailing,
     this.padding = const EdgeInsets.all(12),
+    this.icon,
+    this.iconOnlyWhenCollapsed = false,
   });
 
   final String title;
@@ -25,10 +27,25 @@ class CollapsibleMapOverlay extends StatelessWidget {
   final Widget? collapsedChild;
   final Widget? trailing;
   final EdgeInsetsGeometry padding;
+  final IconData? icon;
+  final bool iconOnlyWhenCollapsed;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (isCollapsed && iconOnlyWhenCollapsed && icon != null) {
+      return AppCard(
+        glow: true,
+        padding: const EdgeInsets.all(6),
+        child: IconButton(
+          tooltip: 'Expand $title',
+          onPressed: onToggle,
+          icon: Icon(icon, size: 20),
+          visualDensity: VisualDensity.compact,
+        ),
+      );
+    }
+
     return AppCard(
       glow: true,
       padding: padding,
@@ -37,6 +54,10 @@ class CollapsibleMapOverlay extends StatelessWidget {
         children: [
           Row(
             children: [
+              if (icon != null) ...[
+                Icon(icon, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: Text(
                   title,
