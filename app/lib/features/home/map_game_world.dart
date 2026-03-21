@@ -272,7 +272,7 @@ class MapWorldEngine {
           id: 'item_${pin.canonicalPlaceId}',
           placeId: pin.canonicalPlaceId,
           placeName: pin.name,
-          title: '${district.name} ${family.title}',
+          title: '${district.name} ${_titleCase(family)}',
           family: family,
           rarity: rarity,
           assetPath: _assetPathFor(pin.category, rarity),
@@ -342,6 +342,14 @@ class MapWorldEngine {
     if (category.contains('museum') || category.contains('park')) return 'scene sigil';
     if (category.contains('night')) return 'afterglow emblem';
     return 'district relic';
+  }
+
+  String _titleCase(String value) {
+    return value
+        .split(' ')
+        .where((word) => word.isNotEmpty)
+        .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
+        .join(' ');
   }
 
   String _assetPathFor(String category, CollectibleRarity rarity) {
