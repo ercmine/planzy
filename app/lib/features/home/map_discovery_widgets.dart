@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/theme/widgets.dart';
@@ -111,28 +112,47 @@ class DiscoveryFilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return SizedBox(
       height: 46,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemBuilder: (context, index) {
-          final filter = filters[index];
-          final selected = selectedIds.contains(filter.id);
-          return FilterChip(
-            selected: selected,
-            onSelected: (_) => onToggle(filter.id),
-            avatar: filter.icon == null ? null : Icon(filter.icon, size: 16),
-            label: Text(filter.label),
-            labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            showCheckmark: false,
-            side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.45)),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-          );
-        },
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemCount: filters.length,
+      child: ScrollConfiguration(
+        behavior: const MaterialScrollBehavior().copyWith(
+          dragDevices: {
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.stylus,
+            PointerDeviceKind.invertedStylus,
+            PointerDeviceKind.unknown,
+          },
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              for (var index = 0; index < filters.length; index++) ...[
+                if (index > 0) const SizedBox(width: 8),
+                Builder(
+                  builder: (context) {
+                    final filter = filters[index];
+                    final selected = selectedIds.contains(filter.id);
+                    return FilterChip(
+                      selected: selected,
+                      onSelected: (_) => onToggle(filter.id),
+                      avatar: filter.icon == null ? null : Icon(filter.icon, size: 16),
+                      label: Text(filter.label),
+                      labelStyle: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      showCheckmark: false,
+                      side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.45)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
