@@ -346,17 +346,12 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     final connectivityState = ref.watch(connectivityControllerProvider);
     final permissionService = ref.read(locationPermissionServiceProvider);
     final linkLauncher = ref.read(linkLauncherProvider);
-    final collectionsAsync = ref.watch(mapCollectionsProvider);
 
     final visiblePlaces = _sortedAndFilteredPlaces(state.pins, state: state, location: location);
     final selected = _resolveSelectedPlace(state, visiblePlaces);
     final markerItems = _clusterPlaces(visiblePlaces, zoom: state.viewport.zoom);
     final permissionBlocked = _shouldShowPermissionOverlay(locationState);
-    final noLocationAvailable = !permissionBlocked && _didInitialize && location == null && locationState.status != LocationStatus.loading;
     final showSearchArea = state.pendingViewportSearch;
-    final collectionSummary = collectionsAsync.valueOrNull?.isNotEmpty == true
-        ? '${collectionsAsync.valueOrNull!.length} collections ready nearby'
-        : null;
 
     return Stack(
       children: [
@@ -517,7 +512,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 158,
+            bottom: 20,
             child: SelectedPlacePeekCard(
               place: selected,
               proximityState: _proximityFor(selected, location),
@@ -529,51 +524,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
               onShare: () => _sharePlace(selected),
             ),
           ),
-        Positioned.fill(
-          top: MediaQuery.of(context).size.height * 0.36,
-          child: NearbyPlacesSheet(
-            places: visiblePlaces,
-            selectedPlaceId: selected?.canonicalPlaceId,
-            savedPlaceIds: _savedPlaceIds,
-            countLabel: _countLabel(visiblePlaces, state: state),
-            sort: state.sort,
-            onOpenSortSheet: _openSortSheet,
-            loading: state.loading && visiblePlaces.isNotEmpty,
-            collectionSummary: collectionSummary,
-            onPlaceSelected: (place) {
-              controller.selectPlace(place.canonicalPlaceId);
-              _moveMapToPlace(place);
-            },
-            onOpenPlace: _openPlaceDetails,
-            onToggleSave: _toggleSave,
-            onReview: _openPlaceDetails,
-            onDirections: (place) => _openPlaceInMaps(linkLauncher, place),
-            onShare: _sharePlace,
-            distanceLabelFor: (place) => _distanceSummary(place, location),
-            badgesFor: _badgesFor,
-            permissionState: permissionBlocked
-                ? DiscoveryStateCard(
-                    icon: Icons.place_outlined,
-                    title: 'Nearby results need location',
-                    body: 'Enable location to sort what is closest, recenter instantly, and highlight places you can walk to right now.',
-                  )
-                : null,
-            errorState: state.discoveryError != null
-                ? DiscoveryStateCard(
-                    icon: Icons.cloud_off_outlined,
-                    title: 'Could not refresh this area',
-                    body: state.discoveryError!,
-                  )
-                : null,
-            emptyState: _emptyStateFor(
-              state: state,
-              locationState: locationState,
-              connectivityState: connectivityState,
-              noLocationAvailable: noLocationAvailable,
-              visiblePlaces: visiblePlaces,
-            ),
-          ),
-        ),
       ],
     );
   }
