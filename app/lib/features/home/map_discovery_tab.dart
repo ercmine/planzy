@@ -447,24 +447,40 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                       ),
                     ),
                   ),
-                  if (!_mapReady)
-                    const Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(color: Color(0xE6111729)),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                    ),
                   Positioned(
                     top: 124,
                     left: 12,
                     right: 12,
                     child: Center(
-                      child: SearchAreaButton(
-                        visible: showSearchArea,
-                        onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
-                        isLoading: state.loading,
-                        resultCount: visiblePlaces.length,
-                      ),
+                      child: !_mapReady
+                          ? IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surface.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(999),
+                                  boxShadow: const [
+                                    BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, 6)),
+                                  ],
+                                ),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                                      SizedBox(width: 10),
+                                      Text('Loading map'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                          : SearchAreaButton(
+                              visible: showSearchArea,
+                              onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
+                              isLoading: state.loading,
+                              resultCount: visiblePlaces.length,
+                            ),
                     ),
                   ),
                   Positioned(
