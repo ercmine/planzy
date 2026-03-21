@@ -85,22 +85,25 @@ class PlacePreviewCard extends StatelessWidget {
                     left: 12,
                     right: 12,
                     top: 12,
-                    child: Row(
-                      children: [
-                        if (proximityLabel != null) AppPill(label: proximityLabel, icon: Icons.my_location),
-                        const Spacer(),
-                        if (saved)
-                          AppPill(
-                            label: 'Saved',
-                            icon: Icons.bookmark_rounded,
-                            backgroundColor: theme.colorScheme.secondary.withOpacity(0.18),
-                          ),
-                        if (place.hasCreatorMedia)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 8),
-                            child: AppPill(label: 'Creator videos', icon: Icons.play_circle_outline),
-                          ),
-                      ],
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          if (proximityLabel != null) AppPill(label: proximityLabel, icon: Icons.my_location),
+                          if (saved) ...[
+                            if (proximityLabel != null) const SizedBox(width: 8),
+                            AppPill(
+                              label: 'Saved',
+                              icon: Icons.bookmark_rounded,
+                              backgroundColor: theme.colorScheme.secondary.withOpacity(0.18),
+                            ),
+                          ],
+                          if (place.hasCreatorMedia) ...[
+                            if (proximityLabel != null || saved) const SizedBox(width: 8),
+                            const AppPill(label: 'Creator videos', icon: Icons.play_circle_outline),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ],

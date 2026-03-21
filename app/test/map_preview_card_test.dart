@@ -37,4 +37,48 @@ void main() {
     expect(find.text('Creator videos'), findsOneWidget);
     expect(find.text('Open place & review'), findsOneWidget);
   });
+
+  testWidgets('keeps overlay chips inside a horizontal scroller when multiple pills are present', (tester) async {
+    const place = MapPin(
+      canonicalPlaceId: 'cp-2',
+      name: 'North End Noodles',
+      category: 'noodle-shop',
+      latitude: 42.3,
+      longitude: -71.0,
+      rating: 4.8,
+      city: 'Boston',
+      neighborhood: 'North End',
+      thumbnailUrl: 'https://example.com/noodles.jpg',
+      hasCreatorMedia: true,
+      hasReviews: true,
+      descriptionSnippet: 'Hand-pulled noodles near the harbor.',
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 220,
+            child: PlacePreviewCard(
+              place: place,
+              proximityState: PlaceProximityState.nearby,
+              distanceMeters: 80,
+              saved: true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Nearby now'), findsOneWidget);
+    expect(find.text('Saved'), findsOneWidget);
+    expect(find.text('Creator videos'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(SingleChildScrollView),
+        matching: find.text('Nearby now'),
+      ),
+      findsOneWidget,
+    );
+  });
 }
