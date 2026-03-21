@@ -499,23 +499,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                       ],
                     ),
                   ),
-                  Positioned(
-                    left: 12,
-                    right: 12,
-                    bottom: selected != null ? 168 : 26,
-                    child: MapWorldHud(
-                      world: world,
-                      onOpenInventory: () => showModalBottomSheet<void>(
-                        context: context,
-                        isScrollControlled: true,
-                        showDragHandle: true,
-                        builder: (_) => FractionallySizedBox(
-                          heightFactor: 0.82,
-                          child: MapWorldInventorySheet(world: world),
-                        ),
-                      ),
-                    ),
-                  ),
                   if (state.loading)
                     const Positioned(top: 0, left: 0, right: 0, child: LinearProgressIndicator(minHeight: 3)),
                   if (!connectivityState.isOnline)
