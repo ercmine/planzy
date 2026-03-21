@@ -55,9 +55,14 @@ class MapWorldHud extends StatelessWidget {
 }
 
 class DistrictLegendCard extends StatelessWidget {
-  const DistrictLegendCard({super.key, required this.world});
+  const DistrictLegendCard({
+    super.key,
+    required this.world,
+    this.onSelectDistrict,
+  });
 
   final MapWorldState world;
+  final ValueChanged<DistrictZone>? onSelectDistrict;
 
   @override
   Widget build(BuildContext context) {
@@ -77,19 +82,26 @@ class DistrictLegendCard extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final zone = world.districts[index];
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onSelectDistrict == null ? null : () => onSelectDistrict!(zone),
                     borderRadius: BorderRadius.circular(18),
-                    gradient: LinearGradient(colors: [zone.color.withOpacity(0.92), zone.color.withOpacity(0.45)]),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(zone.name, style: theme.textTheme.labelLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
-                      Text(zone.scene, style: theme.textTheme.labelSmall?.copyWith(color: Colors.white.withOpacity(0.88))),
-                    ],
+                    child: Ink(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        gradient: LinearGradient(colors: [zone.color.withOpacity(0.92), zone.color.withOpacity(0.45)]),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(zone.name, style: theme.textTheme.labelLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+                          Text(zone.scene, style: theme.textTheme.labelSmall?.copyWith(color: Colors.white.withOpacity(0.88))),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               },

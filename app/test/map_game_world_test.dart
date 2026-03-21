@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:perbug/core/location/location_models.dart';
 import 'package:perbug/features/home/map_discovery_models.dart';
+import 'package:perbug/features/home/map_discovery_widgets.dart';
 import 'package:perbug/features/home/map_game_world.dart';
 import 'package:perbug/features/home/map_game_world_widgets.dart';
 
@@ -107,5 +108,65 @@ void main() {
 
     expect(find.text('Creator signal'), findsOneWidget);
     expect(find.byType(Stack), findsWidgets);
+  });
+
+  testWidgets('district legend cards are tappable for exploration actions', (tester) async {
+    final world = const MapWorldEngine().build(
+      pins: const [],
+      viewport: const MapViewport(centerLat: 30.27, centerLng: -97.74, zoom: 14),
+    );
+    DistrictZone? selected;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: DistrictLegendCard(
+            world: world,
+            onSelectDistrict: (zone) => selected = zone,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Discovery Field'));
+    await tester.pumpAndSettle();
+
+    expect(selected?.scene, 'Open exploration');
+  });
+
+  testWidgets('collapsible overlay toggles between expanded and collapsed content', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CollapsibleMapOverlay(
+            title: 'Discovery controls',
+            isCollapsed: false,
+            onToggle: () {},
+            child: const Text('Expanded content'),
+            collapsedChild: const Text('Collapsed summary'),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Expanded content'), findsOneWidget);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CollapsibleMapOverlay(
+            title: 'Discovery controls',
+            isCollapsed: true,
+            onToggle: () {},
+            child: const Text('Expanded content'),
+            collapsedChild: const Text('Collapsed summary'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Collapsed summary'), findsOneWidget);
   });
 }
