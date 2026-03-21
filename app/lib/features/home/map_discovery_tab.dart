@@ -147,14 +147,26 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
     );
   }
 
-  void setSort(MapDiscoverySort sort) => state = state.copyWith(sort: sort);
+  void setSort(MapDiscoverySort sort) {
+    if (state.sort == sort) return;
+    state = state.copyWith(sort: sort);
+  }
 
-  void selectPlace(String placeId) => state = state.copyWith(selectedPlaceId: placeId);
+  void selectPlace(String placeId) {
+    if (state.selectedPlaceId == placeId) return;
+    state = state.copyWith(selectedPlaceId: placeId);
+  }
 
-  void clearSelectedPlace() => state = state.copyWith(clearSelectedPlace: true);
+  void clearSelectedPlace() {
+    if (state.selectedPlaceId == null) return;
+    state = state.copyWith(clearSelectedPlace: true);
+  }
 
   void setViewport(MapViewport viewport, {bool markPendingSearch = true}) {
-    state = state.copyWith(viewport: viewport, pendingViewportSearch: markPendingSearch || state.pendingViewportSearch);
+    final pendingViewportSearch = markPendingSearch || state.pendingViewportSearch;
+    final viewportUnchanged = state.viewport.isSimilarTo(viewport, centerThreshold: 0.0003, zoomThreshold: 0.01);
+    if (viewportUnchanged && pendingViewportSearch == state.pendingViewportSearch) return;
+    state = state.copyWith(viewport: viewport, pendingViewportSearch: pendingViewportSearch);
   }
 
   Future<void> centerOnUserLocation(AppLocation location) async {
@@ -280,14 +292,30 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   bool _mapReady = false;
   bool _didInitialize = false;
   bool _hasFollowedUserLocation = false;
+  bool _isSyncingMapViewport = false;
   LatLng? _lastMapCenter;
   double? _lastMapZoom;
   Timer? _viewportDebounce;
   MapViewport? _lastAutoSearchViewport;
+  late final ProviderSubscription<MapViewportState> _mapStateSubscription;
+  late final ProviderSubscription<LocationControllerState> _locationSubscription;
+  late final ProviderSubscription<ConnectivityState> _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
+    _mapStateSubscription = ref.listenManual<MapViewportState>(
+      mapDiscoveryControllerProvider,
+      (previous, next) => _handleMapStateChanged(previous: previous, next: next),
+    );
+    _locationSubscription = ref.listenManual<LocationControllerState>(
+      locationControllerProvider,
+      (previous, next) => _handleLocationStateChanged(previous: previous, next: next),
+    );
+    _connectivitySubscription = ref.listenManual<ConnectivityState>(
+      connectivityControllerProvider,
+      (previous, next) => _handleConnectivityChanged(previous: previous, next: next),
+    );
     Future.microtask(() async {
       final initialLocation = ref.read(locationControllerProvider).effectiveLocation;
       await ref.read(mapDiscoveryControllerProvider.notifier).initialize(initialLocation: initialLocation);
@@ -302,6 +330,9 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   @override
   void dispose() {
     _viewportDebounce?.cancel();
+    _mapStateSubscription.close();
+    _locationSubscription.close();
+    _connectivitySubscription.close();
     _searchController.dispose();
     super.dispose();
   }
@@ -318,19 +349,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     final linkLauncher = ref.read(linkLauncherProvider);
     final collectionsAsync = ref.watch(mapCollectionsProvider);
 
-    if (!_hasFollowedUserLocation && _didInitialize && location != null) {
-      _hasFollowedUserLocation = true;
-      Future.microtask(() async {
-        await controller.centerOnUserLocation(location);
-        if (mounted) {
-          _moveMap(state: ref.read(mapDiscoveryControllerProvider));
-          await _checkVisitReviewPrompt();
-        }
-      });
-    }
-
-    _maybeSyncMapViewport(state.viewport);
-
     final visiblePlaces = _sortedAndFilteredPlaces(state.pins, state: state, location: location);
     final selected = _resolveSelectedPlace(state, visiblePlaces);
     final markerItems = _clusterPlaces(visiblePlaces, zoom: state.viewport.zoom);
@@ -340,8 +358,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     final collectionSummary = collectionsAsync.valueOrNull?.isNotEmpty == true
         ? '${collectionsAsync.valueOrNull!.length} collections ready nearby'
         : null;
-
-    _scheduleViewportRefresh(state: state, connectivityState: connectivityState, permissionBlocked: permissionBlocked);
 
     return Stack(
       children: [
@@ -378,12 +394,18 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                           final center = position.center;
                           if (center == null) return;
                           final nextZoom = position.zoom ?? state.viewport.zoom;
+                          final nextViewport = MapViewport(centerLat: center.latitude, centerLng: center.longitude, zoom: nextZoom);
                           _lastMapCenter = center;
                           _lastMapZoom = nextZoom;
-                          controller.setViewport(
-                            MapViewport(centerLat: center.latitude, centerLng: center.longitude, zoom: nextZoom),
-                            markPendingSearch: hasGesture,
-                          );
+                          if (_isSyncingMapViewport && !hasGesture) {
+                            final targetViewport = ref.read(mapDiscoveryControllerProvider).viewport;
+                            if (nextViewport.isSimilarTo(targetViewport, centerThreshold: 0.0003, zoomThreshold: 0.01)) {
+                              _isSyncingMapViewport = false;
+                              return;
+                            }
+                          }
+                          controller.setViewport(nextViewport, markPendingSearch: hasGesture);
+                          if (!hasGesture) _isSyncingMapViewport = false;
                         },
                       ),
                       children: [
@@ -641,29 +663,58 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     return state.status == LocationStatus.permissionDenied || state.status == LocationStatus.serviceDisabled;
   }
 
-  void _maybeSyncMapViewport(MapViewport viewport) {
+  void _handleMapStateChanged({required MapViewportState? previous, required MapViewportState next}) {
     if (!_mapReady) return;
-    final nextCenter = viewport.toLatLng();
-    final centerChanged = _lastMapCenter == null || _lastMapCenter!.latitude != nextCenter.latitude || _lastMapCenter!.longitude != nextCenter.longitude;
-    final zoomChanged = _lastMapZoom == null || (_lastMapZoom! - viewport.zoom).abs() > 0.01;
-    if (!centerChanged && !zoomChanged) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _moveMap(state: ref.read(mapDiscoveryControllerProvider));
-    });
+    if (previous == null || !next.viewport.isSimilarTo(previous.viewport, centerThreshold: 0.0003, zoomThreshold: 0.01)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+      });
+    }
+    _scheduleViewportRefresh();
   }
 
-  void _scheduleViewportRefresh({
-    required MapViewportState state,
-    required ConnectivityState connectivityState,
-    required bool permissionBlocked,
+  void _handleLocationStateChanged({
+    required LocationControllerState? previous,
+    required LocationControllerState next,
   }) {
+    if (!_didInitialize) return;
+    final nextLocation = next.effectiveLocation;
+    final previousLocation = previous?.effectiveLocation;
+    final locationJustBecameAvailable = nextLocation != null && previousLocation == null;
+    if (!_hasFollowedUserLocation && locationJustBecameAvailable) {
+      _hasFollowedUserLocation = true;
+      Future.microtask(() async {
+        await ref.read(mapDiscoveryControllerProvider.notifier).centerOnUserLocation(nextLocation!);
+        if (mounted) await _checkVisitReviewPrompt();
+      });
+    }
+    _scheduleViewportRefresh();
+  }
+
+  void _handleConnectivityChanged({
+    required ConnectivityState? previous,
+    required ConnectivityState next,
+  }) {
+    if (next.isOnline && previous?.isOnline != true) {
+      _scheduleViewportRefresh();
+    }
+  }
+
+  void _scheduleViewportRefresh() {
+    final state = ref.read(mapDiscoveryControllerProvider);
+    final connectivityState = ref.read(connectivityControllerProvider);
+    final permissionBlocked = _shouldShowPermissionOverlay(ref.read(locationControllerProvider));
     if (!state.pendingViewportSearch || state.loading || !connectivityState.isOnline || permissionBlocked) return;
     if (_lastAutoSearchViewport != null && _lastAutoSearchViewport!.isSimilarTo(state.viewport)) return;
     _viewportDebounce?.cancel();
     _viewportDebounce = Timer(const Duration(milliseconds: 550), () async {
       if (!mounted) return;
-      _lastAutoSearchViewport = state.viewport;
+      final latestState = ref.read(mapDiscoveryControllerProvider);
+      final latestConnectivity = ref.read(connectivityControllerProvider);
+      final latestPermissionBlocked = _shouldShowPermissionOverlay(ref.read(locationControllerProvider));
+      if (!latestState.pendingViewportSearch || latestState.loading || !latestConnectivity.isOnline || latestPermissionBlocked) return;
+      _lastAutoSearchViewport = latestState.viewport;
       await ref.read(mapDiscoveryControllerProvider.notifier).searchThisArea(mode: 'search_this_area');
       if (mounted) await ref.read(mapDiscoveryControllerProvider.notifier).refreshAreaLabel();
     });
@@ -678,6 +729,16 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   void _moveMap({required MapViewportState state}) {
     if (!_mapReady) return;
     final center = state.viewport.toLatLng();
+    final alreadyAligned = _lastMapCenter != null &&
+        (_lastMapCenter!.latitude - center.latitude).abs() <= 0.0003 &&
+        (_lastMapCenter!.longitude - center.longitude).abs() <= 0.0003 &&
+        _lastMapZoom != null &&
+        (_lastMapZoom! - state.viewport.zoom).abs() <= 0.01;
+    if (alreadyAligned) {
+      _isSyncingMapViewport = false;
+      return;
+    }
+    _isSyncingMapViewport = true;
     _mapController.move(center, state.viewport.zoom);
     _lastMapCenter = center;
     _lastMapZoom = state.viewport.zoom;
