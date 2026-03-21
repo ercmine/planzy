@@ -361,6 +361,8 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     final permissionBlocked = _shouldShowPermissionOverlay(locationState);
     final showSearchArea = state.pendingViewportSearch;
 
+    final overlayWidth = min(max(MediaQuery.sizeOf(context).width - 24, 0.0), 360.0);
+
     return Stack(
       children: [
         Positioned.fill(
@@ -454,81 +456,80 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                   Positioned(
                     top: 124,
                     left: 12,
-                    right: 12,
-                    child: Center(
-                      child: !_mapReady
-                          ? IgnorePointer(
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.surface.withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(999),
-                                  boxShadow: const [
-                                    BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, 6)),
-                                  ],
-                                ),
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                                      SizedBox(width: 10),
-                                      Text('Loading map'),
-                                    ],
+                    child: SizedBox(
+                      width: overlayWidth,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          !_mapReady
+                              ? IgnorePointer(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.surface.withOpacity(0.9),
+                                      borderRadius: BorderRadius.circular(999),
+                                      boxShadow: const [
+                                        BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, 6)),
+                                      ],
+                                    ),
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                                          SizedBox(width: 10),
+                                          Text('Loading map'),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : CollapsibleMapOverlay(
+                                  title: 'Search area',
+                                  isCollapsed: _searchAreaOverlayCollapsed,
+                                  onToggle: () => setState(() => _searchAreaOverlayCollapsed = !_searchAreaOverlayCollapsed),
+                                  collapsedChild: Text(
+                                    showSearchArea ? 'Search this area ready' : 'No pending map changes',
+                                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: SearchAreaButton(
+                                      visible: showSearchArea,
+                                      onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
+                                      isLoading: state.loading,
+                                      resultCount: visiblePlaces.length,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            )
-                          : CollapsibleMapOverlay(
-                              title: 'Search area',
-                              isCollapsed: _searchAreaOverlayCollapsed,
-                              onToggle: () => setState(() => _searchAreaOverlayCollapsed = !_searchAreaOverlayCollapsed),
-                              collapsedChild: Text(
-                                showSearchArea ? 'Search this area ready' : 'No pending map changes',
-                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: SearchAreaButton(
-                                  visible: showSearchArea,
-                                  onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
-                                  isLoading: state.loading,
-                                  resultCount: visiblePlaces.length,
-                                ),
+                          const SizedBox(height: 12),
+                          CollapsibleMapOverlay(
+                            title: 'Map insights',
+                            isCollapsed: _statsOverlayCollapsed,
+                            onToggle: () => setState(() => _statsOverlayCollapsed = !_statsOverlayCollapsed),
+                            collapsedChild: Text(
+                              '${visiblePlaces.length} places • ${world.districts.length} districts',
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  DiscoveryCountPill(
+                                    count: visiblePlaces.length,
+                                    label: visiblePlaces.length == 1 ? 'place in view' : 'places in view',
+                                  ),
+                                  const SizedBox(height: 10),
+                                  DistrictLegendCard(
+                                    world: world,
+                                    onSelectDistrict: _handleDistrictSelected,
+                                  ),
+                                ],
                               ),
                             ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 184,
-                    left: 12,
-                    right: 12,
-                    child: CollapsibleMapOverlay(
-                      title: 'Map insights',
-                      isCollapsed: _statsOverlayCollapsed,
-                      onToggle: () => setState(() => _statsOverlayCollapsed = !_statsOverlayCollapsed),
-                      collapsedChild: Text(
-                        '${visiblePlaces.length} places • ${world.districts.length} districts',
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            DiscoveryCountPill(
-                              count: visiblePlaces.length,
-                              label: visiblePlaces.length == 1 ? 'place in view' : 'places in view',
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: DistrictLegendCard(
-                                world: world,
-                                onSelectDistrict: _handleDistrictSelected,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -579,35 +580,37 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
         Positioned(
           top: 12,
           left: 12,
-          right: 12,
-          child: CollapsibleMapOverlay(
-            title: 'Discovery controls',
-            isCollapsed: _topOverlayCollapsed,
-            onToggle: () => setState(() => _topOverlayCollapsed = !_topOverlayCollapsed),
-            collapsedChild: Text(
-              state.areaLabel ?? state.geoStatus ?? 'Search, filter, and recenter the map.',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Column(
-                children: [
-                  DiscoverySearchBar(
-                    controller: _searchController,
-                    onSubmit: () => _searchForLocation(controller),
-                    onRecenter: () => _handleCenterOnUserLocation(locationState, permissionService),
-                    onOpenSortSheet: _openSortSheet,
-                    isLoading: state.loading,
-                    locationEnabled: location != null,
-                    areaLabel: state.areaLabel ?? state.geoStatus,
-                  ),
-                  const SizedBox(height: 10),
-                  DiscoveryFilterChips(
-                    filters: filters,
-                    selectedIds: state.selectedFilters,
-                    onToggle: (filterId) => controller.toggleFilter(filterById[filterId]!),
-                  ),
-                ],
+          child: SizedBox(
+            width: overlayWidth,
+            child: CollapsibleMapOverlay(
+              title: 'Discovery controls',
+              isCollapsed: _topOverlayCollapsed,
+              onToggle: () => setState(() => _topOverlayCollapsed = !_topOverlayCollapsed),
+              collapsedChild: Text(
+                state.areaLabel ?? state.geoStatus ?? 'Search, filter, and recenter the map.',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Column(
+                  children: [
+                    DiscoverySearchBar(
+                      controller: _searchController,
+                      onSubmit: () => _searchForLocation(controller),
+                      onRecenter: () => _handleCenterOnUserLocation(locationState, permissionService),
+                      onOpenSortSheet: _openSortSheet,
+                      isLoading: state.loading,
+                      locationEnabled: location != null,
+                      areaLabel: state.areaLabel ?? state.geoStatus,
+                    ),
+                    const SizedBox(height: 10),
+                    DiscoveryFilterChips(
+                      filters: filters,
+                      selectedIds: state.selectedFilters,
+                      onToggle: (filterId) => controller.toggleFilter(filterById[filterId]!),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
