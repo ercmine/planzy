@@ -19,6 +19,8 @@ import '../collections/collection_repository.dart';
 import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_widgets.dart';
+import 'map_game_world.dart';
+import 'map_game_world_widgets.dart';
 import 'place_preview_card.dart';
 import 'place_video_detail_page.dart';
 import '../video_platform/video_providers.dart';
@@ -350,6 +352,8 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     final visiblePlaces = _sortedAndFilteredPlaces(state.pins, state: state, location: location);
     final selected = _resolveSelectedPlace(state, visiblePlaces);
     final markerItems = _clusterPlaces(visiblePlaces, zoom: state.viewport.zoom);
+    final world = const MapWorldEngine().build(pins: visiblePlaces, viewport: state.viewport, location: location);
+    final selectedCollectible = world.collectibles.firstWhere((item) => item.placeId == selected?.canonicalPlaceId, orElse: () => world.collectibles.first);
     final permissionBlocked = _shouldShowPermissionOverlay(locationState);
     final showSearchArea = state.pendingViewportSearch;
 
@@ -408,8 +412,39 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                           userAgentPackageName: 'com.perbug.app',
                           maxZoom: 19,
                         ),
-                        MarkerLayer(markers: _buildMarkers(context, markerItems, selected, location)),
+                        CircleLayer(
+                          circles: [
+                            for (final zone in world.districts)
+                              CircleMarker(
+                                point: LatLng(zone.centerLat, zone.centerLng),
+                                radius: zone.radiusMeters,
+                                useRadiusInMeter: true,
+                                color: zone.color.withOpacity(0.12 + (zone.energy * 0.08)),
+                                borderColor: zone.color.withOpacity(0.42),
+                                borderStrokeWidth: 2,
+                              ),
+                          ],
+                        ),
+                        MarkerLayer(markers: _buildCollectibleMarkers(world, selectedCollectible)),
+                        MarkerLayer(markers: _buildMarkers(markerItems, selected, world, location)),
                       ],
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFF60A5FA).withOpacity(0.08),
+                              const Color(0xFF6C5CE7).withOpacity(0.14),
+                              const Color(0xFFFFC857).withOpacity(0.08),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                   if (!_mapReady)
@@ -435,9 +470,34 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                   Positioned(
                     top: 184,
                     left: 12,
-                    child: DiscoveryCountPill(
-                      count: visiblePlaces.length,
-                      label: visiblePlaces.length == 1 ? 'place in view' : 'places in view',
+                    right: 12,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DiscoveryCountPill(
+                          count: visiblePlaces.length,
+                          label: visiblePlaces.length == 1 ? 'place in view' : 'places in view',
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(child: DistrictLegendCard(world: world)),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: selected != null ? 168 : 26,
+                    child: MapWorldHud(
+                      world: world,
+                      onOpenInventory: () => showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        showDragHandle: true,
+                        builder: (_) => FractionallySizedBox(
+                          heightFactor: 0.82,
+                          child: MapWorldInventorySheet(world: world),
+                        ),
+                      ),
                     ),
                   ),
                   if (state.loading)
@@ -699,7 +759,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     _moveMap(state: ref.read(mapDiscoveryControllerProvider));
   }
 
-  List<Marker> _buildMarkers(BuildContext context, List<_MarkerPresentation> markers, MapPin? selected, AppLocation? location) {
+  List<Marker> _buildMarkers(List<_MarkerPresentation> markers, MapPin? selected, MapWorldState world, AppLocation? location) {
     final built = <Marker>[
       for (final item in markers)
         Marker(
@@ -735,15 +795,36 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
       built.add(
         Marker(
           point: LatLng(location.lat, location.lng),
-          width: 28,
-          height: 28,
-          child: const IgnorePointer(child: _UserLocationMarker()),
+          width: 74,
+          height: 74,
+          child: IgnorePointer(child: PlayerAvatarMarker(loadout: world.loadout)),
         ),
       );
     }
     return built;
   }
 
+
+  List<Marker> _buildCollectibleMarkers(MapWorldState world, CollectibleItem? selectedCollectible) {
+    return [
+      for (final item in world.collectibles)
+        Marker(
+          point: LatLng(item.latitude, item.longitude),
+          width: 58,
+          height: 72,
+          child: CollectibleMarkerSprite(
+            item: item,
+            selected: item.id == selectedCollectible?.id,
+            onTap: () {
+              final state = ref.read(mapDiscoveryControllerProvider);
+              if (state.pins.any((pin) => pin.canonicalPlaceId == item.placeId)) {
+                ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(item.placeId);
+              }
+            },
+          ),
+        ),
+    ];
+  }
   Future<void> _openPlaceInMaps(LinkLauncher linkLauncher, MapPin place) async {
     await linkLauncher.openLink(
       context,
@@ -1131,25 +1212,6 @@ class _ClusterMarker extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _UserLocationMarker extends StatelessWidget {
-  const _UserLocationMarker();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Theme.of(context).colorScheme.primary,
-        border: Border.all(color: Colors.white, width: 3),
-        boxShadow: const [
-          BoxShadow(color: Color(0x66000000), blurRadius: 10, offset: Offset(0, 4)),
-        ],
-      ),
-      child: const SizedBox.expand(),
     );
   }
 }

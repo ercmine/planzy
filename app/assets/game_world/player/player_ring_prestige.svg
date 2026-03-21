@@ -1,0 +1,8 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="g" x1="18" y1="18" x2="109" y2="108" gradientUnits="userSpaceOnUse"><stop stop-color="#80D8FF"/><stop offset="0.5" stop-color="#6C5CE7"/><stop offset="1" stop-color="#FFC857"/></linearGradient></defs>
+  <circle cx="64" cy="64" r="50" stroke="url(#g)" stroke-width="8" opacity="0.35"/>
+  <circle cx="64" cy="64" r="38" stroke="url(#g)" stroke-width="6" stroke-dasharray="10 8"/>
+  <circle cx="28" cy="54" r="6" fill="#80D8FF"/>
+  <circle cx="94" cy="30" r="5" fill="#FFC857"/>
+  <circle cx="98" cy="84" r="7" fill="#FF8A65"/>
+</svg>
