@@ -59,3 +59,8 @@ flutter:
     - .env.prod
     - assets/branding/perbug.svg
     - assets/branding/perbug1.svg
+    - assets/game_world/collectibles/common/
+    - assets/game_world/collectibles/uncommon/
+    - assets/game_world/collectibles/rare/
+    - assets/game_world/collectibles/epic/
+    - assets/game_world/player/
