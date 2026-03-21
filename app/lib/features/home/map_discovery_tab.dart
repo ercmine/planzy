@@ -294,6 +294,10 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   bool _didInitialize = false;
   bool _hasFollowedUserLocation = false;
   bool _isSyncingMapViewport = false;
+  bool _topOverlayCollapsed = false;
+  bool _statsOverlayCollapsed = false;
+  bool _searchAreaOverlayCollapsed = false;
+  bool _selectedPlaceOverlayCollapsed = false;
   LatLng? _lastMapCenter;
   double? _lastMapZoom;
   Timer? _viewportDebounce;
@@ -475,11 +479,23 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                                 ),
                               ),
                             )
-                          : SearchAreaButton(
-                              visible: showSearchArea,
-                              onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
-                              isLoading: state.loading,
-                              resultCount: visiblePlaces.length,
+                          : CollapsibleMapOverlay(
+                              title: 'Search area',
+                              isCollapsed: _searchAreaOverlayCollapsed,
+                              onToggle: () => setState(() => _searchAreaOverlayCollapsed = !_searchAreaOverlayCollapsed),
+                              collapsedChild: Text(
+                                showSearchArea ? 'Search this area ready' : 'No pending map changes',
+                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: SearchAreaButton(
+                                  visible: showSearchArea,
+                                  onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
+                                  isLoading: state.loading,
+                                  resultCount: visiblePlaces.length,
+                                ),
+                              ),
                             ),
                     ),
                   ),
@@ -487,16 +503,33 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                     top: 184,
                     left: 12,
                     right: 12,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        DiscoveryCountPill(
-                          count: visiblePlaces.length,
-                          label: visiblePlaces.length == 1 ? 'place in view' : 'places in view',
+                    child: CollapsibleMapOverlay(
+                      title: 'Map insights',
+                      isCollapsed: _statsOverlayCollapsed,
+                      onToggle: () => setState(() => _statsOverlayCollapsed = !_statsOverlayCollapsed),
+                      collapsedChild: Text(
+                        '${visiblePlaces.length} places • ${world.districts.length} districts',
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            DiscoveryCountPill(
+                              count: visiblePlaces.length,
+                              label: visiblePlaces.length == 1 ? 'place in view' : 'places in view',
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: DistrictLegendCard(
+                                world: world,
+                                onSelectDistrict: _handleDistrictSelected,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(child: DistrictLegendCard(world: world)),
-                      ],
+                      ),
                     ),
                   ),
                   if (state.loading)
@@ -547,24 +580,36 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
           top: 12,
           left: 12,
           right: 12,
-          child: Column(
-            children: [
-              DiscoverySearchBar(
-                controller: _searchController,
-                onSubmit: () => _searchForLocation(controller),
-                onRecenter: () => _handleCenterOnUserLocation(locationState, permissionService),
-                onOpenSortSheet: _openSortSheet,
-                isLoading: state.loading,
-                locationEnabled: location != null,
-                areaLabel: state.areaLabel ?? state.geoStatus,
+          child: CollapsibleMapOverlay(
+            title: 'Discovery controls',
+            isCollapsed: _topOverlayCollapsed,
+            onToggle: () => setState(() => _topOverlayCollapsed = !_topOverlayCollapsed),
+            collapsedChild: Text(
+              state.areaLabel ?? state.geoStatus ?? 'Search, filter, and recenter the map.',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Column(
+                children: [
+                  DiscoverySearchBar(
+                    controller: _searchController,
+                    onSubmit: () => _searchForLocation(controller),
+                    onRecenter: () => _handleCenterOnUserLocation(locationState, permissionService),
+                    onOpenSortSheet: _openSortSheet,
+                    isLoading: state.loading,
+                    locationEnabled: location != null,
+                    areaLabel: state.areaLabel ?? state.geoStatus,
+                  ),
+                  const SizedBox(height: 10),
+                  DiscoveryFilterChips(
+                    filters: filters,
+                    selectedIds: state.selectedFilters,
+                    onToggle: (filterId) => controller.toggleFilter(filterById[filterId]!),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
-              DiscoveryFilterChips(
-                filters: filters,
-                selectedIds: state.selectedFilters,
-                onToggle: (filterId) => controller.toggleFilter(filterById[filterId]!),
-              ),
-            ],
+            ),
           ),
         ),
         if (selected != null)
@@ -572,15 +617,30 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
             left: 0,
             right: 0,
             bottom: 20,
-            child: SelectedPlacePeekCard(
-              place: selected,
-              proximityState: _proximityFor(selected, location),
-              distanceMeters: _distanceMeters(location?.lat, location?.lng, selected.latitude, selected.longitude),
-              saved: _savedPlaceIds.contains(selected.canonicalPlaceId),
-              onOpenDetails: () => _openPlaceDetails(selected),
-              onOpenMaps: () => _openPlaceInMaps(linkLauncher, selected),
-              onSave: () => _toggleSave(selected),
-              onShare: () => _sharePlace(selected),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: CollapsibleMapOverlay(
+                title: selected.name,
+                isCollapsed: _selectedPlaceOverlayCollapsed,
+                onToggle: () => setState(() => _selectedPlaceOverlayCollapsed = !_selectedPlaceOverlayCollapsed),
+                collapsedChild: Text(
+                  selected.neighborhoodLabel,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: SelectedPlacePeekCard(
+                    place: selected,
+                    proximityState: _proximityFor(selected, location),
+                    distanceMeters: _distanceMeters(location?.lat, location?.lng, selected.latitude, selected.longitude),
+                    saved: _savedPlaceIds.contains(selected.canonicalPlaceId),
+                    onOpenDetails: () => _openPlaceDetails(selected),
+                    onOpenMaps: () => _openPlaceInMaps(linkLauncher, selected),
+                    onSave: () => _toggleSave(selected),
+                    onShare: () => _sharePlace(selected),
+                  ),
+                ),
+              ),
             ),
           ),
       ],
@@ -756,6 +816,75 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
       markPendingSearch: false,
     );
     _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+  }
+
+  Future<void> _handleDistrictSelected(DistrictZone zone) async {
+    if (!mounted) return;
+    final controller = ref.read(mapDiscoveryControllerProvider.notifier);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(zone.name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                Text(
+                  '${zone.scene} • ${(zone.completion * 100).round()}% discovered',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () async {
+                        Navigator.of(context).pop();
+                        controller.setViewport(
+                          MapViewport(
+                            centerLat: zone.centerLat,
+                            centerLng: zone.centerLng,
+                            zoom: max(ref.read(mapDiscoveryControllerProvider).viewport.zoom, 14.5),
+                          ),
+                          markPendingSearch: true,
+                        );
+                        _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+                        await controller.searchThisArea(mode: 'district_exploration');
+                      },
+                      icon: const Icon(Icons.travel_explore_rounded),
+                      label: const Text('Open exploration'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        controller.setViewport(
+                          MapViewport(
+                            centerLat: zone.centerLat,
+                            centerLng: zone.centerLng,
+                            zoom: max(ref.read(mapDiscoveryControllerProvider).viewport.zoom, 14),
+                          ),
+                          markPendingSearch: true,
+                        );
+                        _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+                      },
+                      icon: const Icon(Icons.center_focus_strong_rounded),
+                      label: const Text('Center map'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   List<Marker> _buildMarkers(List<_MarkerPresentation> markers, MapPin? selected, MapWorldState world, AppLocation? location) {

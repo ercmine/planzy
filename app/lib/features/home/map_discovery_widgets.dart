@@ -6,6 +6,76 @@ import '../../app/theme/widgets.dart';
 import 'map_discovery_models.dart';
 import 'place_preview_card.dart';
 
+class CollapsibleMapOverlay extends StatelessWidget {
+  const CollapsibleMapOverlay({
+    super.key,
+    required this.title,
+    required this.isCollapsed,
+    required this.onToggle,
+    required this.child,
+    this.collapsedChild,
+    this.trailing,
+    this.padding = const EdgeInsets.all(12),
+  });
+
+  final String title;
+  final bool isCollapsed;
+  final VoidCallback onToggle;
+  final Widget child;
+  final Widget? collapsedChild;
+  final Widget? trailing;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AppCard(
+      glow: true,
+      padding: padding,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (trailing != null) ...[
+                trailing!,
+                const SizedBox(width: 8),
+              ],
+              IconButton(
+                tooltip: isCollapsed ? 'Expand $title' : 'Collapse $title',
+                onPressed: onToggle,
+                icon: Icon(isCollapsed ? Icons.expand_more_rounded : Icons.expand_less_rounded),
+              ),
+            ],
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 220),
+            crossFadeState: isCollapsed ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            firstChild: child,
+            secondChild: Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: collapsedChild ??
+                    Text(
+                      '$title collapsed',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class DiscoverySearchBar extends StatelessWidget {
   const DiscoverySearchBar({
     super.key,
@@ -29,71 +99,67 @@ class DiscoverySearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return AppCard(
-      glow: true,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (_) => onSubmit(),
-                  decoration: InputDecoration(
-                    hintText: 'Search neighborhoods, landmarks, or a specific place',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: isLoading
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : IconButton(
-                            tooltip: 'Search map',
-                            onPressed: onSubmit,
-                            icon: const Icon(Icons.arrow_forward_rounded),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => onSubmit(),
+                decoration: InputDecoration(
+                  hintText: 'Search neighborhoods, landmarks, or a specific place',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: isLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                  ),
+                        )
+                      : IconButton(
+                          tooltip: 'Search map',
+                          onPressed: onSubmit,
+                          icon: const Icon(Icons.arrow_forward_rounded),
+                        ),
                 ),
               ),
-              const SizedBox(width: 8),
-              _CircleActionButton(
-                tooltip: locationEnabled ? 'Center on my location' : 'Enable location',
-                icon: locationEnabled ? Icons.my_location_rounded : Icons.location_searching_rounded,
-                onTap: onRecenter,
+            ),
+            const SizedBox(width: 8),
+            _CircleActionButton(
+              tooltip: locationEnabled ? 'Center on my location' : 'Enable location',
+              icon: locationEnabled ? Icons.my_location_rounded : Icons.location_searching_rounded,
+              onTap: onRecenter,
+            ),
+            const SizedBox(width: 8),
+            _CircleActionButton(
+              tooltip: 'Change sort',
+              icon: Icons.tune_rounded,
+              onTap: onOpenSortSheet,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                areaLabel ?? 'Explore the map to surface the best nearby places.',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
-              const SizedBox(width: 8),
-              _CircleActionButton(
-                tooltip: 'Change sort',
-                icon: Icons.tune_rounded,
-                onTap: onOpenSortSheet,
+            ),
+            if (areaLabel != null)
+              AppPill(
+                label: 'Live area',
+                icon: Icons.explore_rounded,
+                backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  areaLabel ?? 'Explore the map to surface the best nearby places.',
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-              ),
-              if (areaLabel != null)
-                AppPill(
-                  label: 'Live area',
-                  icon: Icons.explore_rounded,
-                  backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
-                ),
-            ],
-          ),
-        ],
-      ),
+          ],
+        ),
+      ],
     );
   }
 }
