@@ -84,6 +84,9 @@ class BackendPlaceDiscoveryClient implements PlaceDiscoveryClient {
       thumbnailUrl: place.thumbnailUrl,
       hasCreatorMedia: place.creatorVideoCount > 0,
       hasReviews: place.reviewCount > 0,
+      openNow: place.openNow,
+      reviewCount: place.reviewCount,
+      creatorVideoCount: place.creatorVideoCount,
     );
   }
 }

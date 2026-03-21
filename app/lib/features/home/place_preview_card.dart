@@ -12,6 +12,7 @@ class PlacePreviewCard extends StatelessWidget {
     required this.place,
     required this.proximityState,
     this.distanceMeters,
+    this.saved = false,
     this.onOpenDetails,
     this.onSave,
     this.onShare,
@@ -21,6 +22,7 @@ class PlacePreviewCard extends StatelessWidget {
   final MapPin place;
   final PlaceProximityState proximityState;
   final double? distanceMeters;
+  final bool saved;
   final VoidCallback? onOpenDetails;
   final VoidCallback? onSave;
   final VoidCallback? onShare;
@@ -46,6 +48,7 @@ class PlacePreviewCard extends StatelessWidget {
       curve: Curves.easeOutCubic,
       child: AppCard(
         padding: EdgeInsets.zero,
+        glow: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -86,7 +89,17 @@ class PlacePreviewCard extends StatelessWidget {
                       children: [
                         if (proximityLabel != null) AppPill(label: proximityLabel, icon: Icons.my_location),
                         const Spacer(),
-                        if (place.hasCreatorMedia) const AppPill(label: 'Creator videos', icon: Icons.play_circle_outline),
+                        if (saved)
+                          AppPill(
+                            label: 'Saved',
+                            icon: Icons.bookmark_rounded,
+                            backgroundColor: theme.colorScheme.secondary.withOpacity(0.18),
+                          ),
+                        if (place.hasCreatorMedia)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 8),
+                            child: AppPill(label: 'Creator videos', icon: Icons.play_circle_outline),
+                          ),
                       ],
                     ),
                   ),
@@ -111,9 +124,15 @@ class PlacePreviewCard extends StatelessWidget {
                     children: [
                       AppPill(label: '★ ${place.rating.toStringAsFixed(1)} trust', icon: Icons.star_rounded),
                       if (distanceLabel != null) AppPill(label: distanceLabel, icon: Icons.route_rounded, outlined: true),
+                      if (place.openNow == true)
+                        AppPill(
+                          label: 'Open now',
+                          icon: Icons.schedule_rounded,
+                          backgroundColor: theme.colorScheme.tertiary.withOpacity(0.14),
+                        ),
                       if (place.hasReviews)
                         AppPill(
-                          label: 'Fresh reviews',
+                          label: '${place.reviewCount} reviews',
                           icon: Icons.flash_on_rounded,
                           backgroundColor: theme.colorScheme.secondary.withOpacity(0.14),
                         ),
@@ -128,7 +147,7 @@ class PlacePreviewCard extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
               child: Row(
                 children: [
-                  AppIconButton(onPressed: onSave, icon: Icons.bookmark_border),
+                  AppIconButton(onPressed: onSave, icon: saved ? Icons.bookmark : Icons.bookmark_border),
                   const SizedBox(width: AppSpacing.s),
                   AppIconButton(onPressed: onShare, icon: Icons.share_outlined),
                   const SizedBox(width: AppSpacing.s),

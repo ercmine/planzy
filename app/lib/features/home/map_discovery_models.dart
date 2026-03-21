@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
 class MapViewport {
@@ -17,6 +18,7 @@ class MapViewport {
   double get south => centerLat - latSpan / 2;
   double get east => centerLng + lngSpan / 2;
   double get west => centerLng - lngSpan / 2;
+  double get areaDeltaScore => (north - south).abs() + (east - west).abs();
 
   MapViewport copyWith({double? centerLat, double? centerLng, double? zoom}) {
     return MapViewport(
@@ -27,6 +29,12 @@ class MapViewport {
   }
 
   LatLng toLatLng() => LatLng(centerLat, centerLng);
+
+  bool isSimilarTo(MapViewport other, {double centerThreshold = 0.0025, double zoomThreshold = 0.2}) {
+    return (centerLat - other.centerLat).abs() <= centerThreshold &&
+        (centerLng - other.centerLng).abs() <= centerThreshold &&
+        (zoom - other.zoom).abs() <= zoomThreshold;
+  }
 }
 
 class SearchAreaContext {
@@ -57,6 +65,9 @@ class MapPin {
     this.hasCreatorMedia = false,
     this.hasReviews = false,
     this.descriptionSnippet,
+    this.openNow,
+    this.reviewCount = 0,
+    this.creatorVideoCount = 0,
   });
 
   final String canonicalPlaceId;
@@ -73,6 +84,9 @@ class MapPin {
   final bool hasCreatorMedia;
   final bool hasReviews;
   final String? descriptionSnippet;
+  final bool? openNow;
+  final int reviewCount;
+  final int creatorVideoCount;
 
   String get categoryLabel => category.replaceAll('-', ' ');
   String get neighborhoodLabel => neighborhood ?? city ?? region ?? 'Nearby';
@@ -117,3 +131,38 @@ class ReverseGeocodeResult {
   final String? city;
   final String? region;
 }
+
+enum MapDiscoverySort { relevance, distance, rating, trending, activity }
+
+class MapFilterOption {
+  const MapFilterOption({
+    required this.id,
+    required this.label,
+    this.icon,
+    this.discoveryCategories = const <String>[],
+    this.openNowOnly = false,
+    this.highlyRatedOnly = false,
+    this.trendingOnly = false,
+    this.minimumReviewCount,
+    this.badge,
+  });
+
+  final String id;
+  final String label;
+  final IconData? icon;
+  final List<String> discoveryCategories;
+  final bool openNowOnly;
+  final bool highlyRatedOnly;
+  final bool trendingOnly;
+  final int? minimumReviewCount;
+  final String? badge;
+}
+
+class PlaceBadge {
+  const PlaceBadge({required this.label, required this.tone});
+
+  final String label;
+  final MapBadgeTone tone;
+}
+
+enum MapBadgeTone { brand, success, warning, info }
