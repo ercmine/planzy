@@ -115,6 +115,8 @@ class PlacePreviewCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${place.categoryLabel} • ${place.neighborhoodLabel}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 10),
