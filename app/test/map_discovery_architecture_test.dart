@@ -45,6 +45,47 @@ class _FakeDiscoveryClient implements PlaceDiscoveryClient {
 }
 
 void main() {
+
+  test('setViewport ignores tiny programmatic map jitter', () async {
+    final container = ProviderContainer(overrides: [
+      mapGeoClientProvider.overrideWith((ref) async => _FakeGeoClient()),
+      placeDiscoveryClientProvider.overrideWith((ref) async => _FakeDiscoveryClient()),
+    ]);
+    addTearDown(container.dispose);
+
+    final controller = container.read(mapDiscoveryControllerProvider.notifier);
+    final before = container.read(mapDiscoveryControllerProvider);
+
+    controller.setViewport(
+      before.viewport.copyWith(
+        centerLat: before.viewport.centerLat + 0.0001,
+        centerLng: before.viewport.centerLng + 0.0001,
+        zoom: before.viewport.zoom + 0.005,
+      ),
+      markPendingSearch: false,
+    );
+
+    final after = container.read(mapDiscoveryControllerProvider);
+    expect(after.viewport.centerLat, before.viewport.centerLat);
+    expect(after.viewport.centerLng, before.viewport.centerLng);
+    expect(after.viewport.zoom, before.viewport.zoom);
+    expect(after.pendingViewportSearch, before.pendingViewportSearch);
+  });
+
+  test('searchThisArea skips duplicate searches after state settles', () async {
+    final discovery = _FakeDiscoveryClient();
+    final container = ProviderContainer(overrides: [
+      mapGeoClientProvider.overrideWith((ref) async => _FakeGeoClient()),
+      placeDiscoveryClientProvider.overrideWith((ref) async => discovery),
+    ]);
+    addTearDown(container.dispose);
+
+    final controller = container.read(mapDiscoveryControllerProvider.notifier);
+    await controller.searchThisArea(mode: 'search_this_area');
+    await controller.searchThisArea(mode: 'search_this_area');
+
+    expect(discovery.calls, 1);
+  });
   test('map discovery loads pins even when geo area labeling fails', () async {
     final geo = _FakeGeoClient(failReverse: true);
     final discovery = _FakeDiscoveryClient();
