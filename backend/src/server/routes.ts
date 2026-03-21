@@ -2637,6 +2637,7 @@ export function createRoutes(
       const videoEventMatch = /^\/v1\/videos\/([^/]+)\/events$/.exec(normalizedPath);
       const videoLikeMatch = /^\/v1\/videos\/([^/]+)\/likes$/.exec(normalizedPath);
       const videoSaveMatch = /^\/v1\/videos\/([^/]+)\/save$/.exec(normalizedPath);
+      const videoReportMatch = /^\/v1\/videos\/([^/]+)\/report$/.exec(normalizedPath);
       const placeVideosMatch = /^\/v1\/places\/([^/]+)\/videos$/.exec(normalizedPath);
       const creatorVideosMatch = /^\/v1\/creators\/([^/]+)\/videos$/.exec(normalizedPath);
 

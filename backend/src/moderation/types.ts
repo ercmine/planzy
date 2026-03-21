@@ -140,10 +140,40 @@ export interface ModerationAggregate {
     fraudScore: number;
     duplicateScore: number;
     suspiciousActivityScore: number;
+    nudityScore: number;
+    sexualContentScore: number;
+    graphicSexualContentScore: number;
+    violenceScore: number;
+    graphicViolenceScore: number;
     maxSeverity: ModerationSeverity;
   };
   lastReviewedAt?: string;
   reviewerUserId?: string;
+}
+
+export interface ModerationAlertRecord {
+  id: string;
+  target: ModerationTargetRef;
+  channel: "email";
+  recipient: string;
+  subject: string;
+  dedupeKey: string;
+  status: "sent" | "failed" | "suppressed";
+  providerMessageId?: string;
+  error?: string;
+  createdAt: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ModerationCaseSnapshot {
+  target: ModerationTargetRef;
+  aggregate: ModerationAggregate;
+  reports: ContentReport[];
+  signals: ModerationSignal[];
+  decisions: ModerationDecision[];
+  audits: ModerationAuditEvent[];
+  context?: Record<string, unknown>;
+  alerts: ModerationAlertRecord[];
 }
 
 export interface ModerationActorSummary {

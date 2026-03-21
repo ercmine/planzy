@@ -3,6 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../video_platform/video_models.dart';
 import '../video_platform/video_providers.dart';
+import '../video_platform/video_repository.dart';
+
+const _reportReasons = <({String code, String label})>[
+  (code: "sexual_explicit", label: "Nudity / sexual content"),
+  (code: "graphic_violent", label: "Violence / graphic content"),
+  (code: "harassment_bullying", label: "Harassment / abuse"),
+  (code: "hate_abusive_language", label: "Hate or offensive content"),
+  (code: "spam", label: "Spam / scam"),
+  (code: "other", label: "Other"),
+];
 
 class PlaceVideoDetailPage extends ConsumerWidget {
   const PlaceVideoDetailPage({required this.placeId, required this.placeName, super.key});
@@ -37,6 +47,11 @@ class PlaceVideoDetailPage extends ConsumerWidget {
                   child: ListTile(
                     title: Text(video.caption.isEmpty ? video.placeName : video.caption),
                     subtitle: Text(video.creatorHandle),
+                    trailing: IconButton(
+                      tooltip: "Report video",
+                      icon: const Icon(Icons.flag_outlined),
+                      onPressed: () => _showReportSheet(context, ref, video),
+                    ),
                   ),
                 ),
               ),
@@ -47,5 +62,43 @@ class PlaceVideoDetailPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
     );
+  }
+}
+
+
+Future<void> _showReportSheet(BuildContext context, WidgetRef ref, PlaceVideoFeedItem video) async {
+  final repo = await ref.read(videoRepositoryProvider.future);
+  final noteController = TextEditingController();
+  String selected = _reportReasons.first.code;
+  final submitted = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => Padding(
+        padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(context).viewInsets.bottom + 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Report video', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            ..._reportReasons.map((reason) => RadioListTile<String>(value: reason.code, groupValue: selected, onChanged: (value) => setState(() => selected = value ?? selected), title: Text(reason.label))),
+            TextField(controller: noteController, maxLines: 3, decoration: const InputDecoration(labelText: 'Optional note')),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () async {
+                await repo.submitVideoReport(videoId: video.videoId, reasonCode: selected, note: noteController.text);
+                if (context.mounted) Navigator.of(context).pop(true);
+              },
+              child: const Text('Submit report'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  noteController.dispose();
+  if (submitted == true && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report received. Our safety team will review it.')));
   }
 }

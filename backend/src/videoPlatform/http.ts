@@ -32,6 +32,7 @@ export interface VideoPlatformHttpHandlers {
   listFeed(req: IncomingMessage, res: ServerResponse, query: URLSearchParams): Promise<void>;
   listPlaceVideos(req: IncomingMessage, res: ServerResponse, placeId: string): Promise<void>;
   listCreatorVideos(req: IncomingMessage, res: ServerResponse, userId: string): Promise<void>;
+  reportVideo(req: IncomingMessage, res: ServerResponse, videoId: string): Promise<void>;
 }
 
 export function createVideoPlatformHttpHandlers(service: VideoPlatformService): VideoPlatformHttpHandlers {
@@ -147,6 +148,12 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
     },
     async listCreatorVideos(_req, res, userId) {
       sendJson(res, 200, { items: await service.listCreatorVideos(userId) });
+    },
+    async reportVideo(req, res, videoId) {
+      const userId = requireUserId(req);
+      const body = await parseJsonBody(req) as { reasonCode?: "sexual_explicit" | "graphic_violent" | "harassment_bullying" | "hate_abusive_language" | "spam" | "other"; note?: string };
+      if (!body?.reasonCode) throw new ValidationError(["reasonCode is required"]);
+      sendJson(res, 202, await service.reportVideo({ userId, videoId, reasonCode: body.reasonCode, note: body.note }));
     }
   };
 }

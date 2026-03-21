@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { MemoryVideoPlatformStore } from "../store.js";
-import { VideoPlatformService, type UploadObjectVerifier, type VideoProcessingExecutor } from "../service.js";
+import { VideoPlatformService, type UploadObjectVerifier, type VideoProcessingExecutor, type VideoModerationProvider } from "../service.js";
 
-function createService(deps?: { verifier?: UploadObjectVerifier; processor?: VideoProcessingExecutor; autoPublishAfterProcessing?: boolean }) {
+function createService(deps?: { verifier?: UploadObjectVerifier; processor?: VideoProcessingExecutor; autoPublishAfterProcessing?: boolean; moderationProvider?: VideoModerationProvider; moderationService?: any }) {
   return new VideoPlatformService(
     new MemoryVideoPlatformStore(),
     { exists: (placeId) => placeId === "place_1" || placeId === "place_2" },
@@ -18,7 +18,11 @@ function createService(deps?: { verifier?: UploadObjectVerifier; processor?: Vid
       autoPublishAfterProcessing: deps?.autoPublishAfterProcessing ?? false
     },
     deps?.verifier,
-    deps?.processor
+    deps?.processor,
+    deps?.moderationService,
+    undefined,
+    undefined,
+    deps?.moderationProvider
   );
 }
 
@@ -36,7 +40,7 @@ describe("VideoPlatformService lifecycle", () => {
     expect(job?.status).toBe("succeeded");
 
     const studioPending = await service.listStudio("user_1");
-    expect(studioPending[0]?.status).toBe("moderation_pending");
+    expect(studioPending[0]?.status).toBe("publish_pending");
 
     await service.applyModeration({ videoId: draft.id, status: "approved" });
     await service.updateDraft({ userId: "user_1", videoId: draft.id, visibility: "public" });
@@ -163,6 +167,29 @@ describe("VideoPlatformService lifecycle", () => {
     expect(reengagement.recentVideos[0]?.videoId).toBe(draft.id);
     expect(reengagement.creatorAffinity[0]?.creatorUserId).toBe("creator_1");
     expect(reengagement.placeAffinity[0]?.canonicalPlaceId).toBe("place_1");
+  });
+
+
+  it("holds borderline unsafe videos for review and blocks severe unsafe uploads", async () => {
+    const reviewService = createService({
+      moderationProvider: { async scan() { return { summary: { nudityScore: 0.1, sexualContentScore: 0.1, graphicSexualContentScore: 0.1, violenceScore: 0.74, graphicViolenceScore: 0.1, decision: "review", policyVersion: "v1", provider: "test", scannedAt: new Date().toISOString() }, evidence: [{ timestampMs: 500, labels: ["violence"], score: 0.74 }] }; } }
+    });
+    const draft = await reviewService.createDraft({ userId: "u2", canonicalPlaceId: "place_1", title: "fight clip" });
+    const upload = await reviewService.requestUploadSession({ userId: "u2", videoId: draft.id, fileName: "fight.mp4", contentType: "video/mp4", sizeBytes: 30 });
+    await reviewService.finalizeUpload({ userId: "u2", videoId: draft.id, uploadSessionId: upload.id });
+    await reviewService.processNextQueuedJob();
+    const studio = await reviewService.listStudio("u2");
+    expect(studio[0]?.status).toBe("moderation_pending");
+
+    const blockedService = createService({
+      moderationProvider: { async scan() { return { summary: { nudityScore: 0.97, sexualContentScore: 0.95, graphicSexualContentScore: 0.98, violenceScore: 0.1, graphicViolenceScore: 0.1, decision: "block", policyVersion: "v1", provider: "test", scannedAt: new Date().toISOString() }, evidence: [{ timestampMs: 600, labels: ["graphic sexual content"], score: 0.98 }] }; } }
+    });
+    const blocked = await blockedService.createDraft({ userId: "u3", canonicalPlaceId: "place_1", title: "graphic sex" });
+    const blockedUpload = await blockedService.requestUploadSession({ userId: "u3", videoId: blocked.id, fileName: "graphic-sex.mp4", contentType: "video/mp4", sizeBytes: 30 });
+    await blockedService.finalizeUpload({ userId: "u3", videoId: blocked.id, uploadSessionId: blockedUpload.id });
+    await blockedService.processNextQueuedJob();
+    const blockedStudio = await blockedService.listStudio("u3");
+    expect(blockedStudio[0]?.status).toBe("rejected");
   });
 
   it("archives drafts", async () => {

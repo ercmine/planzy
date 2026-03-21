@@ -36,7 +36,7 @@ import { ProviderRouter } from "../plans/router/providerRouter.js";
 import type { ProviderRouter as ProviderRouterType } from "../plans/router/providerRouter.js";
 import { MemoryTelemetryStore } from "../telemetry/memoryStore.js";
 import { MemoryReviewsStore } from "../reviews/memoryStore.js";
-import { ModerationService, ReviewsModerationEnforcementAdapter } from "../moderation/index.js";
+import { MemoryModerationAlertDispatcher, ModerationService, ReviewsModerationEnforcementAdapter, WebhookModerationAlertDispatcher } from "../moderation/index.js";
 import { MemoryNotificationStore, NotificationService } from "../notifications/index.js";
 import { DevBillingProvider } from "../subscriptions/billing/provider.js";
 import { EntitlementPolicyService } from "../subscriptions/policy.js";
@@ -102,9 +102,29 @@ export function createServer(options?: CreateServerOptions) {
   const analyticsService = new AnalyticsService(new MemoryAnalyticsStore());
   const analyticsQueryService = new AnalyticsQueryService(analyticsService);
   const reviewsStore = new MemoryReviewsStore();
+  let videoPlatformService: VideoPlatformService | undefined;
   const notificationStore = new MemoryNotificationStore();
   const notificationService = new NotificationService(notificationStore);
-  const moderationService = new ModerationService(new ReviewsModerationEnforcementAdapter(reviewsStore));
+  const moderationAlertDispatcher = process.env.MODERATION_EMAIL_API_URL
+    ? new WebhookModerationAlertDispatcher({
+        endpoint: process.env.MODERATION_EMAIL_API_URL,
+        apiKey: process.env.MODERATION_EMAIL_API_KEY,
+        fromEmail: process.env.MODERATION_EMAIL_FROM ?? "moderation@perbug.com",
+        reviewBaseUrl: process.env.MODERATION_REVIEW_BASE_URL ?? "https://admin.perbug.com"
+      })
+    : new MemoryModerationAlertDispatcher();
+  const moderationService = new ModerationService({
+    enforcement: new ReviewsModerationEnforcementAdapter(reviewsStore),
+    alertDispatcher: moderationAlertDispatcher,
+    reportAlertRecipient: process.env.MODERATION_ALERT_EMAIL ?? "alex@perbug.com",
+    targetContextLoader: async (target) => {
+      if (target.targetType !== "place_review_video") return undefined;
+      const video = await videoPlatformService?.getVideoById?.(target.targetId);
+      return video ? {
+        videoId: video.id, uploaderUserId: video.authorUserId, placeId: video.canonicalPlaceId, title: video.title, caption: video.caption, moderationSummary: video.moderationSummary, evidence: video.moderationEvidence, playbackUrl: video.processedPlaybackUrl, thumbnailUrl: video.thumbnailPlaybackUrl
+      } : undefined;
+    }
+  });
   const trustSafetyService = new TrustSafetyService(moderationService);
   const usageStore = new MemoryUsageStore();
   const subscriptionService = new SubscriptionService(usageStore, new DevBillingProvider(), {
@@ -191,7 +211,7 @@ export function createServer(options?: CreateServerOptions) {
   });
   const rolloutService = new RolloutService(new MemoryRolloutStore(rolloutSeedForLocalDev()), accountsService, subscriptionService);
   const geoGateway = createBackendGeoGatewayFromEnv();
-  const videoPlatformService = new VideoPlatformService(
+  videoPlatformService = new VideoPlatformService(
     new MemoryVideoPlatformStore(),
     { exists: (placeId) => Boolean(placeService.getCanonicalPlace(placeId)) },
     {
