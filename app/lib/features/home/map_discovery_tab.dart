@@ -266,7 +266,6 @@ class MapDiscoveryTab extends ConsumerStatefulWidget {
 
 class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   static const _defaultTileTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-  static const _defaultTileAttribution = '© OpenStreetMap contributors';
   static const List<MapFilterOption> filters = [
     MapFilterOption(id: 'cuisine', label: 'Cuisine', icon: Icons.restaurant_rounded, discoveryCategories: ['food']),
     MapFilterOption(id: 'coffee', label: 'Coffee', icon: Icons.local_cafe_rounded, discoveryCategories: ['coffee']),
@@ -415,9 +414,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                           maxZoom: 19,
                         ),
                         MarkerLayer(markers: _buildMarkers(context, markerItems, selected, location)),
-                        RichAttributionWidget(
-                          attributions: const [TextSourceAttribution(_defaultTileAttribution)],
-                        ),
                       ],
                     ),
                   ),
