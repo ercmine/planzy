@@ -98,4 +98,20 @@ describe("moderation routes", () => {
     const restoredList = await listAfterRestore.json();
     expect(restoredList.reviews.some((item: { id: string }) => item.id === reviewId)).toBe(true);
   });
+
+  it("reports a video, creates a moderation case, and exposes alert history", async () => {
+    const videoId = "vid_report_1";
+    const report = await fetch(`${baseUrl}/v1/moderation/reports`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": "viewer-report" },
+      body: JSON.stringify({ targetType: "place_review_video", targetId: videoId, placeId: "place-1", subjectUserId: "creator-video", reasonCode: "graphic_violent", note: "violent content slipped through" })
+    });
+    expect(report.status).toBe(202);
+
+    const details = await fetch(`${baseUrl}/v1/admin/moderation/targets/place_review_video/${encodeURIComponent(videoId)}`, { headers: { "x-admin-key": "admin-secret" } });
+    expect(details.status).toBe(200);
+    const detailsJson = await details.json();
+    expect(detailsJson.reports.length).toBeGreaterThan(0);
+    expect(detailsJson.alerts.length).toBeGreaterThan(0);
+  });
 });

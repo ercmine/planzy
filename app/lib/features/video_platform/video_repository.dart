@@ -186,6 +186,10 @@ class VideoRepository {
     );
   }
 
+  Future<void> submitVideoReport({required String videoId, required String reasonCode, String? note}) async {
+    await apiClient.postJson('/v1/videos/$videoId/report', body: {'reasonCode': reasonCode, if (note != null && note.trim().isNotEmpty) 'note': note.trim()});
+  }
+
   Future<List<StudioVideo>> fetchStudioVideos({StudioSection? section}) async {
     final cacheKey = section?.name ?? 'all';
     return _loadCachedList(

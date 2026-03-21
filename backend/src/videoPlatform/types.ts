@@ -15,7 +15,10 @@ export type VideoLifecycleStatus =
   | "rejected"
   | "archived";
 
-export type ModerationStatus = "pending" | "approved" | "flagged" | "rejected";
+export type ModerationStatus = "pending" | "approved" | "review" | "flagged" | "rejected";
+
+export interface VideoModerationFrameEvidence { timestampMs: number; thumbnailUrl?: string; labels: string[]; score: number; }
+export interface VideoModerationSummary { nudityScore: number; sexualContentScore: number; graphicSexualContentScore: number; violenceScore: number; graphicViolenceScore: number; decision: "safe" | "review" | "block"; policyVersion: string; provider: string; scannedAt: string; }
 export type Visibility = "public" | "unlisted" | "private";
 export type UploadPurpose = "place_review_video" | "thumbnail" | "cover" | "draft_asset";
 export type FeedScope = "local" | "regional" | "global";
@@ -69,6 +72,8 @@ export interface VideoAsset {
   processedPlaybackUrl?: string;
   thumbnailPlaybackUrl?: string;
   coverPlaybackUrl?: string;
+  moderationSummary?: VideoModerationSummary;
+  moderationEvidence?: VideoModerationFrameEvidence[];
   feedDebug?: {
     distanceMeters?: number;
     placeCity?: string;

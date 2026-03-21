@@ -17,13 +17,17 @@ import type {
   ModerationTargetRef,
   ModerationActorSummary,
   ModerationPlaceSummary,
+  ModerationAlertRecord,
+  ModerationCaseSnapshot,
   ReportReasonCode
 } from "./types.js";
+import type { ModerationAlertDispatcher } from "./alerts.js";
 
 const REPORT_RATE_LIMIT_WINDOW_MS = 60_000;
 const REPORT_RATE_LIMIT_MAX = 12;
 const AUTO_HIDE_THRESHOLD = 0.92;
 const AUTO_LIMIT_THRESHOLD = 0.7;
+const DEFAULT_REPORT_ALERT_RECIPIENT = "alex@perbug.com";
 
 function keyForTarget(target: ModerationTargetRef): string {
   return `${target.targetType}:${target.targetId}`;
@@ -69,6 +73,13 @@ export interface ModerationEnforcementPort {
   applyState(target: ModerationTargetRef, state: ModerationState, reasonCode: string): Promise<void>;
 }
 
+export interface ModerationServiceOptions {
+  enforcement?: ModerationEnforcementPort;
+  alertDispatcher?: ModerationAlertDispatcher;
+  reportAlertRecipient?: string;
+  targetContextLoader?: (target: ModerationTargetRef) => Promise<Record<string, unknown> | undefined> | Record<string, unknown> | undefined;
+}
+
 export class ModerationService {
   private readonly reports = new Map<string, ContentReport[]>();
   private readonly reporterRateWindow = new Map<string, number[]>();
@@ -76,10 +87,27 @@ export class ModerationService {
   private readonly decisions = new Map<string, ModerationDecision[]>();
   private readonly audits = new Map<string, ModerationAuditEvent[]>();
   private readonly states = new Map<string, ModerationState>();
+  private readonly alerts = new Map<string, ModerationAlertRecord[]>();
   private readonly contentFingerprints = new Map<string, Array<{ userId?: string; normalizedText: string; createdAt: number; placeId?: string }>>();
   private readonly submissionTimesByUser = new Map<string, number[]>();
 
-  constructor(private readonly enforcement?: ModerationEnforcementPort) {}
+  private readonly enforcement?: ModerationEnforcementPort;
+  private readonly alertDispatcher?: ModerationAlertDispatcher;
+  private readonly reportAlertRecipient: string;
+  private readonly targetContextLoader?: ModerationServiceOptions["targetContextLoader"];
+
+  constructor(options: ModerationEnforcementPort | ModerationServiceOptions = {}) {
+    if ("applyState" in options && typeof options.applyState === "function") {
+      this.enforcement = options;
+      this.reportAlertRecipient = DEFAULT_REPORT_ALERT_RECIPIENT;
+      return;
+    }
+    const resolved = options as ModerationServiceOptions;
+    this.enforcement = resolved.enforcement;
+    this.alertDispatcher = resolved.alertDispatcher;
+    this.reportAlertRecipient = resolved.reportAlertRecipient ?? DEFAULT_REPORT_ALERT_RECIPIENT;
+    this.targetContextLoader = resolved.targetContextLoader;
+  }
 
   async submitReport(input: {
     target: ModerationTargetRef;
@@ -123,6 +151,7 @@ export class ModerationService {
     if (aggregate.uniqueReporterCount >= 3 && this.currentState(input.target) === "active") {
       await this.transitionState({ target: input.target, newState: "pending_review", source: "user_report", actorUserId: input.reporterUserId, reasonCode: "report_threshold_reached", now });
     }
+    await this.dispatchCaseAlertIfNeeded(input.target, `report:${report.id}`);
     return { accepted: true, reportId: report.id, aggregate: this.getAggregate(input.target) };
   }
 
@@ -173,6 +202,33 @@ export class ModerationService {
     }
 
     return { signals: generated, state: this.currentState(input.target) };
+  }
+
+
+  async ingestSignals(input: {
+    target: ModerationTargetRef;
+    signals: Array<{ category: ModerationSignal["category"]; ruleId: string; score: number; reasonCode: string; explanation: string; metadata?: Record<string, unknown> }>;
+    actorUserId?: string;
+    source?: ModerationSource;
+    now?: Date;
+  }): Promise<{ signals: ModerationSignal[]; state: ModerationState }> {
+    const now = input.now ?? new Date();
+    const key = keyForTarget(input.target);
+    const existing = this.signals.get(key) ?? [];
+    const created = input.signals
+      .filter((item) => item.score > 0)
+      .map((item) => this.createSignal(input.target, input.source ?? "automated_rule", item.category, item.ruleId, item.score, item.reasonCode, item.explanation, now, item.metadata));
+    if (created.length) this.signals.set(key, [...existing, ...created]);
+    for (const signal of created) {
+      this.pushAudit(input.target, { eventType: "signal_generated", source: signal.source, details: { signalId: signal.id, category: signal.category, ruleId: signal.ruleId, score: signal.score, severity: signal.severity, reasonCode: signal.reasonCode, metadata: signal.metadata }, createdAt: signal.createdAt });
+    }
+    const highest = Math.max(0, ...created.map((item) => item.score));
+    if (highest >= AUTO_HIDE_THRESHOLD) {
+      await this.transitionState({ target: input.target, newState: "hidden", source: input.source ?? "automated_rule", actorUserId: input.actorUserId, reasonCode: "unsafe_media_auto_hidden", now });
+    } else if (highest >= AUTO_LIMIT_THRESHOLD) {
+      await this.transitionState({ target: input.target, newState: "pending_review", source: input.source ?? "automated_rule", actorUserId: input.actorUserId, reasonCode: "unsafe_media_manual_review", now });
+    }
+    return { signals: created, state: this.currentState(input.target) };
   }
 
   async adminDecision(input: {
@@ -227,6 +283,11 @@ export class ModerationService {
       fraudScore: Math.max(0, ...signals.filter((item) => item.category === "scam_fraud").map((item) => item.score)),
       duplicateScore: Math.max(0, ...signals.filter((item) => item.category === "duplicate").map((item) => item.score)),
       suspiciousActivityScore: Math.max(0, ...signals.filter((item) => item.category === "suspicious_activity").map((item) => item.score)),
+      nudityScore: Math.max(0, ...signals.filter((item) => item.ruleId === "video.nudity").map((item) => item.score)),
+      sexualContentScore: Math.max(0, ...signals.filter((item) => item.ruleId === "video.sexual_content").map((item) => item.score)),
+      graphicSexualContentScore: Math.max(0, ...signals.filter((item) => item.ruleId === "video.graphic_sexual_content").map((item) => item.score)),
+      violenceScore: Math.max(0, ...signals.filter((item) => item.ruleId === "video.violence").map((item) => item.score)),
+      graphicViolenceScore: Math.max(0, ...signals.filter((item) => item.ruleId === "video.graphic_violence").map((item) => item.score)),
       maxSeverity: signals.reduce<ModerationSeverity>((current, signal) => {
         const order: ModerationSeverity[] = ["low", "medium", "high", "critical"];
         return order.indexOf(signal.severity) > order.indexOf(current) ? signal.severity : current;
@@ -274,14 +335,15 @@ export class ModerationService {
     return queue.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, Math.max(1, Math.min(filter.limit ?? 100, 200)));
   }
 
-  getTargetDetails(target: ModerationTargetRef): { aggregate: ModerationAggregate; reports: ContentReport[]; signals: ModerationSignal[]; decisions: ModerationDecision[]; audits: ModerationAuditEvent[] } {
+  getTargetDetails(target: ModerationTargetRef): { aggregate: ModerationAggregate; reports: ContentReport[]; signals: ModerationSignal[]; decisions: ModerationDecision[]; audits: ModerationAuditEvent[]; alerts: ModerationAlertRecord[] } {
     const key = keyForTarget(target);
     return {
       aggregate: this.getAggregate(target),
       reports: [...(this.reports.get(key) ?? [])],
       signals: [...(this.signals.get(key) ?? [])],
       decisions: [...(this.decisions.get(key) ?? [])],
-      audits: [...(this.audits.get(key) ?? [])]
+      audits: [...(this.audits.get(key) ?? [])],
+      alerts: [...(this.alerts.get(key) ?? [])]
     };
   }
 
@@ -385,7 +447,7 @@ export class ModerationService {
     return previousState;
   }
 
-  private createSignal(target: ModerationTargetRef, source: ModerationSource, category: ModerationSignal["category"], ruleId: string, score: number, reasonCode: string, explanation: string, now: Date): ModerationSignal {
+  private createSignal(target: ModerationTargetRef, source: ModerationSource, category: ModerationSignal["category"], ruleId: string, score: number, reasonCode: string, explanation: string, now: Date, metadata?: Record<string, unknown>): ModerationSignal {
     return {
       id: randomUUID(),
       target,
@@ -397,6 +459,7 @@ export class ModerationService {
       score: clamp01(score),
       reasonCode,
       explanation,
+      metadata,
       createdAt: now.toISOString()
     };
   }
@@ -433,5 +496,28 @@ export class ModerationService {
     if (signals.some((item) => item.severity === "high" || item.severity === "critical")) return "high_risk_auto";
     if (aggregate.state === "escalated") return "escalated_repeat_offender";
     return null;
+  }
+
+  async getCaseSnapshot(target: ModerationTargetRef): Promise<ModerationCaseSnapshot> {
+    const details = this.getTargetDetails(target);
+    return {
+      target,
+      aggregate: details.aggregate,
+      reports: details.reports,
+      signals: details.signals,
+      decisions: details.decisions,
+      audits: details.audits,
+      alerts: details.alerts,
+      context: await this.targetContextLoader?.(target)
+    };
+  }
+
+  private async dispatchCaseAlertIfNeeded(target: ModerationTargetRef, dedupeKey: string): Promise<void> {
+    if (!this.alertDispatcher) return;
+    const snapshot = await this.getCaseSnapshot(target);
+    const existing = (this.alerts.get(keyForTarget(target)) ?? []).find((item) => item.dedupeKey === dedupeKey);
+    if (existing) return;
+    const alert = await this.alertDispatcher.sendCaseAlert({ recipient: this.reportAlertRecipient, snapshot, dedupeKey });
+    this.alerts.set(keyForTarget(target), [...(this.alerts.get(keyForTarget(target)) ?? []), alert]);
   }
 }

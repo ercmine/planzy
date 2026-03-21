@@ -15,7 +15,9 @@ import type {
   FeedScopeRequestContext,
   PlaceFeedSignals,
   CreatorFeedSignals,
-  ReengagementSummary
+  ReengagementSummary,
+  VideoModerationSummary,
+  VideoModerationFrameEvidence
 } from "./types.js";
 import { rankPlaceLinkedVideoFeed } from "./feedRanking.js";
 import type { VideoPlatformStore } from "./store.js";
@@ -30,7 +32,7 @@ const VALID_TRANSITIONS: Record<VideoLifecycleStatus, readonly VideoLifecycleSta
   upload_received: ["processing_queued", "failed_upload", "archived"],
   processing_queued: ["processing", "failed_processing", "archived"],
   processing: ["processed", "failed_processing", "archived"],
-  processed: ["publish_pending", "moderation_pending", "published", "archived"],
+  processed: ["publish_pending", "moderation_pending", "published", "hidden", "rejected", "archived"],
   publish_pending: ["published", "moderation_pending", "rejected", "hidden", "archived"],
   published: ["hidden", "rejected", "archived"],
   failed_upload: ["awaiting_upload", "archived"],
@@ -40,6 +42,13 @@ const VALID_TRANSITIONS: Record<VideoLifecycleStatus, readonly VideoLifecycleSta
   rejected: ["archived"],
   archived: []
 };
+
+export interface VideoModerationPolicyConfig {
+  providerName: string;
+  policyVersion: string;
+  reviewThreshold: number;
+  blockThreshold: number;
+}
 
 export interface VideoStorageConfig {
   awsRegion: string;
@@ -51,6 +60,12 @@ export interface VideoStorageConfig {
   multipartThresholdBytes: number;
   autoPublishAfterProcessing?: boolean;
   maxProcessingAttempts?: number;
+  moderation?: VideoModerationPolicyConfig;
+  moderationReviewBaseUrl?: string;
+}
+
+export interface VideoModerationProvider {
+  scan(input: { video: VideoAsset }): Promise<{ summary: VideoModerationSummary; evidence: VideoModerationFrameEvidence[] }>;
 }
 
 export interface PlaceLookup {
@@ -84,6 +99,28 @@ const defaultProcessingExecutor: VideoProcessingExecutor = {
   }
 };
 
+
+const defaultModerationProvider: VideoModerationProvider = {
+  async scan({ video }) {
+    const corpus = [video.title, video.caption, video.sourceFileName].join(" ").toLowerCase();
+    const scoreFor = (terms: string[], weights: number[]) => Math.max(0, ...terms.map((term, idx) => corpus.includes(term) ? weights[idx] : 0));
+    const nudityScore = scoreFor(["nude", "nudity", "topless", "lingerie"], [0.96, 0.9, 0.92, 0.66]);
+    const sexualContentScore = scoreFor(["sex", "sexual", "explicit", "nsfw"], [0.88, 0.82, 0.8, 0.76]);
+    const graphicSexualContentScore = scoreFor(["porn", "graphic sex", "xxx"], [0.99, 0.98, 0.94]);
+    const violenceScore = scoreFor(["fight", "violence", "blood", "assault"], [0.72, 0.8, 0.85, 0.78]);
+    const graphicViolenceScore = scoreFor(["gore", "beheading", "graphic violence"], [0.99, 0.99, 0.95]);
+    const maxScore = Math.max(nudityScore, sexualContentScore, graphicSexualContentScore, violenceScore, graphicViolenceScore);
+    const decision = maxScore >= 0.93 ? "block" : maxScore >= 0.7 ? "review" : "safe" as const;
+    return {
+      summary: {
+        nudityScore, sexualContentScore, graphicSexualContentScore, violenceScore, graphicViolenceScore, decision,
+        policyVersion: "video-safety-v1", provider: "heuristic-frame-sampler", scannedAt: new Date().toISOString()
+      },
+      evidence: maxScore > 0 ? [{ timestampMs: Math.max(0, Math.round((video.durationMs ?? 1000) / 2)), thumbnailUrl: video.thumbnailPlaybackUrl, labels: [decision === "block" ? "unsafe" : "review"], score: maxScore }] : []
+    };
+  }
+};
+
 export class VideoPlatformService {
   constructor(
     private readonly store: VideoPlatformStore,
@@ -93,7 +130,8 @@ export class VideoPlatformService {
     private readonly processingExecutor: VideoProcessingExecutor = defaultProcessingExecutor,
     private readonly moderationService?: ModerationService,
     private readonly trustSafetyService?: TrustSafetyService,
-    private readonly notificationService?: NotificationService
+    private readonly notificationService?: NotificationService,
+    private readonly moderationProvider: VideoModerationProvider = defaultModerationProvider
   ) {}
 
   async createDraft(input: { userId: string; canonicalPlaceId: string; title?: string; caption?: string; rating?: number }): Promise<VideoAsset> {
@@ -253,10 +291,13 @@ export class VideoPlatformService {
 
       await this.transition(video, "processed");
       await this.notificationService?.notify({ type: "video.processing.finished", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId });
-      if (video.moderationStatus === "pending") {
-        await this.transition(video, "moderation_pending");
+      await this.runModerationScan(video);
+      if (video.moderationStatus === "pending" || video.moderationStatus === "review") {
+        await this.transition(video, "moderation_pending", { allowNoop: true });
       } else if (this.cfg.autoPublishAfterProcessing && video.moderationStatus === "approved") {
         await this.completePublish(video);
+      } else if (video.moderationStatus === "rejected") {
+        await this.transition(video, "rejected", { allowNoop: true });
       } else {
         await this.transition(video, "publish_pending", { allowNoop: true });
       }
@@ -272,7 +313,7 @@ export class VideoPlatformService {
     }
   }
 
-  async applyModeration(input: { videoId: string; status: "approved" | "flagged" | "rejected" }): Promise<VideoAsset> {
+  async applyModeration(input: { videoId: string; status: "approved" | "review" | "flagged" | "rejected" }): Promise<VideoAsset> {
     const video = await this.store.getVideo(input.videoId);
     if (!video) throw new Error("video_not_found");
     video.moderationStatus = input.status;
@@ -282,6 +323,8 @@ export class VideoPlatformService {
       if (video.status === "moderation_pending") {
         await this.transition(video, "publish_pending");
       }
+    } else if (input.status === "review") {
+      await this.transition(video, "moderation_pending", { allowNoop: true });
     } else if (input.status === "flagged") {
       await this.transition(video, "hidden", { allowNoop: true });
     } else {
@@ -351,7 +394,7 @@ export class VideoPlatformService {
           status: video.status,
           moderationStatus: video.moderationStatus,
           moderationState: moderationAggregate?.state,
-          moderationReason: moderationAggregate?.state === "pending_review" ? "Under moderation review" : moderationAggregate?.state,
+          moderationReason: video.moderationSummary?.decision == "block" ? "Blocked due to safety policy" : moderationAggregate?.state === "pending_review" || video.moderationStatus === "review" ? "Under safety review" : moderationAggregate?.state,
           statusLabel: this.statusLabel(video.status),
           section: this.sectionFor(video),
           isRetryable: video.status === "failed_processing" || video.status === "failed_upload",
@@ -442,6 +485,10 @@ export class VideoPlatformService {
       topVideos,
       topPlaces
     };
+  }
+
+  async getVideoById(videoId: string): Promise<VideoAsset | undefined> {
+    return this.store.getVideo(videoId);
   }
 
   async recordVideoEvent(input: { videoId: string; userId?: string; event: "video_viewed" | "video_liked" | "video_saved" | "video_shared" | "video_completed"; progressMs?: number }): Promise<VideoAsset> {
@@ -566,6 +613,14 @@ export class VideoPlatformService {
     return { recentVideos, creatorAffinity, placeAffinity };
   }
 
+  async reportVideo(input: { userId: string; videoId: string; reasonCode: "sexual_explicit" | "graphic_violent" | "harassment_bullying" | "hate_abusive_language" | "spam" | "other"; note?: string }): Promise<{ accepted: true; aggregate?: ReturnType<ModerationService["getAggregate"]> }> {
+    const video = await this.store.getVideo(input.videoId);
+    if (!video) throw new Error("video_not_found");
+    const target = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId, subjectUserId: video.authorUserId };
+    const result = await this.moderationService?.submitReport({ target, reporterUserId: input.userId, reasonCode: input.reasonCode, note: input.note });
+    return { accepted: true, aggregate: result?.aggregate };
+  }
+
   async listCreatorVideos(userId: string): Promise<VideoFeedItem[]> {
     const rows = (await this.store.listByAuthor(userId)).filter((video) => video.status === "published" && video.moderationStatus === "approved" && this.isVisibleVideo(video));
     return rows.map((video) => this.toFeedItem(video));
@@ -583,6 +638,35 @@ export class VideoPlatformService {
       staleDraftCount: allVideos.filter((video) => video.status === "draft" && new Date(video.lifecycle.createdAt).getTime() < staleDraftThreshold).length,
       stuckProcessingCount: allVideos.filter((video) => ["processing", "processing_queued"].includes(video.status) && new Date(video.lifecycle.updatedAt).getTime() < stuckThreshold).length
     };
+  }
+
+  private async runModerationScan(video: VideoAsset): Promise<void> {
+    const result = await this.moderationProvider.scan({ video });
+    video.moderationSummary = result.summary;
+    video.moderationEvidence = result.evidence;
+    const target = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId, subjectUserId: video.authorUserId };
+    await this.moderationService?.ingestSignals({
+      target,
+      actorUserId: video.authorUserId,
+      signals: [
+        { category: "unsafe_media", ruleId: "video.nudity", score: result.summary.nudityScore, reasonCode: "nudity_risk_detected", explanation: "Representative frame scan detected nudity risk.", metadata: { evidence: result.evidence } },
+        { category: "unsafe_media", ruleId: "video.sexual_content", score: result.summary.sexualContentScore, reasonCode: "sexual_content_risk_detected", explanation: "Representative frame scan detected sexual content risk.", metadata: { evidence: result.evidence } },
+        { category: "unsafe_media", ruleId: "video.graphic_sexual_content", score: result.summary.graphicSexualContentScore, reasonCode: "graphic_sexual_content_detected", explanation: "Representative frame scan detected graphic sexual content risk.", metadata: { evidence: result.evidence } },
+        { category: "unsafe_media", ruleId: "video.violence", score: result.summary.violenceScore, reasonCode: "violence_risk_detected", explanation: "Representative frame scan detected violence risk.", metadata: { evidence: result.evidence } },
+        { category: "unsafe_media", ruleId: "video.graphic_violence", score: result.summary.graphicViolenceScore, reasonCode: "graphic_violence_detected", explanation: "Representative frame scan detected graphic violence risk.", metadata: { evidence: result.evidence } }
+      ]
+    });
+    if (result.summary.decision === "safe") {
+      video.moderationStatus = "approved";
+    } else if (result.summary.decision === "review") {
+      video.moderationStatus = "review";
+      await this.notificationService?.notify({ type: "video.moderation.changed", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId, moderationState: "pending" });
+    } else {
+      video.moderationStatus = "rejected";
+      await this.notificationService?.notify({ type: "video.moderation.changed", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId, moderationState: "rejected" });
+    }
+    video.lifecycle.moderatedAt = new Date().toISOString();
+    await this.store.updateVideo(video);
   }
 
   private async enqueueProcessing(video: VideoAsset): Promise<VideoAsset> {
