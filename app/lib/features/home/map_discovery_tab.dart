@@ -1,12 +1,12 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:share_plus/share_plus.dart';
 
-import '../../app/theme/spacing.dart';
-import '../../app/theme/widgets.dart';
 import '../../core/connectivity/connectivity_state.dart';
 import '../../core/links/link_launcher.dart';
 import '../../core/links/link_types.dart';
@@ -14,8 +14,11 @@ import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
 import '../../core/location/location_permission_service.dart';
 import '../../providers/app_providers.dart';
+import '../collections/collection_models.dart';
+import '../collections/collection_repository.dart';
 import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
+import 'map_discovery_widgets.dart';
 import 'place_preview_card.dart';
 import 'place_video_detail_page.dart';
 import '../video_platform/video_providers.dart';
@@ -25,47 +28,63 @@ class MapViewportState {
     required this.viewport,
     this.selectedPlaceId,
     this.pins = const [],
-    this.categories = const <String>{},
+    this.selectedFilters = const <String>{},
+    this.backendCategories = const <String>{},
     this.pendingViewportSearch = false,
     this.loading = false,
     this.discoveryError,
     this.areaLabel,
     this.geoStatus,
+    this.sort = MapDiscoverySort.relevance,
+    this.hasInitialized = false,
+    this.lastSearchMode = 'nearby',
   });
 
   final MapViewport viewport;
   final String? selectedPlaceId;
   final List<MapPin> pins;
-  final Set<String> categories;
+  final Set<String> selectedFilters;
+  final Set<String> backendCategories;
   final bool pendingViewportSearch;
   final bool loading;
   final String? discoveryError;
   final String? areaLabel;
   final String? geoStatus;
+  final MapDiscoverySort sort;
+  final bool hasInitialized;
+  final String lastSearchMode;
 
   MapViewportState copyWith({
     MapViewport? viewport,
     String? selectedPlaceId,
     bool clearSelectedPlace = false,
     List<MapPin>? pins,
-    Set<String>? categories,
+    Set<String>? selectedFilters,
+    Set<String>? backendCategories,
     bool? pendingViewportSearch,
     bool? loading,
     String? discoveryError,
     String? areaLabel,
     String? geoStatus,
     bool clearGeoStatus = false,
+    MapDiscoverySort? sort,
+    bool? hasInitialized,
+    String? lastSearchMode,
   }) {
     return MapViewportState(
       viewport: viewport ?? this.viewport,
       selectedPlaceId: clearSelectedPlace ? null : (selectedPlaceId ?? this.selectedPlaceId),
       pins: pins ?? this.pins,
-      categories: categories ?? this.categories,
+      selectedFilters: selectedFilters ?? this.selectedFilters,
+      backendCategories: backendCategories ?? this.backendCategories,
       pendingViewportSearch: pendingViewportSearch ?? this.pendingViewportSearch,
       loading: loading ?? this.loading,
       discoveryError: discoveryError,
       areaLabel: areaLabel ?? this.areaLabel,
       geoStatus: clearGeoStatus ? null : (geoStatus ?? this.geoStatus),
+      sort: sort ?? this.sort,
+      hasInitialized: hasInitialized ?? this.hasInitialized,
+      lastSearchMode: lastSearchMode ?? this.lastSearchMode,
     );
   }
 }
@@ -78,6 +97,12 @@ final mapGeoClientProvider = FutureProvider<MapGeoClient>((ref) async {
 final placeDiscoveryClientProvider = FutureProvider<PlaceDiscoveryClient>((ref) async {
   final repository = await ref.watch(videoRepositoryProvider.future);
   return BackendPlaceDiscoveryClient(repository);
+});
+
+final mapCollectionsProvider = FutureProvider<List<CollectionCardModel>>((ref) async {
+  final apiClient = await ref.watch(apiClientProvider.future);
+  final repository = CollectionRepository(apiClient);
+  return repository.fetchCollections();
 });
 
 class MapDiscoveryController extends StateNotifier<MapViewportState> {
@@ -102,20 +127,34 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
 
     await searchThisArea(mode: 'nearby');
     await refreshAreaLabel();
+    state = state.copyWith(hasInitialized: true, lastSearchMode: 'nearby');
   }
 
-  void toggleCategory(String category) {
-    final next = {...state.categories};
-    if (!next.add(category)) next.remove(category);
-    state = state.copyWith(categories: next, pendingViewportSearch: true);
+  void toggleFilter(MapFilterOption filter) {
+    final selectedFilters = {...state.selectedFilters};
+    if (!selectedFilters.add(filter.id)) selectedFilters.remove(filter.id);
+
+    final backendCategories = <String>{};
+    for (final activeFilterId in selectedFilters) {
+      final option = _MapDiscoveryTabState.filterById[activeFilterId];
+      if (option != null) backendCategories.addAll(option.discoveryCategories);
+    }
+
+    state = state.copyWith(
+      selectedFilters: selectedFilters,
+      backendCategories: backendCategories,
+      pendingViewportSearch: true,
+    );
   }
+
+  void setSort(MapDiscoverySort sort) => state = state.copyWith(sort: sort);
 
   void selectPlace(String placeId) => state = state.copyWith(selectedPlaceId: placeId);
 
   void clearSelectedPlace() => state = state.copyWith(clearSelectedPlace: true);
 
   void setViewport(MapViewport viewport, {bool markPendingSearch = true}) {
-    state = state.copyWith(viewport: viewport, pendingViewportSearch: markPendingSearch);
+    state = state.copyWith(viewport: viewport, pendingViewportSearch: markPendingSearch || state.pendingViewportSearch);
   }
 
   Future<void> centerOnUserLocation(AppLocation location) async {
@@ -168,14 +207,24 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
 
   Future<void> searchThisArea({String mode = 'search_this_area'}) async {
     final viewport = state.viewport;
-    final queryKey = [viewport.north, viewport.south, viewport.east, viewport.west, viewport.zoom, mode, state.categories.join(',')].join('|');
+    final queryKey = [
+      viewport.north.toStringAsFixed(4),
+      viewport.south.toStringAsFixed(4),
+      viewport.east.toStringAsFixed(4),
+      viewport.west.toStringAsFixed(4),
+      viewport.zoom.toStringAsFixed(2),
+      mode,
+      state.backendCategories.join(','),
+    ].join('|');
     if (!state.pendingViewportSearch && _lastSearchKey == queryKey && state.pins.isNotEmpty) return;
 
     final requestId = ++_searchRequestId;
-    state = state.copyWith(loading: true, discoveryError: null);
+    state = state.copyWith(loading: true, discoveryError: null, lastSearchMode: mode);
     try {
       final discoveryClient = await _ref.read(placeDiscoveryClientProvider.future);
-      final pins = await discoveryClient.searchByViewport(SearchAreaContext(viewport: viewport, categories: state.categories.toList(growable: false), mode: mode));
+      final pins = await discoveryClient.searchByViewport(
+        SearchAreaContext(viewport: viewport, categories: state.backendCategories.toList(growable: false), mode: mode),
+      );
       if (requestId != _searchRequestId) return;
       _lastSearchKey = queryKey;
       state = state.copyWith(
@@ -204,17 +253,37 @@ class MapDiscoveryTab extends ConsumerStatefulWidget {
 }
 
 class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
-  static const _categories = ['food', 'coffee', 'nightlife', 'parks', 'museums', 'shopping'];
   static const _defaultTileTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   static const _defaultTileAttribution = '© OpenStreetMap contributors';
+  static const List<MapFilterOption> filters = [
+    MapFilterOption(id: 'cuisine', label: 'Cuisine', icon: Icons.restaurant_rounded, discoveryCategories: ['food']),
+    MapFilterOption(id: 'coffee', label: 'Coffee', icon: Icons.local_cafe_rounded, discoveryCategories: ['coffee']),
+    MapFilterOption(id: 'nightlife', label: 'Nightlife', icon: Icons.nightlife_rounded, discoveryCategories: ['nightlife']),
+    MapFilterOption(id: 'bars', label: 'Bars', icon: Icons.wine_bar_rounded, discoveryCategories: ['nightlife']),
+    MapFilterOption(id: 'brunch', label: 'Brunch', icon: Icons.brunch_dining_rounded, discoveryCategories: ['food']),
+    MapFilterOption(id: 'attractions', label: 'Attractions', icon: Icons.museum_rounded, discoveryCategories: ['museums']),
+    MapFilterOption(id: 'outdoor', label: 'Outdoor', icon: Icons.park_rounded, discoveryCategories: ['parks']),
+    MapFilterOption(id: 'shopping', label: 'Shopping', icon: Icons.shopping_bag_rounded, discoveryCategories: ['shopping']),
+    MapFilterOption(id: 'hidden_gems', label: 'Hidden gems', icon: Icons.diamond_outlined, highlyRatedOnly: true, minimumReviewCount: 1, badge: 'Hidden gem'),
+    MapFilterOption(id: 'cheap_eats', label: 'Cheap eats', icon: Icons.sell_outlined, discoveryCategories: ['food']),
+    MapFilterOption(id: 'date_spots', label: 'Date spots', icon: Icons.favorite_border_rounded, highlyRatedOnly: true),
+    MapFilterOption(id: 'scenic', label: 'Scenic', icon: Icons.landscape_outlined, discoveryCategories: ['parks'], badge: 'Scenic'),
+    MapFilterOption(id: 'open_now', label: 'Open now', icon: Icons.schedule_rounded, openNowOnly: true),
+    MapFilterOption(id: 'highly_rated', label: 'Highly rated', icon: Icons.star_rounded, highlyRatedOnly: true),
+    MapFilterOption(id: 'trending', label: 'Trending', icon: Icons.local_fire_department_outlined, trendingOnly: true),
+  ];
+  static final Map<String, MapFilterOption> filterById = {for (final filter in filters) filter.id: filter};
 
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
+  final Set<String> _savedPlaceIds = <String>{};
   bool _mapReady = false;
   bool _didInitialize = false;
   bool _hasFollowedUserLocation = false;
   LatLng? _lastMapCenter;
   double? _lastMapZoom;
+  Timer? _viewportDebounce;
+  MapViewport? _lastAutoSearchViewport;
 
   @override
   void initState() {
@@ -232,6 +301,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
 
   @override
   void dispose() {
+    _viewportDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -246,6 +316,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     final connectivityState = ref.watch(connectivityControllerProvider);
     final permissionService = ref.read(locationPermissionServiceProvider);
     final linkLauncher = ref.read(linkLauncherProvider);
+    final collectionsAsync = ref.watch(mapCollectionsProvider);
 
     if (!_hasFollowedUserLocation && _didInitialize && location != null) {
       _hasFollowedUserLocation = true;
@@ -260,99 +331,23 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
 
     _maybeSyncMapViewport(state.viewport);
 
-    MapPin? selected;
-    for (final p in state.pins) {
-      if (p.canonicalPlaceId == state.selectedPlaceId) {
-        selected = p;
-        break;
-      }
-    }
-    selected ??= state.pins.isEmpty ? null : state.pins.first;
+    final visiblePlaces = _sortedAndFilteredPlaces(state.pins, state: state, location: location);
+    final selected = _resolveSelectedPlace(state, visiblePlaces);
+    final markerItems = _clusterPlaces(visiblePlaces, zoom: state.viewport.zoom);
+    final permissionBlocked = _shouldShowPermissionOverlay(locationState);
+    final noLocationAvailable = !permissionBlocked && _didInitialize && location == null && locationState.status != LocationStatus.loading;
+    final showSearchArea = state.pendingViewportSearch;
+    final collectionSummary = collectionsAsync.valueOrNull?.isNotEmpty == true
+        ? '${collectionsAsync.valueOrNull!.length} collections ready nearby'
+        : null;
 
-    PlaceProximityState proximityFor(MapPin place) {
-      final distance = _distanceMeters(location?.lat, location?.lng, place.latitude, place.longitude);
-      if (distance == null) return PlaceProximityState.unknown;
-      if (distance <= 90) return PlaceProximityState.here;
-      if (distance <= 240) return PlaceProximityState.nearby;
-      return PlaceProximityState.unknown;
-    }
+    _scheduleViewportRefresh(state: state, connectivityState: connectivityState, permissionBlocked: permissionBlocked);
 
-    return Column(
+    return Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-          child: BrandHeroCard(
-            child: Column(
-              children: [
-                const AppSectionHeader(
-                  title: 'Map discovery',
-                  subtitle: 'Pulse through nearby places, creator clips, and real-world momentum.',
-                ),
-                const SizedBox(height: AppSpacing.s),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        textInputAction: TextInputAction.search,
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.search),
-                          hintText: 'Search neighborhood or place',
-                          suffixIcon: IconButton(
-                            tooltip: 'Search map',
-                            onPressed: state.loading ? null : () => _searchForLocation(controller),
-                            icon: const Icon(Icons.arrow_forward_rounded),
-                          ),
-                        ),
-                        onSubmitted: state.loading ? null : (_) => _searchForLocation(controller),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    AppIconButton(
-                      tooltip: 'Center on my location',
-                      onPressed: () => _handleCenterOnUserLocation(locationState, permissionService),
-                      icon: Icons.my_location,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (state.areaLabel != null || state.geoStatus != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                state.areaLabel != null ? 'Area: ${state.areaLabel}' : state.geoStatus!,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ),
-        SizedBox(
-          height: 44,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            children: _categories
-                .map(
-                  (category) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip.elevated(
-                      label: Text(category),
-                      selected: state.categories.contains(category),
-                      onSelected: (_) => controller.toggleCategory(category),
-                    ),
-                  ),
-                )
-                .toList(growable: false),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Expanded(
+        Positioned.fill(
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(28),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerLowest,
@@ -373,6 +368,12 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                           _captureMapViewport();
                         },
                         onTap: (_, __) => controller.clearSelectedPlace(),
+                        onLongPress: (_, point) {
+                          controller.setViewport(
+                            MapViewport(centerLat: point.latitude, centerLng: point.longitude, zoom: max(state.viewport.zoom, 15)),
+                            markPendingSearch: true,
+                          );
+                        },
                         onPositionChanged: (position, hasGesture) {
                           final center = position.center;
                           if (center == null) return;
@@ -391,11 +392,9 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                           userAgentPackageName: 'com.perbug.app',
                           maxZoom: 19,
                         ),
-                        MarkerLayer(markers: _buildMarkers(context, state, selected, location)),
+                        MarkerLayer(markers: _buildMarkers(context, markerItems, selected, location)),
                         RichAttributionWidget(
-                          attributions: const [
-                            TextSourceAttribution(_defaultTileAttribution),
-                          ],
+                          attributions: const [TextSourceAttribution(_defaultTileAttribution)],
                         ),
                       ],
                     ),
@@ -407,16 +406,43 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                         child: Center(child: CircularProgressIndicator()),
                       ),
                     ),
+                  Positioned(
+                    top: 124,
+                    left: 12,
+                    right: 12,
+                    child: Center(
+                      child: SearchAreaButton(
+                        visible: showSearchArea,
+                        onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
+                        isLoading: state.loading,
+                        resultCount: visiblePlaces.length,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 184,
+                    left: 12,
+                    child: DiscoveryCountPill(
+                      count: visiblePlaces.length,
+                      label: visiblePlaces.length == 1 ? 'place in view' : 'places in view',
+                    ),
+                  ),
                   if (state.loading)
-                    const Positioned(top: 12, left: 12, right: 12, child: LinearProgressIndicator()),
+                    const Positioned(top: 0, left: 0, right: 0, child: LinearProgressIndicator(minHeight: 3)),
                   if (!connectivityState.isOnline)
-                    Positioned.fill(child: _MapStatusOverlay(message: 'You appear to be offline. Reconnect to load map tiles and nearby places.', icon: Icons.wifi_off_rounded)),
-                  if (_shouldShowPermissionOverlay(locationState))
                     Positioned.fill(
-                      child: _MapActionOverlay(
-                        title: locationState.status == LocationStatus.serviceDisabled ? 'Turn on location services' : 'Allow location access',
-                        body: locationState.errorMessage ?? 'We use your location to center the map and surface nearby places.',
+                      child: DiscoveryStateCard(
+                        icon: Icons.wifi_off_rounded,
+                        title: 'You are offline',
+                        body: 'Reconnect to refresh nearby places and map tiles. Cached results will stay visible while you get back online.',
+                      ),
+                    ),
+                  if (permissionBlocked)
+                    Positioned.fill(
+                      child: DiscoveryStateCard(
                         icon: locationState.status == LocationStatus.serviceDisabled ? Icons.location_disabled : Icons.location_searching,
+                        title: locationState.status == LocationStatus.serviceDisabled ? 'Turn on location services' : 'Allow location access',
+                        body: locationState.errorMessage ?? 'Perbug uses your location to center the map, surface what is close, and power recenter + nearby discovery.',
                         actions: [
                           FilledButton(
                             onPressed: () => _handleCenterOnUserLocation(locationState, permissionService),
@@ -427,24 +453,17 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                     ),
                   if (state.discoveryError != null)
                     Positioned.fill(
-                      child: _MapActionOverlay(
+                      child: DiscoveryStateCard(
+                        icon: Icons.error_outline,
                         title: 'Nearby places unavailable',
                         body: state.discoveryError!,
-                        icon: Icons.error_outline,
                         actions: [
                           FilledButton.icon(
-                            onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
+                            onPressed: () => controller.searchThisArea(mode: state.lastSearchMode),
                             icon: const Icon(Icons.refresh),
                             label: const Text('Retry'),
                           ),
                         ],
-                      ),
-                    ),
-                  if (!_isMapBlocked(connectivityState, locationState, state) && state.pins.isEmpty && !state.loading)
-                    const Positioned.fill(
-                      child: _MapStatusOverlay(
-                        message: 'No nearby places match this area yet. Move the map or change filters to discover more spots.',
-                        icon: Icons.travel_explore_outlined,
                       ),
                     ),
                 ],
@@ -452,64 +471,141 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
-        if (selected != null)
-          PlacePreviewCard(
-            place: selected,
-            proximityState: proximityFor(selected),
-            distanceMeters: _distanceMeters(location?.lat, location?.lng, selected.latitude, selected.longitude),
-            onOpenDetails: () => _openPlaceDetails(selected!),
-            onOpenMaps: () => _openPlaceInMaps(linkLauncher, selected!),
-            onSave: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${selected!.name} saved.'))),
-            onShare: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Share ${selected!.name} from the place detail flow.'))),
-          ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.tonalIcon(
-            onPressed: state.pendingViewportSearch || state.loading ? null : () => controller.searchThisArea(),
-            icon: const Icon(Icons.travel_explore),
-            label: const Text('Search this area'),
+        Positioned(
+          top: 12,
+          left: 12,
+          right: 12,
+          child: Column(
+            children: [
+              DiscoverySearchBar(
+                controller: _searchController,
+                onSubmit: () => _searchForLocation(controller),
+                onRecenter: () => _handleCenterOnUserLocation(locationState, permissionService),
+                onOpenSortSheet: _openSortSheet,
+                isLoading: state.loading,
+                locationEnabled: location != null,
+                areaLabel: state.areaLabel ?? state.geoStatus,
+              ),
+              const SizedBox(height: 10),
+              DiscoveryFilterChips(
+                filters: filters,
+                selectedIds: state.selectedFilters,
+                onToggle: (filterId) => controller.toggleFilter(filterById[filterId]!),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 108,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: state.pins.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, index) {
-              final place = state.pins[index];
-              final distance = _distanceMeters(location?.lat, location?.lng, place.latitude, place.longitude);
-              return SizedBox(
-                width: 240,
-                child: AppCard(
-                  glow: false,
-                  gradient: selected?.canonicalPlaceId == place.canonicalPlaceId
-                      ? LinearGradient(
-                          colors: [
-                            theme.colorScheme.surfaceContainerHigh,
-                            theme.colorScheme.primary.withOpacity(0.10),
-                          ],
-                          stops: const [0, 1],
-                        )
-                      : null,
-                  child: ListTile(
-                    onTap: () {
-                      controller.selectPlace(place.canonicalPlaceId);
-                      _moveMapToPlace(place);
-                    },
-                    title: Text(place.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text('${place.categoryLabel} • ${distance != null && distance < 95 ? 'You’re here' : place.neighborhoodLabel}'),
-                  ),
-                ),
-              );
+        if (selected != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 158,
+            child: SelectedPlacePeekCard(
+              place: selected,
+              proximityState: _proximityFor(selected, location),
+              distanceMeters: _distanceMeters(location?.lat, location?.lng, selected.latitude, selected.longitude),
+              saved: _savedPlaceIds.contains(selected.canonicalPlaceId),
+              onOpenDetails: () => _openPlaceDetails(selected),
+              onOpenMaps: () => _openPlaceInMaps(linkLauncher, selected),
+              onSave: () => _toggleSave(selected),
+              onShare: () => _sharePlace(selected),
+            ),
+          ),
+        Positioned.fill(
+          top: MediaQuery.of(context).size.height * 0.36,
+          child: NearbyPlacesSheet(
+            places: visiblePlaces,
+            selectedPlaceId: selected?.canonicalPlaceId,
+            savedPlaceIds: _savedPlaceIds,
+            countLabel: _countLabel(visiblePlaces, state: state),
+            sort: state.sort,
+            onOpenSortSheet: _openSortSheet,
+            loading: state.loading && visiblePlaces.isNotEmpty,
+            collectionSummary: collectionSummary,
+            onPlaceSelected: (place) {
+              controller.selectPlace(place.canonicalPlaceId);
+              _moveMapToPlace(place);
             },
+            onOpenPlace: _openPlaceDetails,
+            onToggleSave: _toggleSave,
+            onReview: _openPlaceDetails,
+            onDirections: (place) => _openPlaceInMaps(linkLauncher, place),
+            onShare: _sharePlace,
+            distanceLabelFor: (place) => _distanceSummary(place, location),
+            badgesFor: _badgesFor,
+            permissionState: permissionBlocked
+                ? DiscoveryStateCard(
+                    icon: Icons.place_outlined,
+                    title: 'Nearby results need location',
+                    body: 'Enable location to sort what is closest, recenter instantly, and highlight places you can walk to right now.',
+                  )
+                : null,
+            errorState: state.discoveryError != null
+                ? DiscoveryStateCard(
+                    icon: Icons.cloud_off_outlined,
+                    title: 'Could not refresh this area',
+                    body: state.discoveryError!,
+                  )
+                : null,
+            emptyState: _emptyStateFor(
+              state: state,
+              locationState: locationState,
+              connectivityState: connectivityState,
+              noLocationAvailable: noLocationAvailable,
+              visiblePlaces: visiblePlaces,
+            ),
           ),
         ),
       ],
     );
+  }
+
+  Widget? _emptyStateFor({
+    required MapViewportState state,
+    required LocationControllerState locationState,
+    required ConnectivityState connectivityState,
+    required bool noLocationAvailable,
+    required List<MapPin> visiblePlaces,
+  }) {
+    if (!connectivityState.isOnline || _shouldShowPermissionOverlay(locationState) || state.discoveryError != null) {
+      return null;
+    }
+    if (state.loading) {
+      return const DiscoveryStateCard(
+        icon: Icons.radar_rounded,
+        title: 'Refreshing nearby places',
+        body: 'Scanning the visible area for the strongest nearby spots, creator activity, and recent reviews.',
+      );
+    }
+    if (noLocationAvailable && visiblePlaces.isEmpty) {
+      return const DiscoveryStateCard(
+        icon: Icons.my_location_outlined,
+        title: 'Location unavailable',
+        body: 'We could not get your current position yet. You can still pan the map and search any area manually.',
+      );
+    }
+    if (visiblePlaces.isEmpty && state.selectedFilters.isNotEmpty) {
+      return const DiscoveryStateCard(
+        icon: Icons.filter_alt_off_outlined,
+        title: 'No places match these filters',
+        body: 'Try removing a few filters or move the map to a busier part of town to widen discovery.',
+      );
+    }
+    if (visiblePlaces.isEmpty && _searchController.text.trim().isNotEmpty) {
+      return const DiscoveryStateCard(
+        icon: Icons.search_off_rounded,
+        title: 'No search results here',
+        body: 'That search did not surface any places in the visible area yet. Try another neighborhood or search this area after moving the map.',
+      );
+    }
+    if (visiblePlaces.isEmpty) {
+      return const DiscoveryStateCard(
+        icon: Icons.travel_explore_outlined,
+        title: 'No places found in this area',
+        body: 'Move the map, zoom out, or use a broader filter mix to discover more places around you.',
+      );
+    }
+    return null;
   }
 
   Future<void> _searchForLocation(MapDiscoveryController controller) async {
@@ -545,23 +641,31 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     return state.status == LocationStatus.permissionDenied || state.status == LocationStatus.serviceDisabled;
   }
 
-  bool _isMapBlocked(ConnectivityState connectivityState, LocationControllerState locationState, MapViewportState state) {
-    return !connectivityState.isOnline || _shouldShowPermissionOverlay(locationState) || state.discoveryError != null;
-  }
-
   void _maybeSyncMapViewport(MapViewport viewport) {
-    if (!_mapReady) {
-      return;
-    }
+    if (!_mapReady) return;
     final nextCenter = viewport.toLatLng();
     final centerChanged = _lastMapCenter == null || _lastMapCenter!.latitude != nextCenter.latitude || _lastMapCenter!.longitude != nextCenter.longitude;
     final zoomChanged = _lastMapZoom == null || (_lastMapZoom! - viewport.zoom).abs() > 0.01;
-    if (!centerChanged && !zoomChanged) {
-      return;
-    }
+    if (!centerChanged && !zoomChanged) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+    });
+  }
+
+  void _scheduleViewportRefresh({
+    required MapViewportState state,
+    required ConnectivityState connectivityState,
+    required bool permissionBlocked,
+  }) {
+    if (!state.pendingViewportSearch || state.loading || !connectivityState.isOnline || permissionBlocked) return;
+    if (_lastAutoSearchViewport != null && _lastAutoSearchViewport!.isSimilarTo(state.viewport)) return;
+    _viewportDebounce?.cancel();
+    _viewportDebounce = Timer(const Duration(milliseconds: 550), () async {
+      if (!mounted) return;
+      _lastAutoSearchViewport = state.viewport;
+      await ref.read(mapDiscoveryControllerProvider.notifier).searchThisArea(mode: 'search_this_area');
+      if (mounted) await ref.read(mapDiscoveryControllerProvider.notifier).refreshAreaLabel();
     });
   }
 
@@ -588,27 +692,40 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     _moveMap(state: ref.read(mapDiscoveryControllerProvider));
   }
 
-  List<Marker> _buildMarkers(BuildContext context, MapViewportState state, MapPin? selected, AppLocation? location) {
-    final markers = <Marker>[
-      for (final pin in state.pins)
+  List<Marker> _buildMarkers(BuildContext context, List<_MarkerPresentation> markers, MapPin? selected, AppLocation? location) {
+    final built = <Marker>[
+      for (final item in markers)
         Marker(
-          point: LatLng(pin.latitude, pin.longitude),
-          width: 72,
-          height: 72,
-          child: _PlaceMarker(
-            label: pin.name,
-            rating: pin.rating,
-            selected: selected?.canonicalPlaceId == pin.canonicalPlaceId,
-            onTap: () {
-              ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(pin.canonicalPlaceId);
-              _moveMapToPlace(pin);
-            },
-          ),
+          point: item.point,
+          width: item.isCluster ? 64 : 78,
+          height: item.isCluster ? 64 : 84,
+          child: item.isCluster
+              ? _ClusterMarker(
+                  count: item.places.length,
+                  highlighted: item.places.any((place) => place.canonicalPlaceId == selected?.canonicalPlaceId),
+                  onTap: () {
+                    final target = item.places.first;
+                    ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(target.canonicalPlaceId);
+                    _moveMapToPlace(target);
+                  },
+                )
+              : _PlaceMarker(
+                  label: item.places.first.name,
+                  rating: item.places.first.rating,
+                  selected: selected?.canonicalPlaceId == item.places.first.canonicalPlaceId,
+                  saved: _savedPlaceIds.contains(item.places.first.canonicalPlaceId),
+                  hasActivity: item.places.first.hasReviews || item.places.first.hasCreatorMedia,
+                  onTap: () {
+                    final pin = item.places.first;
+                    ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(pin.canonicalPlaceId);
+                    _moveMapToPlace(pin);
+                  },
+                ),
         ),
     ];
 
     if (location != null) {
-      markers.add(
+      built.add(
         Marker(
           point: LatLng(location.lat, location.lng),
           width: 28,
@@ -617,8 +734,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
         ),
       );
     }
-
-    return markers;
+    return built;
   }
 
   Future<void> _openPlaceInMaps(LinkLauncher linkLauncher, MapPin place) async {
@@ -636,6 +752,49 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
         builder: (_) => PlaceVideoDetailPage(placeId: place.canonicalPlaceId, placeName: place.name),
       ),
     );
+  }
+
+  void _toggleSave(MapPin place) {
+    setState(() {
+      if (!_savedPlaceIds.add(place.canonicalPlaceId)) {
+        _savedPlaceIds.remove(place.canonicalPlaceId);
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_savedPlaceIds.contains(place.canonicalPlaceId) ? '${place.name} saved.' : '${place.name} removed from saved places.')),
+    );
+  }
+
+  Future<void> _sharePlace(MapPin place) async {
+    await Share.share('Check out ${place.name} on Perbug: https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}');
+  }
+
+  Future<void> _openSortSheet() async {
+    final currentSort = ref.read(mapDiscoveryControllerProvider).sort;
+    final result = await showModalBottomSheet<MapDiscoverySort>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final sort in MapDiscoverySort.values)
+                RadioListTile<MapDiscoverySort>(
+                  value: sort,
+                  groupValue: currentSort,
+                  title: Text(_sortLabel(sort)),
+                  subtitle: Text(_sortDescription(sort)),
+                  onChanged: (value) => Navigator.of(context).pop(value),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+    if (result != null) {
+      ref.read(mapDiscoveryControllerProvider.notifier).setSort(result);
+    }
   }
 
   Future<void> _checkVisitReviewPrompt() async {
@@ -668,6 +827,148 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     );
   }
 
+  MapPin? _resolveSelectedPlace(MapViewportState state, List<MapPin> visiblePlaces) {
+    for (final place in visiblePlaces) {
+      if (place.canonicalPlaceId == state.selectedPlaceId) return place;
+    }
+    return visiblePlaces.isEmpty ? null : visiblePlaces.first;
+  }
+
+  List<MapPin> _sortedAndFilteredPlaces(List<MapPin> pins, {required MapViewportState state, required AppLocation? location}) {
+    Iterable<MapPin> filtered = pins;
+    for (final filterId in state.selectedFilters) {
+      final filter = filterById[filterId];
+      if (filter == null) continue;
+      filtered = filtered.where((pin) {
+        if (filter.openNowOnly && pin.openNow != true) return false;
+        if (filter.highlyRatedOnly && pin.rating < 0.72) return false;
+        if (filter.trendingOnly && !_isTrending(pin)) return false;
+        if (filter.minimumReviewCount != null && pin.reviewCount < filter.minimumReviewCount!) return false;
+        return true;
+      });
+    }
+
+    final places = filtered.toList(growable: false);
+    final sorted = [...places];
+    if (state.sort == MapDiscoverySort.distance) {
+      sorted.sort((a, b) => _distanceForSort(a, location).compareTo(_distanceForSort(b, location)));
+    } else if (state.sort == MapDiscoverySort.rating) {
+      sorted.sort((a, b) => b.rating.compareTo(a.rating));
+    } else if (state.sort == MapDiscoverySort.trending) {
+      sorted.sort((a, b) => _trendScore(b).compareTo(_trendScore(a)));
+    } else if (state.sort == MapDiscoverySort.activity) {
+      sorted.sort((a, b) => _activityScore(b).compareTo(_activityScore(a)));
+    } else {
+      sorted.sort((a, b) => _relevanceScore(b, location).compareTo(_relevanceScore(a, location)));
+    }
+    return sorted;
+  }
+
+  List<_MarkerPresentation> _clusterPlaces(List<MapPin> places, {required double zoom}) {
+    if (zoom >= 14.5 || places.length <= 8) {
+      return places
+          .map((place) => _MarkerPresentation(point: LatLng(place.latitude, place.longitude), places: [place]))
+          .toList(growable: false);
+    }
+
+    final bucketSize = zoom >= 13 ? 0.01 : zoom >= 11 ? 0.02 : 0.035;
+    final buckets = <String, List<MapPin>>{};
+    for (final place in places) {
+      final latBucket = (place.latitude / bucketSize).floor();
+      final lngBucket = (place.longitude / bucketSize).floor();
+      buckets.putIfAbsent('$latBucket:$lngBucket', () => <MapPin>[]).add(place);
+    }
+
+    return buckets.values.map((bucket) {
+      if (bucket.length == 1) {
+        final place = bucket.first;
+        return _MarkerPresentation(point: LatLng(place.latitude, place.longitude), places: [place]);
+      }
+      final avgLat = bucket.map((place) => place.latitude).reduce((a, b) => a + b) / bucket.length;
+      final avgLng = bucket.map((place) => place.longitude).reduce((a, b) => a + b) / bucket.length;
+      return _MarkerPresentation(point: LatLng(avgLat, avgLng), places: bucket);
+    }).toList(growable: false);
+  }
+
+  List<PlaceBadge> _badgesFor(MapPin place) {
+    final badges = <PlaceBadge>[];
+    if (_isTrending(place)) badges.add(const PlaceBadge(label: 'Trending', tone: MapBadgeTone.warning));
+    if (place.rating >= 0.82) badges.add(const PlaceBadge(label: 'Must try', tone: MapBadgeTone.brand));
+    if (place.reviewCount <= 6 && place.rating >= 0.75) badges.add(const PlaceBadge(label: 'Hidden gem', tone: MapBadgeTone.info));
+    if ((place.category.contains('park') || place.category.contains('museum')) && place.thumbnailUrl != null) {
+      badges.add(const PlaceBadge(label: 'Scenic', tone: MapBadgeTone.success));
+    }
+    if (place.reviewCount >= 10) badges.add(const PlaceBadge(label: 'Local favorite', tone: MapBadgeTone.brand));
+    if (place.hasCreatorMedia) badges.add(const PlaceBadge(label: 'Recent reviews nearby', tone: MapBadgeTone.info));
+    return badges;
+  }
+
+  bool _isTrending(MapPin place) => place.reviewCount >= 8 || place.creatorVideoCount >= 1;
+
+  double _relevanceScore(MapPin place, AppLocation? location) {
+    return place.rating * 0.55 + _activityScore(place) * 0.25 + (1 / max(_distanceForSort(place, location), 1)) * 1200;
+  }
+
+  double _activityScore(MapPin place) => place.reviewCount + (place.creatorVideoCount * 5) + (place.openNow == true ? 2 : 0);
+
+  double _trendScore(MapPin place) => (place.creatorVideoCount * 8) + place.reviewCount + (place.openNow == true ? 4 : 0) + place.rating * 5;
+
+  double _distanceForSort(MapPin place, AppLocation? location) {
+    return _distanceMeters(location?.lat, location?.lng, place.latitude, place.longitude) ?? (place.distanceMeters ?? 999999);
+  }
+
+  String _countLabel(List<MapPin> visiblePlaces, {required MapViewportState state}) {
+    final sortLabel = _sortLabel(state.sort);
+    final filterText = state.selectedFilters.isEmpty ? 'All places' : '${state.selectedFilters.length} filters active';
+    return '${visiblePlaces.length} places in this area • Sorted by $sortLabel • $filterText';
+  }
+
+  PlaceProximityState _proximityFor(MapPin place, AppLocation? location) {
+    final distance = _distanceMeters(location?.lat, location?.lng, place.latitude, place.longitude);
+    if (distance == null) return PlaceProximityState.unknown;
+    if (distance <= 90) return PlaceProximityState.here;
+    if (distance <= 240) return PlaceProximityState.nearby;
+    return PlaceProximityState.unknown;
+  }
+
+  String? _distanceSummary(MapPin place, AppLocation? location) {
+    final distance = _distanceMeters(location?.lat, location?.lng, place.latitude, place.longitude) ?? place.distanceMeters;
+    if (distance == null) return null;
+    if (distance < 120) return 'Here now';
+    if (distance < 1000) return '${distance.round()} m';
+    return '${(distance / 1000).toStringAsFixed(1)} km';
+  }
+
+  static String _sortLabel(MapDiscoverySort sort) {
+    switch (sort) {
+      case MapDiscoverySort.distance:
+        return 'distance';
+      case MapDiscoverySort.rating:
+        return 'rating';
+      case MapDiscoverySort.trending:
+        return 'trending';
+      case MapDiscoverySort.activity:
+        return 'activity';
+      case MapDiscoverySort.relevance:
+        return 'relevance';
+    }
+  }
+
+  static String _sortDescription(MapDiscoverySort sort) {
+    switch (sort) {
+      case MapDiscoverySort.distance:
+        return 'Prioritize what is closest to you or the current map center.';
+      case MapDiscoverySort.rating:
+        return 'Push the strongest-rated places to the top first.';
+      case MapDiscoverySort.trending:
+        return 'Highlight places with fresh activity and creator momentum.';
+      case MapDiscoverySort.activity:
+        return 'Surface the busiest places with reviews and recent content.';
+      case MapDiscoverySort.relevance:
+        return 'Blend quality, proximity, and activity for the best overall discovery.';
+    }
+  }
+
   double? _distanceMeters(double? fromLat, double? fromLng, double toLat, double toLng) {
     if (fromLat == null || fromLng == null) return null;
     const earthRadiusMeters = 6371000.0;
@@ -682,17 +983,30 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   double _toRadians(double value) => value * 3.1415926535897932 / 180;
 }
 
+class _MarkerPresentation {
+  const _MarkerPresentation({required this.point, required this.places});
+
+  final LatLng point;
+  final List<MapPin> places;
+
+  bool get isCluster => places.length > 1;
+}
+
 class _PlaceMarker extends StatelessWidget {
   const _PlaceMarker({
     required this.label,
     required this.rating,
     required this.selected,
+    required this.saved,
+    required this.hasActivity,
     required this.onTap,
   });
 
   final String label;
   final double rating;
   final bool selected;
+  final bool saved;
+  final bool hasActivity;
   final VoidCallback onTap;
 
   @override
@@ -703,44 +1017,110 @@ class _PlaceMarker extends StatelessWidget {
 
     return Align(
       alignment: Alignment.topCenter,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            constraints: const BoxConstraints(minWidth: 52, maxWidth: 120),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.18),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-              border: Border.all(color: theme.colorScheme.outlineVariant),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.place, size: 20, color: foregroundColor),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(color: foregroundColor, fontWeight: FontWeight.w700),
-                ),
-                if (rating > 0)
-                  Text(
-                    '★ ${rating.toStringAsFixed(1)}',
-                    style: theme.textTheme.labelSmall?.copyWith(color: foregroundColor.withOpacity(0.92)),
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 180),
+        scale: selected ? 1.05 : 1,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 58, maxWidth: 124),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: (selected ? theme.colorScheme.primary : Colors.black).withOpacity(selected ? 0.28 : 0.18),
+                    blurRadius: selected ? 18 : 12,
+                    offset: const Offset(0, 6),
                   ),
-              ],
+                ],
+                border: Border.all(color: selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(Icons.location_on_rounded, size: 22, color: foregroundColor),
+                      if (saved)
+                        Positioned(
+                          right: -4,
+                          top: -2,
+                          child: Icon(Icons.bookmark_rounded, size: 12, color: foregroundColor),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(color: foregroundColor, fontWeight: FontWeight.w800),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (hasActivity) ...[
+                        Icon(Icons.bolt_rounded, size: 11, color: foregroundColor.withOpacity(0.92)),
+                        const SizedBox(width: 2),
+                      ],
+                      if (rating > 0)
+                        Text(
+                          '★ ${rating.toStringAsFixed(1)}',
+                          style: theme.textTheme.labelSmall?.copyWith(color: foregroundColor.withOpacity(0.92)),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClusterMarker extends StatelessWidget {
+  const _ClusterMarker({required this.count, required this.highlighted, required this.onTap});
+
+  final int count;
+  final bool highlighted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(32),
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: highlighted ? theme.colorScheme.primary : theme.colorScheme.surface,
+            border: Border.all(color: highlighted ? theme.colorScheme.primary : theme.colorScheme.outlineVariant, width: 2),
+            boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 16, offset: Offset(0, 8))],
+          ),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.hub_rounded, color: highlighted ? theme.colorScheme.onPrimary : theme.colorScheme.primary),
+              Text(
+                '$count',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: highlighted ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -763,78 +1143,6 @@ class _UserLocationMarker extends StatelessWidget {
         ],
       ),
       child: const SizedBox.expand(),
-    );
-  }
-}
-
-class _MapStatusOverlay extends StatelessWidget {
-  const _MapStatusOverlay({required this.message, required this.icon});
-
-  final String message;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ColoredBox(
-      color: theme.colorScheme.surface.withOpacity(0.78),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 32),
-              const SizedBox(height: 12),
-              Text(message, textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MapActionOverlay extends StatelessWidget {
-  const _MapActionOverlay({
-    required this.title,
-    required this.body,
-    required this.icon,
-    required this.actions,
-  });
-
-  final String title;
-  final String body;
-  final IconData icon;
-  final List<Widget> actions;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ColoredBox(
-      color: theme.colorScheme.surface.withOpacity(0.82),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 320),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 36),
-                  const SizedBox(height: 12),
-                  Text(title, textAlign: TextAlign.center, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  Text(body, textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                  Wrap(alignment: WrapAlignment.center, spacing: 12, runSpacing: 12, children: actions),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
