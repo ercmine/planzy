@@ -1,0 +1,18 @@
+[package]
+name = "perbug-tipping-program"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+borsh.workspace = true
+solana-program.workspace = true
+thiserror.workspace = true
+perbug-common = { path = "../perbug-common" }
+
+[dev-dependencies]
+solana-sdk.workspace = true
