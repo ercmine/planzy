@@ -14,11 +14,21 @@ class RewardClaimSummary {
 }
 
 class RewardReviewSummary {
-  RewardReviewSummary({required this.id, required this.rewardStatus, this.finalRewardAmount});
+  RewardReviewSummary({required this.id, required this.rewardStatus, this.finalRewardAmount, this.rewardPosition});
   final String id;
   final String rewardStatus;
-  final double? finalRewardAmount;
-  factory RewardReviewSummary.fromJson(Map<String, dynamic> json) => RewardReviewSummary(id: (json['id'] ?? '').toString(), rewardStatus: (json['rewardStatus'] ?? '').toString(), finalRewardAmount: parseDouble(json['finalRewardAmount']));
+  final String? finalRewardAmount;
+  final int? rewardPosition;
+
+  factory RewardReviewSummary.fromJson(Map<String, dynamic> json) {
+    final reward = (json['reward'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+    return RewardReviewSummary(
+      id: (json['id'] ?? '').toString(),
+      rewardStatus: (reward['status'] ?? json['rewardStatus'] ?? '').toString(),
+      finalRewardAmount: reward['finalAmountAtomic']?.toString() ?? json['finalRewardAmount']?.toString(),
+      rewardPosition: parseInt(reward['rewardPosition'] ?? json['rewardPosition']),
+    );
+  }
 }
 
 class RewardOverviewItem {

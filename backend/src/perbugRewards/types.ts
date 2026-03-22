@@ -1,21 +1,21 @@
 export type RewardQualityRating = "low" | "standard" | "high" | "featured";
-export type ReviewRewardStatus = "ineligible" | "eligible" | "queued" | "claimable" | "claimed" | "blocked";
+export type ReviewRewardStatus = "ineligible" | "eligible" | "claimable" | "claiming" | "claimed" | "blocked" | "failed";
 export type ReviewLifecycleStatus = "pending" | "approved" | "rejected" | "removed";
 export type ClaimStatus = "pending" | "submitted" | "confirmed" | "failed" | "canceled";
 
-export interface RewardTier {
+export interface PerbugRewardTier {
   id: string;
-  name: string;
   startPosition: number;
   endPosition: number | null;
-  tokenAmount: number;
+  baseAmountAtomic: bigint;
+  baseAmountDisplay: string;
   active: boolean;
-  createdAt: string;
 }
 
 export interface PlaceRewardState {
   placeId: string;
   approvedRewardedReviewCount: number;
+  rewardsEnabled: boolean;
   updatedAt: string;
 }
 
@@ -29,29 +29,36 @@ export interface WalletRecord {
   createdAt: string;
 }
 
-export interface RewardEligibilityRecord {
+export interface WalletNonce {
   id: string;
-  reviewId: string;
-  userId: string;
-  placeId: string;
-  isDuplicate: boolean;
-  isSpam: boolean;
-  isGeoVerified: boolean;
-  policyPassed: boolean;
-  distinctRewardSlot: string;
-  ruleVersion: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
+  publicKey: string;
+  nonce: string;
+  message: string;
+  issuedAt: string;
+  expiresAt: string;
+  consumedAt?: string;
+  cluster: string;
 }
 
-export interface ModerationFlagRecord {
-  id: string;
+export interface WalletSessionBinding {
+  userId: string;
+  publicKey: string;
+  chain: "solana";
+  verifiedAt: string;
+  isPrimary: boolean;
+}
+
+export interface RewardEligibilityRecord {
   reviewId: string;
-  flagType: string;
-  severity: "low" | "medium" | "high";
-  details: Record<string, unknown>;
-  createdAt: string;
+  duplicateBlocked: boolean;
+  spamBlocked: boolean;
+  policyBlocked: boolean;
+  geoVerified?: boolean;
+  oneRewardPerCreatorPerPlaceBlocked: boolean;
+  moderationApproved: boolean;
+  contentHash?: string;
+  notes?: string;
+  updatedAt: string;
 }
 
 export interface AdminAuditLogRecord {
@@ -85,35 +92,47 @@ export interface RewardClaimRecord {
   updatedAt: string;
 }
 
-export interface WalletLoginNonceRecord {
+export interface PerbugReviewReward {
   id: string;
-  publicKey: string;
-  nonce: string;
-  issuedAt: string;
-  expiresAt: string;
-  consumedAt?: string;
+  reviewId: string;
+  videoId?: string;
+  userId: string;
+  creatorProfileId?: string;
+  placeId: string;
+  rewardPosition?: number;
+  qualityRating: RewardQualityRating;
+  baseAmountAtomic?: bigint;
+  finalAmountAtomic?: bigint;
+  status: ReviewRewardStatus;
+  claimWalletPublicKey?: string;
+  claimTransactionSignature?: string;
+  reasonCode?: string;
   createdAt: string;
+  updatedAt: string;
+  claimedAt?: string;
 }
 
 export interface RewardReviewRecord {
   id: string;
+  reviewId: string;
   userId: string;
   placeId: string;
+  videoId?: string;
   videoUrl: string;
   contentHash: string;
   status: ReviewLifecycleStatus;
   moderationStatus: "pending" | "approved" | "rejected" | "blocked";
   qualityRating: RewardQualityRating;
-  rewardStatus: ReviewRewardStatus;
-  rewardPosition?: number;
-  baseRewardAmount?: number;
-  finalRewardAmount?: number;
+  reward: PerbugReviewReward;
   approvalTimestamp?: string;
-  createdAt: string;
-  updatedAt: string;
   distinctRewardSlot: string;
   adminDistinctRewardSlotEnabled: boolean;
   rewardBlockedReason?: string;
+  rewardStatus?: ReviewRewardStatus;
+  rewardPosition?: number;
+  finalRewardAmount?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PlaceRecord {
@@ -158,7 +177,8 @@ export interface RewardPreview {
   nextRewardPosition: number;
   nextBaseRewardAmount: number;
   rewardText: string;
-  ladder: RewardTier[];
+  ladder: PerbugRewardTier[];
+  approvedRewardedReviewCount: number;
 }
 
 export interface SolanaTransferResult {
@@ -177,8 +197,8 @@ export interface SolanaClaimsAdapter {
 }
 
 export interface PerbugRewardsStore {
-  listRewardTiers(): RewardTier[];
-  saveRewardTier(tier: RewardTier): void;
+  listRewardTiers(): PerbugRewardTier[];
+  saveRewardTier(tier: PerbugRewardTier): void;
   listPlaces(): PlaceRecord[];
   getPlace(placeId: string): PlaceRecord | null;
   savePlace(place: PlaceRecord): void;
@@ -197,10 +217,8 @@ export interface PerbugRewardsStore {
   listWalletsForUser(userId: string): WalletRecord[];
   getWalletByPublicKey(publicKey: string): WalletRecord | null;
   saveWallet(wallet: WalletRecord): void;
-  listWalletNonces(publicKey: string): WalletLoginNonceRecord[];
-  saveWalletNonce(record: WalletLoginNonceRecord): void;
-  listModerationFlags(reviewId: string): ModerationFlagRecord[];
-  addModerationFlag(flag: ModerationFlagRecord): void;
+  listWalletNonces(publicKey: string): WalletNonce[];
+  saveWalletNonce(record: WalletNonce): void;
   listAuditLogs(): AdminAuditLogRecord[];
   addAuditLog(log: AdminAuditLogRecord): void;
 }

@@ -5,7 +5,7 @@ export type MonetizationReasonCode = "creator_profile_missing" | "creator_not_ac
 export type PayoutReadinessStatus = "not_started" | "pending" | "ready" | "blocked";
 export type ComplianceReadinessStatus = "not_started" | "pending" | "ready" | "blocked";
 
-export type MonetizationCapability = "canReceiveTips" | "canPublishPremiumContent" | "canBeFeatured" | "canAccessHigherUploadLimits" | "canOfferSubscriptionsFuture" | "canAccessCreatorAnalyticsPremium" | "canUploadExtendedVideo" | "canCreatePremiumGuides";
+export type MonetizationCapability = "canReceiveTips" | "canReceivePerbugTips" | "canClaimPerbugRewards" | "canPublishPremiumContent" | "canBeFeatured" | "canAccessHigherUploadLimits" | "canOfferSubscriptionsFuture" | "canAccessCreatorAnalyticsPremium" | "canUploadExtendedVideo" | "canCreatePremiumGuides";
 
 export interface CreatorMonetizationProfile {
   id: string;
@@ -30,6 +30,12 @@ export interface CreatorMonetizationProfile {
 
 export type TipStatus = "intent_created" | "pending" | "succeeded" | "failed" | "canceled" | "refunded";
 export interface TipIntent {
+  chain?: "fiat" | "solana";
+  amountAtomic?: string;
+  tokenMintAddress?: string;
+  senderWalletPublicKey?: string;
+  recipientWalletPublicKey?: string;
+  transactionSignature?: string;
   id: string;
   senderUserId: string;
   creatorUserId: string;
