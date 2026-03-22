@@ -20,15 +20,15 @@ class CreatorRewardsPage extends ConsumerWidget {
               child: ListTile(
                 title: Text('${data.claimableDisplay} PERBUG claimable'),
                 subtitle: Text('Claimed: ${data.claimedDisplay} PERBUG · Pending reviews: ${data.pendingCount}'),
-                trailing: Text(data.walletPublicKey == null ? 'Connect Phantom to claim PERBUG' : _mask(data.walletPublicKey!)),
+                trailing: Text(data.walletPublicKey == null ? 'Connect Phantom to claim' : _mask(data.walletPublicKey!)),
               ),
             ),
             const SizedBox(height: AppSpacing.m),
             Text('Claimable rewards', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.s),
             if (data.claimable.isEmpty)
-              const Card(child: ListTile(title: Text('No claimable rewards yet'), subtitle: Text('Your review was approved and is now claimable once it passes moderation and wallet auth.'))),
-            ...data.claimable.map((item) => Card(child: ListTile(title: Text(item.place.name), subtitle: Text('Status: ${item.review.rewardStatus}'), trailing: Text('${item.review.finalRewardAmount ?? 0} PERBUG')))),
+              const Card(child: ListTile(title: Text('No claimable rewards yet'), subtitle: Text('Approved reviews become claimable after moderation and wallet verification.'))),
+            ...data.claimable.map((item) => Card(child: ListTile(title: Text(item.place.name), subtitle: Text('Status: ${item.review.rewardStatus} · Position #${item.review.rewardPosition ?? '-'}'), trailing: Text(item.review.finalRewardAmount ?? '0')))),
             const SizedBox(height: AppSpacing.m),
             Text('Reward history', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.s),

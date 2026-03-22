@@ -88,6 +88,8 @@ import type { GamificationControlService } from "../gamificationControl/service.
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
 import { createPerbugRewardsHttpHandlers } from "../perbugRewards/http.js";
 import type { PerbugRewardsService } from "../perbugRewards/service.js";
+import { createPerbugTipsHttpHandlers } from "../perbugTips/http.js";
+import type { PerbugTipsService } from "../perbugTips/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -173,6 +175,7 @@ export function createRoutes(
     socialGamificationService?: SocialGamificationService;
     gamificationControlService?: GamificationControlService;
     perbugRewardsService?: PerbugRewardsService;
+    perbugTipsService?: PerbugTipsService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -205,6 +208,7 @@ export function createRoutes(
   const socialGamificationHandlers = deps?.socialGamificationService ? createSocialGamificationHttpHandlers(deps.socialGamificationService) : null;
   const gamificationControlHandlers = deps?.gamificationControlService ? createGamificationControlHttpHandlers(deps.gamificationControlService) : null;
   const perbugRewardsHandlers = deps?.perbugRewardsService ? createPerbugRewardsHttpHandlers(deps.perbugRewardsService) : null;
+  const perbugTipsHandlers = deps?.perbugTipsService ? createPerbugTipsHttpHandlers(deps.perbugTipsService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -286,6 +290,26 @@ export function createRoutes(
         return;
       }
 
+      if (req.method === "POST" && normalizedPath === "/v1/wallets/primary" && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.setPrimaryWallet(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/wallets" && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.listWallets(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/rewards/tiers" && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.rewardTiers(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/rewards/me" && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.dashboard(req, res);
+        return;
+      }
+
       if (req.method === "GET" && normalizedPath === "/v1/admin/reward-tiers" && perbugRewardsHandlers) {
         await perbugRewardsHandlers.rewardTiers(req, res);
         return;
@@ -319,9 +343,49 @@ export function createRoutes(
         return;
       }
 
-      const claimMatch = /^\/v1\/rewards\/reviews\/([^/]+)\/claim$/.exec(normalizedPath);
+      const claimMatch = /^\/v1\/(?:rewards\/reviews|perbug\/rewards)\/([^/]+)\/claim$/.exec(normalizedPath);
       if (req.method === "POST" && claimMatch && perbugRewardsHandlers) {
         await perbugRewardsHandlers.claim(req, res, decodeURIComponent(claimMatch[1]));
+        return;
+      }
+
+      const nextRewardMatch = /^\/v1\/perbug\/rewards\/places\/([^/]+)\/next$/.exec(normalizedPath);
+      if (req.method === "GET" && nextRewardMatch && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.preview(req, res, decodeURIComponent(nextRewardMatch[1]));
+        return;
+      }
+
+      const videoTipIntentMatch = /^\/v1\/perbug\/tips\/videos\/([^/]+)\/intents$/.exec(normalizedPath);
+      if (req.method === "POST" && videoTipIntentMatch && perbugTipsHandlers) {
+        await perbugTipsHandlers.createIntent(req, res, decodeURIComponent(videoTipIntentMatch[1]));
+        return;
+      }
+
+      const videoTipSubmitMatch = /^\/v1\/perbug\/tips\/([^/]+)\/submit$/.exec(normalizedPath);
+      if (req.method === "POST" && videoTipSubmitMatch && perbugTipsHandlers) {
+        await perbugTipsHandlers.submit(req, res, decodeURIComponent(videoTipSubmitMatch[1]));
+        return;
+      }
+
+      const videoTipsListMatch = /^\/v1\/perbug\/tips\/videos\/([^/]+)$/.exec(normalizedPath);
+      if (req.method === "GET" && videoTipsListMatch && perbugTipsHandlers) {
+        await perbugTipsHandlers.listVideo(req, res, decodeURIComponent(videoTipsListMatch[1]));
+        return;
+      }
+
+      const creatorTipsSummaryMatch = /^\/v1\/perbug\/tips\/creator\/([^/]+)\/summary$/.exec(normalizedPath);
+      if (req.method === "GET" && creatorTipsSummaryMatch && perbugTipsHandlers) {
+        await perbugTipsHandlers.creatorSummary(req, res, decodeURIComponent(creatorTipsSummaryMatch[1]));
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/tips/me/sent" && perbugTipsHandlers) {
+        await perbugTipsHandlers.sent(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/tips/me/received" && perbugTipsHandlers) {
+        await perbugTipsHandlers.received(req, res);
         return;
       }
 

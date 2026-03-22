@@ -66,6 +66,7 @@ import { CollectionsService, MemoryCollectionStore } from "../collections/index.
 import { MemorySocialGamificationStore, SocialGamificationService } from "../socialGamification/index.js";
 import { GamificationControlService, MemoryGamificationControlStore } from "../gamificationControl/index.js";
 import { MemoryPerbugRewardsStore, PerbugRewardsService } from "../perbugRewards/index.js";
+import { MemoryPerbugTipsStore, PerbugTipsService } from "../perbugTips/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -243,6 +244,10 @@ export function createServer(options?: CreateServerOptions) {
   const perbugRewardsService = new PerbugRewardsService(new MemoryPerbugRewardsStore());
   perbugRewardsService.createPlace({ id: "place-1", name: "Perbug Test Cafe" });
   perbugRewardsService.createPlace({ id: "place-2", name: "Perbug Arcade" });
+  const perbugTipsService = new PerbugTipsService(new MemoryPerbugTipsStore(), {
+    getVideo: (videoId) => videoPlatformService?.getVideoById(videoId),
+    getPrimaryWallet: (userId) => perbugRewardsService.listWallets(userId).find((wallet) => wallet.isPrimary)
+  });
   gamificationControlService.seedInitialRules("system");
 
   return createHttpServer(service, merchantService, {
@@ -293,7 +298,8 @@ export function createServer(options?: CreateServerOptions) {
     collectionsService,
     socialGamificationService,
     gamificationControlService,
-    perbugRewardsService
+    perbugRewardsService,
+    perbugTipsService
   });
 }
 

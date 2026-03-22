@@ -40,6 +40,7 @@ import type { CollectionsService } from "../collections/service.js";
 import type { SocialGamificationService } from "../socialGamification/service.js";
 import type { GamificationControlService } from "../gamificationControl/service.js";
 import type { PerbugRewardsService } from "../perbugRewards/service.js";
+import type { PerbugTipsService } from "../perbugTips/service.js";
 import { createRoutes } from "./routes.js";
 
 export function matchPath(pattern: string, pathname: string): Record<string, string> | null {
@@ -113,6 +114,7 @@ export function createHttpServer(
     socialGamificationService?: SocialGamificationService;
     gamificationControlService?: GamificationControlService;
     perbugRewardsService?: PerbugRewardsService;
+    perbugTipsService?: PerbugTipsService;
   }
 ): Server {
   const route = createRoutes(service, merchantService, deps);
