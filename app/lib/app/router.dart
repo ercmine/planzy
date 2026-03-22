@@ -17,6 +17,7 @@ import '../features/onboarding/onboarding_location_page.dart';
 import '../features/onboarding/onboarding_discovery_page.dart';
 import '../features/place_review_editor/place_review_video_editor_screen.dart';
 import '../features/results/results_page.dart';
+import '../features/rewards/creator_rewards_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/sessions/create_session/create_session_page.dart';
 import '../features/sessions/join_session/join_session_page.dart';
@@ -153,6 +154,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           }
           return const RoleHubPage(family: 'USER');
         },
+      ),
+      GoRoute(
+        path: '/creator/rewards',
+        name: 'creator-rewards',
+        builder: (context, state) => const CreatorRewardsPage(),
       ),
       GoRoute(
         path: '/settings',

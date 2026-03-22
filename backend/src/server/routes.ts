@@ -86,6 +86,8 @@ import type { SocialGamificationService } from "../socialGamification/service.js
 import { createGamificationControlHttpHandlers } from "../gamificationControl/http.js";
 import type { GamificationControlService } from "../gamificationControl/service.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
+import { createPerbugRewardsHttpHandlers } from "../perbugRewards/http.js";
+import type { PerbugRewardsService } from "../perbugRewards/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -170,6 +172,7 @@ export function createRoutes(
     collectionsService?: CollectionsService;
     socialGamificationService?: SocialGamificationService;
     gamificationControlService?: GamificationControlService;
+    perbugRewardsService?: PerbugRewardsService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -201,6 +204,7 @@ export function createRoutes(
   const collectionsHandlers = deps?.collectionsService ? createCollectionsHttpHandlers(deps.collectionsService) : null;
   const socialGamificationHandlers = deps?.socialGamificationService ? createSocialGamificationHttpHandlers(deps.socialGamificationService) : null;
   const gamificationControlHandlers = deps?.gamificationControlService ? createGamificationControlHttpHandlers(deps.gamificationControlService) : null;
+  const perbugRewardsHandlers = deps?.perbugRewardsService ? createPerbugRewardsHttpHandlers(deps.perbugRewardsService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -264,6 +268,60 @@ export function createRoutes(
 
       if (req.method === "GET" && normalizedPath === "/v1/collections" && collectionsHandlers) {
         await collectionsHandlers.list(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/wallet-auth/nonce" && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.createWalletNonce(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/wallet-auth/verify" && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.verifyWalletLogin(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/creator/rewards/dashboard" && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.dashboard(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/reward-tiers" && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.rewardTiers(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/admin/rewards/audit-logs" && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.auditLogs(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/reviews" && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.submitReview(req, res);
+        return;
+      }
+
+      const previewMatch = /^\/(?:v1\/)?places\/([^/]+)\/reward-preview$/.exec(normalizedPath);
+      if (req.method === "GET" && previewMatch && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.preview(req, res, decodeURIComponent(previewMatch[1]));
+        return;
+      }
+
+      const approveMatch = /^\/v1\/admin\/reviews\/([^/]+)\/approve$/.exec(normalizedPath);
+      if (req.method === "POST" && approveMatch && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.approveReview(req, res, decodeURIComponent(approveMatch[1]));
+        return;
+      }
+
+      const rejectMatch = /^\/v1\/admin\/reviews\/([^/]+)\/reject$/.exec(normalizedPath);
+      if (req.method === "POST" && rejectMatch && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.rejectReview(req, res, decodeURIComponent(rejectMatch[1]));
+        return;
+      }
+
+      const claimMatch = /^\/v1\/rewards\/reviews\/([^/]+)\/claim$/.exec(normalizedPath);
+      if (req.method === "POST" && claimMatch && perbugRewardsHandlers) {
+        await perbugRewardsHandlers.claim(req, res, decodeURIComponent(claimMatch[1]));
         return;
       }
 

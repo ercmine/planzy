@@ -187,6 +187,21 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
           AppSectionCard(
+            title: 'Creator rewards',
+            icon: Icons.token_outlined,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Track claimable PERBUG, review reward status, and open the claim dashboard.'),
+                const SizedBox(height: AppSpacing.s),
+                FilledButton.tonal(
+                  onPressed: () => context.go('/creator/rewards'),
+                  child: const Text('Open creator earnings dashboard'),
+                ),
+              ],
+            ),
+          ),
+          AppSectionCard(
             title: 'Support',
             icon: Icons.support_agent,
             child: Wrap(
