@@ -67,6 +67,7 @@ import { MemorySocialGamificationStore, SocialGamificationService } from "../soc
 import { GamificationControlService, MemoryGamificationControlStore } from "../gamificationControl/index.js";
 import { MemoryPerbugRewardsStore, PerbugRewardsService } from "../perbugRewards/index.js";
 import { MemoryPerbugTipsStore, PerbugTipsService } from "../perbugTips/index.js";
+import { CompetitionService, MemoryCompetitionStore } from "../competition/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -248,6 +249,10 @@ export function createServer(options?: CreateServerOptions) {
     getVideo: (videoId) => videoPlatformService?.getVideoById(videoId),
     getPrimaryWallet: (userId) => perbugRewardsService.listWallets(userId).find((wallet) => wallet.isPrimary)
   });
+  const competitionService = new CompetitionService(new MemoryCompetitionStore(), perbugRewardsService);
+  competitionService.recordVideoPublished({ videoId: "video_seed_1", reviewId: "review_seed_1", userId: "u1", publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), city: "Bloomington", category: "coffee", canonicalPlaceId: "place-1" });
+  competitionService.recordApprovedReview({ id: "review_event_1", reviewId: "review_seed_1", videoId: "video_seed_1", userId: "u1", canonicalPlaceId: "place-1", approvedAt: new Date().toISOString(), city: "Bloomington", category: "coffee", discoveryType: "first_review", approved: true, blocked: false });
+  competitionService.recordLike({ id: "like_seed_1", videoId: "video_seed_1", userId: "fan_1", createdAt: new Date().toISOString(), valid: true, bannedUser: false, blockedUser: false, fraudFlagged: false });
   gamificationControlService.seedInitialRules("system");
 
   return createHttpServer(service, merchantService, {
@@ -299,7 +304,8 @@ export function createServer(options?: CreateServerOptions) {
     socialGamificationService,
     gamificationControlService,
     perbugRewardsService,
-    perbugTipsService
+    perbugTipsService,
+    competitionService
   });
 }
 

@@ -133,3 +133,5 @@ export * from "./accomplishments/index.js";
 export * from "./challenges/index.js";
 
 export * from "./leaderboards/index.js";
+
+export * from "./competition/index.js";

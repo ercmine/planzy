@@ -8,6 +8,7 @@ export const docsNav: DocsNavItem[] = [
   { title: 'Introduction', href: '/docs/' },
   { title: 'Getting Started', href: '/docs/getting-started/' },
   { title: 'FAQ', href: '/docs/faq/' },
+  { title: 'Competition', href: '/docs/competition/' },
   {
     title: 'API',
     href: '/docs/api/overview/',
