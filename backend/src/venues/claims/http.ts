@@ -29,7 +29,7 @@ export async function parseJsonBody(req: IncomingMessage): Promise<unknown> {
 export function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status;
   res.setHeader("content-type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(body));
+  res.end(JSON.stringify(body, (_key, value) => typeof value === "bigint" ? value.toString() : value));
 }
 
 export function readHeader(req: IncomingMessage, name: string): string | undefined {
