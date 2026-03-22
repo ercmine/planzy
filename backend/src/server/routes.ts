@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { matchPath } from "./httpServer.js";
+
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import { createAccountsHttpHandlers } from "../accounts/http.js";
 import { createDiscoveryHttpHandlers } from "../discovery/http.js";
@@ -90,6 +92,8 @@ import { createPerbugRewardsHttpHandlers } from "../perbugRewards/http.js";
 import type { PerbugRewardsService } from "../perbugRewards/service.js";
 import { createPerbugTipsHttpHandlers } from "../perbugTips/http.js";
 import type { PerbugTipsService } from "../perbugTips/service.js";
+import { createCompetitionHttpHandlers } from "../competition/http.js";
+import type { CompetitionService } from "../competition/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -176,6 +180,7 @@ export function createRoutes(
     gamificationControlService?: GamificationControlService;
     perbugRewardsService?: PerbugRewardsService;
     perbugTipsService?: PerbugTipsService;
+    competitionService?: CompetitionService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -209,6 +214,7 @@ export function createRoutes(
   const gamificationControlHandlers = deps?.gamificationControlService ? createGamificationControlHttpHandlers(deps.gamificationControlService) : null;
   const perbugRewardsHandlers = deps?.perbugRewardsService ? createPerbugRewardsHttpHandlers(deps.perbugRewardsService) : null;
   const perbugTipsHandlers = deps?.perbugTipsService ? createPerbugTipsHttpHandlers(deps.perbugTipsService) : null;
+  const competitionHandlers = deps?.competitionService ? createCompetitionHttpHandlers(deps.competitionService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -244,6 +250,75 @@ export function createRoutes(
     try {
 
 
+
+
+      if (req.method === "GET" && normalizedPath === "/v1/competition/home" && competitionHandlers) {
+        await competitionHandlers.home(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/competition/missions" && competitionHandlers) {
+        await competitionHandlers.missions(req, res);
+        return;
+      }
+      const missionProgressMatch = matchPath("/v1/competition/missions/:missionId/progress", normalizedPath);
+      if (req.method === "GET" && missionProgressMatch && competitionHandlers) {
+        await competitionHandlers.missionProgress(req, res, missionProgressMatch.missionId);
+        return;
+      }
+      const missionClaimMatch = matchPath("/v1/competition/missions/:missionId/claim", normalizedPath);
+      if (req.method === "POST" && missionClaimMatch && competitionHandlers) {
+        await competitionHandlers.claimMission(req, res, missionClaimMatch.missionId);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/competition/leaderboards" && competitionHandlers) {
+        await competitionHandlers.leaderboards(req, res);
+        return;
+      }
+      const leaderboardMatch = matchPath("/v1/competition/leaderboards/:leaderboardId", normalizedPath);
+      if (req.method === "GET" && leaderboardMatch && competitionHandlers) {
+        await competitionHandlers.leaderboard(req, res, leaderboardMatch.leaderboardId);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/competition/rewards/me" && competitionHandlers) {
+        await competitionHandlers.myRewards(req, res);
+        return;
+      }
+      const rewardClaimMatch = matchPath("/v1/competition/rewards/:rewardId/claim", normalizedPath);
+      if (req.method === "POST" && rewardClaimMatch && competitionHandlers) {
+        await competitionHandlers.claimReward(req, res, rewardClaimMatch.rewardId);
+        return;
+      }
+      const qualityMatch = matchPath("/v1/competition/videos/:videoId/quality", normalizedPath);
+      if (req.method === "GET" && qualityMatch && competitionHandlers) {
+        await competitionHandlers.videoQuality(req, res, qualityMatch.videoId);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/competition/seasons/current" && competitionHandlers) {
+        await competitionHandlers.season(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/competition/missions" && competitionHandlers) {
+        await competitionHandlers.adminCreateMission(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/competition/leaderboards" && competitionHandlers) {
+        await competitionHandlers.adminCreateLeaderboard(req, res);
+        return;
+      }
+      const adminBlockRewardMatch = matchPath("/v1/admin/competition/rewards/:rewardId/block", normalizedPath);
+      if (req.method === "POST" && adminBlockRewardMatch && competitionHandlers) {
+        await competitionHandlers.adminBlockReward(req, res, adminBlockRewardMatch.rewardId);
+        return;
+      }
+      const adminRecomputeMatch = matchPath("/v1/admin/competition/videos/:videoId/quality-recompute", normalizedPath);
+      if (req.method === "POST" && adminRecomputeMatch && competitionHandlers) {
+        await competitionHandlers.adminRecomputeQuality(req, res, adminRecomputeMatch.videoId);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/competition/audit" && competitionHandlers) {
+        await competitionHandlers.adminAudit(req, res);
+        return;
+      }
 
       if (req.method === "GET" && normalizedPath === "/v1/social-gamification/feed" && socialGamificationHandlers) {
         await socialGamificationHandlers.feed(req, res, url);

@@ -1,0 +1,52 @@
+---
+layout: ../../layouts/DocsLayout.astro
+title: Competition
+description: How Competition turns Perbug into a PERBUG earning hub.
+currentPath: /docs/competition/
+editPath: src/pages/docs/competition.mdx
+---
+
+# Competition
+
+Competition is the main place to **earn PERBUG** across missions, discovery, leaderboards, and claimable reward pools.
+
+## How to earn PERBUG
+
+- Complete daily, weekly, and seasonal missions.
+- Rank on city, global, discovery, quality, and tipping leaderboards.
+- Unlock place discovery bonuses for first reviews, first-five reviews, and under-covered places.
+- Build streaks for repeat contribution bonuses.
+- Claim competition rewards after missions or leaderboard periods settle.
+
+## 48-hour quality model
+
+Perbug quality is driven by **valid likes in the first 48 hours after publish**.
+
+- `published_at` starts the quality window.
+- `quality_window_ends_at = published_at + 48 hours`.
+- `early_like_count` only counts deduped, valid likes during that window.
+- Likes after the 48-hour window do **not** change competition quality.
+
+### Default quality bands
+
+- 0–4 likes → `LOW`
+- 5–14 likes → `STANDARD`
+- 15–39 likes → `HIGH`
+- 40+ likes → `FEATURED`
+
+## Anti-abuse rules
+
+Competition scoring is backend-authoritative.
+
+- One valid like per user per video.
+- Banned, blocked, or fraud-flagged likes do not count.
+- Removed or blocked videos stop contributing to active competition rewards.
+- Duplicate reward issuance is prevented with deterministic reward source IDs.
+
+## Claiming rewards
+
+Competition rewards become claimable in the same PERBUG claim flow as other creator rewards.
+
+- Mission rewards are fixed payouts.
+- Leaderboard rewards use pooled PERBUG distributions.
+- Claims are recorded with deterministic transaction signatures in the backend reward ledger.

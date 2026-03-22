@@ -6,112 +6,87 @@ import 'package:perbug/features/leaderboards/leaderboard_providers.dart';
 import 'package:perbug/features/leaderboards/leaderboard_tab.dart';
 
 void main() {
-  Future<void> pumpHub(WidgetTester tester, {List<Override> overrides = const []}) async {
+  const hub = CompetitionHubModel(
+    season: CompetitionSeasonModel(name: 'Season 1 · Perbug Competition', endsAtLabel: '2026-03-29T23:59:59Z', rewardPoolAtomic: '2500000000'),
+    score: 84.5,
+    streakDays: 3,
+    cityRank: 4,
+    claimableRewardAtomic: '150000000',
+    missions: [
+      CompetitionMissionCardModel(id: 'm1', title: 'Upload 1 approved place review today', description: 'Daily mission', rewardAtomic: '25000000', progressValue: 1, goalValue: 1, completed: true, claimed: false),
+      CompetitionMissionCardModel(id: 'm2', title: 'Review 3 new coffee shops this week', description: 'Weekly mission', rewardAtomic: '75000000', progressValue: 2, goalValue: 3, completed: false, claimed: false),
+      CompetitionMissionCardModel(id: 'm3', title: 'Get 10 likes in the first 48 hours to earn a bonus', description: 'Quality mission', rewardAtomic: '90000000', progressValue: 8, goalValue: 10, completed: false, claimed: false),
+    ],
+    leaderboards: [
+      CompetitionLeaderboardModel(
+        id: 'lb1',
+        name: 'Global weekly leaderboard',
+        type: 'weekly_global',
+        myEntry: CompetitionLeaderboardEntryModel(userId: 'u1', score: 84.5, rank: 4),
+        topEntries: [
+          CompetitionLeaderboardEntryModel(userId: 'u2', score: 99, rank: 1),
+          CompetitionLeaderboardEntryModel(userId: 'u3', score: 92, rank: 2),
+          CompetitionLeaderboardEntryModel(userId: 'u1', score: 84.5, rank: 4),
+        ],
+      ),
+    ],
+    featuredChallenge: CompetitionMissionCardModel(id: 'm3', title: 'Get 10 likes in the first 48 hours to earn a bonus', description: 'Quality mission', rewardAtomic: '90000000', progressValue: 8, goalValue: 10, completed: false, claimed: false),
+    rewards: [CompetitionRewardModel(id: 'r1', sourceType: 'mission', rewardAtomic: '90000000', status: 'claimable')],
+    rewardHistory: [CompetitionRewardModel(id: 'r2', sourceType: 'leaderboard', rewardAtomic: '200000000', status: 'claimed')],
+  );
+
+  Future<void> pumpHub(WidgetTester tester, AsyncValue<CompetitionHubModel> state) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: overrides,
+        overrides: [competitionHubProvider.overrideWith((ref) async => state.requireValue)],
         child: const MaterialApp(home: Scaffold(body: LeaderboardTab())),
       ),
     );
     await tester.pumpAndSettle();
   }
 
-  testWidgets('renders the game hub hero and core modules', (tester) async {
-    await pumpHub(tester);
+  testWidgets('renders mission cards, leaderboard cards, and reward sections', (tester) async {
+    await pumpHub(tester, const AsyncData(hub));
 
-    expect(find.text('Your competition hub'), findsOneWidget);
-    expect(find.text('Live competitions'), findsOneWidget);
-    expect(find.text('Quests and challenge progress'), findsOneWidget);
-    expect(find.text('Recent rewards and trophy shelf'), findsOneWidget);
-    expect(find.text('Top Coffee Explorers'), findsOneWidget);
+    expect(find.text('Earn PERBUG'), findsOneWidget);
+    expect(find.text('Daily missions'), findsOneWidget);
+    expect(find.text('Weekly missions'), findsOneWidget);
+    expect(find.text('Leaderboards'), findsOneWidget);
+    expect(find.text('Claimable competition rewards'), findsOneWidget);
+    expect(find.text('Competition reward history'), findsOneWidget);
+    expect(find.text('Get 10 likes in the first 48 hours to earn a bonus'), findsAtLeastNWidgets(1));
   });
 
-  testWidgets('switches family filters across creator and city ladders', (tester) async {
-    await pumpHub(tester);
-
-    expect(find.text('Ari @ari'), findsOneWidget);
-
-    await tester.tap(find.text('Explorers'));
-    await tester.pumpAndSettle();
-    expect(find.text('Luca'), findsOneWidget);
-
-    await tester.tap(find.text('Cities'));
-    await tester.pumpAndSettle();
-    expect(find.text('Minneapolis'), findsOneWidget);
-    expect(find.text('Chicago'), findsOneWidget);
-  });
-
-  testWidgets('updates seasonal state for all-time archive', (tester) async {
-    await pumpHub(tester);
-
-    await tester.tap(find.text('All-time'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Archive'), findsOneWidget);
-    expect(find.text('Legacy Archive'), findsOneWidget);
-    expect(find.text('Historical standings only'), findsOneWidget);
-    expect(find.text('Review archive'), findsOneWidget);
-  });
-
-  testWidgets('supports sparse backend-driven empty modules', (tester) async {
-    const sparseData = GameHubData(
-      status: StatusHeroModel(
-        title: 'Your competition hub',
-        seasonLabel: 'Sparse Season',
-        rankLabel: '#98 explorer in a new market',
-        creatorTier: 'Local Scout · Bronze',
-        explorerTier: 'Local Scout · Bronze',
-        cityContribution: 'No city battle yet',
-        streakLabel: '1 day streak',
-        levelLabel: 'Level 2',
-        recentUnlock: 'Welcome badge',
-        nextMilestone: 'Complete your first collection',
-        progress: 0.1,
-      ),
-      season: SeasonModel(
-        name: 'Sparse Season',
-        timeRemaining: '5d left',
-        reward: 'Starter rewards',
-        isActive: true,
-        resetLabel: 'Weekly reset every Monday',
-      ),
-      creatorTier: TierBandModel(
-        label: 'Local Scout',
-        subtitle: 'Early creator tier.',
-        progressLabel: '2 posts to next tier',
-        isPromoted: false,
-      ),
-      explorerTier: TierBandModel(
-        label: 'Local Scout',
-        subtitle: 'Early explorer tier.',
-        progressLabel: '1 discovery to next tier',
-        isPromoted: false,
-      ),
-      competitions: [],
-      battles: [],
-      creatorLeaderboard: [
-        LeaderboardEntry(rank: 1, entityId: 'u1', displayName: 'Starter Sam', score: 22, trustLabel: 'Developing', delta: 0),
-      ],
-      explorerLeaderboard: [
-        LeaderboardEntry(rank: 1, entityId: 'u1', displayName: 'Starter Sam', score: 22, trustLabel: 'Developing', delta: 0),
-      ],
-      cityLeaderboard: [],
-      categoryLeaderboard: [],
-      quests: [],
-      collections: [],
-      socialMoments: [],
-      recentRewards: [],
-      milestones: [],
+  testWidgets('shows empty-state copy for rewards and missions', (tester) async {
+    const emptyHub = CompetitionHubModel(
+      season: null,
+      score: 0,
+      streakDays: 0,
+      cityRank: null,
+      claimableRewardAtomic: '0',
+      missions: [],
+      leaderboards: [],
+      featuredChallenge: null,
+      rewards: [],
+      rewardHistory: [],
     );
 
-    await pumpHub(
-      tester,
-      overrides: [leaderboardGameHubProvider.overrideWithValue(sparseData)],
-    );
+    await pumpHub(tester, const AsyncData(emptyHub));
 
-    expect(find.text('Your competition hub'), findsOneWidget);
-    expect(find.text('Starter Sam'), findsOneWidget);
-    expect(find.text('Live competitions'), findsOneWidget);
-    expect(find.text('Collections and mastery'), findsOneWidget);
+    expect(find.text('No active missions right now'), findsNWidgets(2));
+    expect(find.text('No claimable competition rewards yet'), findsOneWidget);
+    expect(find.text('No competition reward history yet'), findsOneWidget);
+  });
+
+  testWidgets('shows error state when backend fails', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [competitionHubProvider.overrideWith((ref) => throw Exception('boom'))],
+        child: const MaterialApp(home: Scaffold(body: LeaderboardTab())),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Competition is having trouble loading'), findsOneWidget);
   });
 }
