@@ -9,6 +9,7 @@ import '../../providers/app_providers.dart';
 import '../challenges/challenge_models.dart';
 import '../collections/collection_models.dart';
 import '../home/map_discovery_tab.dart';
+import '../home/home_page.dart';
 import 'economy_models.dart';
 
 class PerbugEconomyHubPage extends ConsumerWidget {
