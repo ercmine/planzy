@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat;
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
@@ -34,6 +34,12 @@ class PerbugEconomyHubPage extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.m),
           children: [
+            const PremiumHeader(
+              title: 'Perbug Balance',
+              subtitle: 'A premium view of your earnings, claim flow, active quests, and collection loops.',
+              badge: AppPill(label: 'Rewards hub', icon: Icons.auto_awesome_rounded),
+            ),
+            const SizedBox(height: AppSpacing.m),
             economy.when(
               data: (data) => _BalanceHero(data: data),
               loading: () => const AppCard(child: LinearProgressIndicator()),
@@ -79,16 +85,10 @@ class _BalanceHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final amount = NumberFormat('#,##0.##').format(data.wallet.balancePerbug);
     final membership = data.membership;
     return AppCard(
       glow: true,
-      gradient: LinearGradient(
-        colors: [
-          Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
-          Theme.of(context).colorScheme.surfaceContainerHigh,
-        ],
-      ),
+      tone: AppCardTone.reward,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -101,7 +101,11 @@ class _BalanceHero extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.m),
-          Text('$amount PERBUG', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900)),
+          AnimatedCountText(
+            value: data.wallet.balancePerbug,
+            suffix: ' PERBUG',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             membership?.active == true
@@ -137,7 +141,7 @@ class _RewardSnapshots extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.s),
         if (data.claimable.isEmpty)
-          const AppCard(child: ListTile(title: Text('No claimable rewards yet'), subtitle: Text('Visit reward-enabled places, complete quests, and finish collections.'))),
+          const AppCard(tone: AppCardTone.kpi, child: ListTile(title: Text('No claimable rewards yet'), subtitle: Text('Visit reward-enabled places, complete quests, and finish collections.'))),
         ...data.claimable.take(4).map((item) => _RewardRow(item: item, claimable: true)),
         ...data.history.take(6).map((item) => _RewardRow(item: item, claimable: false)),
       ],
@@ -156,6 +160,7 @@ class _RewardRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
+        tone: claimable ? AppCardTone.reward : AppCardTone.kpi,
         child: ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(claimable ? Icons.bolt_outlined : Icons.receipt_long_outlined),
@@ -196,6 +201,7 @@ class _QuestAndCollectionGrid extends StatelessWidget {
       children: [
         if (summary != null)
           AppCard(
+            tone: AppCardTone.kpi,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -210,6 +216,7 @@ class _QuestAndCollectionGrid extends StatelessWidget {
           (quest) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: AppCard(
+              tone: AppCardTone.featured,
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.flag_outlined),
@@ -224,6 +231,7 @@ class _QuestAndCollectionGrid extends StatelessWidget {
           (collection) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: AppCard(
+              tone: AppCardTone.collection,
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.collections_bookmark_outlined),

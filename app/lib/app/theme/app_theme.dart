@@ -49,11 +49,11 @@ class AppTheme {
         labelStyle: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: colorScheme.surface.withOpacity(isDark ? 0.94 : 0.97),
-        indicatorColor: colorScheme.primary.withOpacity(0.14),
+        backgroundColor: colorScheme.surfaceContainerLow.withOpacity(isDark ? 0.95 : 0.92),
+        indicatorColor: colorScheme.primary.withOpacity(0.18),
         surfaceTintColor: Colors.transparent,
         shadowColor: colorScheme.shadow,
-        elevation: 8,
+        elevation: 12,
         height: 76,
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
@@ -67,7 +67,7 @@ class AppTheme {
         style: FilledButton.styleFrom(
           foregroundColor: colorScheme.onPrimary,
           backgroundColor: colorScheme.primary,
-          elevation: 0,
+          elevation: 1.5,
           minimumSize: const Size.fromHeight(54),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.sm),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
@@ -104,7 +104,7 @@ class AppTheme {
         elevation: AppElevation.flat,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.large),
-          side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.42)),
+          side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
