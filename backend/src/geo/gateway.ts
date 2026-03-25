@@ -38,7 +38,7 @@ class LocalGeoGateway implements GeoGateway {
   constructor(private readonly service: GeocodingService) {}
 
   async geocode(input: GeoGeocodeRequest): Promise<GeoResult[]> {
-    return this.service.geocode(input);
+    return this.service.geocode({ ...input, viewbox: input.bounds ? [input.bounds.west, input.bounds.north, input.bounds.east, input.bounds.south] : undefined });
   }
 
   async reverseGeocode(input: GeoReverseGeocodeRequest): Promise<GeoReverseResult> {
@@ -50,7 +50,8 @@ class LocalGeoGateway implements GeoGateway {
       query: input.query,
       language: input.language,
       limit: Math.min(15, Math.max(1, input.limit ?? 8)),
-      countryCodes: input.bias?.countryCode ? [input.bias.countryCode] : undefined
+      countryCodes: input.bias?.countryCode ? [input.bias.countryCode] : undefined,
+      viewbox: input.bounds ? [input.bounds.west, input.bounds.north, input.bounds.east, input.bounds.south] : undefined
     });
 
     return geocoded.map((item, index) => ({

@@ -197,7 +197,7 @@ export function createRoutes(
     : null;
   const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
-  const geoHandlers = deps?.geoGateway ? createGeoHttpHandlers(deps.geoGateway, { authSecret: process.env.GEO_INTERNAL_AUTH_SECRET }) : null;
+  const geoHandlers = deps?.geoGateway ? createGeoHttpHandlers(deps.geoGateway, { authSecret: process.env.GEO_INTERNAL_AUTH_SECRET, rateLimitPerMinute: Number(process.env.GEO_PUBLIC_RATE_LIMIT_PER_MINUTE ?? 180) }) : null;
   const rankingTuningHandlers = deps?.rankingTuning ? createRankingTuningHandlers(deps.rankingTuning.service, deps.rankingTuning.resolver, deps.rankingTuning.repo) : null;
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
   const creatorVerificationHandlers = deps?.creatorVerificationService ? createCreatorVerificationHttpHandlers(deps.creatorVerificationService) : null;
@@ -1331,6 +1331,22 @@ export function createRoutes(
         return;
       }
 
+
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/api/geo/search") {
+        await geoHandlers.apiSearch(req, res);
+        return;
+      }
+
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/api/geo/reverse") {
+        await geoHandlers.apiReverse(req, res);
+        return;
+      }
+
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/api/geo/autocomplete") {
+        await geoHandlers.apiAutocomplete(req, res);
+        return;
+      }
+
       if (geoHandlers && req.method === "GET" && normalizedPath === "/v1/geocode") {
         await geoHandlers.geocode(req, res);
         return;
@@ -1388,6 +1404,11 @@ export function createRoutes(
 
       if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/browse") {
         await discoveryHandlers.browse(req, res);
+        return;
+      }
+
+      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/api/geo/nearby") {
+        await discoveryHandlers.nearby(req, res);
         return;
       }
 

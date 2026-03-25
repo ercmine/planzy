@@ -6,12 +6,20 @@ export interface GeoBiasContext {
   countryCode?: string;
 }
 
+export interface GeoBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
 export interface GeoGeocodeRequest {
   query: string;
   language?: string;
   countryCodes?: string[];
   limit?: number;
   bias?: GeoBiasContext;
+  bounds?: GeoBounds;
 }
 
 export interface GeoReverseGeocodeRequest {
@@ -26,6 +34,7 @@ export interface GeoAutocompleteRequest {
   limit?: number;
   language?: string;
   bias?: GeoBiasContext;
+  bounds?: GeoBounds;
 }
 
 export interface GeoPlaceLookupRequest {
@@ -105,6 +114,36 @@ export interface GeoAreaContext {
   lat: number;
   lng: number;
   source: "nominatim";
+}
+
+export interface PerbugGeoPlace {
+  id: string;
+  name: string;
+  displayName: string;
+  shortAddress?: string;
+  lat: number;
+  lon: number;
+  boundingBox?: GeoBounds;
+  category?: string;
+  subcategory?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  postcode?: string;
+  source: "nominatim";
+  confidence?: number;
+  importance?: number;
+  osm?: {
+    canonicalKey: string;
+  };
+  match: {
+    knownPlace: boolean;
+    internalPlaceId?: string;
+    rewardEnabled: boolean;
+    sponsored: boolean;
+    hasReviews: boolean;
+    checkInEligible: boolean;
+  };
 }
 
 export interface GeoHealthResponse {
