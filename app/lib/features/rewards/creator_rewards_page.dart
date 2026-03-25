@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/theme/spacing.dart';
+import '../../app/theme/widgets.dart';
 import '../../providers/app_providers.dart';
 
 class CreatorRewardsPage extends ConsumerWidget {
@@ -11,28 +13,38 @@ class CreatorRewardsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(rewardDashboardProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Creator earnings')),
+      appBar: AppBar(
+        title: const Text('Creator earnings'),
+        actions: [
+          IconButton(
+            tooltip: 'Perbug balance hub',
+            onPressed: () => context.push('/economy'),
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+          )
+        ],
+      ),
       body: dashboard.when(
         data: (data) => ListView(
           padding: const EdgeInsets.all(AppSpacing.m),
           children: [
-            Card(
+            AppCard(
+              glow: true,
               child: ListTile(
-                title: Text('${data.claimableDisplay} PERBUG claimable'),
-                subtitle: Text('Claimed: ${data.claimedDisplay} PERBUG · Pending reviews: ${data.pendingCount}'),
-                trailing: Text(data.walletPublicKey == null ? 'Connect Phantom to claim' : _mask(data.walletPublicKey!)),
+                title: Text('${data.claimableDisplay} PERBUG claimable', style: Theme.of(context).textTheme.titleLarge),
+                subtitle: Text('Claimed ${data.claimedDisplay} · Pending ${data.pendingCount}'),
+                trailing: Text(data.walletPublicKey == null ? 'Connect wallet' : _mask(data.walletPublicKey!)),
               ),
             ),
             const SizedBox(height: AppSpacing.m),
             Text('Claimable rewards', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.s),
             if (data.claimable.isEmpty)
-              const Card(child: ListTile(title: Text('No claimable rewards yet'), subtitle: Text('Approved reviews become claimable after moderation and wallet verification.'))),
-            ...data.claimable.map((item) => Card(child: ListTile(title: Text(item.place.name), subtitle: Text('Status: ${item.review.rewardStatus} · Position #${item.review.rewardPosition ?? '-'}'), trailing: Text(item.review.finalRewardAmount ?? '0')))),
+              const AppCard(child: ListTile(title: Text('No claimable rewards yet'), subtitle: Text('Approved reviews become claimable after moderation and wallet verification.'))),
+            ...data.claimable.map((item) => AppCard(child: ListTile(title: Text(item.place.name), subtitle: Text('Creator reward · Claim now · Position #${item.review.rewardPosition ?? '-'}'), trailing: Text(item.review.finalRewardAmount ?? '0')))),
             const SizedBox(height: AppSpacing.m),
             Text('Reward history', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.s),
-            ...data.history.map((item) => Card(child: ListTile(title: Text(item.place.name), subtitle: Text('Status: ${item.review.rewardStatus}'), trailing: item.claim?.explorerUrl == null ? null : const Icon(Icons.open_in_new)))),
+            ...data.history.map((item) => AppCard(child: ListTile(title: Text(item.place.name), subtitle: Text('Claimed reward · ${item.review.rewardStatus}'), trailing: item.claim?.explorerUrl == null ? null : const Icon(Icons.open_in_new)))),
           ],
         ),
         error: (error, _) => Center(child: Text('Failed to load rewards: $error')),

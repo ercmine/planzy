@@ -16,6 +16,7 @@ import '../../core/location/location_permission_service.dart';
 import '../../providers/app_providers.dart';
 import '../collections/collection_models.dart';
 import '../collections/collection_repository.dart';
+import '../economy/economy_models.dart';
 import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_widgets.dart';
@@ -105,6 +106,11 @@ final mapCollectionsProvider = FutureProvider<List<CollectionCardModel>>((ref) a
   final apiClient = await ref.watch(apiClientProvider.future);
   final repository = CollectionRepository(apiClient);
   return repository.fetchCollections();
+});
+
+final sponsoredPlacementsProvider = FutureProvider.family<List<SponsoredPlacement>, ({double lat, double lng})>((ref, args) async {
+  final repository = await ref.watch(economyRepositoryProvider.future);
+  return repository.fetchSponsoredPlacements(lat: args.lat, lng: args.lng);
 });
 
 class MapDiscoveryController extends StateNotifier<MapViewportState> {
@@ -352,6 +358,15 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     final connectivityState = ref.watch(connectivityControllerProvider);
     final permissionService = ref.read(locationPermissionServiceProvider);
     final linkLauncher = ref.read(linkLauncherProvider);
+    final economy = ref.watch(economyDashboardProvider).valueOrNull;
+    final sponsoredPlacements = ref.watch(
+      sponsoredPlacementsProvider((lat: state.viewport.centerLat, lng: state.viewport.centerLng)),
+    ).valueOrNull ?? const <SponsoredPlacement>[];
+    final sponsoredPlaceIds = sponsoredPlacements.map((item) => item.placeId).toSet();
+    final questPlaceIds = (economy?.activeQuests ?? const <EconomyQuest>[]).map((item) => item.placeId).toSet();
+    final collectionPlaceIds = (economy?.collections ?? const <EconomyCollection>[])
+        .expand((item) => item.placeIds)
+        .toSet();
 
     final visiblePlaces = _sortedAndFilteredPlaces(state.pins, state: state, location: location);
     final selected = _resolveSelectedPlace(state, visiblePlaces);
@@ -432,7 +447,17 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                           ],
                         ),
                         MarkerLayer(markers: _buildCollectibleMarkers(world, selectedCollectible)),
-                        MarkerLayer(markers: _buildMarkers(markerItems, selected, world, location)),
+                        MarkerLayer(
+                          markers: _buildMarkers(
+                            markerItems,
+                            selected,
+                            world,
+                            location,
+                            sponsoredPlaceIds: sponsoredPlaceIds,
+                            questPlaceIds: questPlaceIds,
+                            collectionPlaceIds: collectionPlaceIds,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -884,7 +909,15 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     );
   }
 
-  List<Marker> _buildMarkers(List<_MarkerPresentation> markers, MapPin? selected, MapWorldState world, AppLocation? location) {
+  List<Marker> _buildMarkers(
+    List<_MarkerPresentation> markers,
+    MapPin? selected,
+    MapWorldState world,
+    AppLocation? location, {
+    required Set<String> sponsoredPlaceIds,
+    required Set<String> questPlaceIds,
+    required Set<String> collectionPlaceIds,
+  }) {
     final built = <Marker>[
       for (final item in markers)
         Marker(
@@ -907,6 +940,9 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                   selected: selected?.canonicalPlaceId == item.places.first.canonicalPlaceId,
                   saved: _savedPlaceIds.contains(item.places.first.canonicalPlaceId),
                   hasActivity: item.places.first.hasReviews || item.places.first.hasCreatorMedia,
+                  sponsored: sponsoredPlaceIds.contains(item.places.first.canonicalPlaceId),
+                  questEnabled: questPlaceIds.contains(item.places.first.canonicalPlaceId),
+                  collectionEnabled: collectionPlaceIds.contains(item.places.first.canonicalPlaceId),
                   onTap: () {
                     final pin = item.places.first;
                     ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(pin.canonicalPlaceId);
@@ -1212,6 +1248,9 @@ class _PlaceMarker extends StatelessWidget {
     required this.selected,
     required this.saved,
     required this.hasActivity,
+    required this.sponsored,
+    required this.questEnabled,
+    required this.collectionEnabled,
     required this.onTap,
   });
 
@@ -1220,6 +1259,9 @@ class _PlaceMarker extends StatelessWidget {
   final bool selected;
   final bool saved;
   final bool hasActivity;
+  final bool sponsored;
+  final bool questEnabled;
+  final bool collectionEnabled;
   final VoidCallback onTap;
 
   @override
@@ -1266,6 +1308,12 @@ class _PlaceMarker extends StatelessWidget {
                           top: -2,
                           child: Icon(Icons.bookmark_rounded, size: 12, color: foregroundColor),
                         ),
+                      if (sponsored)
+                        Positioned(
+                          left: -5,
+                          top: -4,
+                          child: Icon(Icons.campaign_rounded, size: 12, color: foregroundColor),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -1280,6 +1328,14 @@ class _PlaceMarker extends StatelessWidget {
                     children: [
                       if (hasActivity) ...[
                         Icon(Icons.bolt_rounded, size: 11, color: foregroundColor.withOpacity(0.92)),
+                        const SizedBox(width: 2),
+                      ],
+                      if (questEnabled) ...[
+                        Icon(Icons.flag_outlined, size: 11, color: foregroundColor.withOpacity(0.92)),
+                        const SizedBox(width: 2),
+                      ],
+                      if (collectionEnabled) ...[
+                        Icon(Icons.collections_bookmark_outlined, size: 11, color: foregroundColor.withOpacity(0.92)),
                         const SizedBox(width: 2),
                       ],
                       if (rating > 0)

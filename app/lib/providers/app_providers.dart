@@ -40,6 +40,8 @@ import '../features/settings/settings_controller.dart';
 import '../features/home/review_prompt_service.dart';
 import '../features/accomplishments/accomplishment_repository.dart';
 import '../features/challenges/challenge_repository.dart';
+import '../features/economy/economy_models.dart';
+import '../features/economy/economy_repository.dart';
 import '../features/settings/settings_state.dart';
 import '../features/sessions/create_session/create_session_controller.dart';
 import '../features/sessions/join_session/join_session_controller.dart';
@@ -225,6 +227,16 @@ final accomplishmentRepositoryProvider = FutureProvider<AccomplishmentRepository
 final challengeRepositoryProvider = FutureProvider<ChallengeRepository>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);
   return ChallengeRepository(apiClient: apiClient);
+});
+
+final economyRepositoryProvider = FutureProvider<EconomyRepository>((ref) async {
+  final apiClient = await ref.watch(apiClientProvider.future);
+  return EconomyRepository(apiClient: apiClient);
+});
+
+final economyDashboardProvider = FutureProvider<EconomyDashboard>((ref) async {
+  final repository = await ref.watch(economyRepositoryProvider.future);
+  return repository.fetchDashboard();
 });
 
 final telemetryQueueStoreProvider = FutureProvider<TelemetryQueueStore>((ref) async {
