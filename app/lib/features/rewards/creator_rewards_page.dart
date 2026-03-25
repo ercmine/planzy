@@ -38,7 +38,7 @@ class CreatorRewardsPage extends ConsumerWidget {
               tone: AppCardTone.reward,
               child: ListTile(
                 title: AnimatedCountText(
-                  value: data.claimable,
+                  value: _asDouble(data.claimableDisplay),
                   suffix: ' PERBUG claimable',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
@@ -68,4 +68,9 @@ class CreatorRewardsPage extends ConsumerWidget {
 String _mask(String value) {
   if (value.length <= 8) return value;
   return '${value.substring(0, 4)}…${value.substring(value.length - 4)}';
+}
+
+double _asDouble(String value) {
+  final normalized = value.replaceAll(RegExp(r'[^0-9\.-]'), '');
+  return double.tryParse(normalized) ?? 0;
 }
