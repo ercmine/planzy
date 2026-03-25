@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../../app/theme/tokens.dart';
 import '../../app/theme/widgets.dart';
 import 'map_discovery_models.dart';
 import 'place_preview_card.dart';
@@ -36,6 +37,7 @@ class CollapsibleMapOverlay extends StatelessWidget {
     if (isCollapsed && iconOnlyWhenCollapsed && icon != null) {
       return AppCard(
         glow: true,
+        tone: AppCardTone.featured,
         padding: const EdgeInsets.all(6),
         child: IconButton(
           tooltip: 'Expand $title',
@@ -48,6 +50,7 @@ class CollapsibleMapOverlay extends StatelessWidget {
 
     return AppCard(
       glow: true,
+      tone: AppCardTone.featured,
       padding: padding,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -288,6 +291,7 @@ class DiscoveryCountPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
+      tone: AppCardTone.kpi,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -357,10 +361,17 @@ class NearbyPlacesSheet extends StatelessWidget {
       builder: (context, scrollController) {
         return DecoratedBox(
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withOpacity(0.96),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                theme.colorScheme.surface.withOpacity(0.98),
+                theme.colorScheme.surfaceContainerLow.withOpacity(0.94),
+              ],
+            ),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            boxShadow: const [
-              BoxShadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, -10)),
+            boxShadow: [
+              BoxShadow(color: theme.colorScheme.shadow.withOpacity(0.22), blurRadius: 24, offset: const Offset(0, -10)),
             ],
           ),
           child: Column(
@@ -490,6 +501,7 @@ class DiscoveryStateCard extends StatelessWidget {
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: AppCard(
+          tone: AppCardTone.featured,
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -582,15 +594,22 @@ class _PlaceListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
+      duration: AppMotion.standard,
+      curve: AppMotion.decelerate,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: selected ? theme.colorScheme.primary.withOpacity(0.7) : theme.colorScheme.outlineVariant.withOpacity(0.35),
           width: selected ? 1.4 : 1,
         ),
-        color: theme.colorScheme.surfaceContainerLow.withOpacity(selected ? 0.98 : 0.92),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.colorScheme.surfaceContainerLow.withOpacity(selected ? 0.99 : 0.94),
+            (selected ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest).withOpacity(selected ? 0.12 : 0.08),
+          ],
+        ),
         boxShadow: [
           BoxShadow(
             color: (selected ? theme.colorScheme.primary : Colors.black).withOpacity(selected ? 0.12 : 0.06),

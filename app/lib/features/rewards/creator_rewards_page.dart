@@ -27,10 +27,21 @@ class CreatorRewardsPage extends ConsumerWidget {
         data: (data) => ListView(
           padding: const EdgeInsets.all(AppSpacing.m),
           children: [
+            const PremiumHeader(
+              title: 'Creator earnings',
+              subtitle: 'Track claimable rewards, payout momentum, and historical performance in one place.',
+              badge: AppPill(label: 'Creator Pro', icon: Icons.insights_rounded),
+            ),
+            const SizedBox(height: AppSpacing.m),
             AppCard(
               glow: true,
+              tone: AppCardTone.reward,
               child: ListTile(
-                title: Text('${data.claimableDisplay} PERBUG claimable', style: Theme.of(context).textTheme.titleLarge),
+                title: AnimatedCountText(
+                  value: data.claimable,
+                  suffix: ' PERBUG claimable',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
                 subtitle: Text('Claimed ${data.claimedDisplay} · Pending ${data.pendingCount}'),
                 trailing: Text(data.walletPublicKey == null ? 'Connect wallet' : _mask(data.walletPublicKey!)),
               ),
@@ -39,12 +50,12 @@ class CreatorRewardsPage extends ConsumerWidget {
             Text('Claimable rewards', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.s),
             if (data.claimable.isEmpty)
-              const AppCard(child: ListTile(title: Text('No claimable rewards yet'), subtitle: Text('Approved reviews become claimable after moderation and wallet verification.'))),
-            ...data.claimable.map((item) => AppCard(child: ListTile(title: Text(item.place.name), subtitle: Text('Creator reward · Claim now · Position #${item.review.rewardPosition ?? '-'}'), trailing: Text(item.review.finalRewardAmount ?? '0')))),
+              const AppCard(tone: AppCardTone.kpi, child: ListTile(title: Text('No claimable rewards yet'), subtitle: Text('Approved reviews become claimable after moderation and wallet verification.'))),
+            ...data.claimable.map((item) => AppCard(tone: AppCardTone.reward, child: ListTile(title: Text(item.place.name), subtitle: Text('Creator reward · Claim now · Position #${item.review.rewardPosition ?? '-'}'), trailing: Text(item.review.finalRewardAmount ?? '0')))),
             const SizedBox(height: AppSpacing.m),
             Text('Reward history', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.s),
-            ...data.history.map((item) => AppCard(child: ListTile(title: Text(item.place.name), subtitle: Text('Claimed reward · ${item.review.rewardStatus}'), trailing: item.claim?.explorerUrl == null ? null : const Icon(Icons.open_in_new)))),
+            ...data.history.map((item) => AppCard(tone: AppCardTone.kpi, child: ListTile(title: Text(item.place.name), subtitle: Text('Claimed reward · ${item.review.rewardStatus}'), trailing: item.claim?.explorerUrl == null ? null : const Icon(Icons.open_in_new)))),
           ],
         ),
         error: (error, _) => Center(child: Text('Failed to load rewards: $error')),

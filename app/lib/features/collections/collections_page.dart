@@ -37,13 +37,21 @@ class CollectionsPage extends StatelessWidget {
     }
     return ListView.separated(
       padding: const EdgeInsets.all(AppSpacing.m),
-      itemCount: collections.length,
+      itemCount: collections.length + 1,
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.m),
       itemBuilder: (context, index) {
-        final collection = collections[index];
+        if (index == 0) {
+          return const PremiumHeader(
+            title: 'Collections',
+            subtitle: 'Track collectible streaks, complete sets, and unlock richer rewards.',
+            badge: AppPill(label: 'Collector mode', icon: Icons.workspace_premium_rounded),
+          );
+        }
+        final collection = collections[index - 1];
         final rewardUnlocked = collection.progress >= 1;
         return AppCard(
           glow: rewardUnlocked,
+          tone: rewardUnlocked ? AppCardTone.reward : AppCardTone.collection,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

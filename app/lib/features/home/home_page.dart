@@ -160,7 +160,13 @@ class _FeedTabState extends ConsumerState<_FeedTab> {
     );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(saved ? 'Saved ${item.placeName}' : 'Passed ${item.placeName}'),
+        content: Row(
+          children: [
+            Icon(saved ? Icons.verified_rounded : Icons.skip_next_rounded, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: Text(saved ? 'Saved ${item.placeName}' : 'Passed ${item.placeName}')),
+          ],
+        ),
         action: saved
             ? SnackBarAction(
                 label: 'Undo',
@@ -193,26 +199,24 @@ class _FeedTabState extends ConsumerState<_FeedTab> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-          child: BrandHeroCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const AppSectionHeader(
-                  title: 'Place stream',
-                  subtitle: 'Swipe vertically between places, swipe horizontally to save or pass, and tap into the place story.',
-                ),
-                const SizedBox(height: AppSpacing.s),
-                SegmentedButton<FeedScope>(
-                  segments: const [
-                    ButtonSegment(value: FeedScope.local, icon: Icon(Icons.place_outlined), label: Text('Local')),
-                    ButtonSegment(value: FeedScope.regional, icon: Icon(Icons.public), label: Text('Regional')),
-                    ButtonSegment(value: FeedScope.global, icon: Icon(Icons.flight_takeoff), label: Text('Global')),
-                  ],
-                  selected: {widget.scope},
-                  onSelectionChanged: (value) => widget.onScopeChanged(value.first),
-                ),
-              ],
-            ),
+          child: Column(
+            children: [
+              const PremiumHeader(
+                title: 'Place stream',
+                subtitle: 'Swipe vertically between places, swipe horizontally to save or pass, and tap into each place story.',
+                badge: AppPill(label: 'Discovery', icon: Icons.auto_awesome_rounded),
+              ),
+              const SizedBox(height: AppSpacing.s),
+              SegmentedButton<FeedScope>(
+                segments: const [
+                  ButtonSegment(value: FeedScope.local, icon: Icon(Icons.place_outlined), label: Text('Local')),
+                  ButtonSegment(value: FeedScope.regional, icon: Icon(Icons.public), label: Text('Regional')),
+                  ButtonSegment(value: FeedScope.global, icon: Icon(Icons.flight_takeoff), label: Text('Global')),
+                ],
+                selected: {widget.scope},
+                onSelectionChanged: (value) => widget.onScopeChanged(value.first),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -369,6 +373,7 @@ class _PlaceStreamCardState extends State<_PlaceStreamCard> {
       child: Transform.translate(
         offset: Offset(_dragDx * 0.16, 0),
         child: AppCard(
+          tone: widget.isActive ? AppCardTone.featured : AppCardTone.standard,
           padding: EdgeInsets.zero,
           child: Stack(
             children: [
@@ -398,10 +403,17 @@ class _PlaceStreamCardState extends State<_PlaceStreamCard> {
                             child: Wrap(
                               spacing: 8,
                               children: [
-                                AppPill(label: item.placeCategory, icon: Icons.place_outlined),
+                                AppPill(
+                                  label: item.placeCategory,
+                                  icon: Icons.place_outlined,
+                                  backgroundColor: Colors.white.withOpacity(0.12),
+                                  foregroundColor: Colors.white,
+                                ),
                                 AppPill(
                                   label: item.heroType == PlaceHeroMediaType.video ? 'Review video' : 'Place hero',
                                   icon: item.heroType == PlaceHeroMediaType.video ? Icons.play_circle_fill_rounded : Icons.image_outlined,
+                                  backgroundColor: Colors.white.withOpacity(0.12),
+                                  foregroundColor: Colors.white,
                                 ),
                               ],
                             ),
@@ -411,7 +423,7 @@ class _PlaceStreamCardState extends State<_PlaceStreamCard> {
                               top: 22,
                               right: 22,
                               child: Chip(
-                                backgroundColor: swipeColor,
+                                backgroundColor: swipeColor.withOpacity(0.82),
                                 label: Text(swipeIntent),
                                 avatar: Icon(_dragDx > 0 ? Icons.bookmark_added_outlined : Icons.do_not_disturb_alt_outlined),
                               ),
@@ -672,9 +684,10 @@ class _SearchTabState extends ConsumerState<_SearchTab> with AutomaticKeepAliveC
       child: Column(
         children: [
           const BrandHeroCard(
-            child: AppSectionHeader(
+            child: PremiumHeader(
               title: 'Search',
-              subtitle: 'Find places, neighborhoods, and new social momentum.',
+              subtitle: 'Find places, neighborhoods, and social momentum.',
+              badge: AppPill(label: 'Live index', icon: Icons.travel_explore_rounded),
             ),
           ),
           const SizedBox(height: 12),
@@ -690,20 +703,21 @@ class _SearchTabState extends ConsumerState<_SearchTab> with AutomaticKeepAliveC
                 if (query.isEmpty) {
                   return const Center(
                     child: BrandHeroCard(
-                      child: AppSectionHeader(
+                      child: PremiumHeader(
                         title: 'Search the city',
                         subtitle: 'Type a place or neighborhood to unlock creator-led discovery.',
+                        badge: AppPill(label: 'Explorer', icon: Icons.location_city_rounded),
                       ),
                     ),
                   );
                 }
-                if (items.isEmpty) return const Center(child: AppCard(child: Text('No results yet. Try another query.')));
+                if (items.isEmpty) return const Center(child: AppCard(tone: AppCardTone.collection, child: Text('No results yet. Try another query.')));
                 return ListView.builder(
                   itemCount: items.length,
                   itemBuilder: (_, index) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: AppCard(
-                      glow: false,
+                      tone: AppCardTone.kpi,
                       child: ListTile(
                         title: Text(items[index].name),
                         subtitle: Text('${items[index].category} • ${items[index].regionLabel}'),
@@ -734,19 +748,22 @@ class _FeedEmptyState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const AppPill(label: 'Fresh feed', icon: Icons.ondemand_video_outlined),
-            const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
-            const SizedBox(height: 6),
-            Text(body, textAlign: TextAlign.center),
-            if (suggestions.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Wrap(spacing: 8, runSpacing: 8, children: suggestions.map((e) => AppPill(label: e)).toList(growable: false)),
+        child: AppCard(
+          tone: AppCardTone.collection,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AppPill(label: 'Fresh feed', icon: Icons.ondemand_video_outlined),
+              const SizedBox(height: 12),
+              Text(title, style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
+              const SizedBox(height: 6),
+              Text(body, textAlign: TextAlign.center),
+              if (suggestions.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(spacing: 8, runSpacing: 8, children: suggestions.map((e) => AppPill(label: e)).toList(growable: false)),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

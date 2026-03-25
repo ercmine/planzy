@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'color_scheme.dart';
 import 'spacing.dart';
 import 'tokens.dart';
 
@@ -130,6 +131,7 @@ class AppCard extends StatelessWidget {
     this.padding,
     this.glow = false,
     this.gradient,
+    this.tone = AppCardTone.standard,
     super.key,
   });
 
@@ -137,23 +139,106 @@ class AppCard extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final bool glow;
   final Gradient? gradient;
+  final AppCardTone tone;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final resolvedGradient = gradient ?? _gradientForTone(colorScheme, tone);
+    final resolvedBorder = _borderForTone(colorScheme, tone);
+    final resolvedGlow = glow || tone == AppCardTone.reward || tone == AppCardTone.featured;
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.large),
-        gradient: gradient,
-        color: gradient == null ? colorScheme.surfaceContainerLow.withOpacity(0.92) : null,
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.44)),
-        boxShadow: AppElevation.card(colorScheme.shadow, glow: glow),
+        gradient: resolvedGradient,
+        color: resolvedGradient == null ? colorScheme.surfaceContainerLow.withOpacity(0.92) : null,
+        border: Border.all(color: resolvedBorder),
+        boxShadow: AppElevation.card(colorScheme.shadow, glow: resolvedGlow),
       ),
       child: Padding(
         padding: padding ?? const EdgeInsets.all(AppSpacing.m),
         child: child,
       ),
     );
+  }
+}
+
+enum AppCardTone {
+  standard,
+  featured,
+  reward,
+  collection,
+  sponsored,
+  kpi,
+}
+
+Gradient? _gradientForTone(ColorScheme scheme, AppCardTone tone) {
+  switch (tone) {
+    case AppCardTone.featured:
+      return LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          scheme.primaryContainer.withOpacity(0.82),
+          scheme.surfaceContainerLow.withOpacity(0.96),
+        ],
+      );
+    case AppCardTone.reward:
+      return LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          AppColors.vividOrange.withOpacity(0.22),
+          scheme.primary.withOpacity(0.24),
+          scheme.surfaceContainerHigh.withOpacity(0.94),
+        ],
+      );
+    case AppCardTone.collection:
+      return LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          scheme.secondaryContainer.withOpacity(0.80),
+          scheme.surfaceContainerHigh.withOpacity(0.96),
+        ],
+      );
+    case AppCardTone.sponsored:
+      return LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          scheme.primary.withOpacity(0.17),
+          scheme.secondary.withOpacity(0.14),
+          scheme.surfaceContainerHigh.withOpacity(0.94),
+        ],
+      );
+    case AppCardTone.kpi:
+      return LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          scheme.surfaceContainerHighest.withOpacity(0.95),
+          scheme.surfaceContainerLow.withOpacity(0.9),
+        ],
+      );
+    case AppCardTone.standard:
+      return null;
+  }
+}
+
+Color _borderForTone(ColorScheme scheme, AppCardTone tone) {
+  switch (tone) {
+    case AppCardTone.featured:
+    case AppCardTone.reward:
+      return scheme.primary.withOpacity(0.32);
+    case AppCardTone.sponsored:
+      return scheme.secondary.withOpacity(0.30);
+    case AppCardTone.collection:
+      return scheme.tertiary.withOpacity(0.30);
+    case AppCardTone.kpi:
+      return scheme.outlineVariant.withOpacity(0.66);
+    case AppCardTone.standard:
+      return scheme.outlineVariant.withOpacity(0.44);
   }
 }
 
@@ -384,8 +469,97 @@ class BrandHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      glow: false,
+      tone: AppCardTone.featured,
       child: child,
+    );
+  }
+}
+
+class PremiumHeader extends StatelessWidget {
+  const PremiumHeader({
+    required this.title,
+    required this.subtitle,
+    this.badge,
+    this.trailing,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget? badge;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      tone: AppCardTone.featured,
+      padding: const EdgeInsets.all(AppSpacing.l),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (badge != null) ...[
+                  badge!,
+                  const SizedBox(height: AppSpacing.s),
+                ],
+                Text(title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+                const SizedBox(height: AppSpacing.xs),
+                Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+              ],
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: AppSpacing.m),
+            trailing!,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class AnimatedCountText extends StatefulWidget {
+  const AnimatedCountText({
+    required this.value,
+    this.suffix = '',
+    this.prefix = '',
+    this.duration = AppMotion.slow,
+    this.style,
+    super.key,
+  });
+
+  final double value;
+  final String suffix;
+  final String prefix;
+  final Duration duration;
+  final TextStyle? style;
+
+  @override
+  State<AnimatedCountText> createState() => _AnimatedCountTextState();
+}
+
+class _AnimatedCountTextState extends State<AnimatedCountText> {
+  double _previous = 0;
+
+  @override
+  void didUpdateWidget(covariant AnimatedCountText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _previous = oldWidget.value;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      duration: widget.duration,
+      curve: AppMotion.decelerate,
+      tween: Tween<double>(begin: _previous, end: widget.value),
+      builder: (context, value, _) {
+        final rounded = value >= 10 ? value.round().toString() : value.toStringAsFixed(1);
+        return Text('${widget.prefix}$rounded${widget.suffix}', style: widget.style);
+      },
     );
   }
 }
