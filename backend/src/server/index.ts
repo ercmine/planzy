@@ -68,6 +68,7 @@ import { GamificationControlService, MemoryGamificationControlStore } from "../g
 import { MemoryPerbugRewardsStore, PerbugRewardsService } from "../perbugRewards/index.js";
 import { MemoryPerbugTipsStore, PerbugTipsService } from "../perbugTips/index.js";
 import { CompetitionService, MemoryCompetitionStore } from "../competition/index.js";
+import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../sponsoredLocations/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -250,6 +251,14 @@ export function createServer(options?: CreateServerOptions) {
     getPrimaryWallet: (userId) => perbugRewardsService.listWallets(userId).find((wallet) => wallet.isPrimary)
   });
   const competitionService = new CompetitionService(new MemoryCompetitionStore(), perbugRewardsService);
+  const sponsoredLocationsService = new SponsoredLocationsService(new MemorySponsoredLocationStore(), {
+    placeCoordinates: (placeId) => {
+      const place = placeService.getCanonicalPlace(placeId);
+      if (!place) return null;
+      return { lat: place.latitude, lng: place.longitude };
+    },
+    onUserRewardPaid: async () => {}
+  });
   competitionService.recordVideoPublished({ videoId: "video_seed_1", reviewId: "review_seed_1", userId: "u1", publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), city: "Bloomington", category: "coffee", canonicalPlaceId: "place-1" });
   competitionService.recordApprovedReview({ id: "review_event_1", reviewId: "review_seed_1", videoId: "video_seed_1", userId: "u1", canonicalPlaceId: "place-1", approvedAt: new Date().toISOString(), city: "Bloomington", category: "coffee", discoveryType: "first_review", approved: true, blocked: false });
   competitionService.recordLike({ id: "like_seed_1", videoId: "video_seed_1", userId: "fan_1", createdAt: new Date().toISOString(), valid: true, bannedUser: false, blockedUser: false, fraudFlagged: false });
@@ -305,7 +314,8 @@ export function createServer(options?: CreateServerOptions) {
     gamificationControlService,
     perbugRewardsService,
     perbugTipsService,
-    competitionService
+    competitionService,
+    sponsoredLocationsService
   });
 }
 

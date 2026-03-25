@@ -135,3 +135,4 @@ export * from "./challenges/index.js";
 export * from "./leaderboards/index.js";
 
 export * from "./competition/index.js";
+export * from "./sponsoredLocations/index.js";

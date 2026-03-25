@@ -94,6 +94,8 @@ import { createPerbugTipsHttpHandlers } from "../perbugTips/http.js";
 import type { PerbugTipsService } from "../perbugTips/service.js";
 import { createCompetitionHttpHandlers } from "../competition/http.js";
 import type { CompetitionService } from "../competition/service.js";
+import { createSponsoredLocationsHttpHandlers } from "../sponsoredLocations/http.js";
+import type { SponsoredLocationsService } from "../sponsoredLocations/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -181,6 +183,7 @@ export function createRoutes(
     perbugRewardsService?: PerbugRewardsService;
     perbugTipsService?: PerbugTipsService;
     competitionService?: CompetitionService;
+    sponsoredLocationsService?: SponsoredLocationsService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -215,6 +218,7 @@ export function createRoutes(
   const perbugRewardsHandlers = deps?.perbugRewardsService ? createPerbugRewardsHttpHandlers(deps.perbugRewardsService) : null;
   const perbugTipsHandlers = deps?.perbugTipsService ? createPerbugTipsHttpHandlers(deps.perbugTipsService) : null;
   const competitionHandlers = deps?.competitionService ? createCompetitionHttpHandlers(deps.competitionService) : null;
+  const sponsoredLocationHandlers = deps?.sponsoredLocationsService ? createSponsoredLocationsHttpHandlers(deps.sponsoredLocationsService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -317,6 +321,95 @@ export function createRoutes(
       }
       if (req.method === "GET" && normalizedPath === "/v1/admin/competition/audit" && competitionHandlers) {
         await competitionHandlers.adminAudit(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/business/places/access-requests" && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.requestPlaceAccess(req, res);
+        return;
+      }
+      const accessApproveMatch = matchPath("/v1/admin/business/places/access-requests/:accessId/approve", normalizedPath);
+      if (req.method === "POST" && accessApproveMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.approvePlaceAccess(req, res, accessApproveMatch.accessId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/business/sponsored-campaigns" && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.createCampaign(req, res);
+        return;
+      }
+      const campaignFundingMatch = matchPath("/v1/business/sponsored-campaigns/:campaignId/fund", normalizedPath);
+      if (req.method === "POST" && campaignFundingMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.fundCampaign(req, res, campaignFundingMatch.campaignId);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/business/sponsored-campaigns" && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.listBusinessCampaigns(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/discovery/sponsored-placements" && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.placements(req, res, url);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/visits/start" && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.startVisit(req, res);
+        return;
+      }
+      const visitHeartbeatMatch = matchPath("/v1/visits/:visitSessionId/heartbeat", normalizedPath);
+      if (req.method === "POST" && visitHeartbeatMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.heartbeatVisit(req, res, visitHeartbeatMatch.visitSessionId);
+        return;
+      }
+      const verifyVisitMatch = matchPath("/v1/visits/:visitSessionId/verify", normalizedPath);
+      if (req.method === "POST" && verifyVisitMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.verifyVisit(req, res, verifyVisitMatch.visitSessionId);
+        return;
+      }
+      const claimVisitMatch = matchPath("/v1/visits/:visitSessionId/claim", normalizedPath);
+      if (req.method === "POST" && claimVisitMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.claimReward(req, res, claimVisitMatch.visitSessionId);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/rewards/claims/me" && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.userRewards(req, res);
+        return;
+      }
+      const pauseCampaignMatch = matchPath("/v1/business/sponsored-campaigns/:campaignId/pause", normalizedPath);
+      if (req.method === "POST" && pauseCampaignMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.pauseCampaign(req, res, pauseCampaignMatch.campaignId);
+        return;
+      }
+      const resumeCampaignMatch = matchPath("/v1/business/sponsored-campaigns/:campaignId/resume", normalizedPath);
+      if (req.method === "POST" && resumeCampaignMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.resumeCampaign(req, res, resumeCampaignMatch.campaignId);
+        return;
+      }
+      const endCampaignMatch = matchPath("/v1/business/sponsored-campaigns/:campaignId/end", normalizedPath);
+      if (req.method === "POST" && endCampaignMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.endCampaign(req, res, endCampaignMatch.campaignId);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/sponsored/fraud-flags" && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.adminFraudFlags(req, res);
+        return;
+      }
+      const adminReviewClaimMatch = matchPath("/v1/admin/sponsored/claims/:claimId/review", normalizedPath);
+      if (req.method === "POST" && adminReviewClaimMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.adminReviewClaim(req, res, adminReviewClaimMatch.claimId);
+        return;
+      }
+      const adminRefundMatch = matchPath("/v1/admin/sponsored/campaigns/:campaignId/refund", normalizedPath);
+      if (req.method === "POST" && adminRefundMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.adminRefundCampaign(req, res, adminRefundMatch.campaignId);
+        return;
+      }
+      const adminStatusMatch = matchPath("/v1/admin/sponsored/campaigns/:campaignId/status", normalizedPath);
+      if (req.method === "POST" && adminStatusMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.adminSetCampaignStatus(req, res, adminStatusMatch.campaignId);
+        return;
+      }
+      const campaignLedgerMatch = matchPath("/v1/admin/sponsored/campaigns/:campaignId/ledger", normalizedPath);
+      if (req.method === "GET" && campaignLedgerMatch && sponsoredLocationHandlers) {
+        await sponsoredLocationHandlers.campaignLedger(req, res, campaignLedgerMatch.campaignId);
         return;
       }
 
