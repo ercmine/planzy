@@ -3,7 +3,39 @@ import { describe, expect, it, vi } from "vitest";
 import { createGeoHttpHandlers } from "../http.js";
 
 describe("createGeoHttpHandlers", () => {
-  it("rejects unauthorized v1 request", async () => {
+  it("rejects unauthorized v1 request when internal auth is enabled", async () => {
+    const protectedHandlers = createGeoHttpHandlers({
+      geocode: vi.fn(),
+      reverseGeocode: vi.fn(),
+      autocomplete: vi.fn(),
+      placeLookup: vi.fn(),
+      areaContext: vi.fn(),
+      health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
+    }, { authSecret: "geo-secret" });
+
+    const res = createMockResponse();
+    await protectedHandlers.geocode({ method: "POST", headers: {}, url: "/v1/geocode" } as never, res as never);
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("serves public /api/geo/search responses", async () => {
+    const handlers = createGeoHttpHandlers({
+      geocode: vi.fn(async () => [{ displayName: "Austin, Texas", lat: 30.2672, lng: -97.7431, source: "nominatim" as const }]),
+      reverseGeocode: vi.fn(),
+      autocomplete: vi.fn(),
+      placeLookup: vi.fn(),
+      areaContext: vi.fn(),
+      health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
+    });
+
+    const res = createMockResponse();
+    await handlers.apiSearch({ method: "GET", headers: {}, url: "/api/geo/search?q=austin" } as never, res as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(String(res.body)).toContain("Austin, Texas");
+  });
+
+  it("validates short /api/geo/search queries", async () => {
     const handlers = createGeoHttpHandlers({
       geocode: vi.fn(),
       reverseGeocode: vi.fn(),
@@ -14,43 +46,32 @@ describe("createGeoHttpHandlers", () => {
     });
 
     const res = createMockResponse();
-    await handlers.geocode({ method: "POST", headers: {}, url: "/v1/geocode" } as never, res as never);
-    expect(res.statusCode).toBe(502);
+    await handlers.apiSearch({ method: "GET", headers: {}, url: "/api/geo/search?q=a" } as never, res as never);
+    expect(res.statusCode).toBe(400);
+  });
 
-    const protectedHandlers = createGeoHttpHandlers({
-      geocode: vi.fn(),
+  it("rate limits public geo endpoints", async () => {
+    const handlers = createGeoHttpHandlers({
+      geocode: vi.fn(async () => [{ displayName: "Austin, Texas", lat: 30.2672, lng: -97.7431, source: "nominatim" as const }]),
       reverseGeocode: vi.fn(),
       autocomplete: vi.fn(),
       placeLookup: vi.fn(),
       areaContext: vi.fn(),
       health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
-    }, { authSecret: "geo-secret" });
+    }, { rateLimitPerMinute: 30 });
 
-    const res2 = createMockResponse();
-    await protectedHandlers.geocode({ method: "POST", headers: {}, url: "/v1/geocode" } as never, res2 as never);
-    expect(res2.statusCode).toBe(401);
-  });
+    const denied = createMockResponse();
+    await handlers.apiSearch({ method: "GET", headers: { "x-forwarded-for": "1.1.1.1" }, url: "/api/geo/search?q=austin" } as never, denied as never);
+    expect(denied.statusCode).toBe(200);
 
-  it("serves autocomplete", async () => {
-    const handlers = createGeoHttpHandlers({
-      geocode: vi.fn(),
-      reverseGeocode: vi.fn(),
-      autocomplete: vi.fn(async () => [{ id: "a", displayName: "Austin", lat: 1, lng: 2, relevanceScore: 0.8, source: "nominatim" as const }]),
-      placeLookup: vi.fn(),
-      areaContext: vi.fn(),
-      health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
-    }, { authSecret: "geo-secret" });
+    for (let i = 0; i < 30; i += 1) {
+      const res = createMockResponse();
+      await handlers.apiSearch({ method: "GET", headers: { "x-forwarded-for": "2.2.2.2" }, url: "/api/geo/search?q=austin" } as never, res as never);
+    }
 
-    const res = createMockResponse();
-    await handlers.autocomplete({
-      method: "POST",
-      headers: { "x-perbug-geo-service": "geo-secret" },
-      url: "/v1/autocomplete",
-      [Symbol.asyncIterator]: async function* () { yield Buffer.from('{"query":"aus"}'); }
-    } as never, res as never);
-
-    expect(res.statusCode).toBe(200);
-    expect(String(res.body)).toContain("Austin");
+    const blocked = createMockResponse();
+    await handlers.apiSearch({ method: "GET", headers: { "x-forwarded-for": "2.2.2.2" }, url: "/api/geo/search?q=austin" } as never, blocked as never);
+    expect(blocked.statusCode).toBe(429);
   });
 });
 

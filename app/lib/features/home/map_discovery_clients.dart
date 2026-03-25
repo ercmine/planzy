@@ -16,29 +16,35 @@ class RemoteMapGeoClient implements MapGeoClient {
   @override
   Future<List<GeocodeResult>> geocode(String query) async {
     if (query.trim().isEmpty) return const [];
-    final response = await _apiClient.postJson('/v1/geocode', body: {'query': query, 'limit': 5});
+    final response = await _apiClient.getJson('/api/geo/search', queryParameters: {
+      'q': query,
+      'limit': '5',
+    });
     final rows = response['results'];
     if (rows is! List) return const [];
     return rows.whereType<Map<String, dynamic>>().map((row) {
       return GeocodeResult(
         displayName: (row['displayName'] ?? '').toString(),
         lat: (row['lat'] as num?)?.toDouble() ?? 0,
-        lng: (row['lng'] as num?)?.toDouble() ?? 0,
+        lng: (row['lon'] as num?)?.toDouble() ?? (row['lng'] as num?)?.toDouble() ?? 0,
         city: row['city']?.toString(),
-        region: row['state']?.toString(),
+        region: row['region']?.toString(),
       );
     }).toList(growable: false);
   }
 
   @override
   Future<ReverseGeocodeResult?> reverseGeocode({required double lat, required double lng}) async {
-    final response = await _apiClient.postJson('/v1/reverse-geocode', body: {'lat': lat, 'lng': lng});
+    final response = await _apiClient.getJson('/api/geo/reverse', queryParameters: {
+      'lat': lat.toString(),
+      'lon': lng.toString(),
+    });
     final row = response['result'];
     if (row is! Map<String, dynamic>) return null;
     return ReverseGeocodeResult(
       displayName: (row['displayName'] ?? '').toString(),
       city: row['city']?.toString(),
-      region: row['state']?.toString(),
+      region: row['region']?.toString(),
     );
   }
 }

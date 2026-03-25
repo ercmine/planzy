@@ -1,37 +1,48 @@
-# Geospatial platform integration (`geo.perbug.com`)
+# Geospatial integration (`geo.perbug.com`)
 
-Perbug geospatial responsibilities are now split across two deployable services:
+Perbug mobile clients **must only call backend geo endpoints**. The backend is the single integration point for `geo.perbug.com` and shields app clients from raw Nominatim schema.
 
-- **Backend server**: business/product APIs, calls geo service through a typed gateway (`backend/src/geo`).
-- **Geo server (`geo.perbug.com`)**: geocode/reverse-geocode API in front of self-hosted Nominatim.
+## Runtime architecture
 
-## Backend integration path
+- **Flutter app** → `api.perbug.com` (`/api/geo/*`)
+- **Backend geo layer** (`backend/src/geo`) → `geo.perbug.com` (or local fallback)
+- **Geo service** (`geo.perbug.com`) → self-hosted Nominatim
 
-Backend routes call `GeoGateway` rather than scattered raw HTTP/Nominatim calls:
+## Backend geo module
 
-- `backend/src/geo/config.ts`: env-driven runtime config
-- `backend/src/geo/client.ts`: typed client with timeout/retry/auth header
-- `backend/src/geo/gateway.ts`: switches between remote geo host and local fallback
-- `backend/src/geo/http.ts`: standardized handlers for geocoding endpoints and health/readiness/version
+- `backend/src/geo/config.ts`: env-driven runtime config.
+- `backend/src/geo/client.ts`: typed upstream client with timeout/retry/auth.
+- `backend/src/geo/gateway.ts`: local/remote gateway switch.
+- `backend/src/geo/http.ts`: public + internal handlers, normalization, and public rate limiting.
 
-## API surface
+## Public app-facing endpoints
+
+- `GET /api/geo/search`
+- `GET /api/geo/reverse`
+- `GET /api/geo/autocomplete`
+- `GET /api/geo/nearby` (discovery-backed)
+
+The payloads are Perbug-friendly DTOs (`PerbugGeoPlace`) and are intentionally stable for mobile clients.
+
+## Internal compatibility endpoints
 
 - `POST|GET /v1/geocode`
 - `POST|GET /v1/reverse-geocode`
+- `POST /v1/autocomplete`
+- `POST /v1/place-lookup`
+- `POST /v1/area-context`
 - `GET /v1/geocoding/health`
-- `GET /health`
-- `GET /ready`
-- `GET /version`
+
+## Environment variables
+
+- `GEO_SERVICE_ENABLED`
+- `GEO_SERVICE_BASE_URL` (use `https://geo.perbug.com` in prod)
+- `GEO_SERVICE_TIMEOUT_MS`
+- `GEO_SERVICE_RETRIES`
+- `GEO_SERVICE_AUTH_SECRET`
+- `GEO_PUBLIC_RATE_LIMIT_PER_MINUTE`
+- `NOMINATIM_*` fallback env values for local mode
 
 ## Security model
 
-Service-to-service requests may include `x-perbug-geo-service` set from `GEO_SERVICE_AUTH_SECRET`.
-
-## Deployment assets
-
-See top-level `geo/` for `geo.perbug.com` deployment templates:
-
-- Nginx TLS reverse proxy config
-- systemd unit template
-- deployment sequence script
-- env examples and runbooks
+Internal service-to-service requests may include `x-perbug-geo-service` (`GEO_SERVICE_AUTH_SECRET`). Public `/api/geo/*` endpoints are rate-limited and validated by backend before upstream calls.
