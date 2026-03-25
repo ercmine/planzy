@@ -321,6 +321,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   bool _statsOverlayCollapsed = false;
   bool _searchAreaOverlayCollapsed = false;
   bool _selectedPlaceOverlayCollapsed = false;
+  bool _is3dMode = false;
   LatLng? _lastMapCenter;
   double? _lastMapZoom;
   Timer? _viewportDebounce;
@@ -463,6 +464,18 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                               ),
                           ],
                         ),
+                        if (_is3dMode)
+                          PolygonLayer(
+                            polygons: [
+                              for (final zone in world.districts)
+                                Polygon(
+                                  points: _district3dShadow(zone),
+                                  color: zone.color.withOpacity(0.12),
+                                  borderColor: zone.color.withOpacity(0.26),
+                                  borderStrokeWidth: 1.5,
+                                ),
+                            ],
+                          ),
                         MarkerLayer(markers: _buildCollectibleMarkers(world, selectedCollectible)),
                         MarkerLayer(
                           markers: _buildMarkers(
@@ -640,14 +653,24 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                       areaLabel: state.areaLabel ?? state.geoStatus,
                     ),
                     const SizedBox(height: 10),
-                    DiscoveryFilterChips(
-                      filters: filters,
-                      selectedIds: state.selectedFilters,
-                      onToggle: (filterId) => controller.toggleFilter(filterById[filterId]!),
-                    ),
-                  ],
-                ),
-              ),
+                                  DiscoveryFilterChips(
+                                    filters: filters,
+                                    selectedIds: state.selectedFilters,
+                                    onToggle: (filterId) => controller.toggleFilter(filterById[filterId]!),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: FilterChip(
+                                      selected: _is3dMode,
+                                      label: const Text('3D map mode (beta)'),
+                                      avatar: const Icon(Icons.view_in_ar_rounded, size: 18),
+                                      onSelected: (value) => setState(() => _is3dMode = value),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
             ),
           ),
         ),
@@ -952,6 +975,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                   },
                 )
               : _PlaceMarker(
+                  category: item.places.first.category,
                   label: item.places.first.name,
                   rating: item.places.first.rating,
                   selected: selected?.canonicalPlaceId == item.places.first.canonicalPlaceId,
@@ -1260,6 +1284,7 @@ class _MarkerPresentation {
 
 class _PlaceMarker extends StatelessWidget {
   const _PlaceMarker({
+    required this.category,
     required this.label,
     required this.rating,
     required this.selected,
@@ -1271,6 +1296,7 @@ class _PlaceMarker extends StatelessWidget {
     required this.onTap,
   });
 
+  final String category;
   final String label;
   final double rating;
   final bool selected;
@@ -1318,7 +1344,18 @@ class _PlaceMarker extends StatelessWidget {
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Icon(Icons.location_on_rounded, size: 22, color: foregroundColor),
+                      Container(
+                        width: 26,
+                        height: 26,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [foregroundColor.withOpacity(0.2), foregroundColor.withOpacity(0.05)],
+                          ),
+                        ),
+                        child: Text(_categorySprite(category), style: const TextStyle(fontSize: 14)),
+                      ),
                       if (saved)
                         Positioned(
                           right: -4,
@@ -1412,4 +1449,25 @@ class _ClusterMarker extends StatelessWidget {
       ),
     );
   }
+}
+
+List<LatLng> _district3dShadow(DistrictZone zone) {
+  const offset = 0.008;
+  return [
+    LatLng(zone.centerLat - offset * 0.75, zone.centerLng - offset),
+    LatLng(zone.centerLat - offset * 0.75, zone.centerLng + offset),
+    LatLng(zone.centerLat + offset * 1.2, zone.centerLng + offset * 1.25),
+    LatLng(zone.centerLat + offset * 1.2, zone.centerLng - offset * 1.25),
+  ];
+}
+
+String _categorySprite(String category) {
+  final value = category.toLowerCase();
+  if (value.contains('coffee')) return '☕';
+  if (value.contains('food') || value.contains('restaurant')) return '🍽️';
+  if (value.contains('night') || value.contains('bar')) return '🍸';
+  if (value.contains('park') || value.contains('outdoor')) return '🌳';
+  if (value.contains('museum') || value.contains('art')) return '🏛️';
+  if (value.contains('shop')) return '🛍️';
+  return '📍';
 }
