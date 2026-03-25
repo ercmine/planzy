@@ -45,9 +45,11 @@ function parseBounds(body: Record<string, unknown>): GeoBounds | undefined {
 
 function normalizePlace(result: GeoResult | GeoReverseResult, index: number): PerbugGeoPlace {
   const shortAddress = [result.city, result.state, result.country].filter(Boolean).join(", ") || undefined;
-  const bounds = result.boundingBox
-    ? { south: result.boundingBox[0], north: result.boundingBox[1], west: result.boundingBox[2], east: result.boundingBox[3] }
+  const boundingBox = "boundingBox" in result ? result.boundingBox : undefined;
+  const bounds = boundingBox
+    ? { south: boundingBox[0], north: boundingBox[1], west: boundingBox[2], east: boundingBox[3] }
     : undefined;
+  const importance = "importance" in result ? result.importance : undefined;
 
   const base = `${(result.displayName ?? "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${result.lat.toFixed(4)}-${result.lng.toFixed(4)}-${index}`;
 
@@ -67,7 +69,7 @@ function normalizePlace(result: GeoResult | GeoReverseResult, index: number): Pe
     postcode: result.postalCode,
     source: "nominatim",
     confidence: result.confidence,
-    importance: result.importance,
+    importance,
     osm: { canonicalKey: base },
     match: {
       knownPlace: false,
