@@ -705,6 +705,23 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
               ),
             ),
           ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: selected != null ? 210 : 96,
+          child: IgnorePointer(
+            ignoring: !_mapReady,
+            child: Center(
+              child: PulsingSearchAreaButton(
+                isLoading: state.loading,
+                onPressed: () async {
+                  await controller.searchThisArea(mode: 'search_this_area');
+                  await controller.refreshAreaLabel();
+                },
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -758,8 +775,23 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   }
 
   Future<void> _searchForLocation(MapDiscoveryController controller) async {
-    final result = await controller.searchLocation(_searchController.text);
-    if (!mounted || result == null) return;
+    final query = _searchController.text.trim();
+    if (query.isEmpty) {
+      await controller.searchThisArea(mode: 'search_this_area');
+      await controller.refreshAreaLabel();
+      if (!mounted) return;
+      _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+      return;
+    }
+
+    final result = await controller.searchLocation(query);
+    if (!mounted) return;
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No matching location found. Try a nearby neighborhood or city.')),
+      );
+      return;
+    }
     _moveMap(state: ref.read(mapDiscoveryControllerProvider));
   }
 

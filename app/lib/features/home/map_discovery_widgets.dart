@@ -282,6 +282,53 @@ class SearchAreaButton extends StatelessWidget {
   }
 }
 
+class PulsingSearchAreaButton extends StatefulWidget {
+  const PulsingSearchAreaButton({
+    super.key,
+    required this.onPressed,
+    required this.isLoading,
+  });
+
+  final VoidCallback onPressed;
+  final bool isLoading;
+
+  @override
+  State<PulsingSearchAreaButton> createState() => _PulsingSearchAreaButtonState();
+}
+
+class _PulsingSearchAreaButtonState extends State<PulsingSearchAreaButton> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
+      ..repeat(reverse: true);
+    _scale = Tween<double>(begin: 0.96, end: 1.04).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scale,
+      child: FilledButton.icon(
+        onPressed: widget.isLoading ? null : widget.onPressed,
+        icon: widget.isLoading
+            ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.radar_rounded),
+        label: const Text('Pulse this area'),
+      ),
+    );
+  }
+}
+
 class DiscoveryCountPill extends StatelessWidget {
   const DiscoveryCountPill({super.key, required this.count, required this.label});
 
