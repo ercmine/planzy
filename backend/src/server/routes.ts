@@ -96,6 +96,8 @@ import { createCompetitionHttpHandlers } from "../competition/http.js";
 import type { CompetitionService } from "../competition/service.js";
 import { createSponsoredLocationsHttpHandlers } from "../sponsoredLocations/http.js";
 import type { SponsoredLocationsService } from "../sponsoredLocations/service.js";
+import { createPerbugEconomyHttpHandlers } from "../perbugEconomy/http.js";
+import type { PerbugEconomyService } from "../perbugEconomy/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -184,6 +186,7 @@ export function createRoutes(
     perbugTipsService?: PerbugTipsService;
     competitionService?: CompetitionService;
     sponsoredLocationsService?: SponsoredLocationsService;
+    perbugEconomyService?: PerbugEconomyService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -219,6 +222,7 @@ export function createRoutes(
   const perbugTipsHandlers = deps?.perbugTipsService ? createPerbugTipsHttpHandlers(deps.perbugTipsService) : null;
   const competitionHandlers = deps?.competitionService ? createCompetitionHttpHandlers(deps.competitionService) : null;
   const sponsoredLocationHandlers = deps?.sponsoredLocationsService ? createSponsoredLocationsHttpHandlers(deps.sponsoredLocationsService) : null;
+  const economyHandlers = deps?.perbugEconomyService ? createPerbugEconomyHttpHandlers(deps.perbugEconomyService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -410,6 +414,84 @@ export function createRoutes(
       const campaignLedgerMatch = matchPath("/v1/admin/sponsored/campaigns/:campaignId/ledger", normalizedPath);
       if (req.method === "GET" && campaignLedgerMatch && sponsoredLocationHandlers) {
         await sponsoredLocationHandlers.campaignLedger(req, res, campaignLedgerMatch.campaignId);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/admin/perbug-economy/credit" && economyHandlers) {
+        await economyHandlers.creditUser(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/business/quests" && economyHandlers) {
+        await economyHandlers.createQuest(req, res);
+        return;
+      }
+      const completeQuestMatch = matchPath("/v1/quests/:questId/complete", normalizedPath);
+      if (req.method === "POST" && completeQuestMatch && economyHandlers) {
+        await economyHandlers.completeQuest(req, res, completeQuestMatch.questId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/exploration/check-in" && economyHandlers) {
+        await economyHandlers.checkIn(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/perbug-economy/collections" && economyHandlers) {
+        await economyHandlers.upsertCollection(req, res);
+        return;
+      }
+      const progressCollectionMatch = matchPath("/v1/collections/:collectionId/progress", normalizedPath);
+      if (req.method === "POST" && progressCollectionMatch && economyHandlers) {
+        await economyHandlers.progressCollection(req, res, progressCollectionMatch.collectionId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/creator/economy/rewards" && economyHandlers) {
+        await economyHandlers.recordCreatorReward(req, res);
+        return;
+      }
+      const claimCreatorRewardMatch = matchPath("/v1/creator/economy/rewards/:rewardId/claim", normalizedPath);
+      if (req.method === "POST" && claimCreatorRewardMatch && economyHandlers) {
+        await economyHandlers.claimCreatorReward(req, res, claimCreatorRewardMatch.rewardId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/curator/guides" && economyHandlers) {
+        await economyHandlers.createGuide(req, res);
+        return;
+      }
+      const guideAnalyticsMatch = matchPath("/v1/curator/guides/:guideId/analytics", normalizedPath);
+      if (req.method === "POST" && guideAnalyticsMatch && economyHandlers) {
+        await economyHandlers.guideAnalytics(req, res, guideAnalyticsMatch.guideId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/premium/membership/purchase" && economyHandlers) {
+        await economyHandlers.purchaseMembership(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/business/offers" && economyHandlers) {
+        await economyHandlers.createOffer(req, res);
+        return;
+      }
+      const redeemOfferMatch = matchPath("/v1/offers/:offerId/redeem", normalizedPath);
+      if (req.method === "POST" && redeemOfferMatch && economyHandlers) {
+        await economyHandlers.redeemOffer(req, res, redeemOfferMatch.offerId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/perbug-economy/splits" && economyHandlers) {
+        await economyHandlers.updateSplit(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/perbug-economy/dashboard" && economyHandlers) {
+        await economyHandlers.adminDashboard(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/perbug-economy/me" && economyHandlers) {
+        await economyHandlers.consumerDashboard(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/creator/economy/dashboard" && economyHandlers) {
+        await economyHandlers.creatorDashboard(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/business/economy/dashboard" && economyHandlers) {
+        await economyHandlers.businessDashboard(req, res);
         return;
       }
 
