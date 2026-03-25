@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/identity/identity_provider.dart';
 import '../features/deck/deck_page.dart';
+import '../features/economy/perbug_economy_hub_page.dart';
 import '../features/home/home_page.dart';
 import '../features/hubs/activity_page.dart';
 import '../features/hubs/planner_page.dart';
@@ -159,6 +160,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/creator/rewards',
         name: 'creator-rewards',
         builder: (context, state) => const CreatorRewardsPage(),
+      ),
+      GoRoute(
+        path: '/economy',
+        name: 'economy',
+        builder: (context, state) => const PerbugEconomyHubPage(),
       ),
       GoRoute(
         path: '/settings',

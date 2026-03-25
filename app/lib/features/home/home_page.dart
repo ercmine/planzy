@@ -1449,6 +1449,20 @@ class _ProfileTabState extends ConsumerState<_ProfileTab> with AutomaticKeepAliv
             child: Column(
               children: [
                 _SettingsEntry(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Perbug Balance hub',
+                  subtitle: 'Wallet, rewards, quests, collections, and earning progression.',
+                  onTap: () => context.push('/economy'),
+                ),
+                const Divider(height: 1),
+                _SettingsEntry(
+                  icon: Icons.insights_outlined,
+                  title: 'Creator earnings',
+                  subtitle: 'Performance, claimable rewards, and monetization activity.',
+                  onTap: () => context.push('/creator/rewards'),
+                ),
+                const Divider(height: 1),
+                _SettingsEntry(
                   icon: Icons.settings_outlined,
                   title: 'Open settings',
                   subtitle: 'Notifications, permissions, support, and privacy controls.',
