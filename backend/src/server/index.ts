@@ -69,6 +69,7 @@ import { MemoryPerbugRewardsStore, PerbugRewardsService } from "../perbugRewards
 import { MemoryPerbugTipsStore, PerbugTipsService } from "../perbugTips/index.js";
 import { CompetitionService, MemoryCompetitionStore } from "../competition/index.js";
 import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../sponsoredLocations/index.js";
+import { MemoryPerbugEconomyStore, PerbugEconomyService } from "../perbugEconomy/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -262,6 +263,21 @@ export function createServer(options?: CreateServerOptions) {
   competitionService.recordVideoPublished({ videoId: "video_seed_1", reviewId: "review_seed_1", userId: "u1", publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), city: "Bloomington", category: "coffee", canonicalPlaceId: "place-1" });
   competitionService.recordApprovedReview({ id: "review_event_1", reviewId: "review_seed_1", videoId: "video_seed_1", userId: "u1", canonicalPlaceId: "place-1", approvedAt: new Date().toISOString(), city: "Bloomington", category: "coffee", discoveryType: "first_review", approved: true, blocked: false });
   competitionService.recordLike({ id: "like_seed_1", videoId: "video_seed_1", userId: "fan_1", createdAt: new Date().toISOString(), valid: true, bannedUser: false, blockedUser: false, fraudFlagged: false });
+  const perbugEconomyService = new PerbugEconomyService(new MemoryPerbugEconomyStore());
+  perbugEconomyService.creditUser("u1", 500, "seed");
+  perbugEconomyService.creditUser("u2", 250, "seed");
+  perbugEconomyService.creditUser("u3", 180, "seed");
+  perbugEconomyService.creditBusiness("biz_owner_seed", 1000, "seed");
+  perbugEconomyService.creditUser("creator_seed", 300, "seed");
+  perbugEconomyService.creditUser("curator_seed", 250, "seed");
+  perbugEconomyService.upsertCollection({
+    id: "collection_downtown_coffee",
+    title: "Downtown Coffee Circuit",
+    placeIds: ["place-1", "place-2"],
+    milestoneRewardsAtomic: [1000000n],
+    completionRewardAtomic: 2500000n,
+    active: true
+  }, "seed");
   gamificationControlService.seedInitialRules("system");
 
   return createHttpServer(service, merchantService, {
@@ -315,7 +331,8 @@ export function createServer(options?: CreateServerOptions) {
     perbugRewardsService,
     perbugTipsService,
     competitionService,
-    sponsoredLocationsService
+    sponsoredLocationsService,
+    perbugEconomyService
   });
 }
 
