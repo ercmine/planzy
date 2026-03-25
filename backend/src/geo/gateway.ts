@@ -114,8 +114,9 @@ class LocalGeoGateway implements GeoGateway {
 
 export function createBackendGeoGatewayFromEnv(env: NodeJS.ProcessEnv = process.env): GeoGateway | null {
   const config = readGeoRuntimeConfig(env);
+  const hasExplicitRemoteBaseUrl = typeof env.GEO_SERVICE_BASE_URL === "string" && env.GEO_SERVICE_BASE_URL.trim().length > 0;
 
-  if (config.client.enabled) {
+  if (config.client.enabled || hasExplicitRemoteBaseUrl) {
     return new RemoteGeoGateway(new GeoServiceClient(config.client));
   }
 

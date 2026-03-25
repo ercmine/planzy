@@ -1347,6 +1347,11 @@ export function createRoutes(
         return;
       }
 
+      if (geoHandlers && req.method === "GET" && normalizedPath === "/api/geo/nearby") {
+        await geoHandlers.apiNearby(req, res);
+        return;
+      }
+
       if (geoHandlers && req.method === "GET" && normalizedPath === "/v1/geocode") {
         await geoHandlers.geocode(req, res);
         return;
@@ -1404,11 +1409,6 @@ export function createRoutes(
 
       if (discoveryHandlers && req.method === "GET" && normalizedPath === "/v1/discovery/browse") {
         await discoveryHandlers.browse(req, res);
-        return;
-      }
-
-      if (discoveryHandlers && req.method === "GET" && normalizedPath === "/api/geo/nearby") {
-        await discoveryHandlers.nearby(req, res);
         return;
       }
 

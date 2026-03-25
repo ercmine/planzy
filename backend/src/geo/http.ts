@@ -81,6 +81,17 @@ function normalizePlace(result: GeoResult | GeoReverseResult, index: number): Pe
   };
 }
 
+function toBoundsFromRadius(lat: number, lng: number, radiusMeters: number): GeoBounds {
+  const latDelta = radiusMeters / 111_000;
+  const lngDelta = radiusMeters / (111_000 * Math.max(Math.cos((lat * Math.PI) / 180), 0.15));
+  return {
+    north: lat + latDelta,
+    south: lat - latDelta,
+    east: lng + lngDelta,
+    west: lng - lngDelta
+  };
+}
+
 export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret?: string; rateLimitPerMinute?: number } = {}) {
   const limiter = new InMemoryGeoRateLimiter({ maxRequestsPerMinute: Math.max(30, options.rateLimitPerMinute ?? 180) });
 
@@ -170,8 +181,10 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
           bounds: parseBounds(Object.fromEntries(url.searchParams.entries()))
         };
         const results = await gateway.geocode(request);
+        console.info("[geo.api.search]", { query, limit: request.limit, resultCount: results.length });
         sendJson(res, 200, { results: results.map(normalizePlace) });
       } catch (error) {
+        console.warn("[geo.api.search.error]", { error: error instanceof Error ? error.message : String(error) });
         sendJson(res, 502, { error: "geo_search_failed", message: error instanceof Error ? error.message : String(error) });
       }
     },
@@ -187,8 +200,10 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
           return;
         }
         const result = await gateway.reverseGeocode({ lat, lng, language: url.searchParams.get("language") ?? undefined });
+        console.info("[geo.api.reverse]", { lat, lng, hasResult: Boolean(result.displayName) });
         sendJson(res, 200, { result: normalizePlace(result, 0) });
       } catch (error) {
+        console.warn("[geo.api.reverse.error]", { error: error instanceof Error ? error.message : String(error) });
         sendJson(res, 502, { error: "geo_reverse_failed", message: error instanceof Error ? error.message : String(error) });
       }
     },
@@ -212,9 +227,62 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
             lng: toNumber(url.searchParams.get("lon") ?? url.searchParams.get("lng"))
           }
         });
+        console.info("[geo.api.autocomplete]", { query, count: suggestions.length });
         sendJson(res, 200, { suggestions });
       } catch (error) {
+        console.warn("[geo.api.autocomplete.error]", { error: error instanceof Error ? error.message : String(error) });
         sendJson(res, 502, { error: "geo_autocomplete_failed", message: error instanceof Error ? error.message : String(error) });
+      }
+    },
+
+    async apiNearby(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      if (!guardPublicEndpoint(req, res)) return;
+      try {
+        const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+        const lat = toNumber(url.searchParams.get("lat"));
+        const lng = toNumber(url.searchParams.get("lon") ?? url.searchParams.get("lng"));
+        if (lat === undefined || lng === undefined) {
+          sendJson(res, 400, { error: "invalid_coordinates", message: "lat and lon are required numbers" });
+          return;
+        }
+
+        const radiusMeters = Math.max(200, Math.min(25_000, toNumber(url.searchParams.get("radius")) ?? 3_500));
+        const limit = Math.max(1, Math.min(120, toNumber(url.searchParams.get("limit")) ?? 60));
+        const categoryTokens = (url.searchParams.get("categories") ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+        const area = await gateway.reverseGeocode({ lat, lng, language: url.searchParams.get("language") ?? undefined });
+        const baseQuery = [area.neighborhood, area.city, area.state].filter((item) => Boolean(item && item.trim().length > 0)).join(" ");
+        const searchQueries = categoryTokens.length === 0
+          ? [baseQuery || area.displayName]
+          : categoryTokens.map((token) => `${token} ${baseQuery || area.displayName}`.trim());
+        const bounds = toBoundsFromRadius(lat, lng, radiusMeters);
+        const rows: GeoResult[] = [];
+        for (const query of searchQueries) {
+          if (!query || rows.length >= limit) break;
+          const results = await gateway.geocode({
+            query,
+            bounds,
+            language: url.searchParams.get("language") ?? undefined,
+            limit: Math.max(6, Math.ceil(limit / Math.max(1, searchQueries.length)))
+          });
+          rows.push(...results);
+        }
+
+        const deduped = new Map<string, GeoResult>();
+        for (const row of rows) {
+          const key = `${row.displayName.toLowerCase()}|${row.lat.toFixed(5)}|${row.lng.toFixed(5)}`;
+          if (!deduped.has(key)) deduped.set(key, row);
+          if (deduped.size >= limit) break;
+        }
+        const places = [...deduped.values()].slice(0, limit).map(normalizePlace);
+        console.info("[geo.api.nearby]", { lat, lng, radiusMeters, categoryCount: categoryTokens.length, resultCount: places.length });
+        sendJson(res, 200, {
+          origin: { lat, lng },
+          radiusMeters,
+          places
+        });
+      } catch (error) {
+        console.warn("[geo.api.nearby.error]", { error: error instanceof Error ? error.message : String(error) });
+        sendJson(res, 502, { error: "geo_nearby_failed", message: error instanceof Error ? error.message : String(error) });
       }
     },
 
