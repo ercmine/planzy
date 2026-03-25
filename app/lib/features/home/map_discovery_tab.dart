@@ -25,6 +25,7 @@ import 'map_game_world_widgets.dart';
 import 'place_preview_card.dart';
 import 'place_video_detail_page.dart';
 import '../video_platform/video_providers.dart';
+import '../../api/api_error.dart';
 
 class MapViewportState {
   const MapViewportState({
@@ -98,8 +99,8 @@ final mapGeoClientProvider = FutureProvider<MapGeoClient>((ref) async {
 });
 
 final placeDiscoveryClientProvider = FutureProvider<PlaceDiscoveryClient>((ref) async {
-  final repository = await ref.watch(videoRepositoryProvider.future);
-  return BackendPlaceDiscoveryClient(repository);
+  final geoClient = await ref.watch(mapGeoClientProvider.future);
+  return BackendPlaceDiscoveryClient(geoClient);
 });
 
 final mapCollectionsProvider = FutureProvider<List<CollectionCardModel>>((ref) async {
@@ -207,6 +208,14 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
       await refreshAreaLabel();
       await searchThisArea(mode: 'search_this_area');
       return match;
+    } on ApiError catch (error) {
+      final message = error.statusCode == 502
+          ? 'Search is temporarily unavailable.'
+          : error.statusCode == 429
+              ? 'Search is temporarily busy. Please retry in a moment.'
+              : 'Search failed. Please retry.';
+      state = state.copyWith(geoStatus: message);
+      return null;
     } catch (_) {
       state = state.copyWith(geoStatus: 'Search is temporarily unavailable.');
       return null;
@@ -256,6 +265,14 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
             ? state.selectedPlaceId
             : (pins.isEmpty ? null : pins.first.canonicalPlaceId),
       );
+    } on ApiError catch (error) {
+      if (requestId != _searchRequestId) return;
+      final message = error.statusCode == 502
+          ? 'Nearby places are temporarily unavailable.'
+          : error.statusCode == 429
+              ? 'Nearby search is busy. Please retry shortly.'
+              : 'Could not load nearby places. Retry to refresh this area.';
+      state = state.copyWith(loading: false, pendingViewportSearch: false, discoveryError: message);
     } catch (_) {
       if (requestId != _searchRequestId) return;
       state = state.copyWith(loading: false, pendingViewportSearch: false, discoveryError: 'Could not load nearby places. Retry to refresh this area.');

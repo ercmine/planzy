@@ -73,6 +73,23 @@ describe("createGeoHttpHandlers", () => {
     await handlers.apiSearch({ method: "GET", headers: { "x-forwarded-for": "2.2.2.2" }, url: "/api/geo/search?q=austin" } as never, blocked as never);
     expect(blocked.statusCode).toBe(429);
   });
+
+  it("serves /api/geo/nearby responses", async () => {
+    const handlers = createGeoHttpHandlers({
+      geocode: vi.fn(async () => [{ displayName: "Coffee Austin", lat: 30.2672, lng: -97.7431, source: "nominatim" as const }]),
+      reverseGeocode: vi.fn(async () => ({ displayName: "Austin, Texas", lat: 30.2672, lng: -97.7431, city: "Austin", state: "Texas", source: "nominatim" as const })),
+      autocomplete: vi.fn(),
+      placeLookup: vi.fn(),
+      areaContext: vi.fn(),
+      health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
+    });
+
+    const res = createMockResponse();
+    await handlers.apiNearby({ method: "GET", headers: {}, url: "/api/geo/nearby?lat=30.2672&lng=-97.7431&radius=1500" } as never, res as never);
+
+    expect(res.statusCode).toBe(200);
+    expect(String(res.body)).toContain("Coffee Austin");
+  });
 });
 
 function createMockResponse() {
