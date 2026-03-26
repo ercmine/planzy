@@ -727,8 +727,8 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
           ),
         Positioned(
           right: 10,
-          top: 180,
-          bottom: selected != null ? 236 : 122,
+          top: 192,
+          bottom: selected != null ? 224 : 110,
           child: _ZoomSliderControl(
             zoom: state.viewport.zoom.clamp(_minMapZoom, _maxMapZoom),
             minZoom: _minMapZoom,
