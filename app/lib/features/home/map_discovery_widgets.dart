@@ -123,67 +123,93 @@ class DiscoverySearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.surface.withOpacity(0.92),
+            theme.colorScheme.surfaceContainerHighest.withOpacity(0.82),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withOpacity(0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) => onSubmit(),
-                decoration: InputDecoration(
-                  hintText: 'Search neighborhoods, landmarks, or a specific place',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: isLoading
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : IconButton(
-                          tooltip: 'Search map',
-                          onPressed: onSubmit,
-                          icon: const Icon(Icons.arrow_forward_rounded),
-                        ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => onSubmit(),
+                    decoration: InputDecoration(
+                      hintText: 'Search neighborhoods, landmarks, or a specific place',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      filled: true,
+                      fillColor: theme.colorScheme.surface.withOpacity(0.76),
+                      suffixIcon: isLoading
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : IconButton(
+                              tooltip: 'Search map',
+                              onPressed: onSubmit,
+                              icon: const Icon(Icons.arrow_forward_rounded),
+                            ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                _CircleActionButton(
+                  tooltip: locationEnabled ? 'Center on my location' : 'Enable location',
+                  icon: locationEnabled ? Icons.my_location_rounded : Icons.location_searching_rounded,
+                  onTap: onRecenter,
+                ),
+                const SizedBox(width: 8),
+                _CircleActionButton(
+                  tooltip: 'Change sort',
+                  icon: Icons.tune_rounded,
+                  onTap: onOpenSortSheet,
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            _CircleActionButton(
-              tooltip: locationEnabled ? 'Center on my location' : 'Enable location',
-              icon: locationEnabled ? Icons.my_location_rounded : Icons.location_searching_rounded,
-              onTap: onRecenter,
-            ),
-            const SizedBox(width: 8),
-            _CircleActionButton(
-              tooltip: 'Change sort',
-              icon: Icons.tune_rounded,
-              onTap: onOpenSortSheet,
-            ),
-          ],
-        ),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                areaLabel ?? 'Explore the map to surface the best nearby places.',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    areaLabel ?? 'Explore the map to surface the best nearby places.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                if (areaLabel != null)
+                  AppPill(
+                    label: 'Live area',
+                    icon: Icons.explore_rounded,
+                    backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
+                  ),
+              ],
             ),
-            if (areaLabel != null)
-              AppPill(
-                label: 'Live area',
-                icon: Icons.explore_rounded,
-                backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
-              ),
           ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -888,16 +914,29 @@ class _CircleActionButton extends StatelessWidget {
     final theme = Theme.of(context);
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          child: SizedBox(
-            width: 50,
-            height: 50,
-            child: Icon(icon),
+          gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.surfaceContainerHighest.withOpacity(0.96),
+              theme.colorScheme.surface.withOpacity(0.88),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.45)),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              width: 50,
+              height: 50,
+              child: Icon(icon),
+            ),
           ),
         ),
       ),
