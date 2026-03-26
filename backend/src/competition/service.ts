@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { ValidationError } from "../plans/errors.js";
-import type { DryadRewardsService } from "../dryadRewards/service.js";
+import type { DryadRewardsService } from "../perbugRewards/service.js";
 import type { CompetitionStore } from "./store.js";
 import { computeCompetitionScore, resolveQualityBand } from "./scoring.js";
 import type {
