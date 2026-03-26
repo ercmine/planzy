@@ -7,10 +7,10 @@ import '../dryad/pages/market_page.dart';
 import '../dryad/pages/wallet_page.dart';
 import 'map_discovery_tab.dart';
 
-enum HomeTab { map, market, wallet, grove, profile }
+enum HomeTab { planting, market, grove, wallet, profile }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.initialTab = HomeTab.map});
+  const HomePage({super.key, this.initialTab = HomeTab.planting});
 
   final HomeTab initialTab;
 
@@ -19,7 +19,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const List<HomeTab> _tabs = [HomeTab.map, HomeTab.market, HomeTab.wallet, HomeTab.grove, HomeTab.profile];
+  static const List<HomeTab> _tabs = [HomeTab.planting, HomeTab.market, HomeTab.grove, HomeTab.wallet, HomeTab.profile];
   late int _navIndex;
 
   @override
@@ -34,8 +34,8 @@ class _HomePageState extends State<HomePage> {
     final pages = [
       const MapDiscoveryTab(),
       DryadMarketPage(onOpenTree: _openTree),
-      const DryadWalletPage(),
       DryadGrovePage(onOpenTree: _openTree),
+      const DryadWalletPage(),
       const _DryadProfilePage(),
     ];
 
@@ -47,10 +47,10 @@ class _HomePageState extends State<HomePage> {
         selectedIndex: _navIndex,
         onDestinationSelected: (value) => setState(() => _navIndex = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Map'),
-          NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Market'),
+          NavigationDestination(icon: Icon(Icons.spa_outlined), selectedIcon: Icon(Icons.spa), label: 'Planting'),
+          NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Marketplace'),
+          NavigationDestination(icon: Icon(Icons.forest_outlined), selectedIcon: Icon(Icons.forest), label: 'My Trees'),
           NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
-          NavigationDestination(icon: Icon(Icons.forest_outlined), selectedIcon: Icon(Icons.forest), label: 'Grove'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
@@ -72,12 +72,8 @@ class _DryadProfilePage extends StatelessWidget {
       children: const [
         PremiumHeader(
           title: 'Steward Profile',
-          subtitle: 'Identity across founder achievements, owned trees, and contribution impact.',
+          subtitle: 'Identity across ownership history, planting activity, and listing performance.',
           badge: AppPill(label: 'Dryad', icon: Icons.emoji_nature_outlined),
-        ),
-        SizedBox(height: 12),
-        AppCard(
-          child: Text('Founder badges, contribution leaderboards, and watchlist settings live here.'),
         ),
       ],
     );

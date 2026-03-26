@@ -103,6 +103,8 @@ import { createDryadEconomyHttpHandlers } from "../dryadEconomy/http.js";
 import type { DryadEconomyService } from "../dryadEconomy/service.js";
 import { createViewerEngagementRewardsHttpHandlers } from "../viewerEngagementRewards/http.js";
 import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
+import { createDryadMarketplaceHttpHandlers } from "../dryad/http.js";
+import type { DryadMarketplaceService } from "../dryad/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.dryad.dev";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -203,6 +205,7 @@ export function createRoutes(
     sponsoredLocationsService?: SponsoredLocationsService;
     dryadEconomyService?: DryadEconomyService;
     viewerEngagementRewardsService?: ViewerEngagementRewardsService;
+    dryadMarketplaceService?: DryadMarketplaceService;
     reviewEligibilityService?: ReviewEligibilityService;
   }
 ) {
@@ -253,6 +256,7 @@ export function createRoutes(
   const sponsoredLocationHandlers = deps?.sponsoredLocationsService ? createSponsoredLocationsHttpHandlers(deps.sponsoredLocationsService) : null;
   const economyHandlers = deps?.dryadEconomyService ? createDryadEconomyHttpHandlers(deps.dryadEconomyService) : null;
   const viewerRewardsHandlers = deps?.viewerEngagementRewardsService ? createViewerEngagementRewardsHttpHandlers(deps.viewerEngagementRewardsService) : null;
+  const dryadMarketplaceHandlers = deps?.dryadMarketplaceService ? createDryadMarketplaceHttpHandlers(deps.dryadMarketplaceService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -290,6 +294,37 @@ export function createRoutes(
 
       if (req.method === "GET" && normalizedPath === "/v1/competition/home" && competitionHandlers) {
         await competitionHandlers.home(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/trees" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.listTrees(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/market/listings" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.listListings(req, res);
+        return;
+      }
+      const dryadTreeMatch = matchPath("/v1/dryad/trees/:treeId", normalizedPath);
+      if (req.method === "GET" && dryadTreeMatch && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.getTree(req, res, dryadTreeMatch.treeId);
+        return;
+      }
+      const claimPlantMatch = matchPath("/v1/dryad/trees/:treeId/claim-plant", normalizedPath);
+      if (req.method === "POST" && claimPlantMatch && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.claimAndPlant(req, res, claimPlantMatch.treeId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/dryad/market/listings" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.listTree(req, res);
+        return;
+      }
+      const unlistMatch = matchPath("/v1/dryad/market/listings/:treeId", normalizedPath);
+      if (req.method === "DELETE" && unlistMatch && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.unlistTree(req, res, unlistMatch.treeId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/dryad/market/buy" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.buyTree(req, res);
         return;
       }
       if (req.method === "GET" && normalizedPath === "/v1/competition/missions" && competitionHandlers) {

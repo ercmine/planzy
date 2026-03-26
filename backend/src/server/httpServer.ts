@@ -46,6 +46,7 @@ import type { CompetitionService } from "../competition/service.js";
 import type { SponsoredLocationsService } from "../sponsoredLocations/service.js";
 import type { DryadEconomyService } from "../dryadEconomy/service.js";
 import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
+import type { DryadMarketplaceService } from "../dryad/service.js";
 import { createRoutes } from "./routes.js";
 
 export function matchPath(pattern: string, pathname: string): Record<string, string> | null {
@@ -125,6 +126,7 @@ export function createHttpServer(
     sponsoredLocationsService?: SponsoredLocationsService;
     dryadEconomyService?: DryadEconomyService;
     viewerEngagementRewardsService?: ViewerEngagementRewardsService;
+    dryadMarketplaceService?: DryadMarketplaceService;
   }
 ): Server {
   const route = createRoutes(service, merchantService, deps);
