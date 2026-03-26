@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/connectivity/connectivity_state.dart';
@@ -26,6 +24,8 @@ import 'place_preview_card.dart';
 import 'place_video_detail_page.dart';
 import '../video_platform/video_providers.dart';
 import '../../api/api_error.dart';
+import '../../core/env/env.dart';
+import 'perbug_maplibre_view.dart';
 
 class MapViewportState {
   const MapViewportState({
@@ -311,7 +311,6 @@ class MapDiscoveryTab extends ConsumerStatefulWidget {
 }
 
 class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
-  static const _defaultTileTemplate = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   static const List<MapFilterOption> filters = [
     MapFilterOption(id: 'cuisine', label: 'Cuisine', icon: Icons.restaurant_rounded, discoveryCategories: ['food']),
     MapFilterOption(id: 'coffee', label: 'Coffee', icon: Icons.local_cafe_rounded, discoveryCategories: ['coffee']),
@@ -331,7 +330,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   ];
   static final Map<String, MapFilterOption> filterById = {for (final filter in filters) filter.id: filter};
 
-  final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _savedPlaceIds = <String>{};
   bool _mapReady = false;
@@ -343,7 +341,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   bool _searchAreaOverlayCollapsed = false;
   bool _selectedPlaceOverlayCollapsed = false;
   bool _is3dMode = false;
-  LatLng? _lastMapCenter;
+  ({double lat, double lng})? _lastMapCenter;
   double? _lastMapZoom;
   Timer? _viewportDebounce;
   MapViewport? _lastAutoSearchViewport;
@@ -409,9 +407,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
 
     final visiblePlaces = _sortedAndFilteredPlaces(state.pins, state: state, location: location);
     final selected = _resolveSelectedPlace(state, visiblePlaces);
-    final markerItems = _clusterPlaces(visiblePlaces, zoom: state.viewport.zoom);
     final world = const MapWorldEngine().build(pins: visiblePlaces, viewport: state.viewport, location: location);
-    final selectedCollectible = world.collectibles.firstWhere((item) => item.placeId == selected?.canonicalPlaceId, orElse: () => world.collectibles.first);
     final permissionBlocked = _shouldShowPermissionOverlay(locationState);
     final showSearchArea = state.pendingViewportSearch;
 
@@ -430,86 +426,46 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: state.viewport.toLatLng(),
-                        initialZoom: state.viewport.zoom,
-                        interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
-                        onMapReady: () {
-                          if (!mounted) return;
-                          setState(() => _mapReady = true);
-                          _captureMapViewport();
-                        },
-                        onTap: (_, __) => controller.clearSelectedPlace(),
-                        onLongPress: (_, point) {
-                          controller.setViewport(
-                            MapViewport(centerLat: point.latitude, centerLng: point.longitude, zoom: max(state.viewport.zoom, 15)),
-                            markPendingSearch: true,
-                          );
-                        },
-                        onPositionChanged: (position, hasGesture) {
-                          final center = position.center;
-                          if (center == null) return;
-                          final nextZoom = position.zoom ?? state.viewport.zoom;
-                          final nextViewport = MapViewport(centerLat: center.latitude, centerLng: center.longitude, zoom: nextZoom);
-                          _lastMapCenter = center;
-                          _lastMapZoom = nextZoom;
-                          if (_isSyncingMapViewport && !hasGesture) {
-                            final targetViewport = ref.read(mapDiscoveryControllerProvider).viewport;
-                            if (nextViewport.isSimilarTo(targetViewport, centerThreshold: 0.0003, zoomThreshold: 0.01)) {
-                              _isSyncingMapViewport = false;
-                              return;
-                            }
+                    child: PerbugMapLibreView(
+                      viewport: state.viewport,
+                      pins: visiblePlaces,
+                      selectedPlaceId: selected?.canonicalPlaceId,
+                      userLocation: location == null ? null : (lat: location.lat, lng: location.lng),
+                      world: world,
+                      sponsoredPlaceIds: sponsoredPlaceIds,
+                      questPlaceIds: questPlaceIds,
+                      collectionPlaceIds: collectionPlaceIds,
+                      is3dMode: _is3dMode,
+                      config: ref.watch(envConfigProvider).mapStack,
+                      onMapReady: () {
+                        if (!mounted) return;
+                        setState(() => _mapReady = true);
+                      },
+                      onTapEmpty: () => controller.clearSelectedPlace(),
+                      onLongPress: (lat, lng) {
+                        controller.setViewport(
+                          MapViewport(centerLat: lat, centerLng: lng, zoom: max(state.viewport.zoom, 15)),
+                          markPendingSearch: true,
+                        );
+                      },
+                      onViewportChanged: (nextViewport, {required hasGesture}) {
+                        _lastMapCenter = (lat: nextViewport.centerLat, lng: nextViewport.centerLng);
+                        _lastMapZoom = nextViewport.zoom;
+                        if (_isSyncingMapViewport && !hasGesture) {
+                          final targetViewport = ref.read(mapDiscoveryControllerProvider).viewport;
+                          if (nextViewport.isSimilarTo(targetViewport, centerThreshold: 0.0003, zoomThreshold: 0.01)) {
+                            _isSyncingMapViewport = false;
+                            return;
                           }
-                          controller.setViewport(nextViewport, markPendingSearch: hasGesture);
-                          if (!hasGesture) _isSyncingMapViewport = false;
-                        },
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate: _defaultTileTemplate,
-                          userAgentPackageName: 'com.perbug.app',
-                          maxZoom: 19,
-                        ),
-                        CircleLayer(
-                          circles: [
-                            for (final zone in world.districts)
-                              CircleMarker(
-                                point: LatLng(zone.centerLat, zone.centerLng),
-                                radius: zone.radiusMeters,
-                                useRadiusInMeter: true,
-                                color: zone.color.withOpacity(0.12 + (zone.energy * 0.08)),
-                                borderColor: zone.color.withOpacity(0.42),
-                                borderStrokeWidth: 2,
-                              ),
-                          ],
-                        ),
-                        if (_is3dMode)
-                          PolygonLayer(
-                            polygons: [
-                              for (final zone in world.districts)
-                                Polygon(
-                                  points: _district3dShadow(zone),
-                                  color: zone.color.withOpacity(0.12),
-                                  borderColor: zone.color.withOpacity(0.26),
-                                  borderStrokeWidth: 1.5,
-                                ),
-                            ],
-                          ),
-                        MarkerLayer(markers: _buildCollectibleMarkers(world, selectedCollectible)),
-                        MarkerLayer(
-                          markers: _buildMarkers(
-                            markerItems,
-                            selected,
-                            world,
-                            location,
-                            sponsoredPlaceIds: sponsoredPlaceIds,
-                            questPlaceIds: questPlaceIds,
-                            collectionPlaceIds: collectionPlaceIds,
-                          ),
-                        ),
-                      ],
+                        }
+                        controller.setViewport(nextViewport, markPendingSearch: hasGesture);
+                        if (!hasGesture) _isSyncingMapViewport = false;
+                      },
+                      onPlaceSelected: (placeId) {
+                        controller.selectPlace(placeId);
+                        final pin = visiblePlaces.where((item) => item.canonicalPlaceId == placeId).firstOrNull;
+                        if (pin != null) _moveMapToPlace(pin);
+                      },
                     ),
                   ),
                   Positioned.fill(
@@ -1035,18 +991,12 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     });
   }
 
-  void _captureMapViewport() {
-    final center = _mapController.camera.center;
-    _lastMapCenter = center;
-    _lastMapZoom = _mapController.camera.zoom;
-  }
-
   void _moveMap({required MapViewportState state}) {
     if (!_mapReady) return;
-    final center = state.viewport.toLatLng();
+    final center = (lat: state.viewport.centerLat, lng: state.viewport.centerLng);
     final alreadyAligned = _lastMapCenter != null &&
-        (_lastMapCenter!.latitude - center.latitude).abs() <= 0.0003 &&
-        (_lastMapCenter!.longitude - center.longitude).abs() <= 0.0003 &&
+        (_lastMapCenter!.lat - center.lat).abs() <= 0.0003 &&
+        (_lastMapCenter!.lng - center.lng).abs() <= 0.0003 &&
         _lastMapZoom != null &&
         (_lastMapZoom! - state.viewport.zoom).abs() <= 0.01;
     if (alreadyAligned) {
@@ -1054,7 +1004,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
       return;
     }
     _isSyncingMapViewport = true;
-    _mapController.move(center, state.viewport.zoom);
     _lastMapCenter = center;
     _lastMapZoom = state.viewport.zoom;
   }
@@ -1137,84 +1086,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     );
   }
 
-  List<Marker> _buildMarkers(
-    List<_MarkerPresentation> markers,
-    MapPin? selected,
-    MapWorldState world,
-    AppLocation? location, {
-    required Set<String> sponsoredPlaceIds,
-    required Set<String> questPlaceIds,
-    required Set<String> collectionPlaceIds,
-  }) {
-    final built = <Marker>[
-      for (final item in markers)
-        Marker(
-          point: item.point,
-          width: item.isCluster ? 64 : 78,
-          height: item.isCluster ? 64 : 84,
-          child: item.isCluster
-              ? _ClusterMarker(
-                  count: item.places.length,
-                  highlighted: item.places.any((place) => place.canonicalPlaceId == selected?.canonicalPlaceId),
-                  onTap: () {
-                    final target = item.places.first;
-                    ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(target.canonicalPlaceId);
-                    _moveMapToPlace(target);
-                  },
-                )
-              : _PlaceMarker(
-                  category: item.places.first.category,
-                  label: item.places.first.name,
-                  rating: item.places.first.rating,
-                  selected: selected?.canonicalPlaceId == item.places.first.canonicalPlaceId,
-                  saved: _savedPlaceIds.contains(item.places.first.canonicalPlaceId),
-                  hasActivity: item.places.first.hasReviews || item.places.first.hasCreatorMedia,
-                  sponsored: sponsoredPlaceIds.contains(item.places.first.canonicalPlaceId),
-                  questEnabled: questPlaceIds.contains(item.places.first.canonicalPlaceId),
-                  collectionEnabled: collectionPlaceIds.contains(item.places.first.canonicalPlaceId),
-                  onTap: () {
-                    final pin = item.places.first;
-                    ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(pin.canonicalPlaceId);
-                    _moveMapToPlace(pin);
-                  },
-                ),
-        ),
-    ];
-
-    if (location != null) {
-      built.add(
-        Marker(
-          point: LatLng(location.lat, location.lng),
-          width: 74,
-          height: 74,
-          child: IgnorePointer(child: PlayerAvatarMarker(loadout: world.loadout)),
-        ),
-      );
-    }
-    return built;
-  }
-
-
-  List<Marker> _buildCollectibleMarkers(MapWorldState world, CollectibleItem? selectedCollectible) {
-    return [
-      for (final item in world.collectibles)
-        Marker(
-          point: LatLng(item.latitude, item.longitude),
-          width: 58,
-          height: 72,
-          child: CollectibleMarkerSprite(
-            item: item,
-            selected: item.id == selectedCollectible?.id,
-            onTap: () {
-              final state = ref.read(mapDiscoveryControllerProvider);
-              if (state.pins.any((pin) => pin.canonicalPlaceId == item.placeId)) {
-                ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(item.placeId);
-              }
-            },
-          ),
-        ),
-    ];
-  }
   Future<void> _openPlaceInMaps(LinkLauncher linkLauncher, MapPin place) async {
     await linkLauncher.openLink(
       context,
@@ -1342,32 +1213,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     return sorted;
   }
 
-  List<_MarkerPresentation> _clusterPlaces(List<MapPin> places, {required double zoom}) {
-    if (zoom >= 14.5 || places.length <= 8) {
-      return places
-          .map((place) => _MarkerPresentation(point: LatLng(place.latitude, place.longitude), places: [place]))
-          .toList(growable: false);
-    }
-
-    final bucketSize = zoom >= 13 ? 0.01 : zoom >= 11 ? 0.02 : 0.035;
-    final buckets = <String, List<MapPin>>{};
-    for (final place in places) {
-      final latBucket = (place.latitude / bucketSize).floor();
-      final lngBucket = (place.longitude / bucketSize).floor();
-      buckets.putIfAbsent('$latBucket:$lngBucket', () => <MapPin>[]).add(place);
-    }
-
-    return buckets.values.map((bucket) {
-      if (bucket.length == 1) {
-        final place = bucket.first;
-        return _MarkerPresentation(point: LatLng(place.latitude, place.longitude), places: [place]);
-      }
-      final avgLat = bucket.map((place) => place.latitude).reduce((a, b) => a + b) / bucket.length;
-      final avgLng = bucket.map((place) => place.longitude).reduce((a, b) => a + b) / bucket.length;
-      return _MarkerPresentation(point: LatLng(avgLat, avgLng), places: bucket);
-    }).toList(growable: false);
-  }
-
   List<PlaceBadge> _badgesFor(MapPin place) {
     final badges = <PlaceBadge>[];
     if (_isTrending(place)) badges.add(const PlaceBadge(label: 'Trending', tone: MapBadgeTone.warning));
@@ -1461,222 +1306,3 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   double _toRadians(double value) => value * 3.1415926535897932 / 180;
 }
 
-class _MarkerPresentation {
-  const _MarkerPresentation({required this.point, required this.places});
-
-  final LatLng point;
-  final List<MapPin> places;
-
-  bool get isCluster => places.length > 1;
-}
-
-class _PlaceMarker extends StatelessWidget {
-  const _PlaceMarker({
-    required this.category,
-    required this.label,
-    required this.rating,
-    required this.selected,
-    required this.saved,
-    required this.hasActivity,
-    required this.sponsored,
-    required this.questEnabled,
-    required this.collectionEnabled,
-    required this.onTap,
-  });
-
-  final String category;
-  final String label;
-  final double rating;
-  final bool selected;
-  final bool saved;
-  final bool hasActivity;
-  final bool sponsored;
-  final bool questEnabled;
-  final bool collectionEnabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final poolFeatured = _isFeaturedPool(
-      category: category,
-      sponsored: sponsored,
-      questEnabled: questEnabled,
-      collectionEnabled: collectionEnabled,
-    );
-    final backgroundColor = selected ? theme.colorScheme.primary : theme.colorScheme.surface;
-    final foregroundColor = selected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
-    final categoryIconColor = poolFeatured ? const Color(0xFFFFD54F) : foregroundColor.withOpacity(0.9);
-    final categoryIcon = poolFeatured ? Icons.auto_awesome_rounded : _categoryIconForCategory(category);
-
-    return Align(
-      alignment: Alignment.topCenter,
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 180),
-        scale: selected ? 1.05 : 1,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 58, maxWidth: 124),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: (selected ? theme.colorScheme.primary : Colors.black).withOpacity(selected ? 0.28 : 0.18),
-                    blurRadius: selected ? 18 : 12,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-                border: Border.all(color: selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 26,
-                        height: 26,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [foregroundColor.withOpacity(0.2), foregroundColor.withOpacity(0.05)],
-                          ),
-                        ),
-                        child: Icon(categoryIcon, size: 14, color: categoryIconColor),
-                      ),
-                      if (saved)
-                        Positioned(
-                          right: -4,
-                          top: -2,
-                          child: Icon(Icons.bookmark_rounded, size: 12, color: foregroundColor),
-                        ),
-                      if (sponsored)
-                        Positioned(
-                          left: -5,
-                          top: -4,
-                          child: Icon(Icons.campaign_rounded, size: 12, color: foregroundColor),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelMedium?.copyWith(color: foregroundColor, fontWeight: FontWeight.w800),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (hasActivity) ...[
-                        Icon(Icons.bolt_rounded, size: 11, color: foregroundColor.withOpacity(0.92)),
-                        const SizedBox(width: 2),
-                      ],
-                      if (questEnabled) ...[
-                        Icon(Icons.flag_outlined, size: 11, color: foregroundColor.withOpacity(0.92)),
-                        const SizedBox(width: 2),
-                      ],
-                      if (collectionEnabled) ...[
-                        Icon(Icons.collections_bookmark_outlined, size: 11, color: foregroundColor.withOpacity(0.92)),
-                        const SizedBox(width: 2),
-                      ],
-                      if (rating > 0)
-                        Text(
-                          '★ ${rating.toStringAsFixed(1)}',
-                          style: theme.textTheme.labelSmall?.copyWith(color: foregroundColor.withOpacity(0.92)),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ClusterMarker extends StatelessWidget {
-  const _ClusterMarker({required this.count, required this.highlighted, required this.onTap});
-
-  final int count;
-  final bool highlighted;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(32),
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: highlighted ? theme.colorScheme.primary : theme.colorScheme.surface,
-            border: Border.all(color: highlighted ? theme.colorScheme.primary : theme.colorScheme.outlineVariant, width: 2),
-            boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 16, offset: Offset(0, 8))],
-          ),
-          alignment: Alignment.center,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.hub_rounded, color: highlighted ? theme.colorScheme.onPrimary : theme.colorScheme.primary),
-              Text(
-                '$count',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: highlighted ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-List<LatLng> _district3dShadow(DistrictZone zone) {
-  const offset = 0.008;
-  return [
-    LatLng(zone.centerLat - offset * 0.75, zone.centerLng - offset),
-    LatLng(zone.centerLat - offset * 0.75, zone.centerLng + offset),
-    LatLng(zone.centerLat + offset * 1.2, zone.centerLng + offset * 1.25),
-    LatLng(zone.centerLat + offset * 1.2, zone.centerLng - offset * 1.25),
-  ];
-}
-
-bool _isFeaturedPool({
-  required String category,
-  required bool sponsored,
-  required bool questEnabled,
-  required bool collectionEnabled,
-}) {
-  final value = category.toLowerCase();
-  final isPool = value.contains('pool') || value.contains('swim') || value.contains('aquatic');
-  final isFeatured = sponsored || questEnabled || collectionEnabled;
-  return isPool && isFeatured;
-}
-
-IconData _categoryIconForCategory(String category) {
-  final value = category.toLowerCase();
-  if (value.contains('coffee')) return Icons.coffee_rounded;
-  if (value.contains('food') || value.contains('restaurant')) return Icons.restaurant_rounded;
-  if (value.contains('night') || value.contains('bar')) return Icons.nightlife_rounded;
-  if (value.contains('pool') || value.contains('swim') || value.contains('aquatic')) return Icons.pool_rounded;
-  if (value.contains('park') || value.contains('outdoor')) return Icons.park_rounded;
-  if (value.contains('museum') || value.contains('art')) return Icons.museum_rounded;
-  if (value.contains('shop')) return Icons.shopping_bag_rounded;
-  return Icons.place_rounded;
-}
