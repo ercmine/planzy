@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/core/widgets/state_panels.dart';
+import 'package:dryad/core/widgets/state_panels.dart';
 
 void main() {
   testWidgets('AppStatePanel renders title/message/actions', (tester) async {

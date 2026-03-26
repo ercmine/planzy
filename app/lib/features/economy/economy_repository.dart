@@ -8,7 +8,7 @@ class EconomyRepository {
   final ApiClient apiClient;
 
   Future<EconomyDashboard> fetchDashboard() async {
-    final payload = await apiClient.getJson('/v1/perbug-economy/me');
+    final payload = await apiClient.getJson('/v1/dryad-economy/me');
     return EconomyDashboard.fromJson(payload);
   }
 

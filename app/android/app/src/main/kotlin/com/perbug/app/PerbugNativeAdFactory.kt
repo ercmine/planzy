@@ -1,4 +1,4 @@
-package com.perbug.app
+package com.dryad.app
 
 import android.view.LayoutInflater
 import android.view.View
@@ -10,7 +10,7 @@ import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdView
 import io.flutter.plugins.googlemobileads.GoogleMobileAdsPlugin.NativeAdFactory
 
-class PerbugNativeAdFactory(private val layoutInflater: LayoutInflater) : NativeAdFactory {
+class DryadNativeAdFactory(private val layoutInflater: LayoutInflater) : NativeAdFactory {
     override fun createNativeAd(nativeAd: NativeAd, customOptions: MutableMap<String, Any>?): NativeAdView {
         val adView = layoutInflater.inflate(R.layout.native_ad, null) as NativeAdView
 

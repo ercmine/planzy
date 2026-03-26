@@ -6,7 +6,7 @@ describe("readGeoRuntimeConfig", () => {
   it("parses remote geo settings", () => {
     const config = readGeoRuntimeConfig({
       GEO_SERVICE_ENABLED: "true",
-      GEO_SERVICE_BASE_URL: "https://geo.perbug.com",
+      GEO_SERVICE_BASE_URL: "https://geo.dryad.dev",
       GEO_SERVICE_TIMEOUT_MS: "3500",
       GEO_SERVICE_RETRIES: "2",
       GEO_SERVICE_FAIL_OPEN: "false",

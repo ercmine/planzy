@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 import { ValidationError } from "../plans/errors.js";
-import { amountToDisplay, isValidSolanaPublicKey } from "../perbugRewards/solana/token.js";
-import { stableIdempotencyKey } from "../perbugRewards/solana/walletAuth.js";
-import type { PerbugTipsAdapter, PerbugTipsStore, PerbugVideoTipIntent, VideoTipSummary } from "./types.js";
+import { amountToDisplay, isValidSolanaPublicKey } from "../dryadRewards/solana/token.js";
+import { stableIdempotencyKey } from "../dryadRewards/solana/walletAuth.js";
+import type { DryadTipsAdapter, DryadTipsStore, DryadVideoTipIntent, VideoTipSummary } from "./types.js";
 
 function nowIso(): string { return new Date().toISOString(); }
 function clone<T>(value: T): T { return structuredClone(value); }
 
-class MockPerbugTipsAdapter implements PerbugTipsAdapter {
+class MockDryadTipsAdapter implements DryadTipsAdapter {
   async submitTransfer(input: { fromWallet: string; toWallet: string; amountAtomic: bigint; memo: string; idempotencyKey: string }) {
     return { signature: stableIdempotencyKey([input.fromWallet, input.toWallet, input.idempotencyKey, input.amountAtomic.toString()]).slice(0, 88), explorerUrl: `https://explorer.solana.com/tx/${stableIdempotencyKey([input.memo, input.idempotencyKey]).slice(0, 88)}?cluster=devnet` };
   }
@@ -19,14 +19,14 @@ export interface VideoTipDependencies {
   getPrimaryWallet(userId: string): { publicKey: string } | undefined;
 }
 
-export class PerbugTipsService {
-  constructor(private readonly store: PerbugTipsStore, private readonly deps: VideoTipDependencies, private readonly adapter: PerbugTipsAdapter = new MockPerbugTipsAdapter()) {}
+export class DryadTipsService {
+  constructor(private readonly store: DryadTipsStore, private readonly deps: VideoTipDependencies, private readonly adapter: DryadTipsAdapter = new MockDryadTipsAdapter()) {}
 
-  createVideoTipIntent(input: { videoId: string; senderUserId: string; senderWalletPublicKey: string; amountAtomic: bigint; note?: string; allowSelfTip?: boolean; platformFeeBps?: number }): Promise<PerbugVideoTipIntent> {
+  createVideoTipIntent(input: { videoId: string; senderUserId: string; senderWalletPublicKey: string; amountAtomic: bigint; note?: string; allowSelfTip?: boolean; platformFeeBps?: number }): Promise<DryadVideoTipIntent> {
     return this.create(input);
   }
 
-  private async create(input: { videoId: string; senderUserId: string; senderWalletPublicKey: string; amountAtomic: bigint; note?: string; allowSelfTip?: boolean; platformFeeBps?: number }): Promise<PerbugVideoTipIntent> {
+  private async create(input: { videoId: string; senderUserId: string; senderWalletPublicKey: string; amountAtomic: bigint; note?: string; allowSelfTip?: boolean; platformFeeBps?: number }): Promise<DryadVideoTipIntent> {
     const video = await this.deps.getVideo(input.videoId);
     if (!video) throw new ValidationError(["video not found"]);
     if (!["published", "processed", "publish_pending"].includes(video.status) || ["rejected", "flagged"].includes(video.moderationStatus)) throw new ValidationError(["video cannot receive tips"]);
@@ -35,11 +35,11 @@ export class PerbugTipsService {
     if (!recipientWallet) throw new ValidationError(["creator wallet not linked"]);
     if (!input.allowSelfTip && video.authorUserId === input.senderUserId) throw new ValidationError(["self tipping disabled"]);
     if (input.note && input.note.length > 280) throw new ValidationError(["tip note too long"]);
-    const feeBps = Math.max(0, input.platformFeeBps ?? Number.parseInt(process.env.PERBUG_PLATFORM_FEE_BPS ?? "0", 10));
+    const feeBps = Math.max(0, input.platformFeeBps ?? Number.parseInt(process.env.DRYAD_PLATFORM_FEE_BPS ?? "0", 10));
     const platformFeeAtomic = (input.amountAtomic * BigInt(feeBps)) / 10000n;
     const recipientNetAtomic = input.amountAtomic - platformFeeAtomic;
     const now = nowIso();
-    const tip: PerbugVideoTipIntent = {
+    const tip: DryadVideoTipIntent = {
       id: `tip_${randomUUID()}`,
       videoId: input.videoId,
       placeId: video.canonicalPlaceId,
@@ -61,7 +61,7 @@ export class PerbugTipsService {
     return clone(tip);
   }
 
-  async submitTip(input: { tipIntentId: string; senderUserId: string }): Promise<PerbugVideoTipIntent> {
+  async submitTip(input: { tipIntentId: string; senderUserId: string }): Promise<DryadVideoTipIntent> {
     const tip = this.requireTip(input.tipIntentId);
     if (tip.senderUserId !== input.senderUserId) throw new ValidationError(["forbidden"]);
     if (tip.status === "confirmed") return clone(tip);
@@ -72,7 +72,7 @@ export class PerbugTipsService {
     this.store.saveTipIntent(tip);
     this.store.saveLedgerEvent({ id: `tle_${randomUUID()}`, tipIntentId: tip.id, status: "submitted", createdAt: tip.updatedAt });
     try {
-      const result = await this.adapter.submitTransfer({ fromWallet: tip.senderWalletPublicKey, toWallet: tip.recipientWalletPublicKey, amountAtomic: tip.grossAmountAtomic, memo: `PERBUG video tip ${tip.videoId}`, idempotencyKey });
+      const result = await this.adapter.submitTransfer({ fromWallet: tip.senderWalletPublicKey, toWallet: tip.recipientWalletPublicKey, amountAtomic: tip.grossAmountAtomic, memo: `DRYAD video tip ${tip.videoId}`, idempotencyKey });
       tip.transactionSignature = result.signature;
       tip.explorerUrl = result.explorerUrl;
       tip.status = "confirmed";
@@ -103,7 +103,7 @@ export class PerbugTipsService {
     return this.reduceSummary(recipientUserId, tips);
   }
 
-  private reduceSummary(id: string, tips: PerbugVideoTipIntent[]): VideoTipSummary {
+  private reduceSummary(id: string, tips: DryadVideoTipIntent[]): VideoTipSummary {
     return {
       videoId: id,
       totalTipsCount: tips.length,
@@ -114,5 +114,5 @@ export class PerbugTipsService {
     };
   }
 
-  private requireTip(id: string): PerbugVideoTipIntent { const tip = this.store.getTipIntent(id); if (!tip) throw new ValidationError(["tip intent not found"]); return tip; }
+  private requireTip(id: string): DryadVideoTipIntent { const tip = this.store.getTipIntent(id); if (!tip) throw new ValidationError(["tip intent not found"]); return tip; }
 }

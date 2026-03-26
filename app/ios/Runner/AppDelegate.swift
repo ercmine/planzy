@@ -5,7 +5,7 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-  private var nativeAdFactory: PerbugNativeAdFactory?
+  private var nativeAdFactory: DryadNativeAdFactory?
 
   override func application(
     _ application: UIApplication,
@@ -13,11 +13,11 @@ import UIKit
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
 
-    nativeAdFactory = PerbugNativeAdFactory()
+    nativeAdFactory = DryadNativeAdFactory()
     if let factory = nativeAdFactory {
       FLTGoogleMobileAdsPlugin.registerNativeAdFactory(
         self,
-        factoryId: "perbugNativeAdFactory",
+        factoryId: "dryadNativeAdFactory",
         nativeAdFactory: factory
       )
     }
@@ -26,12 +26,12 @@ import UIKit
   }
 
   override func applicationWillTerminate(_ application: UIApplication) {
-    FLTGoogleMobileAdsPlugin.unregisterNativeAdFactory(self, factoryId: "perbugNativeAdFactory")
+    FLTGoogleMobileAdsPlugin.unregisterNativeAdFactory(self, factoryId: "dryadNativeAdFactory")
     super.applicationWillTerminate(application)
   }
 }
 
-final class PerbugNativeAdFactory: NSObject, FLTNativeAdFactory {
+final class DryadNativeAdFactory: NSObject, FLTNativeAdFactory {
   func createNativeAd(
     _ nativeAd: GADNativeAd,
     customOptions: [AnyHashable: Any]? = nil

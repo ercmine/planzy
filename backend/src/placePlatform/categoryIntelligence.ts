@@ -18,7 +18,7 @@ export interface CategoryNormalizationResult {
 
 export const CATEGORY_NORMALIZATION_VERSION = "v1";
 
-export const PERBUG_CATEGORIES: PlaceCategory[] = [
+export const DRYAD_CATEGORIES: PlaceCategory[] = [
   { id: "cat_coffee", slug: "coffee", displayName: "Coffee", parentCategoryId: "cat_food", status: "ACTIVE" },
   { id: "cat_restaurants", slug: "restaurants", displayName: "Restaurants", parentCategoryId: "cat_food", status: "ACTIVE" },
   { id: "cat_bars", slug: "bars", displayName: "Bars", parentCategoryId: "cat_nightlife", status: "ACTIVE" },

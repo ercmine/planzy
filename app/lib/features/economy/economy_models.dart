@@ -4,7 +4,7 @@ class EconomyWallet {
   final String ownerId;
   final String balanceAtomic;
 
-  double get balancePerbug => (double.tryParse(balanceAtomic) ?? 0) / 1000000;
+  double get balanceDryad => (double.tryParse(balanceAtomic) ?? 0) / 1000000;
 
   factory EconomyWallet.fromJson(Map<String, dynamic> json) {
     return EconomyWallet(
@@ -35,7 +35,7 @@ class EconomyQuest {
   final int dailyCap;
   final int totalCap;
 
-  double get rewardPerbug => (double.tryParse(rewardAtomic) ?? 0) / 1000000;
+  double get rewardDryad => (double.tryParse(rewardAtomic) ?? 0) / 1000000;
 
   factory EconomyQuest.fromJson(Map<String, dynamic> json) {
     return EconomyQuest(
@@ -60,7 +60,7 @@ class EconomyCollection {
   final String completionRewardAtomic;
   final String? sponsoredByBusinessId;
 
-  double get completionRewardPerbug => (double.tryParse(completionRewardAtomic) ?? 0) / 1000000;
+  double get completionRewardDryad => (double.tryParse(completionRewardAtomic) ?? 0) / 1000000;
 
   factory EconomyCollection.fromJson(Map<String, dynamic> json) {
     return EconomyCollection(
@@ -122,18 +122,18 @@ class EconomyDashboard {
 }
 
 class SponsoredPlacement {
-  const SponsoredPlacement({required this.placeId, required this.campaignTitle, required this.rewardPerbug, required this.sponsoredByBusinessId});
+  const SponsoredPlacement({required this.placeId, required this.campaignTitle, required this.rewardDryad, required this.sponsoredByBusinessId});
 
   final String placeId;
   final String campaignTitle;
-  final double rewardPerbug;
+  final double rewardDryad;
   final String sponsoredByBusinessId;
 
   factory SponsoredPlacement.fromJson(Map<String, dynamic> json) {
     return SponsoredPlacement(
       placeId: (json['campaign'] as Map?)?['placeId']?.toString() ?? '',
       campaignTitle: (json['campaign'] as Map?)?['title']?.toString() ?? 'Sponsored campaign',
-      rewardPerbug: ((json['estimatedRewardPerbug'] as num?) ?? 0).toDouble(),
+      rewardDryad: ((json['estimatedRewardDryad'] as num?) ?? 0).toDouble(),
       sponsoredByBusinessId: (json['campaign'] as Map?)?['businessId']?.toString() ?? '',
     );
   }

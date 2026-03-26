@@ -1,6 +1,6 @@
-export type PerbugTipStatus = "created" | "awaiting_signature" | "submitted" | "confirmed" | "failed" | "canceled";
+export type DryadTipStatus = "created" | "awaiting_signature" | "submitted" | "confirmed" | "failed" | "canceled";
 
-export interface PerbugVideoTipIntent {
+export interface DryadVideoTipIntent {
   id: string;
   videoId: string;
   placeId?: string;
@@ -13,7 +13,7 @@ export interface PerbugVideoTipIntent {
   platformFeeAtomic: bigint;
   recipientNetAtomic: bigint;
   note?: string;
-  status: PerbugTipStatus;
+  status: DryadTipStatus;
   transactionSignature?: string;
   explorerUrl?: string;
   failureReason?: string;
@@ -31,29 +31,29 @@ export interface VideoTipSummary {
   latestTipAt?: string;
 }
 
-export interface PerbugTipLedgerEvent {
+export interface DryadTipLedgerEvent {
   id: string;
   tipIntentId: string;
-  status: PerbugTipStatus;
+  status: DryadTipStatus;
   createdAt: string;
   payload?: Record<string, unknown>;
 }
 
-export interface PerbugTipsStore {
-  saveTipIntent(tip: PerbugVideoTipIntent): void;
-  getTipIntent(id: string): PerbugVideoTipIntent | null;
-  listTipsByVideo(videoId: string): PerbugVideoTipIntent[];
-  listTipsBySender(userId: string): PerbugVideoTipIntent[];
-  listTipsByRecipient(recipientUserId: string): PerbugVideoTipIntent[];
-  saveLedgerEvent(event: PerbugTipLedgerEvent): void;
-  listLedgerEvents(tipIntentId: string): PerbugTipLedgerEvent[];
+export interface DryadTipsStore {
+  saveTipIntent(tip: DryadVideoTipIntent): void;
+  getTipIntent(id: string): DryadVideoTipIntent | null;
+  listTipsByVideo(videoId: string): DryadVideoTipIntent[];
+  listTipsBySender(userId: string): DryadVideoTipIntent[];
+  listTipsByRecipient(recipientUserId: string): DryadVideoTipIntent[];
+  saveLedgerEvent(event: DryadTipLedgerEvent): void;
+  listLedgerEvents(tipIntentId: string): DryadTipLedgerEvent[];
 }
 
-export interface PerbugTipTransferResult {
+export interface DryadTipTransferResult {
   signature: string;
   explorerUrl: string;
 }
 
-export interface PerbugTipsAdapter {
-  submitTransfer(input: { fromWallet: string; toWallet: string; amountAtomic: bigint; memo: string; idempotencyKey: string }): Promise<PerbugTipTransferResult>;
+export interface DryadTipsAdapter {
+  submitTransfer(input: { fromWallet: string; toWallet: string; amountAtomic: bigint; memo: string; idempotencyKey: string }): Promise<DryadTipTransferResult>;
 }

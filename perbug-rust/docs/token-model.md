@@ -1,15 +1,15 @@
 # Token Model
 
-## PERBUG assumptions
+## DRYAD assumptions
 
-- Token symbol: `PERBUG`
+- Token symbol: `DRYAD`
 - Default decimals: `6`
 - Base token program: standard SPL Token
 - Future compatibility: Token-2022 is intentionally left optional so extensions can be introduced without rewriting the workspace structure.
 
 ## Mint and treasury model
 
-- One canonical PERBUG mint is expected per environment.
+- One canonical DRYAD mint is expected per environment.
 - A treasury owner can hold the project treasury ATA for developer minting and future reward payouts.
 - The CLI helps create the mint, derive token accounts, and inspect balances.
 

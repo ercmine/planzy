@@ -6,7 +6,7 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
-use perbug_common::{checked_add_u64, RewardClaimedEvent, RewardReceiptCreatedEvent};
+use dryad_common::{checked_add_u64, RewardClaimedEvent, RewardReceiptCreatedEvent};
 
 use crate::{
     error::RewardsError,
@@ -70,7 +70,7 @@ impl Processor {
         let payer = next_account_info(account_info_iter)?;
         let config_ai = next_account_info(account_info_iter)?;
         assert_signer(payer)?;
-        let (expected, _) = perbug_common::derive_config_pda(program_id);
+        let (expected, _) = dryad_common::derive_config_pda(program_id);
         assert_pda(expected, config_ai.key)?;
 
         if !is_empty(config_ai)? {
@@ -95,7 +95,7 @@ impl Processor {
         let config = read_state::<RewardsConfig>(config_ai)?;
         assert_admin(&config, admin_ai.key)?;
         assert_not_paused(&config)?;
-        let (expected, _) = perbug_common::derive_place_pda(program_id, &place_id);
+        let (expected, _) = dryad_common::derive_place_pda(program_id, &place_id);
         assert_pda(expected, place_ai.key)?;
         if !is_empty(place_ai)? {
             return Err(RewardsError::AlreadyInitialized.into());
@@ -126,10 +126,10 @@ impl Processor {
         if place.authority != *authority_ai.key {
             return Err(RewardsError::Unauthorized.into());
         }
-        let (expected_place, _) = perbug_common::derive_place_pda(program_id, &place_id);
+        let (expected_place, _) = dryad_common::derive_place_pda(program_id, &place_id);
         assert_pda(expected_place, place_ai.key)?;
         let (expected_receipt, _) =
-            perbug_common::derive_reward_receipt_pda(program_id, place_ai.key, &reward_id);
+            dryad_common::derive_reward_receipt_pda(program_id, place_ai.key, &reward_id);
         assert_pda(expected_receipt, receipt_ai.key)?;
         if !is_empty(receipt_ai)? {
             return Err(RewardsError::DuplicateReceipt.into());
@@ -169,7 +169,7 @@ impl Processor {
         let mut place = read_state::<PlaceState>(place_ai)?;
         let mut receipt = read_state::<RewardReceipt>(receipt_ai)?;
         let (expected_receipt, _) =
-            perbug_common::derive_reward_receipt_pda(program_id, place_ai.key, &reward_id);
+            dryad_common::derive_reward_receipt_pda(program_id, place_ai.key, &reward_id);
         assert_pda(expected_receipt, receipt_ai.key)?;
         if receipt.claimed {
             return Err(RewardsError::AlreadyClaimed.into());
@@ -245,6 +245,6 @@ fn write_state<T: borsh::BorshSerialize>(
     Ok(())
 }
 
-fn map_common_error(_: perbug_common::PerbugError) -> ProgramError {
+fn map_common_error(_: dryad_common::DryadError) -> ProgramError {
     ProgramError::ArithmeticOverflow
 }

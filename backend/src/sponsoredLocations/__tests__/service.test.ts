@@ -19,12 +19,12 @@ describe("SponsoredLocationsService", () => {
       placements: ["map", "nearby"],
       startsAt: new Date(Date.now() - 60_000).toISOString(),
       endsAt: new Date(Date.now() + 86_400_000).toISOString(),
-      dailyBudgetPerbug: 100,
-      totalBudgetPerbug: 500,
-      rewardRule: { payoutPerVisitPerbug: 15, dwellSeconds: 30, requiredActions: ["check_in", "dwell"] }
+      dailyBudgetDryad: 100,
+      totalBudgetDryad: 500,
+      rewardRule: { payoutPerVisitDryad: 15, dwellSeconds: 30, requiredActions: ["check_in", "dwell"] }
     });
 
-    const budget = service.fundCampaign({ campaignId: campaign.id, businessId: "biz_1", amountPerbug: 100 });
+    const budget = service.fundCampaign({ campaignId: campaign.id, businessId: "biz_1", amountDryad: 100 });
     expect(budget.rewardPoolAtomic).toBeGreaterThan(0n);
 
     const visit = service.startVisitSession({ userId: "u1", campaignId: campaign.id, lat: 40, lng: -88 });
@@ -46,11 +46,11 @@ describe("SponsoredLocationsService", () => {
       placements: ["map"],
       startsAt: new Date(Date.now() - 60_000).toISOString(),
       endsAt: new Date(Date.now() + 86_400_000).toISOString(),
-      dailyBudgetPerbug: 100,
-      totalBudgetPerbug: 500,
-      rewardRule: { payoutPerVisitPerbug: 15, dwellSeconds: 300, requiredActions: ["check_in", "dwell"] }
+      dailyBudgetDryad: 100,
+      totalBudgetDryad: 500,
+      rewardRule: { payoutPerVisitDryad: 15, dwellSeconds: 300, requiredActions: ["check_in", "dwell"] }
     });
-    service.fundCampaign({ campaignId: campaign.id, businessId: "biz_1", amountPerbug: 100 });
+    service.fundCampaign({ campaignId: campaign.id, businessId: "biz_1", amountDryad: 100 });
 
     const visit = service.startVisitSession({ userId: "u1", campaignId: campaign.id, lat: 40, lng: -88 });
     service.heartbeatVisit({ visitSessionId: visit.id, lat: 40, lng: -88, elapsedSeconds: 10 });

@@ -1,4 +1,4 @@
-# Perbug world-map SVG asset pipeline
+# Dryad world-map SVG asset pipeline
 
 ## Directory structure
 - `assets/game_world/collectibles/<rarity>/...svg`

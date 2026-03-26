@@ -27,7 +27,7 @@ import 'place_video_detail_page.dart';
 import '../video_platform/video_providers.dart';
 import '../../api/api_error.dart';
 import '../../core/env/env.dart';
-import 'perbug_maplibre_view.dart';
+import 'dryad_maplibre_view.dart';
 
 class MapViewportState {
   const MapViewportState({
@@ -472,7 +472,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: PerbugMapLibreView(
+                    child: DryadMapLibreView(
                       viewport: state.viewport,
                       pins: visiblePlaces,
                       selectedPlaceId: selected?.canonicalPlaceId,
@@ -727,7 +727,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                       child: DiscoveryStateCard(
                         icon: locationState.status == LocationStatus.serviceDisabled ? Icons.location_disabled : Icons.location_searching,
                         title: locationState.status == LocationStatus.serviceDisabled ? 'Turn on location services' : 'Allow location access',
-                        body: locationState.errorMessage ?? 'Perbug uses your location to center the map, surface what is close, and power recenter + nearby discovery.',
+                        body: locationState.errorMessage ?? 'Dryad uses your location to center the map, surface what is close, and power recenter + nearby discovery.',
                         actions: [
                           FilledButton(
                             onPressed: () => _handleCenterOnUserLocation(locationState, permissionService),
@@ -1167,7 +1167,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   }
 
   Future<void> _sharePlace(MapPin place) async {
-    await Share.share('Check out ${place.name} on Perbug: https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}');
+    await Share.share('Check out ${place.name} on Dryad: https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}');
   }
 
   Future<void> _openSortSheet() async {

@@ -1,4 +1,4 @@
-package com.perbug.app
+package com.dryad.app
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -9,13 +9,13 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         GoogleMobileAdsPlugin.registerNativeAdFactory(
             flutterEngine,
-            "perbugNativeAdFactory",
-            PerbugNativeAdFactory(layoutInflater)
+            "dryadNativeAdFactory",
+            DryadNativeAdFactory(layoutInflater)
         )
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
-        GoogleMobileAdsPlugin.unregisterNativeAdFactory(flutterEngine, "perbugNativeAdFactory")
+        GoogleMobileAdsPlugin.unregisterNativeAdFactory(flutterEngine, "dryadNativeAdFactory")
         super.cleanUpFlutterEngine(flutterEngine)
     }
 }

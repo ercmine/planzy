@@ -3,7 +3,7 @@ import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRe
 const accountKey = (ownerType: TokenAccount["ownerType"], ownerId: string) => `${ownerType}:${ownerId}`;
 const collectionProgressKey = (collectionId: string, userId: string) => `${collectionId}:${userId}`;
 
-export class MemoryPerbugEconomyStore implements EconomyStore {
+export class MemoryDryadEconomyStore implements EconomyStore {
   private splitConfigs = new Map<string, TokenSplitConfig>();
   private accounts = new Map<string, TokenAccount>();
   private ledger: EconomyLedgerEntry[] = [];

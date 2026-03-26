@@ -1,9 +1,9 @@
-# Perbug production operations hardening
+# Dryad production operations hardening
 
 ## Scope and dependencies
 This runbook hardens operational safety for:
 - Backend API and support services
-- Geo/open-data stack (`geo.perbug.com`, Nominatim/PostGIS)
+- Geo/open-data stack (`geo.dryad.dev`, Nominatim/PostGIS)
 - Main DB + geo DB + Redis
 - Queue workers (media/import/reindex/enrichment/notifications)
 - AWS media pipeline metadata and object-key integrity
@@ -62,7 +62,7 @@ Canonical backup systems:
 
 Storage rules:
 - write backups off-host (S3 compatible target)
-- immutable naming convention: `perbug/<system>/YYYY/MM/DD/<timestamp>_<type>.sql.gz`
+- immutable naming convention: `dryad/<system>/YYYY/MM/DD/<timestamp>_<type>.sql.gz`
 - retention: daily 35d, weekly 12w, monthly 12m
 - checksums and manifest required
 
@@ -88,7 +88,7 @@ Validation checklist:
 ## Geo/home-hosting safeguards
 - monitor dynamic DNS updater heartbeat
 - monitor TLS cert expiry and nginx status
-- monitor internet reachability to `geo.perbug.com`
+- monitor internet reachability to `geo.dryad.dev`
 - monitor storage pressure for imports and flatnode files
 
 ## Incident quick actions

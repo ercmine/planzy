@@ -16,7 +16,7 @@ class AppDiagnostics {
     final platform = _platformLabel();
     final safeUser = _maskUserId(userId);
 
-    return '''Perbug diagnostics
+    return '''Dryad diagnostics
 appVersion: ${packageInfo.version} (${packageInfo.buildNumber})
 platform: $platform
 online: ${connectivityState.isOnline}

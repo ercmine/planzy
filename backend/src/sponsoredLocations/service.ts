@@ -3,10 +3,10 @@ import { randomUUID } from "node:crypto";
 import { ValidationError } from "../plans/errors.js";
 import type { CampaignBudget, EligibilityDecision, FraudFlag, LedgerEntry, PlaceOwnerAccess, QualifyingAction, RewardClaim, SponsoredCampaign, SponsoredLocationStore, SponsoredRewardRule, VisitSession } from "./types.js";
 
-const PERBUG_DECIMALS = 6;
+const DRYAD_DECIMALS = 6;
 
 function nowIso(): string { return new Date().toISOString(); }
-function atomic(amount: number): bigint { return BigInt(Math.round(amount * (10 ** PERBUG_DECIMALS))); }
+function atomic(amount: number): bigint { return BigInt(Math.round(amount * (10 ** DRYAD_DECIMALS))); }
 function clamp(n: number, min: number, max: number): number { return Math.max(min, Math.min(max, n)); }
 
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -62,11 +62,11 @@ export class SponsoredLocationsService {
     targetRadiusMeters?: number;
     startsAt: string;
     endsAt: string;
-    dailyBudgetPerbug: number;
-    totalBudgetPerbug: number;
+    dailyBudgetDryad: number;
+    totalBudgetDryad: number;
     rewardRule: {
       type?: SponsoredRewardRule["type"];
-      payoutPerVisitPerbug: number;
+      payoutPerVisitDryad: number;
       decayBps?: number;
       firstXDaily?: number;
       splitWindowDays?: number;
@@ -77,7 +77,7 @@ export class SponsoredLocationsService {
     };
   }): { campaign: SponsoredCampaign; rewardRule: SponsoredRewardRule; budget: CampaignBudget } {
     if (new Date(input.endsAt) <= new Date(input.startsAt)) throw new ValidationError(["campaign end must be after start"]);
-    if (input.totalBudgetPerbug <= 0 || input.dailyBudgetPerbug <= 0) throw new ValidationError(["budgets must be positive"]);
+    if (input.totalBudgetDryad <= 0 || input.dailyBudgetDryad <= 0) throw new ValidationError(["budgets must be positive"]);
 
     const campaign: SponsoredCampaign = {
       id: `camp_${randomUUID()}`,
@@ -90,8 +90,8 @@ export class SponsoredLocationsService {
       targetRadiusMeters: input.targetRadiusMeters ?? 250,
       startsAt: input.startsAt,
       endsAt: input.endsAt,
-      dailyBudgetAtomic: atomic(input.dailyBudgetPerbug),
-      totalBudgetAtomic: atomic(input.totalBudgetPerbug),
+      dailyBudgetAtomic: atomic(input.dailyBudgetDryad),
+      totalBudgetAtomic: atomic(input.totalBudgetDryad),
       status: "draft",
       createdBy: input.createdBy,
       createdAt: nowIso(),
@@ -100,7 +100,7 @@ export class SponsoredLocationsService {
     const rewardRule: SponsoredRewardRule = {
       campaignId: campaign.id,
       type: input.rewardRule.type ?? "fixed_per_visit",
-      payoutAtomic: atomic(input.rewardRule.payoutPerVisitPerbug),
+      payoutAtomic: atomic(input.rewardRule.payoutPerVisitDryad),
       decayBps: input.rewardRule.decayBps,
       firstXDaily: input.rewardRule.firstXDaily,
       splitWindowDays: input.rewardRule.splitWindowDays,
@@ -125,13 +125,13 @@ export class SponsoredLocationsService {
     return { campaign: structuredClone(campaign), rewardRule: structuredClone(rewardRule), budget: structuredClone(budget) };
   }
 
-  fundCampaign(input: { campaignId: string; businessId: string; amountPerbug: number }): CampaignBudget {
-    if (input.amountPerbug <= 0) throw new ValidationError(["funding amount must be positive"]);
+  fundCampaign(input: { campaignId: string; businessId: string; amountDryad: number }): CampaignBudget {
+    if (input.amountDryad <= 0) throw new ValidationError(["funding amount must be positive"]);
     const campaign = this.requireCampaign(input.campaignId);
     if (campaign.businessId !== input.businessId) throw new ValidationError(["campaign not owned by business"]);
     if (!["draft", "active", "paused"].includes(campaign.status)) throw new ValidationError(["campaign cannot be funded in current status"]);
     const budget = this.requireBudget(campaign.id);
-    const amountAtomic = atomic(input.amountPerbug);
+    const amountAtomic = atomic(input.amountDryad);
     const feeBps = clamp(this.options.platformFeeBps ?? Number.parseInt(process.env.SPONSORED_PLATFORM_FEE_BPS ?? "1000", 10), 0, 5000);
     const feeAtomic = (amountAtomic * BigInt(feeBps)) / 10_000n;
     const rewardPoolAtomic = amountAtomic - feeAtomic;
@@ -148,7 +148,7 @@ export class SponsoredLocationsService {
       this.store.saveCampaign(campaign);
     }
 
-    this.addLedger({ campaign, type: "funding", amountAtomic, metadata: { amountPerbug: input.amountPerbug } });
+    this.addLedger({ campaign, type: "funding", amountAtomic, metadata: { amountDryad: input.amountDryad } });
     if (feeAtomic > 0n) this.addLedger({ campaign, type: "platform_fee", amountAtomic: feeAtomic, metadata: { feeBps } });
     return structuredClone(budget);
   }
@@ -165,7 +165,7 @@ export class SponsoredLocationsService {
           campaign,
           badge: "Sponsored",
           rewardEnabled: budget.rewardPoolAtomic - budget.reservedAtomic - budget.paidAtomic > 0n,
-          estimatedRewardPerbug: Number(this.requireRule(campaign.id).payoutAtomic) / (10 ** PERBUG_DECIMALS),
+          estimatedRewardDryad: Number(this.requireRule(campaign.id).payoutAtomic) / (10 ** DRYAD_DECIMALS),
           poolRemainingAtomic: budget.rewardPoolAtomic - budget.reservedAtomic - budget.paidAtomic
         };
       });

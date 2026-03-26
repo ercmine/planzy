@@ -47,7 +47,7 @@ class LinkConfirmSheet extends StatelessWidget {
         children: [
           Text(callout, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          Text('You are leaving Perbug for "$planTitle".'),
+          Text('You are leaving Dryad for "$planTitle".'),
           const SizedBox(height: 4),
           Text(
             uri.toString(),

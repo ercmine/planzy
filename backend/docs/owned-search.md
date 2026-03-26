@@ -1,6 +1,6 @@
 # Owned discovery/search foundations
 
-Perbug discovery now supports first-party search modes backed by canonical place storage and internal ranking:
+Dryad discovery now supports first-party search modes backed by canonical place storage and internal ranking:
 
 - `GET /v1/discovery/nearby`: location-first radius discovery with category + filter support.
 - `GET /v1/discovery/search`: text-first search over canonical place attributes with optional geo bias.

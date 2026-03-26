@@ -1,7 +1,7 @@
-name: perbug
+name: dryad
 publish_to: none
 
-description: Perbug Flutter app foundation.
+description: Dryad Flutter app foundation.
 
 version: 1.0.0+1
 
@@ -56,8 +56,8 @@ flutter:
     - .env.dev
     - .env.stage
     - .env.prod
-    - assets/branding/perbug.svg
-    - assets/branding/perbug1.svg
+    - assets/branding/dryad.svg
+    - assets/branding/dryad1.svg
     - assets/game_world/collectibles/common/
     - assets/game_world/collectibles/uncommon/
     - assets/game_world/collectibles/rare/

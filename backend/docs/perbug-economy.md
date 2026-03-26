@@ -1,12 +1,12 @@
-# Perbug Economy vNext
+# Dryad Economy vNext
 
 This module powers a unified in-app economy loop for:
 
-- Business quests funded in PERBUG.
+- Business quests funded in DRYAD.
 - Exploration check-in rewards with streak logic.
 - Collection milestones and completion payouts.
 - Creator and curator performance rewards with moderation/risk checks.
-- Premium membership purchases in PERBUG.
+- Premium membership purchases in DRYAD.
 - Local offer redemption with inventory + trust checks.
 - Configurable token split percentages (reward pool, creator pool, treasury, burn, partner).
 
@@ -15,7 +15,7 @@ This module powers a unified in-app economy loop for:
 - `POST /v1/business/quests`
 - `POST /v1/quests/:questId/complete`
 - `POST /v1/exploration/check-in`
-- `POST /v1/admin/perbug-economy/collections`
+- `POST /v1/admin/dryad-economy/collections`
 - `POST /v1/collections/:collectionId/progress`
 - `POST /v1/creator/economy/rewards`
 - `POST /v1/creator/economy/rewards/:rewardId/claim`
@@ -24,11 +24,11 @@ This module powers a unified in-app economy loop for:
 - `POST /v1/premium/membership/purchase`
 - `POST /v1/business/offers`
 - `POST /v1/offers/:offerId/redeem`
-- `POST /v1/admin/perbug-economy/splits`
-- `GET /v1/perbug-economy/me`
+- `POST /v1/admin/dryad-economy/splits`
+- `GET /v1/dryad-economy/me`
 - `GET /v1/creator/economy/dashboard`
 - `GET /v1/business/economy/dashboard`
-- `GET /v1/admin/perbug-economy/dashboard`
+- `GET /v1/admin/dryad-economy/dashboard`
 
 ## Accounting model
 

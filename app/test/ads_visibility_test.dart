@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/core/ads/ad_placement.dart';
-import 'package:perbug/core/ads/ad_policy.dart';
-import 'package:perbug/core/ads/ads_config.dart';
-import 'package:perbug/core/ads/ads_visibility.dart';
+import 'package:dryad/core/ads/ad_placement.dart';
+import 'package:dryad/core/ads/ad_policy.dart';
+import 'package:dryad/core/ads/ads_config.dart';
+import 'package:dryad/core/ads/ads_visibility.dart';
 
 void main() {
   const enabledConfig = AdsConfig(

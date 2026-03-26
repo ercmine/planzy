@@ -15,7 +15,7 @@ function RewardsConsoleInner({ apiBaseUrl, cluster }: { apiBaseUrl: string; clus
   const wallet = useWallet();
   const [userId, setUserId] = useState('demo-creator');
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
-  const [status, setStatus] = useState<string>('Connect Phantom to claim PERBUG');
+  const [status, setStatus] = useState<string>('Connect Phantom to claim DRYAD');
 
   async function signIn() {
     if (!wallet.publicKey || !wallet.signMessage) return;
@@ -63,8 +63,8 @@ function RewardsConsoleInner({ apiBaseUrl, cluster }: { apiBaseUrl: string; clus
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Creator rewards</p>
-          <h2 className="text-2xl font-semibold">PERBUG claim console</h2>
-          <p className="text-sm text-slate-300">Cluster: {cluster}. Connect Phantom to claim PERBUG.</p>
+          <h2 className="text-2xl font-semibold">DRYAD claim console</h2>
+          <p className="text-sm text-slate-300">Cluster: {cluster}. Connect Phantom to claim DRYAD.</p>
         </div>
         <WalletMultiButton />
       </div>
@@ -74,8 +74,8 @@ function RewardsConsoleInner({ apiBaseUrl, cluster }: { apiBaseUrl: string; clus
       </div>
       <p className="rounded-2xl border border-white/10 bg-slate-900/70 p-4 text-sm text-slate-200">{status}</p>
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl bg-slate-900/70 p-4"><div className="text-sm text-slate-400">Claimable</div><div className="text-3xl font-semibold">{dashboard?.totals.claimableDisplay ?? '0'} PERBUG</div></div>
-        <div className="rounded-2xl bg-slate-900/70 p-4"><div className="text-sm text-slate-400">Claimed</div><div className="text-3xl font-semibold">{dashboard?.totals.claimedDisplay ?? '0'} PERBUG</div></div>
+        <div className="rounded-2xl bg-slate-900/70 p-4"><div className="text-sm text-slate-400">Claimable</div><div className="text-3xl font-semibold">{dashboard?.totals.claimableDisplay ?? '0'} DRYAD</div></div>
+        <div className="rounded-2xl bg-slate-900/70 p-4"><div className="text-sm text-slate-400">Claimed</div><div className="text-3xl font-semibold">{dashboard?.totals.claimedDisplay ?? '0'} DRYAD</div></div>
         <div className="rounded-2xl bg-slate-900/70 p-4"><div className="text-sm text-slate-400">Pending reviews</div><div className="text-3xl font-semibold">{dashboard?.totals.pendingCount ?? 0}</div></div>
       </div>
       <section className="space-y-3">
@@ -87,7 +87,7 @@ function RewardsConsoleInner({ apiBaseUrl, cluster }: { apiBaseUrl: string; clus
               <div className="text-sm text-slate-400">This place’s next approved review earns transparent per-place rewards.</div>
             </div>
             <div className="flex items-center gap-3">
-              <span>{item.review.finalRewardAmount ?? 0} PERBUG</span>
+              <span>{item.review.finalRewardAmount ?? 0} DRYAD</span>
               <button className="rounded-full bg-emerald-400 px-4 py-2 font-medium text-slate-950" onClick={() => claim(item.review.id)}>Claim</button>
             </div>
           </div>

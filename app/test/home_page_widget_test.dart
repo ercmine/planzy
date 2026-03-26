@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:perbug/core/identity/identity_provider.dart';
-import 'package:perbug/core/identity/identity_store.dart';
-import 'package:perbug/features/accomplishments/accomplishment_models.dart';
-import 'package:perbug/features/challenges/challenge_models.dart';
-import 'package:perbug/features/collections/collection_models.dart';
-import 'package:perbug/features/home/home_page.dart';
-import 'package:perbug/features/home/place_video_detail_page.dart';
-import 'package:perbug/features/video_platform/video_models.dart';
-import 'package:perbug/features/video_platform/video_providers.dart';
-import 'package:perbug/features/viewer_rewards/viewer_reward_models.dart';
+import 'package:dryad/core/identity/identity_provider.dart';
+import 'package:dryad/core/identity/identity_store.dart';
+import 'package:dryad/features/accomplishments/accomplishment_models.dart';
+import 'package:dryad/features/challenges/challenge_models.dart';
+import 'package:dryad/features/collections/collection_models.dart';
+import 'package:dryad/features/home/home_page.dart';
+import 'package:dryad/features/home/place_video_detail_page.dart';
+import 'package:dryad/features/video_platform/video_models.dart';
+import 'package:dryad/features/video_platform/video_providers.dart';
+import 'package:dryad/features/viewer_rewards/viewer_reward_models.dart';
 
 void main() {
   Widget buildApp(List<Override> overrides) {
@@ -35,7 +35,7 @@ void main() {
       creatorHandle: '@sam',
       caption: 'Best espresso near station',
       videoUrl: 'https://cdn/video.mp4',
-      viewerRewardHint: ViewerRewardHint(isEligible: true, watchRewardPerbug: 3, sponsorName: 'Cafe Orbit'),
+      viewerRewardHint: ViewerRewardHint(isEligible: true, watchRewardDryad: 3, sponsorName: 'Cafe Orbit'),
       rating: 5,
     ),
   ];
@@ -146,7 +146,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Cafe Orbit'), findsOneWidget);
-    expect(find.text('Earn 3.0 PERBUG'), findsOneWidget);
+    expect(find.text('Earn 3.0 DRYAD'), findsOneWidget);
 
     await tester.tap(find.text('Regional'));
     await tester.pumpAndSettle();

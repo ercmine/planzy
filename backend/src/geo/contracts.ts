@@ -118,7 +118,7 @@ export interface GeoAreaContext {
   source: "nominatim";
 }
 
-export interface PerbugGeoPlace {
+export interface DryadGeoPlace {
   id: string;
   name: string;
   displayName: string;
@@ -169,5 +169,5 @@ export interface GeoHealthResponse {
 }
 
 export interface GeoAuthHeaders {
-  "x-perbug-geo-service": string;
+  "x-dryad-geo-service": string;
 }

@@ -91,20 +91,20 @@ import type { SocialGamificationService } from "../socialGamification/service.js
 import { createGamificationControlHttpHandlers } from "../gamificationControl/http.js";
 import type { GamificationControlService } from "../gamificationControl/service.js";
 import { rolloutErrorPayload, RolloutAccessError, type RolloutService } from "../rollouts/service.js";
-import { createPerbugRewardsHttpHandlers } from "../perbugRewards/http.js";
-import type { PerbugRewardsService } from "../perbugRewards/service.js";
-import { createPerbugTipsHttpHandlers } from "../perbugTips/http.js";
-import type { PerbugTipsService } from "../perbugTips/service.js";
+import { createDryadRewardsHttpHandlers } from "../dryadRewards/http.js";
+import type { DryadRewardsService } from "../dryadRewards/service.js";
+import { createDryadTipsHttpHandlers } from "../dryadTips/http.js";
+import type { DryadTipsService } from "../dryadTips/service.js";
 import { createCompetitionHttpHandlers } from "../competition/http.js";
 import type { CompetitionService } from "../competition/service.js";
 import { createSponsoredLocationsHttpHandlers } from "../sponsoredLocations/http.js";
 import type { SponsoredLocationsService } from "../sponsoredLocations/service.js";
-import { createPerbugEconomyHttpHandlers } from "../perbugEconomy/http.js";
-import type { PerbugEconomyService } from "../perbugEconomy/service.js";
+import { createDryadEconomyHttpHandlers } from "../dryadEconomy/http.js";
+import type { DryadEconomyService } from "../dryadEconomy/service.js";
 import { createViewerEngagementRewardsHttpHandlers } from "../viewerEngagementRewards/http.js";
 import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
 
-const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
+const DEFAULT_PUBLIC_API_BASE_URL = "https://api.dryad.dev";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
 
 const PREMIUM_CONTENT: Record<string, PremiumContentDescriptor> = {
@@ -197,11 +197,11 @@ export function createRoutes(
     collectionsService?: CollectionsService;
     socialGamificationService?: SocialGamificationService;
     gamificationControlService?: GamificationControlService;
-    perbugRewardsService?: PerbugRewardsService;
-    perbugTipsService?: PerbugTipsService;
+    dryadRewardsService?: DryadRewardsService;
+    dryadTipsService?: DryadTipsService;
     competitionService?: CompetitionService;
     sponsoredLocationsService?: SponsoredLocationsService;
-    perbugEconomyService?: PerbugEconomyService;
+    dryadEconomyService?: DryadEconomyService;
     viewerEngagementRewardsService?: ViewerEngagementRewardsService;
     reviewEligibilityService?: ReviewEligibilityService;
   }
@@ -247,11 +247,11 @@ export function createRoutes(
   const collectionsHandlers = deps?.collectionsService ? createCollectionsHttpHandlers(deps.collectionsService) : null;
   const socialGamificationHandlers = deps?.socialGamificationService ? createSocialGamificationHttpHandlers(deps.socialGamificationService) : null;
   const gamificationControlHandlers = deps?.gamificationControlService ? createGamificationControlHttpHandlers(deps.gamificationControlService) : null;
-  const perbugRewardsHandlers = deps?.perbugRewardsService ? createPerbugRewardsHttpHandlers(deps.perbugRewardsService) : null;
-  const perbugTipsHandlers = deps?.perbugTipsService ? createPerbugTipsHttpHandlers(deps.perbugTipsService) : null;
+  const dryadRewardsHandlers = deps?.dryadRewardsService ? createDryadRewardsHttpHandlers(deps.dryadRewardsService) : null;
+  const dryadTipsHandlers = deps?.dryadTipsService ? createDryadTipsHttpHandlers(deps.dryadTipsService) : null;
   const competitionHandlers = deps?.competitionService ? createCompetitionHttpHandlers(deps.competitionService) : null;
   const sponsoredLocationHandlers = deps?.sponsoredLocationsService ? createSponsoredLocationsHttpHandlers(deps.sponsoredLocationsService) : null;
-  const economyHandlers = deps?.perbugEconomyService ? createPerbugEconomyHttpHandlers(deps.perbugEconomyService) : null;
+  const economyHandlers = deps?.dryadEconomyService ? createDryadEconomyHttpHandlers(deps.dryadEconomyService) : null;
   const viewerRewardsHandlers = deps?.viewerEngagementRewardsService ? createViewerEngagementRewardsHttpHandlers(deps.viewerEngagementRewardsService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
@@ -445,7 +445,7 @@ export function createRoutes(
         return;
       }
 
-      if (req.method === "POST" && normalizedPath === "/v1/admin/perbug-economy/credit" && economyHandlers) {
+      if (req.method === "POST" && normalizedPath === "/v1/admin/dryad-economy/credit" && economyHandlers) {
         await economyHandlers.creditUser(req, res);
         return;
       }
@@ -462,7 +462,7 @@ export function createRoutes(
         await economyHandlers.checkIn(req, res);
         return;
       }
-      if (req.method === "POST" && normalizedPath === "/v1/admin/perbug-economy/collections" && economyHandlers) {
+      if (req.method === "POST" && normalizedPath === "/v1/admin/dryad-economy/collections" && economyHandlers) {
         await economyHandlers.upsertCollection(req, res);
         return;
       }
@@ -502,15 +502,15 @@ export function createRoutes(
         await economyHandlers.redeemOffer(req, res, redeemOfferMatch.offerId);
         return;
       }
-      if (req.method === "POST" && normalizedPath === "/v1/admin/perbug-economy/splits" && economyHandlers) {
+      if (req.method === "POST" && normalizedPath === "/v1/admin/dryad-economy/splits" && economyHandlers) {
         await economyHandlers.updateSplit(req, res);
         return;
       }
-      if (req.method === "GET" && normalizedPath === "/v1/admin/perbug-economy/dashboard" && economyHandlers) {
+      if (req.method === "GET" && normalizedPath === "/v1/admin/dryad-economy/dashboard" && economyHandlers) {
         await economyHandlers.adminDashboard(req, res);
         return;
       }
-      if (req.method === "GET" && normalizedPath === "/v1/perbug-economy/me" && economyHandlers) {
+      if (req.method === "GET" && normalizedPath === "/v1/dryad-economy/me" && economyHandlers) {
         await economyHandlers.consumerDashboard(req, res);
         return;
       }
@@ -625,117 +625,117 @@ export function createRoutes(
         return;
       }
 
-      if (req.method === "POST" && normalizedPath === "/v1/wallet-auth/nonce" && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.createWalletNonce(req, res);
+      if (req.method === "POST" && normalizedPath === "/v1/wallet-auth/nonce" && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.createWalletNonce(req, res);
         return;
       }
 
-      if (req.method === "POST" && normalizedPath === "/v1/wallet-auth/verify" && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.verifyWalletLogin(req, res);
+      if (req.method === "POST" && normalizedPath === "/v1/wallet-auth/verify" && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.verifyWalletLogin(req, res);
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/v1/creator/rewards/dashboard" && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.dashboard(req, res);
+      if (req.method === "GET" && normalizedPath === "/v1/creator/rewards/dashboard" && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.dashboard(req, res);
         return;
       }
 
-      if (req.method === "POST" && normalizedPath === "/v1/wallets/primary" && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.setPrimaryWallet(req, res);
+      if (req.method === "POST" && normalizedPath === "/v1/wallets/primary" && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.setPrimaryWallet(req, res);
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/v1/wallets" && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.listWallets(req, res);
+      if (req.method === "GET" && normalizedPath === "/v1/wallets" && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.listWallets(req, res);
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/v1/perbug/rewards/tiers" && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.rewardTiers(req, res);
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/rewards/tiers" && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.rewardTiers(req, res);
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/v1/perbug/rewards/me" && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.dashboard(req, res);
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/rewards/me" && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.dashboard(req, res);
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/v1/admin/reward-tiers" && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.rewardTiers(req, res);
+      if (req.method === "GET" && normalizedPath === "/v1/admin/reward-tiers" && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.rewardTiers(req, res);
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/v1/admin/rewards/audit-logs" && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.auditLogs(req, res);
+      if (req.method === "GET" && normalizedPath === "/v1/admin/rewards/audit-logs" && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.auditLogs(req, res);
         return;
       }
 
-      if (req.method === "POST" && normalizedPath === "/v1/reviews" && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.submitReview(req, res);
+      if (req.method === "POST" && normalizedPath === "/v1/reviews" && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.submitReview(req, res);
         return;
       }
 
       const previewMatch = /^\/(?:v1\/)?places\/([^/]+)\/reward-preview$/.exec(normalizedPath);
-      if (req.method === "GET" && previewMatch && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.preview(req, res, decodeURIComponent(previewMatch[1]));
+      if (req.method === "GET" && previewMatch && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.preview(req, res, decodeURIComponent(previewMatch[1]));
         return;
       }
 
       const approveMatch = /^\/v1\/admin\/reviews\/([^/]+)\/approve$/.exec(normalizedPath);
-      if (req.method === "POST" && approveMatch && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.approveReview(req, res, decodeURIComponent(approveMatch[1]));
+      if (req.method === "POST" && approveMatch && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.approveReview(req, res, decodeURIComponent(approveMatch[1]));
         return;
       }
 
       const rejectMatch = /^\/v1\/admin\/reviews\/([^/]+)\/reject$/.exec(normalizedPath);
-      if (req.method === "POST" && rejectMatch && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.rejectReview(req, res, decodeURIComponent(rejectMatch[1]));
+      if (req.method === "POST" && rejectMatch && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.rejectReview(req, res, decodeURIComponent(rejectMatch[1]));
         return;
       }
 
-      const claimMatch = /^\/v1\/(?:rewards\/reviews|perbug\/rewards)\/([^/]+)\/claim$/.exec(normalizedPath);
-      if (req.method === "POST" && claimMatch && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.claim(req, res, decodeURIComponent(claimMatch[1]));
+      const claimMatch = /^\/v1\/(?:rewards\/reviews|dryad\/rewards)\/([^/]+)\/claim$/.exec(normalizedPath);
+      if (req.method === "POST" && claimMatch && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.claim(req, res, decodeURIComponent(claimMatch[1]));
         return;
       }
 
-      const nextRewardMatch = /^\/v1\/perbug\/rewards\/places\/([^/]+)\/next$/.exec(normalizedPath);
-      if (req.method === "GET" && nextRewardMatch && perbugRewardsHandlers) {
-        await perbugRewardsHandlers.preview(req, res, decodeURIComponent(nextRewardMatch[1]));
+      const nextRewardMatch = /^\/v1\/dryad\/rewards\/places\/([^/]+)\/next$/.exec(normalizedPath);
+      if (req.method === "GET" && nextRewardMatch && dryadRewardsHandlers) {
+        await dryadRewardsHandlers.preview(req, res, decodeURIComponent(nextRewardMatch[1]));
         return;
       }
 
-      const videoTipIntentMatch = /^\/v1\/perbug\/tips\/videos\/([^/]+)\/intents$/.exec(normalizedPath);
-      if (req.method === "POST" && videoTipIntentMatch && perbugTipsHandlers) {
-        await perbugTipsHandlers.createIntent(req, res, decodeURIComponent(videoTipIntentMatch[1]));
+      const videoTipIntentMatch = /^\/v1\/dryad\/tips\/videos\/([^/]+)\/intents$/.exec(normalizedPath);
+      if (req.method === "POST" && videoTipIntentMatch && dryadTipsHandlers) {
+        await dryadTipsHandlers.createIntent(req, res, decodeURIComponent(videoTipIntentMatch[1]));
         return;
       }
 
-      const videoTipSubmitMatch = /^\/v1\/perbug\/tips\/([^/]+)\/submit$/.exec(normalizedPath);
-      if (req.method === "POST" && videoTipSubmitMatch && perbugTipsHandlers) {
-        await perbugTipsHandlers.submit(req, res, decodeURIComponent(videoTipSubmitMatch[1]));
+      const videoTipSubmitMatch = /^\/v1\/dryad\/tips\/([^/]+)\/submit$/.exec(normalizedPath);
+      if (req.method === "POST" && videoTipSubmitMatch && dryadTipsHandlers) {
+        await dryadTipsHandlers.submit(req, res, decodeURIComponent(videoTipSubmitMatch[1]));
         return;
       }
 
-      const videoTipsListMatch = /^\/v1\/perbug\/tips\/videos\/([^/]+)$/.exec(normalizedPath);
-      if (req.method === "GET" && videoTipsListMatch && perbugTipsHandlers) {
-        await perbugTipsHandlers.listVideo(req, res, decodeURIComponent(videoTipsListMatch[1]));
+      const videoTipsListMatch = /^\/v1\/dryad\/tips\/videos\/([^/]+)$/.exec(normalizedPath);
+      if (req.method === "GET" && videoTipsListMatch && dryadTipsHandlers) {
+        await dryadTipsHandlers.listVideo(req, res, decodeURIComponent(videoTipsListMatch[1]));
         return;
       }
 
-      const creatorTipsSummaryMatch = /^\/v1\/perbug\/tips\/creator\/([^/]+)\/summary$/.exec(normalizedPath);
-      if (req.method === "GET" && creatorTipsSummaryMatch && perbugTipsHandlers) {
-        await perbugTipsHandlers.creatorSummary(req, res, decodeURIComponent(creatorTipsSummaryMatch[1]));
+      const creatorTipsSummaryMatch = /^\/v1\/dryad\/tips\/creator\/([^/]+)\/summary$/.exec(normalizedPath);
+      if (req.method === "GET" && creatorTipsSummaryMatch && dryadTipsHandlers) {
+        await dryadTipsHandlers.creatorSummary(req, res, decodeURIComponent(creatorTipsSummaryMatch[1]));
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/v1/perbug/tips/me/sent" && perbugTipsHandlers) {
-        await perbugTipsHandlers.sent(req, res);
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/tips/me/sent" && dryadTipsHandlers) {
+        await dryadTipsHandlers.sent(req, res);
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/v1/perbug/tips/me/received" && perbugTipsHandlers) {
-        await perbugTipsHandlers.received(req, res);
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/tips/me/received" && dryadTipsHandlers) {
+        await dryadTipsHandlers.received(req, res);
         return;
       }
 
@@ -884,7 +884,7 @@ export function createRoutes(
 
       if (req.method === "GET" && normalizedPath === "/") {
         sendJson(res, 200, {
-          service: "perbug-api",
+          service: "dryad-api",
           version: "1.0.0"
         });
         return;
@@ -1511,7 +1511,7 @@ export function createRoutes(
       if (req.method === "GET" && normalizedPath === "/health") {
         sendJson(res, 200, {
           ok: true,
-          service: "perbug-api",
+          service: "dryad-api",
           version: "1.0.0",
           time: new Date().toISOString()
         });
@@ -2085,7 +2085,7 @@ export function createRoutes(
           const rating = payload.rating == null ? undefined : Number(payload.rating);
           const text = String(payload.body ?? payload.text ?? "").trim();
           const userId = String(readHeader(req, "x-user-id") ?? payload.userId ?? "anonymous-user").trim();
-          const displayName = String(payload.displayName ?? "").trim() || "Perbug User";
+          const displayName = String(payload.displayName ?? "").trim() || "Dryad User";
 
           if (rating != null && (!Number.isFinite(rating) || rating < 1 || rating > 5)) {
             throw new ValidationError(["rating must be between 1 and 5"], "Invalid review payload");

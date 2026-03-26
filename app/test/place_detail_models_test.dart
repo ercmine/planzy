@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/features/deck/place_detail_models.dart';
-import 'package:perbug/models/plan.dart';
+import 'package:dryad/features/deck/place_detail_models.dart';
+import 'package:dryad/models/plan.dart';
 
 void main() {
   Plan basePlan() => Plan(

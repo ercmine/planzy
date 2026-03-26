@@ -1,4 +1,4 @@
--- Sponsored Locations with Perbug Rewards
+-- Sponsored Locations with Dryad Rewards
 
 create table if not exists business_place_access (
   id text primary key,

@@ -127,7 +127,7 @@ describe("server diagnostic and alias routes", () => {
     const rootResponse = await fetch(`${baseUrl}/`);
     expect(rootResponse.status).toBe(200);
     await expect(rootResponse.json()).resolves.toMatchObject({
-      service: "perbug-api",
+      service: "dryad-api",
       version: "1.0.0"
     });
 
@@ -135,7 +135,7 @@ describe("server diagnostic and alias routes", () => {
     expect(healthResponse.status).toBe(200);
     await expect(healthResponse.json()).resolves.toMatchObject({
       ok: true,
-      service: "perbug-api",
+      service: "dryad-api",
       version: "1.0.0"
     });
 
@@ -263,7 +263,7 @@ describe("server diagnostic and alias routes", () => {
         id: "google:abc",
         title: "Coffee Place",
         photo: "places/abc/photos/def",
-        photoUrl: "https://api.perbug.com/photo?name=places%2Fabc%2Fphotos%2Fdef&maxWidthPx=800"
+        photoUrl: "https://api.dryad.dev/photo?name=places%2Fabc%2Fphotos%2Fdef&maxWidthPx=800"
       }
     ]);
 

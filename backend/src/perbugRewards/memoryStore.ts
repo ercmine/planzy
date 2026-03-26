@@ -1,7 +1,7 @@
-import type { AdminAuditLogRecord, PerbugRewardsStore, PerbugRewardTier, PlaceRecord, PlaceRewardState, RewardClaimRecord, RewardEligibilityRecord, RewardReviewRecord, WalletNonce, WalletRecord } from "./types.js";
+import type { AdminAuditLogRecord, DryadRewardsStore, DryadRewardTier, PlaceRecord, PlaceRewardState, RewardClaimRecord, RewardEligibilityRecord, RewardReviewRecord, WalletNonce, WalletRecord } from "./types.js";
 
-export class MemoryPerbugRewardsStore implements PerbugRewardsStore {
-  private readonly tiers = new Map<string, PerbugRewardTier>();
+export class MemoryDryadRewardsStore implements DryadRewardsStore {
+  private readonly tiers = new Map<string, DryadRewardTier>();
   private readonly places = new Map<string, PlaceRecord>();
   private readonly placeRewardStates = new Map<string, PlaceRewardState>();
   private readonly reviews = new Map<string, RewardReviewRecord>();
@@ -12,8 +12,8 @@ export class MemoryPerbugRewardsStore implements PerbugRewardsStore {
   private readonly walletNonces = new Map<string, WalletNonce[]>();
   private readonly auditLogs: AdminAuditLogRecord[] = [];
 
-  listRewardTiers(): PerbugRewardTier[] { return [...this.tiers.values()].sort((a, b) => a.startPosition - b.startPosition); }
-  saveRewardTier(tier: PerbugRewardTier): void { this.tiers.set(tier.id, tier); }
+  listRewardTiers(): DryadRewardTier[] { return [...this.tiers.values()].sort((a, b) => a.startPosition - b.startPosition); }
+  saveRewardTier(tier: DryadRewardTier): void { this.tiers.set(tier.id, tier); }
   listPlaces(): PlaceRecord[] { return [...this.places.values()]; }
   getPlace(placeId: string): PlaceRecord | null { return this.places.get(placeId) ?? null; }
   savePlace(place: PlaceRecord): void { this.places.set(place.id, place); }

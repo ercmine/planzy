@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/features/viewer_rewards/viewer_reward_models.dart';
-import 'package:perbug/features/viewer_rewards/viewer_reward_providers.dart';
-import 'package:perbug/features/viewer_rewards/viewer_rewards_dashboard_page.dart';
+import 'package:dryad/features/viewer_rewards/viewer_reward_models.dart';
+import 'package:dryad/features/viewer_rewards/viewer_reward_providers.dart';
+import 'package:dryad/features/viewer_rewards/viewer_rewards_dashboard_page.dart';
 
 void main() {
   Widget buildApp(List<Override> overrides) {
@@ -31,7 +31,7 @@ void main() {
                 id: '1',
                 videoTitle: 'Coffee Crawl Downtown',
                 action: 'watch',
-                perbug: 2,
+                dryad: 2,
                 status: ViewerRewardStatusType.earned,
                 occurredAt: DateTime(2026, 3, 26),
               )
@@ -40,7 +40,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('13.0 PERBUG earned'), findsOneWidget);
+    expect(find.textContaining('13.0 DRYAD earned'), findsOneWidget);
     expect(find.textContaining('Coffee Crawl Downtown'), findsOneWidget);
     expect(find.textContaining('+2.0'), findsOneWidget);
   });

@@ -3,7 +3,7 @@
 ## Photo proxy quick check
 
 ```bash
-curl -I "https://api.perbug.com/photos?name=places/.../photos/...&maxWidthPx=800"
+curl -I "https://api.dryad.dev/photos?name=places/.../photos/...&maxWidthPx=800"
 ```
 
 ## Identity + profile architecture notes
@@ -53,7 +53,7 @@ curl -I "https://api.perbug.com/photos?name=places/.../photos/...&maxWidthPx=800
   "personalProfile": {
     "id": "pp_abc",
     "userId": "user_123",
-    "displayName": "Perbug User"
+    "displayName": "Dryad User"
   },
   "creatorProfile": {
     "id": "cp_abc",

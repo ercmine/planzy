@@ -11,5 +11,5 @@
   <path d="M19 38A19 19 0 1 0 50 38" stroke="url(#markGradient)" stroke-width="7" stroke-linecap="round"/>
   <path d="M18 46V24" stroke="url(#markGradient)" stroke-width="7" stroke-linecap="round"/>
   <path d="M27 30H33A6 6 0 0 1 33 42H27" stroke="url(#markGradient)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="76" y="43" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="700">Perbug</text>
+  <text x="76" y="43" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="700">Dryad</text>
 </svg>

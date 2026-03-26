@@ -18,7 +18,7 @@ const { title, description = defaultDescription, currentPath, editPath } = Astro
 const seo = createSeo({ title, description, path: currentPath });
 const docsPages = await Astro.glob('/src/pages/docs/**/*.mdx');
 const searchIndex = getDocsSearchIndex(docsPages);
-const editBase = publicConfig.PERBUG_DOCS_GITHUB_URL;
+const editBase = publicConfig.DRYAD_DOCS_GITHUB_URL;
 const editHref = editBase && editPath ? `${editBase.replace(/\/$/, '')}/${editPath}` : undefined;
 ---
 

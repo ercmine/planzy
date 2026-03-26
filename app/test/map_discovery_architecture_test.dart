@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/features/home/map_discovery_clients.dart';
-import 'package:perbug/features/home/map_discovery_models.dart';
-import 'package:perbug/features/home/map_discovery_tab.dart';
+import 'package:dryad/features/home/map_discovery_clients.dart';
+import 'package:dryad/features/home/map_discovery_models.dart';
+import 'package:dryad/features/home/map_discovery_tab.dart';
 
 class _FakeGeoClient implements MapGeoClient {
   _FakeGeoClient({this.failReverse = false});

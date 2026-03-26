@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { ValidationError } from "../plans/errors.js";
 import { parseJsonBody, readHeader, sendJson } from "../venues/claims/http.js";
-import type { PerbugRewardsService } from "./service.js";
+import type { DryadRewardsService } from "./service.js";
 
 function requireUserId(req: IncomingMessage): string {
   const userId = readHeader(req, "x-user-id");
@@ -10,7 +10,7 @@ function requireUserId(req: IncomingMessage): string {
   return userId;
 }
 
-export function createPerbugRewardsHttpHandlers(service: PerbugRewardsService) {
+export function createDryadRewardsHttpHandlers(service: DryadRewardsService) {
   return {
     preview: async (_req: IncomingMessage, res: ServerResponse, placeId: string) => sendJson(res, 200, service.getRewardPreview(placeId)),
     createWalletNonce: async (req: IncomingMessage, res: ServerResponse) => {

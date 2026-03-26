@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[perbug] linting workspace"
+echo "[dryad] linting workspace"
 cargo clippy --workspace --all-targets -- -D warnings

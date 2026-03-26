@@ -10,14 +10,14 @@ import '../providers/app_providers.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 
-class PerbugApp extends ConsumerStatefulWidget {
-  const PerbugApp({super.key});
+class DryadApp extends ConsumerStatefulWidget {
+  const DryadApp({super.key});
 
   @override
-  ConsumerState<PerbugApp> createState() => _PerbugAppState();
+  ConsumerState<DryadApp> createState() => _DryadAppState();
 }
 
-class _PerbugAppState extends ConsumerState<PerbugApp> {
+class _DryadAppState extends ConsumerState<DryadApp> {
   TelemetryDispatcher? _registeredDispatcher;
   bool _adsInitialized = false;
   bool _healthCheckStarted = false;

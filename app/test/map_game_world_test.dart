@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/core/location/location_models.dart';
-import 'package:perbug/features/home/map_discovery_models.dart';
-import 'package:perbug/features/home/map_discovery_widgets.dart';
-import 'package:perbug/features/home/map_game_world.dart';
-import 'package:perbug/features/home/map_game_world_widgets.dart';
+import 'package:dryad/core/location/location_models.dart';
+import 'package:dryad/features/home/map_discovery_models.dart';
+import 'package:dryad/features/home/map_discovery_widgets.dart';
+import 'package:dryad/features/home/map_game_world.dart';
+import 'package:dryad/features/home/map_game_world_widgets.dart';
 
 void main() {
   const pins = [

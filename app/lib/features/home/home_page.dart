@@ -41,7 +41,7 @@ class _HomePageState extends State<HomePage> {
 
     return AppScaffold(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-      appBar: AppBar(title: const Text('Perbug')),
+      appBar: AppBar(title: const Text('Dryad')),
       body: IndexedStack(index: _navIndex, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,

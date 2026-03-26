@@ -159,7 +159,7 @@ class ResultsController extends StateNotifier<ResultsState> {
 
   Future<void> lockIn(Plan plan) async {
     await _swipesRepository.lockIn(_sessionId, plan);
-    await _shareService.shareText(_buildShareCard(plan), subject: 'Perbug pick: ${plan.title}');
+    await _shareService.shareText(_buildShareCard(plan), subject: 'Dryad pick: ${plan.title}');
     state = state.copyWith(
       lockedPlanId: plan.id,
       feedItems: _composeFeed(state.topPicks, lockedPlanId: plan.id),
@@ -194,7 +194,7 @@ class ResultsController extends StateNotifier<ResultsState> {
   String _buildShareCard(Plan plan) {
     final mapsLink = plan.deepLinks?.mapsLink ?? 'N/A';
     final websiteLink = plan.deepLinks?.websiteLink ?? 'N/A';
-    return 'Perbug pick: ${plan.title}\nCategory: ${plan.category}\nMaps: $mapsLink\nWebsite: $websiteLink\n\nJoin session: https://perbug.com/invite/$_sessionId';
+    return 'Dryad pick: ${plan.title}\nCategory: ${plan.category}\nMaps: $mapsLink\nWebsite: $websiteLink\n\nJoin session: https://dryad.dev/invite/$_sessionId';
   }
 
   String _formatError(Object error) {

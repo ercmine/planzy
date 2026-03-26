@@ -1,1 +1,1 @@
-pub use perbug_common::{RewardClaimedEvent, RewardReceiptCreatedEvent};
+pub use dryad_common::{RewardClaimedEvent, RewardReceiptCreatedEvent};
