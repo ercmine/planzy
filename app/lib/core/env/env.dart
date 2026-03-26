@@ -1,12 +1,36 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../ads/ads_config.dart';
 import '../logging/log.dart';
 import 'env_keys.dart';
 
 enum EnvFlavor { dev, stage, prod }
+
+class MapStackConfig {
+  const MapStackConfig({
+    required this.styleUrl,
+    required this.darkStyleUrl,
+    required this.tileSourceStrategy,
+    this.terrainSourceUrl,
+    required this.enable3dBuildings,
+    required this.enableTerrain,
+    required this.enableClustering,
+    required this.enableEnhancedPitch,
+    required this.enableDiagnostics,
+  });
+
+  final String styleUrl;
+  final String darkStyleUrl;
+  final String tileSourceStrategy;
+  final String? terrainSourceUrl;
+  final bool enable3dBuildings;
+  final bool enableTerrain;
+  final bool enableClustering;
+  final bool enableEnhancedPitch;
+  final bool enableDiagnostics;
+}
 
 class EnvConfig {
   const EnvConfig({
@@ -16,6 +40,7 @@ class EnvConfig {
     required this.associatedDomain,
     required this.adsConfig,
     required this.fsqApiKey,
+    required this.mapStack,
   });
 
   final EnvFlavor flavor;
@@ -24,6 +49,7 @@ class EnvConfig {
   final String associatedDomain;
   final AdsConfig adsConfig;
   final String? fsqApiKey;
+  final MapStackConfig mapStack;
 }
 
 final envConfigProvider = Provider<EnvConfig>((ref) {
@@ -34,6 +60,8 @@ class Env {
   const Env._();
 
   static const String _defaultApiBaseUrl = 'https://api.perbug.com';
+  static const String _defaultMapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';
+  static const String _defaultMapStyleDarkUrl = 'https://tiles.openfreemap.org/styles/dark';
 
   static Future<EnvConfig> load(EnvFlavor flavor) async {
     final fileName = switch (flavor) {
@@ -74,6 +102,7 @@ class Env {
       associatedDomain: dotenv.maybeGet(EnvKeys.associatedDomain) ?? 'perbug.com',
       adsConfig: AdsConfig.fromEnv(flavor: flavor),
       fsqApiKey: _resolveFoursquareApiKey(),
+      mapStack: _resolveMapStackConfig(),
     );
   }
 
@@ -86,6 +115,7 @@ class Env {
       associatedDomain: 'perbug.com',
       adsConfig: AdsConfig.disabled(),
       fsqApiKey: _resolveFoursquareApiKey(),
+      mapStack: _resolveMapStackConfig(),
     );
   }
 
@@ -119,7 +149,38 @@ class Env {
     return raw;
   }
 
+  static MapStackConfig _resolveMapStackConfig() {
+    const styleFromDefine = String.fromEnvironment(EnvKeys.mapStyleUrl);
+    const darkFromDefine = String.fromEnvironment(EnvKeys.mapStyleDarkUrl);
+    const strategyFromDefine = String.fromEnvironment(EnvKeys.mapTileSourceStrategy);
+    const terrainFromDefine = String.fromEnvironment(EnvKeys.mapTerrainSourceUrl);
 
+    return MapStackConfig(
+      styleUrl: styleFromDefine.trim().isNotEmpty
+          ? styleFromDefine.trim()
+          : (dotenv.maybeGet(EnvKeys.mapStyleUrl)?.trim().isNotEmpty == true
+              ? dotenv.maybeGet(EnvKeys.mapStyleUrl)!.trim()
+              : _defaultMapStyleUrl),
+      darkStyleUrl: darkFromDefine.trim().isNotEmpty
+          ? darkFromDefine.trim()
+          : (dotenv.maybeGet(EnvKeys.mapStyleDarkUrl)?.trim().isNotEmpty == true
+              ? dotenv.maybeGet(EnvKeys.mapStyleDarkUrl)!.trim()
+              : _defaultMapStyleDarkUrl),
+      tileSourceStrategy: strategyFromDefine.trim().isNotEmpty
+          ? strategyFromDefine.trim()
+          : (dotenv.maybeGet(EnvKeys.mapTileSourceStrategy)?.trim().isNotEmpty == true
+              ? dotenv.maybeGet(EnvKeys.mapTileSourceStrategy)!.trim()
+              : 'openfreemap'),
+      terrainSourceUrl: terrainFromDefine.trim().isNotEmpty
+          ? terrainFromDefine.trim()
+          : dotenv.maybeGet(EnvKeys.mapTerrainSourceUrl)?.trim(),
+      enable3dBuildings: _parseBool(dotenv.maybeGet(EnvKeys.mapEnable3dBuildings), fallback: true),
+      enableTerrain: _parseBool(dotenv.maybeGet(EnvKeys.mapEnableTerrain), fallback: false),
+      enableClustering: _parseBool(dotenv.maybeGet(EnvKeys.mapEnableClustering), fallback: true),
+      enableEnhancedPitch: _parseBool(dotenv.maybeGet(EnvKeys.mapEnableEnhancedPitch), fallback: true),
+      enableDiagnostics: _parseBool(dotenv.maybeGet(EnvKeys.mapEnableDiagnostics), fallback: false),
+    );
+  }
 
   static String? _resolveFoursquareApiKey() {
     const fromDartDefine = String.fromEnvironment(EnvKeys.fsqApiKey);

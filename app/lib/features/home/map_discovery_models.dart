@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:latlong2/latlong.dart';
 
 class MapViewport {
   const MapViewport({
@@ -28,7 +27,6 @@ class MapViewport {
     );
   }
 
-  LatLng toLatLng() => LatLng(centerLat, centerLng);
 
   bool isSimilarTo(MapViewport other, {double centerThreshold = 0.0025, double zoomThreshold = 0.2}) {
     return (centerLat - other.centerLat).abs() <= centerThreshold &&

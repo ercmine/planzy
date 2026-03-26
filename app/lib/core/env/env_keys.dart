@@ -13,4 +13,13 @@ class EnvKeys {
   static const String adsFrequencyN = 'ADS_FREQUENCY_N';
   static const String adsPlaceFirstAfter = 'ADS_PLACE_FIRST_AFTER';
   static const String fsqApiKey = 'FSQ_API_KEY';
+  static const String mapStyleUrl = 'MAP_STYLE_URL';
+  static const String mapStyleDarkUrl = 'MAP_STYLE_DARK_URL';
+  static const String mapTileSourceStrategy = 'MAP_TILE_SOURCE_STRATEGY';
+  static const String mapTerrainSourceUrl = 'MAP_TERRAIN_SOURCE_URL';
+  static const String mapEnable3dBuildings = 'MAP_ENABLE_3D_BUILDINGS';
+  static const String mapEnableTerrain = 'MAP_ENABLE_TERRAIN';
+  static const String mapEnableClustering = 'MAP_ENABLE_CLUSTERING';
+  static const String mapEnableEnhancedPitch = 'MAP_ENABLE_ENHANCED_PITCH';
+  static const String mapEnableDiagnostics = 'MAP_ENABLE_DIAGNOSTICS';
 }
