@@ -54,7 +54,7 @@ import { createVenueClaimsHttpHandlers, parseJsonBody, readHeader, sendJson } fr
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 import type { ReviewsStore } from "../reviews/store.js";
 import { getPlaceReviewVideoSection } from "../reviews/placeVideoSection.js";
-import { ReviewEligibilityService, type DeviceLocationProof } from "../reviews/reviewEligibility.js";
+import { ReviewEligibilityService, type DeviceLocationProof, type ReviewEligibilityDecision } from "../reviews/reviewEligibility.js";
 import type { SavedHttpHandlers } from "../saved/http.js";
 import type { PlaceContentHttpHandlers } from "../placeContent/http.js";
 import type { OutingPlannerService } from "../outingPlanner/service.js";
@@ -1904,7 +1904,7 @@ export function createRoutes(
             viewerUserId: userIdHeader,
             limit: 20
           });
-          const eligibility = (!hasLocationFix && !place)
+          const eligibility: ReviewEligibilityDecision = (!hasLocationFix && !place)
             ? {
                 allowed: true,
                 reasonCode: "allowed",
