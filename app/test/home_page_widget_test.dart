@@ -11,6 +11,7 @@ import 'package:perbug/features/home/home_page.dart';
 import 'package:perbug/features/home/place_video_detail_page.dart';
 import 'package:perbug/features/video_platform/video_models.dart';
 import 'package:perbug/features/video_platform/video_providers.dart';
+import 'package:perbug/features/viewer_rewards/viewer_reward_models.dart';
 
 void main() {
   Widget buildApp(List<Override> overrides) {
@@ -34,6 +35,7 @@ void main() {
       creatorHandle: '@sam',
       caption: 'Best espresso near station',
       videoUrl: 'https://cdn/video.mp4',
+      viewerRewardHint: ViewerRewardHint(isEligible: true, watchRewardPerbug: 3, sponsorName: 'Cafe Orbit'),
       rating: 5,
     ),
   ];
@@ -144,6 +146,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Cafe Orbit'), findsOneWidget);
+    expect(find.text('Earn 3.0 PERBUG'), findsOneWidget);
 
     await tester.tap(find.text('Regional'));
     await tester.pumpAndSettle();

@@ -1,3 +1,5 @@
+import '../viewer_rewards/viewer_reward_models.dart';
+
 enum FeedScope { local, regional, global }
 
 enum StudioVideoStatus { draft, awaiting_upload, uploaded, processing, published, failed, hidden, rejected, archived }
@@ -84,6 +86,7 @@ class PlaceVideoFeedItem {
     this.placeImageUrl,
     this.trustTier,
     this.trustBadges = const [],
+    this.viewerRewardHint,
   });
 
   final String videoId;
@@ -101,6 +104,7 @@ class PlaceVideoFeedItem {
   final String? placeImageUrl;
   final String? trustTier;
   final List<String> trustBadges;
+  final ViewerRewardHint? viewerRewardHint;
   final int rating;
   final String status;
 
@@ -132,6 +136,9 @@ class PlaceVideoFeedItem {
       trustBadges: (json['trust'] is Map && (json['trust'] as Map)['badges'] is List)
           ? ((json['trust'] as Map)['badges'] as List).map((e) => e.toString()).toList(growable: false)
           : const [],
+      viewerRewardHint: json['viewerReward'] is Map<String, dynamic>
+          ? ViewerRewardHint.fromJson(json['viewerReward'] as Map<String, dynamic>)
+          : (json['rewards'] is Map<String, dynamic> ? ViewerRewardHint.fromJson(json['rewards'] as Map<String, dynamic>) : null),
       rating: json['rating'] is num ? (json['rating'] as num).toInt() : 0,
       status: (json['status'] ?? 'draft').toString(),
     );
@@ -153,6 +160,7 @@ class PlaceStreamReview {
     this.coverUrl,
     this.trustTier,
     this.trustBadges = const [],
+    this.viewerRewardHint,
   });
 
   final String reviewId;
@@ -165,6 +173,7 @@ class PlaceStreamReview {
   final String? coverUrl;
   final String? trustTier;
   final List<String> trustBadges;
+  final ViewerRewardHint? viewerRewardHint;
   final int rating;
 }
 
@@ -259,6 +268,7 @@ class PlaceStreamItem {
             coverUrl: item.coverUrl,
             trustTier: item.trustTier,
             trustBadges: item.trustBadges,
+            viewerRewardHint: item.viewerRewardHint,
             rating: item.rating,
           ),
         )

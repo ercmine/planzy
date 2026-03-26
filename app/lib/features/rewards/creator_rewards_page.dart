@@ -20,7 +20,12 @@ class CreatorRewardsPage extends ConsumerWidget {
             tooltip: 'Perbug balance hub',
             onPressed: () => context.push('/economy'),
             icon: const Icon(Icons.account_balance_wallet_outlined),
-          )
+          ),
+          IconButton(
+            tooltip: 'Viewer earnings',
+            onPressed: () => context.push('/viewer/rewards'),
+            icon: const Icon(Icons.play_lesson_outlined),
+          ),
         ],
       ),
       body: dashboard.when(

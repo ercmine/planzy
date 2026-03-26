@@ -19,6 +19,7 @@ import '../notifications/notification_providers.dart';
 import '../place_review_editor/place_review_video_editor_screen.dart';
 import '../video_platform/video_models.dart';
 import '../video_platform/video_providers.dart';
+import '../viewer_rewards/viewer_reward_models.dart';
 import 'map_discovery_tab.dart';
 import 'place_video_detail_page.dart';
 
@@ -462,6 +463,16 @@ class _PlaceStreamCardState extends State<_PlaceStreamCard> {
                                       runSpacing: 8,
                                       children: [
                                         if (review != null) _ActionChip(icon: Icons.star_rounded, label: '${review.rating}/5'),
+                                        if (review?.viewerRewardHint?.isEligible == true)
+                                          _ActionChip(
+                                            icon: Icons.workspace_premium_outlined,
+                                            label: 'Earn ${(review!.viewerRewardHint!.watchRewardPerbug ?? 0).toStringAsFixed(1)} PERBUG',
+                                          ),
+                                        if (review?.viewerRewardHint?.hasSponsoredFunding == true)
+                                          _ActionChip(
+                                            icon: Icons.campaign_outlined,
+                                            label: _sponsorLabel(review!.viewerRewardHint!),
+                                          ),
                                         if (item.socialProof != null) _ActionChip(icon: Icons.layers_outlined, label: item.socialProof!),
                                         _ActionChip(icon: Icons.swipe_rounded, label: 'Swipe right save • left pass'),
                                       ],
@@ -1938,4 +1949,11 @@ class _SettingsEntry extends StatelessWidget {
       onTap: onTap,
     );
   }
+}
+
+String _sponsorLabel(ViewerRewardHint hint) {
+  if (hint.sponsorName?.isNotEmpty == true) {
+    return 'Sponsored by ${hint.sponsorName}';
+  }
+  return hint.fundingLabel?.isNotEmpty == true ? hint.fundingLabel! : 'Sponsored reward';
 }

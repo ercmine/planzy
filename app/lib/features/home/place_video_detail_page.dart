@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../video_platform/video_models.dart';
 import '../video_platform/video_providers.dart';
 import '../video_platform/video_repository.dart';
+import '../viewer_rewards/viewer_reward_providers.dart';
 
 const _reportReasons = <({String code, String label})>[
   (code: "sexual_explicit", label: "Nudity / sexual content"),
@@ -24,7 +26,16 @@ class PlaceVideoDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(videoFeedProvider(FeedScope.local));
     return Scaffold(
-      appBar: AppBar(title: Text(placeName)),
+      appBar: AppBar(
+        title: Text(placeName),
+        actions: [
+          IconButton(
+            tooltip: 'Viewer earnings',
+            onPressed: () => context.push('/viewer/rewards'),
+            icon: const Icon(Icons.wallet_giftcard_outlined),
+          )
+        ],
+      ),
       body: feed.when(
         data: (items) {
           final placeVideos = items.where((item) => item.placeId == placeId).toList(growable: false);
@@ -43,23 +54,47 @@ class PlaceVideoDetailPage extends ConsumerWidget {
                   ),
                 ),
               ...placeVideos.map(
-                (video) => Card(
-                  child: ListTile(
-                    title: Text(video.caption.isEmpty ? video.placeName : video.caption),
-                    subtitle: Text(video.creatorHandle),
-                    trailing: IconButton(
-                      tooltip: "Report video",
-                      icon: const Icon(Icons.flag_outlined),
-                      onPressed: () => _showReportSheet(context, ref, video),
-                    ),
-                  ),
-                ),
+                (video) => _RewardAwareVideoTile(video: video, onReport: () => _showReportSheet(context, ref, video)),
               ),
             ],
           );
         },
         error: (_, __) => const Center(child: Text('No place videos available')),
         loading: () => const Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+}
+
+class _RewardAwareVideoTile extends ConsumerWidget {
+  const _RewardAwareVideoTile({required this.video, required this.onReport});
+
+  final PlaceVideoFeedItem video;
+  final VoidCallback onReport;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rewardStatus = ref.watch(viewerRewardVideoStatusProvider(video.videoId));
+    return Card(
+      child: ListTile(
+        title: Text(video.caption.isEmpty ? video.placeName : video.caption),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(video.creatorHandle),
+            if (video.viewerRewardHint?.isEligible == true)
+              Text('Earn ${(video.viewerRewardHint?.watchRewardPerbug ?? 0).toStringAsFixed(1)} PERBUG by watching'),
+            rewardStatus.maybeWhen(
+              data: (status) => Text(status.statusLabel),
+              orElse: () => const SizedBox.shrink(),
+            ),
+          ],
+        ),
+        trailing: IconButton(
+          tooltip: "Report video",
+          icon: const Icon(Icons.flag_outlined),
+          onPressed: onReport,
+        ),
       ),
     );
   }

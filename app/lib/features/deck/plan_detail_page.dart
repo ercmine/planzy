@@ -20,6 +20,8 @@ import '../../models/place_review_video.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
 import '../../core/location/location_controller.dart';
+import '../viewer_rewards/viewer_reward_models.dart';
+import '../viewer_rewards/viewer_reward_providers.dart';
 import 'place_detail_models.dart';
 import 'widgets/category_pill.dart';
 import '../../core/widgets/app_back_button.dart';
@@ -74,6 +76,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   int _selectedRating = 0;
   bool _anonymous = false;
   NativeAdController? _detailAdController;
+  bool _isRewardMutationRunning = false;
 
   @override
   void initState() {
@@ -226,10 +229,12 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final current = _videos[index];
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.m),
-                child: Column(
+            return Consumer(builder: (context, ref, _) {
+              final rewardStatus = ref.watch(viewerRewardVideoStatusProvider(current.id));
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.m),
+                  child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -243,6 +248,23 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                     const SizedBox(height: AppSpacing.s),
                     Text(current.author.displayName, style: Theme.of(context).textTheme.titleMedium),
                     if (current.caption?.trim().isNotEmpty == true) Text(current.caption!),
+                    const SizedBox(height: AppSpacing.s),
+                    rewardStatus.when(
+                      data: (status) => _ViewerRewardProgressCard(
+                        status: status,
+                        onSimulateWatchProgress: _isRewardMutationRunning
+                            ? null
+                            : () async {
+                                setState(() => _isRewardMutationRunning = true);
+                                final repo = await ref.read(viewerRewardRepositoryProvider.future);
+                                await repo.submitWatchProgress(videoId: current.id, secondsWatched: 30);
+                                ref.invalidate(viewerRewardVideoStatusProvider(current.id));
+                                if (mounted) setState(() => _isRewardMutationRunning = false);
+                              },
+                      ),
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, __) => const SizedBox.shrink(),
+                    ),
                     const SizedBox(height: AppSpacing.s),
                     Wrap(
                       spacing: AppSpacing.s,
@@ -272,8 +294,9 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                     ),
                   ],
                 ),
-              ),
-            );
+                ),
+              );
+            });
           },
         );
       },
@@ -326,6 +349,15 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
         _anonymous = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Review submitted.')));
+      final targetVideoId = _featuredVideo?.id ?? (_videos.isNotEmpty ? _videos.first.id : null);
+      if (targetVideoId != null) {
+        final rewardRepo = await ref.read(viewerRewardRepositoryProvider.future);
+        final rewardStatus = await rewardRepo.notifyCommentSubmitted(videoId: targetVideoId, commentLength: text.length);
+        ref.invalidate(viewerRewardVideoStatusProvider(targetVideoId));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_commentRewardCopy(rewardStatus))));
+        }
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not submit review.')));
@@ -934,6 +966,20 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_featuredVideo != null)
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final status = ref.watch(viewerRewardVideoStatusProvider(_featuredVideo!.id));
+                      return status.when(
+                        data: (data) => Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                          child: _RewardEligibilityBanner(status: data),
+                        ),
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                      );
+                    },
+                  ),
                 DropdownButtonFormField<int>(
                   value: _selectedRating == 0 ? null : _selectedRating,
                   decoration: const InputDecoration(labelText: 'Rating'),
@@ -941,7 +987,16 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                     5,
                     (index) => DropdownMenuItem<int>(value: index + 1, child: Text('${index + 1}')),
                   ),
-                  onChanged: (value) => setState(() => _selectedRating = value ?? 0),
+                  onChanged: (value) async {
+                    setState(() => _selectedRating = value ?? 0);
+                    if ((value ?? 0) == 0 || _featuredVideo == null) return;
+                    final repo = await ref.read(viewerRewardRepositoryProvider.future);
+                    final rewardStatus = await repo.submitRatingReward(videoId: _featuredVideo!.id, rating: value!);
+                    ref.invalidate(viewerRewardVideoStatusProvider(_featuredVideo!.id));
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_ratingRewardCopy(rewardStatus))));
+                    }
+                  },
                   validator: (value) => value == null ? 'Rating is required' : null,
                 ),
                 const SizedBox(height: AppSpacing.s),
@@ -1075,6 +1130,95 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     final text = [plan.title, if (address != null && address.isNotEmpty) address, maps].join('\n');
     await Share.share(text);
   }
+}
+
+class _ViewerRewardProgressCard extends StatelessWidget {
+  const _ViewerRewardProgressCard({required this.status, this.onSimulateWatchProgress});
+
+  final ViewerRewardVideoStatus status;
+  final VoidCallback? onSimulateWatchProgress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(status.statusLabel, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          LinearProgressIndicator(value: (status.progressPercent / 100).clamp(0, 1)),
+          const SizedBox(height: 4),
+          Text(status.remainingSeconds > 0 ? '${status.remainingSeconds}s more watch time to qualify' : 'Watch milestone reached'),
+          if (status.hasSponsoredFunding)
+            Text(status.sponsorName?.isNotEmpty == true ? 'Sponsored reward · ${status.sponsorName}' : 'Sponsored reward'),
+          if (status.reason?.isNotEmpty == true)
+            Text(status.reason!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onSimulateWatchProgress,
+              icon: const Icon(Icons.av_timer_outlined),
+              label: const Text('Track +30s watch'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RewardEligibilityBanner extends StatelessWidget {
+  const _RewardEligibilityBanner({required this.status});
+
+  final ViewerRewardVideoStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBlocked = status.status == ViewerRewardStatusType.capReached ||
+        status.status == ViewerRewardStatusType.denied ||
+        status.status == ViewerRewardStatusType.suspicious;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.s),
+      decoration: BoxDecoration(
+        color: isBlocked ? Theme.of(context).colorScheme.errorContainer : Theme.of(context).colorScheme.primaryContainer.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(_ratingUnlockCopy(status)),
+    );
+  }
+}
+
+String _ratingUnlockCopy(ViewerRewardVideoStatus status) {
+  if (status.status == ViewerRewardStatusType.insufficientWatchTime || status.status == ViewerRewardStatusType.started) {
+    return 'Watch more to unlock rating reward.';
+  }
+  if (status.status == ViewerRewardStatusType.eligibleSoon) {
+    return 'Almost there — keep watching to unlock rating bonus.';
+  }
+  if (status.status == ViewerRewardStatusType.capReached) {
+    return 'Daily cap reached. Ratings still help creators, but rewards resume tomorrow.';
+  }
+  return 'Rating reward available now.';
+}
+
+String _ratingRewardCopy(ViewerRewardVideoStatus status) {
+  if (status.status == ViewerRewardStatusType.pending) return 'Rating submitted — reward pending validation.';
+  if (status.status == ViewerRewardStatusType.earned) return 'Rating reward earned.';
+  if (status.status == ViewerRewardStatusType.denied) return 'Rating didn’t qualify for reward.';
+  return status.statusLabel;
+}
+
+String _commentRewardCopy(ViewerRewardVideoStatus status) {
+  if (status.status == ViewerRewardStatusType.pending) return 'Comment submitted — reward pending review.';
+  if (status.status == ViewerRewardStatusType.earned) return 'Thoughtful comment reward earned.';
+  if (status.status == ViewerRewardStatusType.denied) return 'Comment didn’t qualify for reward.';
+  return status.statusLabel;
 }
 
 Plan mergePlanWithDetails({
