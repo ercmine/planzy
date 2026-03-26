@@ -464,8 +464,19 @@ export function createGeoHttpHandlers(
         sendJson(res, 503, { ok: false, mode: status().mode, version: "1.0.0", status: status() });
         return;
       }
-      const payload = await gateway.health();
-      sendJson(res, payload.ok ? 200 : 503, { ...payload, status: status() });
+      try {
+        const payload = await gateway.health();
+        sendJson(res, payload.ok ? 200 : 503, { ...payload, status: status() });
+      } catch (error) {
+        sendJson(res, 503, {
+          ok: false,
+          mode: status().mode,
+          version: "1.0.0",
+          error: "geo_health_failed",
+          message: error instanceof Error ? error.message : String(error),
+          status: status()
+        });
+      }
     },
 
     async debugStatus(_req: IncomingMessage, res: ServerResponse): Promise<void> {
