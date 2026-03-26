@@ -413,7 +413,9 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     final permissionBlocked = _shouldShowPermissionOverlay(locationState);
     final showSearchArea = state.pendingViewportSearch;
 
-    final overlayWidth = min(max(MediaQuery.sizeOf(context).width - 24, 0.0), 360.0);
+    final screenSize = MediaQuery.sizeOf(context);
+    final overlayWidth = min(max(screenSize.width - 24, 0.0), 360.0);
+    final overlayMaxHeight = max(screenSize.height - 210, 260.0);
 
     return Stack(
       children: [
@@ -488,50 +490,159 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                     ),
                   ),
                   Positioned(
-                    top: 124,
+                    top: 12,
                     left: 12,
                     child: SizedBox(
                       width: overlayWidth,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          !_mapReady
-                              ? IgnorePointer(
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.surface.withOpacity(0.9),
-                                      borderRadius: BorderRadius.circular(999),
-                                      boxShadow: const [
-                                        BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, 6)),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: overlayMaxHeight),
+                        child: ScrollConfiguration(
+                          behavior: const MaterialScrollBehavior().copyWith(scrollbars: false),
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.zero,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CollapsibleMapOverlay(
+                                  title: 'Discovery controls',
+                                  icon: Icons.tune_rounded,
+                                  iconOnlyWhenCollapsed: true,
+                                  isCollapsed: _topOverlayCollapsed,
+                                  onToggle: () => setState(() => _topOverlayCollapsed = !_topOverlayCollapsed),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Column(
+                                      children: [
+                                        DiscoverySearchBar(
+                                          controller: _searchController,
+                                          onSubmit: () => _searchForLocation(controller),
+                                          onRecenter: () => _handleCenterOnUserLocation(locationState, permissionService),
+                                          onOpenSortSheet: _openSortSheet,
+                                          isLoading: state.loading,
+                                          locationEnabled: location != null,
+                                          areaLabel: state.areaLabel ?? state.geoStatus,
+                                        ),
+                                        const SizedBox(height: 10),
+                                        DiscoveryFilterChips(
+                                          filters: filters,
+                                          selectedIds: state.selectedFilters,
+                                          onToggle: (filterId) => controller.toggleFilter(filterById[filterId]!),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: FilterChip(
+                                            selected: _is3dMode,
+                                            label: const Text('3D map mode (beta)'),
+                                            avatar: const Icon(Icons.view_in_ar_rounded, size: 18),
+                                            onSelected: (value) => setState(() => _is3dMode = value),
+                                          ),
+                                        ),
                                       ],
                                     ),
-                                    child: const Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                                          SizedBox(width: 10),
-                                          Text('Loading map'),
-                                        ],
-                                      ),
-                                    ),
                                   ),
-                                )
-                              : CollapsibleMapOverlay(
-                                  title: 'Search area',
-                                  icon: Icons.travel_explore_rounded,
+                                ),
+                                const SizedBox(height: 12),
+                                !_mapReady
+                                    ? IgnorePointer(
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.surface.withOpacity(0.9),
+                                            borderRadius: BorderRadius.circular(999),
+                                            boxShadow: const [
+                                              BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, 6)),
+                                            ],
+                                          ),
+                                          child: const Padding(
+                                            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                                                SizedBox(width: 10),
+                                                Text('Loading map'),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    : CollapsibleMapOverlay(
+                                        title: 'Search area',
+                                        icon: Icons.travel_explore_rounded,
+                                        iconOnlyWhenCollapsed: true,
+                                        isCollapsed: _searchAreaOverlayCollapsed,
+                                        onToggle: () => setState(() => _searchAreaOverlayCollapsed = !_searchAreaOverlayCollapsed),
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(top: 6),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  IconButton.filledTonal(
+                                                    onPressed: () => _openNearbyPlacesList(
+                                                      state: state,
+                                                      visiblePlaces: visiblePlaces,
+                                                      locationState: locationState,
+                                                      connectivityState: connectivityState,
+                                                      location: location,
+                                                    ),
+                                                    tooltip: 'Open nearby places list',
+                                                    icon: const Icon(Icons.format_list_bulleted_rounded),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Expanded(
+                                                    child: SearchAreaButton(
+                                                      visible: showSearchArea,
+                                                      onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
+                                                      isLoading: state.loading,
+                                                      resultCount: visiblePlaces.length,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 10),
+                                              Text(
+                                                'Search radius: ${_radiusLabel(state.searchRadiusMeters)}',
+                                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                              ),
+                                              Slider(
+                                                value: state.searchRadiusMeters.clamp(1000, 50000),
+                                                min: 1000,
+                                                max: 50000,
+                                                divisions: 49,
+                                                label: _radiusLabel(state.searchRadiusMeters),
+                                                onChanged: (value) => controller.setSearchRadiusMeters(value),
+                                                onChangeEnd: (value) => _handleRadiusChanged(
+                                                  value,
+                                                  location: location,
+                                                  controller: controller,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                const SizedBox(height: 12),
+                                CollapsibleMapOverlay(
+                                  title: 'Nearby places',
+                                  icon: Icons.format_list_bulleted_rounded,
                                   iconOnlyWhenCollapsed: true,
-                                  isCollapsed: _searchAreaOverlayCollapsed,
-                                  onToggle: () => setState(() => _searchAreaOverlayCollapsed = !_searchAreaOverlayCollapsed),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          IconButton.filledTonal(
+                                  isCollapsed: _statsOverlayCollapsed,
+                                  onToggle: () => setState(() => _statsOverlayCollapsed = !_statsOverlayCollapsed),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        DiscoveryCountPill(
+                                          count: visiblePlaces.length,
+                                          label: visiblePlaces.length == 1 ? 'place in view' : 'places in view',
+                                        ),
+                                        const SizedBox(height: 10),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: FilledButton.icon(
                                             onPressed: () => _openNearbyPlacesList(
                                               state: state,
                                               visiblePlaces: visiblePlaces,
@@ -539,83 +650,23 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                                               connectivityState: connectivityState,
                                               location: location,
                                             ),
-                                            tooltip: 'Open nearby places list',
-                                            icon: const Icon(Icons.format_list_bulleted_rounded),
+                                            icon: const Icon(Icons.map_outlined),
+                                            label: const Text('Open nearby places list screen'),
                                           ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: SearchAreaButton(
-                                              visible: showSearchArea,
-                                              onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
-                                              isLoading: state.loading,
-                                              resultCount: visiblePlaces.length,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        'Search radius: ${_radiusLabel(state.searchRadiusMeters)}',
-                                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                                      ),
-                                      Slider(
-                                        value: state.searchRadiusMeters.clamp(1000, 50000),
-                                        min: 1000,
-                                        max: 50000,
-                                        divisions: 49,
-                                        label: _radiusLabel(state.searchRadiusMeters),
-                                        onChanged: (value) => controller.setSearchRadiusMeters(value),
-                                        onChangeEnd: (value) => _handleRadiusChanged(
-                                          value,
-                                          location: location,
-                                          controller: controller,
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          const SizedBox(height: 12),
-                          CollapsibleMapOverlay(
-                            title: 'Nearby places',
-                            icon: Icons.format_list_bulleted_rounded,
-                            iconOnlyWhenCollapsed: true,
-                            isCollapsed: _statsOverlayCollapsed,
-                            onToggle: () => setState(() => _statsOverlayCollapsed = !_statsOverlayCollapsed),
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  DiscoveryCountPill(
-                                    count: visiblePlaces.length,
-                                    label: visiblePlaces.length == 1 ? 'place in view' : 'places in view',
-                                  ),
-                                  const SizedBox(height: 10),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: FilledButton.icon(
-                                      onPressed: () => _openNearbyPlacesList(
-                                        state: state,
-                                        visiblePlaces: visiblePlaces,
-                                        locationState: locationState,
-                                        connectivityState: connectivityState,
-                                        location: location,
-                                      ),
-                                      icon: const Icon(Icons.map_outlined),
-                                      label: const Text('Open nearby places list screen'),
+                                        const SizedBox(height: 10),
+                                        DistrictLegendCard(
+                                          world: world,
+                                          onSelectDistrict: _handleDistrictSelected,
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: 10),
-                                  DistrictLegendCard(
-                                    world: world,
-                                    onSelectDistrict: _handleDistrictSelected,
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -660,52 +711,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                     ),
                 ],
               ),
-            ),
-          ),
-        ),
-        Positioned(
-          top: 12,
-          left: 12,
-          child: SizedBox(
-            width: overlayWidth,
-            child: CollapsibleMapOverlay(
-              title: 'Discovery controls',
-              icon: Icons.tune_rounded,
-              iconOnlyWhenCollapsed: true,
-              isCollapsed: _topOverlayCollapsed,
-              onToggle: () => setState(() => _topOverlayCollapsed = !_topOverlayCollapsed),
-              child: Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Column(
-                  children: [
-                    DiscoverySearchBar(
-                      controller: _searchController,
-                      onSubmit: () => _searchForLocation(controller),
-                      onRecenter: () => _handleCenterOnUserLocation(locationState, permissionService),
-                      onOpenSortSheet: _openSortSheet,
-                      isLoading: state.loading,
-                      locationEnabled: location != null,
-                      areaLabel: state.areaLabel ?? state.geoStatus,
-                    ),
-                    const SizedBox(height: 10),
-                                  DiscoveryFilterChips(
-                                    filters: filters,
-                                    selectedIds: state.selectedFilters,
-                                    onToggle: (filterId) => controller.toggleFilter(filterById[filterId]!),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: FilterChip(
-                                      selected: _is3dMode,
-                                      label: const Text('3D map mode (beta)'),
-                                      avatar: const Icon(Icons.view_in_ar_rounded, size: 18),
-                                      onSelected: (value) => setState(() => _is3dMode = value),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
             ),
           ),
         ),
