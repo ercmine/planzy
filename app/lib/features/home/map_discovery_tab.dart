@@ -1353,7 +1353,8 @@ class _DistrictInsightsPage extends StatelessWidget {
               FilledButton.icon(
                 onPressed: () async {
                   await onOpenExploration();
-                  if (context.mounted) Navigator.of(context).pop();
+                  if (!context.mounted) return;
+                  await Navigator.of(context).maybePop();
                 },
                 icon: const Icon(Icons.travel_explore_rounded),
                 label: const Text('Open exploration'),
@@ -1362,7 +1363,7 @@ class _DistrictInsightsPage extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () {
                   onCenterMap();
-                  Navigator.of(context).pop();
+                  unawaited(Navigator.of(context).maybePop());
                 },
                 icon: const Icon(Icons.center_focus_strong_rounded),
                 label: const Text('Center map'),
