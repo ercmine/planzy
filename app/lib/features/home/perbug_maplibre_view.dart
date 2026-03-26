@@ -48,16 +48,24 @@ class PerbugMapLibreView extends StatefulWidget {
 }
 
 class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
+  static const double _minPerspectiveTilt = 24;
+  static const double _maxPerspectiveTilt = 78;
+  static const double _dragTiltSensitivity = 0.24;
+
   MapLibreMapController? _controller;
   CameraPosition? _lastCamera;
   bool _styleLoaded = false;
   VoidCallback? _cameraListener;
+  double? _manualTilt;
 
   PerbugMapTheme get _theme => PerbugMapTheme.resolve(brightness: Theme.of(context).brightness, config: widget.config);
 
   @override
   void didUpdateWidget(covariant PerbugMapLibreView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!widget.is3dMode && oldWidget.is3dMode) {
+      _manualTilt = null;
+    }
     if (_controller == null || !_styleLoaded) return;
 
     final shouldMove = !widget.viewport.isSimilarTo(oldWidget.viewport, centerThreshold: 0.0003, zoomThreshold: 0.01);
@@ -81,45 +89,64 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
   @override
   Widget build(BuildContext context) {
     final mapTheme = _theme;
-    return MapLibreMap(
-      styleString: mapTheme.styleUrl,
-      initialCameraPosition: _cameraPositionForState(),
-      // maplibre_gl 0.21.x exposes camera updates through the controller
-      // listener API instead of a Map widget `onCameraMove` callback.
-      trackCameraPosition: true,
-      compassEnabled: false,
-      rotateGesturesEnabled: true,
-      tiltGesturesEnabled: widget.config.enableEnhancedPitch,
-      myLocationEnabled: false,
-      onMapCreated: (controller) {
-        final previousListener = _cameraListener;
-        if (previousListener != null) {
-          _controller?.removeListener(previousListener);
-        }
-        _controller = controller;
-        _cameraListener = () => _lastCamera = controller.cameraPosition;
-        controller.addListener(_cameraListener!);
-      },
-      onStyleLoadedCallback: () async {
-        _styleLoaded = true;
-        widget.onMapReady();
-        await _applyStyleEnhancements();
-        await _syncMapData();
-      },
-      onMapClick: (_, __) => widget.onTapEmpty(),
-      onMapLongClick: (_, point) => widget.onLongPress(point.latitude, point.longitude),
-      onCameraIdle: () {
-        final camera = _lastCamera;
-        if (camera == null) return;
-        final hasSelection = widget.selectedPlaceId != null;
-        final zoomBoost = hasSelection ? _theme.camera.selectedZoomBoost : _theme.camera.idleZoomBoost;
-        final normalizedZoom = ((camera.zoom ?? widget.viewport.zoom) - zoomBoost).clamp(0.0, 22.0).toDouble();
-        widget.onViewportChanged(
-          MapViewport(centerLat: camera.target.latitude, centerLng: camera.target.longitude, zoom: normalizedZoom),
-          hasGesture: true,
-        );
-      },
-      onCameraTrackingChanged: (_) {},
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: MapLibreMap(
+            styleString: mapTheme.styleUrl,
+            initialCameraPosition: _cameraPositionForState(),
+            // maplibre_gl 0.21.x exposes camera updates through the controller
+            // listener API instead of a Map widget `onCameraMove` callback.
+            trackCameraPosition: true,
+            compassEnabled: false,
+            rotateGesturesEnabled: true,
+            tiltGesturesEnabled: widget.config.enableEnhancedPitch,
+            myLocationEnabled: false,
+            onMapCreated: (controller) {
+              final previousListener = _cameraListener;
+              if (previousListener != null) {
+                _controller?.removeListener(previousListener);
+              }
+              _controller = controller;
+              _cameraListener = () => _lastCamera = controller.cameraPosition;
+              controller.addListener(_cameraListener!);
+            },
+            onStyleLoadedCallback: () async {
+              _styleLoaded = true;
+              widget.onMapReady();
+              await _applyStyleEnhancements();
+              await _syncMapData();
+            },
+            onMapClick: (_, __) => widget.onTapEmpty(),
+            onMapLongClick: (_, point) => widget.onLongPress(point.latitude, point.longitude),
+            onCameraIdle: () {
+              final camera = _lastCamera;
+              if (camera == null) return;
+              final hasSelection = widget.selectedPlaceId != null;
+              final zoomBoost = hasSelection ? _theme.camera.selectedZoomBoost : _theme.camera.idleZoomBoost;
+              final normalizedZoom = ((camera.zoom ?? widget.viewport.zoom) - zoomBoost).clamp(0.0, 22.0).toDouble();
+              widget.onViewportChanged(
+                MapViewport(centerLat: camera.target.latitude, centerLng: camera.target.longitude, zoom: normalizedZoom),
+                hasGesture: true,
+              );
+            },
+            onCameraTrackingChanged: (_) {},
+          ),
+        ),
+        if (_showPerspectiveHandle)
+          Positioned(
+            right: 12,
+            top: 84,
+            bottom: 164,
+            child: _PerspectiveDragHandle(
+              tilt: _resolvedTilt(),
+              minTilt: _minPerspectiveTilt,
+              maxTilt: _maxPerspectiveTilt,
+              onDrag: _applyPerspectiveDrag,
+              onReset: _resetPerspective,
+            ),
+          ),
+      ],
     );
   }
 
@@ -139,9 +166,48 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
     return CameraPosition(
       target: LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
       zoom: widget.viewport.zoom + (hasSelection ? camera.selectedZoomBoost : camera.idleZoomBoost),
-      tilt: canPitch ? (hasSelection ? camera.selectedTilt : camera.idleTilt) : 20,
+      tilt: canPitch ? _resolvedTilt(hasSelection: hasSelection) : 20,
       bearing: canPitch ? (hasSelection ? camera.selectedBearing : camera.idleBearing) : 0,
     );
+  }
+
+  bool get _showPerspectiveHandle => widget.is3dMode && widget.config.enableEnhancedPitch;
+
+  double _resolvedTilt({bool? hasSelection}) {
+    final selected = hasSelection ?? (widget.selectedPlaceId != null);
+    final defaultTilt = selected ? _theme.camera.selectedTilt : _theme.camera.idleTilt;
+    return (_manualTilt ?? defaultTilt).clamp(_minPerspectiveTilt, _maxPerspectiveTilt).toDouble();
+  }
+
+  void _applyPerspectiveDrag(double dragDeltaDy) {
+    if (!_showPerspectiveHandle) return;
+    final hasSelection = widget.selectedPlaceId != null;
+    final nextTilt = (_resolvedTilt(hasSelection: hasSelection) + (-dragDeltaDy * _dragTiltSensitivity))
+        .clamp(_minPerspectiveTilt, _maxPerspectiveTilt)
+        .toDouble();
+    if ((_manualTilt ?? -1) == nextTilt) return;
+    setState(() => _manualTilt = nextTilt);
+    final controller = _controller;
+    if (controller == null) return;
+    final current = _cameraPositionForState();
+    controller.moveCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: current.target,
+          zoom: current.zoom,
+          tilt: nextTilt,
+          bearing: current.bearing,
+        ),
+      ),
+    );
+  }
+
+  void _resetPerspective() {
+    if (_manualTilt == null) return;
+    setState(() => _manualTilt = null);
+    final controller = _controller;
+    if (controller == null) return;
+    controller.animateCamera(CameraUpdate.newCameraPosition(_cameraPositionForState()));
   }
 
   Future<void> _applyStyleEnhancements() async {
@@ -466,5 +532,55 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
         ),
       );
     } catch (_) {}
+  }
+}
+
+class _PerspectiveDragHandle extends StatelessWidget {
+  const _PerspectiveDragHandle({
+    required this.tilt,
+    required this.minTilt,
+    required this.maxTilt,
+    required this.onDrag,
+    required this.onReset,
+  });
+
+  final double tilt;
+  final double minTilt;
+  final double maxTilt;
+  final ValueChanged<double> onDrag;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final progress = ((tilt - minTilt) / (maxTilt - minTilt)).clamp(0.0, 1.0);
+    return GestureDetector(
+      onVerticalDragUpdate: (details) => onDrag(details.delta.dy),
+      onDoubleTap: onReset,
+      child: Container(
+        width: 52,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          color: theme.colorScheme.surface.withOpacity(0.75),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.72)),
+          boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 10, offset: Offset(0, 4))],
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+        child: Column(
+          children: [
+            Icon(Icons.view_in_ar_rounded, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(height: 8),
+            Expanded(
+              child: RotatedBox(
+                quarterTurns: 3,
+                child: LinearProgressIndicator(value: progress, minHeight: 6, borderRadius: BorderRadius.circular(999)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text('3D', style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w800)),
+          ],
+        ),
+      ),
+    );
   }
 }
