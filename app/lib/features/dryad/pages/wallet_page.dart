@@ -6,14 +6,23 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/widgets.dart';
 import '../chain/dryad_chain_providers.dart';
 
-class DryadWalletPage extends ConsumerWidget {
+class DryadWalletPage extends ConsumerStatefulWidget {
   const DryadWalletPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DryadWalletPage> createState() => _DryadWalletPageState();
+}
+
+class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
+  bool _isConnecting = false;
+  String? _connectionMessage;
+
+  @override
+  Widget build(BuildContext context) {
     final config = ref.watch(dryadContractConfigProvider);
     final wallet = ref.watch(walletAddressProvider);
     final snapshot = ref.watch(groveNftSnapshotProvider);
+    final connector = ref.watch(walletConnectorProvider);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -34,11 +43,23 @@ class DryadWalletPage extends ConsumerWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  FilledButton(onPressed: () => _launchWallet('metamask://'), child: const Text('MetaMask')),
-                  FilledButton(onPressed: () => _launchWallet('phantom://'), child: const Text('Phantom')),
-                  OutlinedButton(onPressed: () => _launchWallet('https://go.cb-w.com/'), child: const Text('Coinbase Wallet')),
+                  FilledButton(
+                    onPressed: _isConnecting ? null : _connectBrowserWallet,
+                    child: Text(_isConnecting ? 'Connecting…' : 'Connect wallet'),
+                  ),
+                  OutlinedButton(onPressed: () => _launchWallet('metamask://'), child: const Text('Open MetaMask')),
+                  OutlinedButton(onPressed: () => _launchWallet('phantom://'), child: const Text('Open Phantom')),
+                  OutlinedButton(onPressed: () => _launchWallet('https://go.cb-w.com/'), child: const Text('Open Coinbase Wallet')),
                 ],
               ),
+              if (!connector.isAvailable) ...[
+                const SizedBox(height: 8),
+                const Text('No browser wallet provider detected here. Install a wallet extension and use this page in a wallet-enabled browser, or connect from onboarding.'),
+              ],
+              if (_connectionMessage != null) ...[
+                const SizedBox(height: 8),
+                Text(_connectionMessage!),
+              ],
               const SizedBox(height: 8),
               SelectableText('Connected wallet: ${wallet ?? 'Disconnected'}'),
             ],
@@ -68,6 +89,39 @@ class DryadWalletPage extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _connectBrowserWallet() async {
+    final connector = ref.read(walletConnectorProvider);
+    if (!connector.isAvailable) {
+      setState(() {
+        _connectionMessage = 'Wallet app links only open the wallet. To actually connect, use the Connect wallet button in a browser with MetaMask/Phantom extension enabled.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isConnecting = true;
+      _connectionMessage = null;
+    });
+
+    try {
+      final account = await connector.connectWallet();
+      ref.read(walletAddressProvider.notifier).state = account;
+      setState(() {
+        _connectionMessage = 'Connected: $account';
+      });
+    } catch (error) {
+      setState(() {
+        _connectionMessage = 'Wallet connection failed: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isConnecting = false;
+        });
+      }
+    }
   }
 
   Future<void> _launchWallet(String uri) async {
