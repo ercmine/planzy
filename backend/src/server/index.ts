@@ -31,7 +31,6 @@ import { MemoryMerchantStore } from "../merchant/memoryStore.js";
 import { MerchantService } from "../merchant/service.js";
 import { BringYourOwnProvider, MemoryIdeasStore } from "../plans/bringYourOwn/index.js";
 import type { IdeasStore } from "../plans/bringYourOwn/storage.js";
-import { CuratedProvider } from "../plans/curated/index.js";
 import { ProviderRouter } from "../plans/router/providerRouter.js";
 import type { ProviderRouter as ProviderRouterType } from "../plans/router/providerRouter.js";
 import { MemoryTelemetryStore } from "../telemetry/memoryStore.js";
@@ -83,14 +82,10 @@ export interface CreateServerOptions {
 
 function createDefaultDeckRouter(sharedIdeasStore: IdeasStore): ProviderRouter {
   return new ProviderRouter({
-    providers: [new BringYourOwnProvider(sharedIdeasStore), new CuratedProvider()],
+    providers: [new BringYourOwnProvider(sharedIdeasStore)],
     includeDebug: true,
     cache: {
       enabled: false
-    },
-    neverEmpty: {
-      enabled: true,
-      curatedProviderName: "curated"
     }
   });
 }
