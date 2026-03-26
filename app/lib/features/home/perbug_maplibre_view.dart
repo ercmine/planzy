@@ -111,8 +111,11 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
       onCameraIdle: () {
         final camera = _lastCamera;
         if (camera == null) return;
+        final hasSelection = widget.selectedPlaceId != null;
+        final zoomBoost = hasSelection ? _theme.camera.selectedZoomBoost : _theme.camera.idleZoomBoost;
+        final normalizedZoom = ((camera.zoom ?? widget.viewport.zoom) - zoomBoost).clamp(0.0, 22.0).toDouble();
         widget.onViewportChanged(
-          MapViewport(centerLat: camera.target.latitude, centerLng: camera.target.longitude, zoom: camera.zoom ?? widget.viewport.zoom),
+          MapViewport(centerLat: camera.target.latitude, centerLng: camera.target.longitude, zoom: normalizedZoom),
           hasGesture: true,
         );
       },
