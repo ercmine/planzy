@@ -18,6 +18,18 @@ flutter pub get
 flutter run
 ```
 
+If Flutter reports a package resolution error such as
+`Couldn't resolve the package 'perbug' in 'package:perbug/main.dart'`, clear
+stale generated artifacts and rebuild:
+
+```bash
+cd app
+flutter clean
+rm -rf .dart_tool build
+flutter pub get
+flutter build web
+```
+
 ### Backend (`/backend`)
 
 ```bash
