@@ -5,7 +5,7 @@ import '../../core/env/env.dart';
 import '../../core/logging/log.dart';
 import 'map_discovery_models.dart';
 import 'map_game_world.dart';
-import 'dryad_map_theme.dart';
+import 'perbug_map_theme.dart';
 
 class DryadMapLibreView extends StatefulWidget {
   const DryadMapLibreView({
