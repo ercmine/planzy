@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme/widgets.dart';
 import '../chain/dryad_chain_providers.dart';
@@ -18,31 +19,35 @@ class DryadWalletPage extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       children: [
         const PremiumHeader(
-          title: 'Dryad Wallet',
-          subtitle: 'Live on-chain NFT status and artwork sourced from tokenURI/image_data SVG.',
-          badge: AppPill(label: 'Wallet', icon: Icons.account_balance_wallet_outlined),
+          title: 'Wallet',
+          subtitle: 'Connect mainstream wallets for claim/plant/list/buy signing.',
+          badge: AppPill(label: 'Wallet Connect', icon: Icons.account_balance_wallet_outlined),
         ),
         const SizedBox(height: 10),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Network: ${config.networkName} (${config.chainId})'),
-              const SizedBox(height: 6),
-              SelectableText('RPC: ${config.rpcUrl}'),
-              const SizedBox(height: 4),
-              SelectableText('NFT: ${config.groveNftAddress}'),
-              if (wallet != null) ...[
-                const SizedBox(height: 4),
-                SelectableText('Connected wallet: $wallet'),
-              ],
+              Text('Target network: ${config.networkName} (${config.chainId})'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton(onPressed: () => _launchWallet('metamask://'), child: const Text('MetaMask')),
+                  FilledButton(onPressed: () => _launchWallet('phantom://'), child: const Text('Phantom')),
+                  OutlinedButton(onPressed: () => _launchWallet('https://go.cb-w.com/'), child: const Text('Coinbase Wallet')),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SelectableText('Connected wallet: ${wallet ?? 'Disconnected'}'),
             ],
           ),
         ),
         const SizedBox(height: 12),
         snapshot.when(
           data: (value) {
-            if (value == null) return const AppCard(child: Text('No wallet connected in onboarding yet.'));
+            if (value == null) return const AppCard(child: Text('Connect wallet from onboarding or paste wallet there to load on-chain tree artwork.'));
             final svg = value.artwork?.svgMarkup;
             if (svg == null) {
               return AppCard(child: Text(value.hasNft ? 'NFT found but no SVG render path was available.' : 'No NFT owned yet.'));
@@ -63,5 +68,9 @@ class DryadWalletPage extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _launchWallet(String uri) async {
+    await launchUrl(Uri.parse(uri), mode: LaunchMode.externalApplication);
   }
 }

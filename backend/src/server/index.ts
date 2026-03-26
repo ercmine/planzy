@@ -71,6 +71,7 @@ import { CompetitionService, MemoryCompetitionStore } from "../competition/index
 import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../sponsoredLocations/index.js";
 import { MemoryDryadEconomyStore, DryadEconomyService } from "../dryadEconomy/index.js";
 import { MemoryViewerEngagementStore, ViewerEngagementRewardsService } from "../viewerEngagementRewards/index.js";
+import { DryadMarketplaceService } from "../dryad/service.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -271,6 +272,47 @@ export function createServer(options?: CreateServerOptions) {
   competitionService.recordVideoPublished({ videoId: "video_seed_1", reviewId: "review_seed_1", userId: "u1", publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), city: "Bloomington", category: "coffee", canonicalPlaceId: "place-1" });
   competitionService.recordApprovedReview({ id: "review_event_1", reviewId: "review_seed_1", videoId: "video_seed_1", userId: "u1", canonicalPlaceId: "place-1", approvedAt: new Date().toISOString(), city: "Bloomington", category: "coffee", discoveryType: "first_review", approved: true, blocked: false });
   competitionService.recordLike({ id: "like_seed_1", videoId: "video_seed_1", userId: "fan_1", createdAt: new Date().toISOString(), valid: true, bannedUser: false, blockedUser: false, fraudFlagged: false });
+  const dryadMarketplaceService = new DryadMarketplaceService([
+    {
+      treeId: "tree-001",
+      nftTokenId: "1001",
+      place: { placeId: "place-1", label: "Mission Creek Boardwalk, San Francisco", lat: 37.7701, lng: -122.391 },
+      founder: "0x1111111111111111111111111111111111111111",
+      owner: "0x2222222222222222222222222222222222222222",
+      growthLevel: 8,
+      contributionCount: 42,
+      listedPriceEth: "0.38"
+    },
+    {
+      treeId: "tree-002",
+      nftTokenId: "1002",
+      place: { placeId: "place-2", label: "Dolores Outlook, San Francisco", lat: 37.7597, lng: -122.4269 },
+      founder: "0x1111111111111111111111111111111111111111",
+      owner: "0x1111111111111111111111111111111111111111",
+      growthLevel: 4,
+      contributionCount: 11
+    },
+    {
+      treeId: "tree-003",
+      nftTokenId: "1003",
+      place: { placeId: "place-3", label: "South Congress Plaza, Austin", lat: 30.2492, lng: -97.7502 },
+      founder: "0x3333333333333333333333333333333333333333",
+      owner: "0x4444444444444444444444444444444444444444",
+      growthLevel: 6,
+      contributionCount: 23,
+      listedPriceEth: "0.74"
+    },
+    {
+      treeId: "tree-004",
+      nftTokenId: "1004",
+      place: { placeId: "place-4", label: "Riverside Pocket Park, Austin", lat: 30.265, lng: -97.744 },
+      founder: "0x0000000000000000000000000000000000000000",
+      owner: "0x0000000000000000000000000000000000000000",
+      growthLevel: 0,
+      contributionCount: 0
+    }
+  ]);
+
   const dryadEconomyService = new DryadEconomyService(new MemoryDryadEconomyStore());
   const viewerEngagementRewardsService = new ViewerEngagementRewardsService(new MemoryViewerEngagementStore(), {
     getVideoContext: (videoId) => ({ creatorId: `creator_${videoId}`, placeId: `place_${videoId}` }),
@@ -346,7 +388,8 @@ export function createServer(options?: CreateServerOptions) {
     competitionService,
     sponsoredLocationsService,
     dryadEconomyService,
-    viewerEngagementRewardsService
+    viewerEngagementRewardsService,
+    dryadMarketplaceService
   });
 }
 

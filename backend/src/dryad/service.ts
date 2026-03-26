@@ -13,6 +13,44 @@ export class DryadMarketplaceService {
     return this.trees;
   }
 
+  getTree(treeId: string): DryadTree | undefined {
+    return this.trees.find((tree) => tree.treeId === treeId);
+  }
+
+  claimAndPlant(treeId: string, wallet: WalletAddress): DryadTree {
+    const tree = this.requireTree(treeId);
+    if (tree.owner !== ("0x0000000000000000000000000000000000000000" as WalletAddress)) {
+      throw new Error("tree_not_claimable");
+    }
+    const updated: DryadTree = { ...tree, owner: wallet };
+    this.replaceTree(updated);
+    return updated;
+  }
+
+  listTree(treeId: string, wallet: WalletAddress, priceEth: string): DryadTree {
+    const tree = this.requireTree(treeId);
+    if (tree.owner.toLowerCase() !== wallet.toLowerCase()) throw new Error("forbidden_owner_mismatch");
+    const updated: DryadTree = { ...tree, listedPriceEth: priceEth };
+    this.replaceTree(updated);
+    return updated;
+  }
+
+  unlistTree(treeId: string, wallet: WalletAddress): DryadTree {
+    const tree = this.requireTree(treeId);
+    if (tree.owner.toLowerCase() != wallet.toLowerCase()) throw new Error("forbidden_owner_mismatch");
+    const updated: DryadTree = { ...tree, listedPriceEth: undefined };
+    this.replaceTree(updated);
+    return updated;
+  }
+
+  buyTree(treeId: string, buyerWallet: WalletAddress): DryadTree {
+    const tree = this.requireTree(treeId);
+    if (!tree.listedPriceEth) throw new Error("tree_not_listed");
+    const updated: DryadTree = { ...tree, owner: buyerWallet, listedPriceEth: undefined };
+    this.replaceTree(updated);
+    return updated;
+  }
+
   evaluatePlantEligibility(input: Omit<PlantEligibility, "eligible" | "reason" | "maxDistanceMeters">): PlantEligibility {
     const eligible = input.distanceMeters <= MAX_PLANT_DISTANCE_METERS;
     return {
@@ -28,16 +66,21 @@ export class DryadMarketplaceService {
     const ownedTreeIds = this.trees.filter((tree) => tree.owner === wallet).map((tree) => tree.treeId);
     const contributedTreeIds = this.contributions.filter((item) => item.contributor === wallet).map((item) => item.treeId);
 
-    return {
-      wallet,
-      foundedTreeIds,
-      ownedTreeIds,
-      contributedTreeIds,
-      watchlistTreeIds: [],
-    };
+    return { wallet, foundedTreeIds, ownedTreeIds, contributedTreeIds, watchlistTreeIds: [] };
   }
 
   chainContracts() {
     return DRYAD_CONTRACTS;
+  }
+
+  private requireTree(treeId: string): DryadTree {
+    const tree = this.getTree(treeId);
+    if (!tree) throw new Error("tree_not_found");
+    return tree;
+  }
+
+  private replaceTree(next: DryadTree): void {
+    const index = this.trees.findIndex((item) => item.treeId === next.treeId);
+    if (index >= 0) this.trees[index] = next;
   }
 }
