@@ -17,7 +17,7 @@ class DryadTreePage extends StatelessWidget {
 
     return AppScaffold(
       appBar: AppBar(title: Text(tree.name)),
-      child: ListView(
+      body: ListView(
         children: [
           AppCard(
             tone: AppCardTone.featured,
