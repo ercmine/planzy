@@ -95,7 +95,6 @@ class _PlantingTreeCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final repoAsync = ref.watch(dryadRepositoryProvider);
     final wallet = ref.watch(walletAddressProvider);
 
     Future<void> claimAndPlant() async {
@@ -103,7 +102,7 @@ class _PlantingTreeCard extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connect wallet first to claim and plant.')));
         return;
       }
-      final repo = await repoAsync.future;
+      final repo = await ref.read(dryadRepositoryProvider.future);
       await repo.claimAndPlant(tree.id, wallet: wallet);
       ref.invalidate(plantingTreesProvider);
       ref.invalidate(treeDetailProvider(tree.id));
