@@ -3,9 +3,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/widgets.dart';
 import '../dryad/pages/grove_page.dart';
-import '../dryad/pages/map_claim_page.dart';
 import '../dryad/pages/market_page.dart';
 import '../dryad/pages/wallet_page.dart';
+import 'map_discovery_tab.dart';
 
 enum HomeTab { map, market, wallet, grove, profile }
 
@@ -32,7 +32,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      DryadMapClaimPage(onOpenTree: _openTree),
+      const MapDiscoveryTab(),
       DryadMarketPage(onOpenTree: _openTree),
       const DryadWalletPage(),
       DryadGrovePage(onOpenTree: _openTree),
@@ -40,8 +40,8 @@ class _HomePageState extends State<HomePage> {
     ];
 
     return AppScaffold(
-      padding: EdgeInsets.zero,
-      appBar: AppBar(title: const Text('Dryad')),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      appBar: AppBar(title: const Text('Perbug')),
       body: IndexedStack(index: _navIndex, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
