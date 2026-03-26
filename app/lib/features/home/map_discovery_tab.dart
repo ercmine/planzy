@@ -42,6 +42,7 @@ class MapViewportState {
     this.sort = MapDiscoverySort.relevance,
     this.hasInitialized = false,
     this.lastSearchMode = 'nearby',
+    this.searchRadiusMeters = 12000,
   });
 
   final MapViewport viewport;
@@ -57,6 +58,7 @@ class MapViewportState {
   final MapDiscoverySort sort;
   final bool hasInitialized;
   final String lastSearchMode;
+  final double searchRadiusMeters;
 
   MapViewportState copyWith({
     MapViewport? viewport,
@@ -74,6 +76,7 @@ class MapViewportState {
     MapDiscoverySort? sort,
     bool? hasInitialized,
     String? lastSearchMode,
+    double? searchRadiusMeters,
   }) {
     return MapViewportState(
       viewport: viewport ?? this.viewport,
@@ -89,6 +92,7 @@ class MapViewportState {
       sort: sort ?? this.sort,
       hasInitialized: hasInitialized ?? this.hasInitialized,
       lastSearchMode: lastSearchMode ?? this.lastSearchMode,
+      searchRadiusMeters: searchRadiusMeters ?? this.searchRadiusMeters,
     );
   }
 }
@@ -159,6 +163,10 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
   void setSort(MapDiscoverySort sort) {
     if (state.sort == sort) return;
     state = state.copyWith(sort: sort);
+  }
+
+  void setSearchRadiusMeters(double radiusMeters) {
+    state = state.copyWith(searchRadiusMeters: radiusMeters.clamp(1000, 50000).toDouble(), pendingViewportSearch: true);
   }
 
   void selectPlace(String placeId) {
@@ -256,7 +264,12 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
     try {
       final discoveryClient = await _ref.read(placeDiscoveryClientProvider.future);
       final pins = await discoveryClient.searchByViewport(
-        SearchAreaContext(viewport: viewport, categories: state.backendCategories.toList(growable: false), mode: mode),
+        SearchAreaContext(
+          viewport: viewport,
+          categories: state.backendCategories.toList(growable: false),
+          mode: mode,
+          radiusMeters: state.searchRadiusMeters,
+        ),
       );
       if (requestId != _searchRequestId) return;
       _lastSearchKey = queryKey;
@@ -553,16 +566,57 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                                   iconOnlyWhenCollapsed: true,
                                   isCollapsed: _searchAreaOverlayCollapsed,
                                   onToggle: () => setState(() => _searchAreaOverlayCollapsed = !_searchAreaOverlayCollapsed),
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: SearchAreaButton(
-                                      visible: showSearchArea,
-                                      onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
-                                      isLoading: state.loading,
-                                      resultCount: visiblePlaces.length,
-                                    ),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          IconButton.filledTonal(
+                                            onPressed: () => _openNearbyPlacesList(
+                                              state: state,
+                                              visiblePlaces: visiblePlaces,
+                                              locationState: locationState,
+                                              connectivityState: connectivityState,
+                                              location: location,
+                                            ),
+                                            tooltip: 'Open nearby places list',
+                                            icon: const Icon(Icons.format_list_bulleted_rounded),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: SearchAreaButton(
+                                              visible: showSearchArea,
+                                              onPressed: () => controller.searchThisArea(mode: 'search_this_area'),
+                                              isLoading: state.loading,
+                                              resultCount: visiblePlaces.length,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'Search radius: ${_radiusLabel(state.searchRadiusMeters)}',
+                                        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                      ),
+                                      Slider(
+                                        value: state.searchRadiusMeters.clamp(1000, 50000),
+                                        min: 1000,
+                                        max: 50000,
+                                        divisions: 49,
+                                        label: _radiusLabel(state.searchRadiusMeters),
+                                        onChanged: (value) => controller.setSearchRadiusMeters(value),
+                                        onChangeEnd: (value) => _handleRadiusChanged(
+                                          value,
+                                          location: location,
+                                          controller: controller,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
+                              ),
                           const SizedBox(height: 12),
                           CollapsibleMapOverlay(
                             title: 'Map insights',
@@ -797,7 +851,104 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
       );
       return;
     }
+    final cityLevelQuery = query.split(RegExp(r'\s+')).length <= 3;
+    if (cityLevelQuery) {
+      controller.setSearchRadiusMeters(40000);
+      final current = ref.read(mapDiscoveryControllerProvider).viewport;
+      controller.setViewport(
+        current.copyWith(zoom: min(current.zoom, 11.2)),
+        markPendingSearch: true,
+      );
+      await controller.searchThisArea(mode: 'city_exploration');
+    }
     _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+  }
+
+  Future<void> _handleRadiusChanged(
+    double radiusMeters, {
+    required AppLocation? location,
+    required MapDiscoveryController controller,
+  }) async {
+    final target = location;
+    if (target != null) {
+      controller.setViewport(
+        MapViewport(
+          centerLat: target.lat,
+          centerLng: target.lng,
+          zoom: _zoomForRadius(radiusMeters),
+        ),
+        markPendingSearch: true,
+      );
+      _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+    }
+    await controller.searchThisArea(mode: 'search_this_area');
+    await controller.refreshAreaLabel();
+  }
+
+  Future<void> _openNearbyPlacesList({
+    required MapViewportState state,
+    required List<MapPin> visiblePlaces,
+    required LocationControllerState locationState,
+    required ConnectivityState connectivityState,
+    required AppLocation? location,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => NearbyPlacesSheet(
+        places: visiblePlaces,
+        selectedPlaceId: state.selectedPlaceId,
+        onPlaceSelected: (place) {
+          ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(place.canonicalPlaceId);
+          _moveMapToPlace(place);
+        },
+        onOpenPlace: _openPlaceDetails,
+        onToggleSave: _toggleSave,
+        onReview: _openPlaceDetails,
+        onDirections: (place) => _openPlaceInMaps(ref.read(linkLauncherProvider), place),
+        onShare: _sharePlace,
+        savedPlaceIds: _savedPlaceIds,
+        countLabel: _countLabel(visiblePlaces, state: state),
+        sort: state.sort,
+        onOpenSortSheet: _openSortSheet,
+        loading: state.loading,
+        emptyState: _emptyStateFor(
+          state: state,
+          locationState: locationState,
+          connectivityState: connectivityState,
+          noLocationAvailable: location == null,
+          visiblePlaces: visiblePlaces,
+        ),
+        permissionState: _shouldShowPermissionOverlay(locationState)
+            ? const DiscoveryStateCard(
+                icon: Icons.location_searching_rounded,
+                title: 'Location required',
+                body: 'Enable location to improve nearby ranking and distance estimates.',
+              )
+            : null,
+        errorState: state.discoveryError == null
+            ? null
+            : DiscoveryStateCard(
+                icon: Icons.error_outline,
+                title: 'Nearby places unavailable',
+                body: state.discoveryError!,
+              ),
+        collectionSummary: null,
+        distanceLabelFor: (place) => _distanceSummary(place, location),
+        badgesFor: _badgesFor,
+      ),
+    );
+  }
+
+  String _radiusLabel(double radiusMeters) {
+    if (radiusMeters < 1000) return '${radiusMeters.round()} m';
+    return '${(radiusMeters / 1000).toStringAsFixed(0)} km';
+  }
+
+  double _zoomForRadius(double radiusMeters) {
+    final computed = 222000 / radiusMeters;
+    return computed.clamp(9.5, 16.5).toDouble();
   }
 
   Future<void> _handleCenterOnUserLocation(LocationControllerState locationState, LocationPermissionService permissionService) async {

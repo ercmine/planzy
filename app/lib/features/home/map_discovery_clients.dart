@@ -47,7 +47,7 @@ class RemoteMapGeoClient implements MapGeoClient {
       queryParameters: {
         'lat': viewport.centerLat.toString(),
         'lng': viewport.centerLng.toString(),
-        'radius': _radiusMetersFromViewport(viewport).toStringAsFixed(0),
+        'radius': (context.radiusMeters ?? _radiusMetersFromViewport(viewport)).toStringAsFixed(0),
         'limit': '80',
         if (context.categories.isNotEmpty) 'categories': context.categories.join(','),
         'mode': context.mode,
@@ -69,7 +69,7 @@ class RemoteMapGeoClient implements MapGeoClient {
   double _radiusMetersFromViewport(MapViewport viewport) {
     final latMeters = (viewport.north - viewport.south).abs() * 111000;
     final lngMeters = (viewport.east - viewport.west).abs() * 111000;
-    final radius = ((latMeters + lngMeters) / 4).clamp(500, 25000);
+    final radius = ((latMeters + lngMeters) / 4).clamp(500, 50000);
     return radius.toDouble();
   }
 
