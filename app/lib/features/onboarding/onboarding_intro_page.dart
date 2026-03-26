@@ -48,7 +48,7 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
             Text('Welcome to Dryad', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
             const SizedBox(height: AppSpacing.s),
             Text(
-              'Connect your Ethereum wallet, verify mainnet, and load your real on-chain Grove NFT artwork.',
+              'Connect your Ethereum wallet first, verify mainnet, and load your real on-chain Grove NFT artwork. You can skip for now if needed.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.m),
@@ -92,11 +92,23 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
               const AppCard(child: Text('No NFT artwork loaded yet.')),
             const SizedBox(height: AppSpacing.m),
             PrimaryButton(
-              label: state.status == OnboardingFlowStatus.nftFound ? 'Continue to app' : 'Skip and continue',
-              onPressed: () async {
-                await ref.read(onboardingControllerProvider.notifier).completeOnboarding();
-                if (mounted) context.go('/');
-              },
+              label: 'Continue with connected wallet',
+              onPressed: state.walletAddress.isEmpty || state.isBusy
+                  ? null
+                  : () async {
+                      await ref.read(onboardingControllerProvider.notifier).completeOnboarding();
+                      if (mounted) context.go('/');
+                    },
+            ),
+            const SizedBox(height: AppSpacing.s),
+            SecondaryButton(
+              label: 'Skip and continue',
+              onPressed: state.isBusy
+                  ? null
+                  : () async {
+                      await ref.read(onboardingControllerProvider.notifier).completeOnboarding();
+                      if (mounted) context.go('/');
+                    },
             ),
           ],
         ),
