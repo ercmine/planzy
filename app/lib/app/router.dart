@@ -26,6 +26,7 @@ import '../features/sessions/session_page.dart';
 import '../features/sessions/session_settings/session_settings_page.dart';
 import '../features/sessions/sessions_page.dart';
 import '../features/video_platform/video_models.dart';
+import '../features/viewer_rewards/viewer_rewards_dashboard_page.dart';
 
 final onboardingGateProvider = Provider<ChangeNotifier>((ref) {
   final gate = ValueNotifier<int>(0);
@@ -164,6 +165,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/creator/rewards',
         name: 'creator-rewards',
         builder: (context, state) => const CreatorRewardsPage(),
+      ),
+      GoRoute(
+        path: '/viewer/rewards',
+        name: 'viewer-rewards',
+        builder: (context, state) => const ViewerRewardsDashboardPage(),
       ),
       GoRoute(
         path: '/economy',
