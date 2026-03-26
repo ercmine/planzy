@@ -55,7 +55,7 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Perbug',
+      title: 'Dryad',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

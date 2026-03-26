@@ -137,3 +137,5 @@ export * from "./leaderboards/index.js";
 export * from "./competition/index.js";
 export * from "./sponsoredLocations/index.js";
 export * from "./viewerEngagementRewards/index.js";
+
+export * from "./dryad/index.js";
