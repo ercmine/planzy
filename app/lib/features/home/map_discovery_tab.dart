@@ -1350,8 +1350,16 @@ class _PlaceMarker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final poolFeatured = _isFeaturedPool(
+      category: category,
+      sponsored: sponsored,
+      questEnabled: questEnabled,
+      collectionEnabled: collectionEnabled,
+    );
     final backgroundColor = selected ? theme.colorScheme.primary : theme.colorScheme.surface;
     final foregroundColor = selected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
+    final categoryIconColor = poolFeatured ? const Color(0xFFFFD54F) : foregroundColor.withOpacity(0.9);
+    final categoryIcon = poolFeatured ? Icons.auto_awesome_rounded : _categoryIconForCategory(category);
 
     return Align(
       alignment: Alignment.topCenter,
@@ -1394,7 +1402,7 @@ class _PlaceMarker extends StatelessWidget {
                             colors: [foregroundColor.withOpacity(0.2), foregroundColor.withOpacity(0.05)],
                           ),
                         ),
-                        child: Text(_categorySprite(category), style: const TextStyle(fontSize: 14)),
+                        child: Icon(categoryIcon, size: 14, color: categoryIconColor),
                       ),
                       if (saved)
                         Positioned(
@@ -1501,13 +1509,26 @@ List<LatLng> _district3dShadow(DistrictZone zone) {
   ];
 }
 
-String _categorySprite(String category) {
+bool _isFeaturedPool({
+  required String category,
+  required bool sponsored,
+  required bool questEnabled,
+  required bool collectionEnabled,
+}) {
   final value = category.toLowerCase();
-  if (value.contains('coffee')) return '☕';
-  if (value.contains('food') || value.contains('restaurant')) return '🍽️';
-  if (value.contains('night') || value.contains('bar')) return '🍸';
-  if (value.contains('park') || value.contains('outdoor')) return '🌳';
-  if (value.contains('museum') || value.contains('art')) return '🏛️';
-  if (value.contains('shop')) return '🛍️';
-  return '📍';
+  final isPool = value.contains('pool') || value.contains('swim') || value.contains('aquatic');
+  final isFeatured = sponsored || questEnabled || collectionEnabled;
+  return isPool && isFeatured;
+}
+
+IconData _categoryIconForCategory(String category) {
+  final value = category.toLowerCase();
+  if (value.contains('coffee')) return Icons.coffee_rounded;
+  if (value.contains('food') || value.contains('restaurant')) return Icons.restaurant_rounded;
+  if (value.contains('night') || value.contains('bar')) return Icons.nightlife_rounded;
+  if (value.contains('pool') || value.contains('swim') || value.contains('aquatic')) return Icons.pool_rounded;
+  if (value.contains('park') || value.contains('outdoor')) return Icons.park_rounded;
+  if (value.contains('museum') || value.contains('art')) return Icons.museum_rounded;
+  if (value.contains('shop')) return Icons.shopping_bag_rounded;
+  return Icons.place_rounded;
 }
