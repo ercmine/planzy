@@ -68,6 +68,7 @@ class MapPin {
     this.openNow,
     this.reviewCount = 0,
     this.creatorVideoCount = 0,
+    this.reviewEligibility,
   });
 
   final String canonicalPlaceId;
@@ -87,9 +88,45 @@ class MapPin {
   final bool? openNow;
   final int reviewCount;
   final int creatorVideoCount;
+  final ReviewEligibilityStatus? reviewEligibility;
 
   String get categoryLabel => category.replaceAll('-', ' ');
   String get neighborhoodLabel => neighborhood ?? city ?? region ?? 'Nearby';
+}
+
+class ReviewEligibilityStatus {
+  const ReviewEligibilityStatus({
+    required this.allowed,
+    required this.reasonCode,
+    this.distanceMeters,
+    this.thresholdMeters,
+    this.message,
+    this.requiresFreshLocation = false,
+    this.requiresPermission = false,
+  });
+
+  final bool allowed;
+  final String reasonCode;
+  final double? distanceMeters;
+  final double? thresholdMeters;
+  final String? message;
+  final bool requiresFreshLocation;
+  final bool requiresPermission;
+
+  String get shortLabel {
+    if (allowed) return 'Reviewable now';
+    switch (reasonCode) {
+      case 'too_far_from_place':
+        return 'Move closer to review';
+      case 'location_permission_missing':
+        return 'Location required';
+      case 'location_too_old':
+      case 'accuracy_too_low':
+        return 'Need fresher location';
+      default:
+        return 'Not reviewable now';
+    }
+  }
 }
 
 class PlacePreviewSummary {

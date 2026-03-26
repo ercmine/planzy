@@ -19,6 +19,8 @@ class PlacePreviewCard extends StatelessWidget {
     this.onSave,
     this.onShare,
     this.onOpenMaps,
+    this.reviewCtaEnabled = true,
+    this.reviewCtaMessage,
   });
 
   final MapPin place;
@@ -31,6 +33,8 @@ class PlacePreviewCard extends StatelessWidget {
   final VoidCallback? onSave;
   final VoidCallback? onShare;
   final VoidCallback? onOpenMaps;
+  final bool reviewCtaEnabled;
+  final String? reviewCtaMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -160,9 +164,9 @@ class PlacePreviewCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: PrimaryButton(
-                          onPressed: onLeaveReview,
+                          onPressed: reviewCtaEnabled ? onLeaveReview : null,
                           icon: const Icon(Icons.rate_review_outlined),
-                          label: 'Leave review',
+                          label: reviewCtaEnabled ? 'Leave review' : 'Review locked',
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -175,6 +179,13 @@ class PlacePreviewCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (!reviewCtaEnabled && reviewCtaMessage != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      reviewCtaMessage!,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   Row(
                     children: [

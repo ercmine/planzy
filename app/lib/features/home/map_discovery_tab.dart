@@ -45,6 +45,7 @@ class MapViewportState {
     this.hasInitialized = false,
     this.lastSearchMode = 'nearby',
     this.searchRadiusMeters = 12000,
+    this.reviewableOnly = false,
   });
 
   final MapViewport viewport;
@@ -61,6 +62,7 @@ class MapViewportState {
   final bool hasInitialized;
   final String lastSearchMode;
   final double searchRadiusMeters;
+  final bool reviewableOnly;
 
   MapViewportState copyWith({
     MapViewport? viewport,
@@ -79,6 +81,7 @@ class MapViewportState {
     bool? hasInitialized,
     String? lastSearchMode,
     double? searchRadiusMeters,
+    bool? reviewableOnly,
   }) {
     return MapViewportState(
       viewport: viewport ?? this.viewport,
@@ -95,6 +98,7 @@ class MapViewportState {
       hasInitialized: hasInitialized ?? this.hasInitialized,
       lastSearchMode: lastSearchMode ?? this.lastSearchMode,
       searchRadiusMeters: searchRadiusMeters ?? this.searchRadiusMeters,
+      reviewableOnly: reviewableOnly ?? this.reviewableOnly,
     );
   }
 }
@@ -106,7 +110,8 @@ final mapGeoClientProvider = FutureProvider<MapGeoClient>((ref) async {
 
 final placeDiscoveryClientProvider = FutureProvider<PlaceDiscoveryClient>((ref) async {
   final geoClient = await ref.watch(mapGeoClientProvider.future);
-  return BackendPlaceDiscoveryClient(geoClient);
+  final apiClient = await ref.watch(apiClientProvider.future);
+  return BackendPlaceDiscoveryClient(geoClient, apiClient);
 });
 
 final mapCollectionsProvider = FutureProvider<List<CollectionCardModel>>((ref) async {
@@ -169,6 +174,10 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
 
   void setSearchRadiusMeters(double radiusMeters) {
     state = state.copyWith(searchRadiusMeters: radiusMeters.clamp(1000, 50000).toDouble(), pendingViewportSearch: true);
+  }
+
+  void setReviewableOnly(bool enabled) {
+    state = state.copyWith(reviewableOnly: enabled);
   }
 
   void selectPlace(String placeId) {
@@ -273,16 +282,49 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
           radiusMeters: state.searchRadiusMeters,
         ),
       );
+      final location = _ref.read(locationControllerProvider).effectiveLocation;
+      final eligibilityByPlace = location == null
+          ? const <String, ReviewEligibilityStatus>{}
+          : await discoveryClient.checkReviewEligibility(
+              lat: location.lat,
+              lng: location.lng,
+              accuracyMeters: location.accuracyMeters,
+              capturedAt: location.capturedAt,
+              isMocked: location.isMocked,
+              placeIds: pins.map((item) => item.canonicalPlaceId).toList(growable: false),
+            );
+      final enrichedPins = pins
+          .map((pin) => MapPin(
+                canonicalPlaceId: pin.canonicalPlaceId,
+                name: pin.name,
+                category: pin.category,
+                latitude: pin.latitude,
+                longitude: pin.longitude,
+                rating: pin.rating,
+                city: pin.city,
+                region: pin.region,
+                neighborhood: pin.neighborhood,
+                distanceMeters: pin.distanceMeters,
+                thumbnailUrl: pin.thumbnailUrl,
+                hasCreatorMedia: pin.hasCreatorMedia,
+                hasReviews: pin.hasReviews,
+                descriptionSnippet: pin.descriptionSnippet,
+                openNow: pin.openNow,
+                reviewCount: pin.reviewCount,
+                creatorVideoCount: pin.creatorVideoCount,
+                reviewEligibility: eligibilityByPlace[pin.canonicalPlaceId],
+              ))
+          .toList(growable: false);
       if (requestId != _searchRequestId) return;
       _lastSearchKey = queryKey;
       state = state.copyWith(
         loading: false,
-        pins: pins,
+        pins: enrichedPins,
         pendingViewportSearch: false,
         discoveryError: null,
-        selectedPlaceId: pins.any((pin) => pin.canonicalPlaceId == state.selectedPlaceId)
+        selectedPlaceId: enrichedPins.any((pin) => pin.canonicalPlaceId == state.selectedPlaceId)
             ? state.selectedPlaceId
-            : (pins.isEmpty ? null : pins.first.canonicalPlaceId),
+            : (enrichedPins.isEmpty ? null : enrichedPins.first.canonicalPlaceId),
       );
     } on ApiError catch (error) {
       if (requestId != _searchRequestId) return;
@@ -748,6 +790,15 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
             ),
           ),
         ),
+        Positioned(
+          left: 16,
+          bottom: 48,
+          child: FilterChip(
+            label: const Text('Can review now'),
+            selected: state.reviewableOnly,
+            onSelected: (value) => ref.read(mapDiscoveryControllerProvider.notifier).setReviewableOnly(value),
+          ),
+        ),
       ],
     );
   }
@@ -1079,6 +1130,13 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   }
 
   void _startReviewFromMap(MapPin place) {
+    final eligibility = place.reviewEligibility;
+    if (eligibility?.allowed != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(eligibility?.message ?? eligibility?.shortLabel ?? 'Move closer to this place to review.')),
+      );
+      return;
+    }
     context.pushNamed(
       'place-review-editor',
       extra: _toPlaceSearchResult(place),
@@ -1179,6 +1237,9 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
 
   List<MapPin> _sortedAndFilteredPlaces(List<MapPin> pins, {required MapViewportState state, required AppLocation? location}) {
     Iterable<MapPin> filtered = pins;
+    if (state.reviewableOnly) {
+      filtered = filtered.where((pin) => pin.reviewEligibility?.allowed == true);
+    }
     for (final filterId in state.selectedFilters) {
       final filter = filterById[filterId];
       if (filter == null) continue;
@@ -1236,7 +1297,8 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
 
   String _countLabel(List<MapPin> visiblePlaces, {required MapViewportState state}) {
     final sortLabel = _sortLabel(state.sort);
-    final filterText = state.selectedFilters.isEmpty ? 'All places' : '${state.selectedFilters.length} filters active';
+    final filterCount = state.selectedFilters.length + (state.reviewableOnly ? 1 : 0);
+    final filterText = filterCount == 0 ? 'All places' : '$filterCount filters active';
     return '${visiblePlaces.length} places in this area • Sorted by $sortLabel • $filterText';
   }
 

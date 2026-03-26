@@ -25,6 +25,9 @@ class LocationService {
       lat: position.latitude,
       lng: position.longitude,
       capturedAt: position.timestamp ?? DateTime.now(),
+      accuracyMeters: position.accuracy,
+      speedMps: position.speed,
+      isMocked: position.isMocked,
     );
   }
 }

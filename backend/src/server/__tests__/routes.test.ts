@@ -213,6 +213,47 @@ describe("server diagnostic and alias routes", () => {
     });
   });
 
+  it("enforces proximity-backed review eligibility and blocks remote review submission", async () => {
+    const matchRes = await fetch(`${baseUrl}/v1/review-prompts/visit-match`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ lat: 30.2672, lng: -97.7431, reviewedPlaceIds: [] })
+    });
+    expect(matchRes.status).toBe(200);
+    const matchPayload = await matchRes.json();
+    const placeId = matchPayload.canonicalPlaceId;
+    if (typeof placeId !== "string" || placeId.length == 0) return;
+
+    const farEligibilityRes = await fetch(`${baseUrl}/places/${encodeURIComponent(placeId)}/review-eligibility`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": "u-prox-1" },
+      body: JSON.stringify({ locationProof: { lat: 0, lng: 0, accuracyMeters: 10, capturedAt: new Date().toISOString() } })
+    });
+    expect(farEligibilityRes.status).toBe(200);
+    await expect(farEligibilityRes.json()).resolves.toMatchObject({
+      eligibility: {
+        allowed: false,
+        reasonCode: "too_far_from_place"
+      }
+    });
+
+    const remoteSubmitRes = await fetch(`${baseUrl}/places/${encodeURIComponent(placeId)}/reviews`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-user-id": "u-prox-1" },
+      body: JSON.stringify({
+        rating: 5,
+        body: "Trying to post while far away should be blocked.",
+        displayName: "Far Tester",
+        locationProof: { lat: 0, lng: 0, accuracyMeters: 10, capturedAt: new Date().toISOString() }
+      })
+    });
+    expect(remoteSubmitRes.status).toBe(403);
+    await expect(remoteSubmitRes.json()).resolves.toMatchObject({
+      error: "review_locked_by_policy",
+      eligibility: { reasonCode: "too_far_from_place" }
+    });
+  });
+
   it("serves plans and live-results under bare and /api aliases", async () => {
     const planResponse = await fetch(`${baseUrl}/plans?lat=44.85&lng=-93.54&category=coffee`);
     expect(planResponse.status).toBe(200);

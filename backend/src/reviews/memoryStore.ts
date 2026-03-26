@@ -208,6 +208,7 @@ export class MemoryReviewsStore implements ReviewsStore {
         existing.media = this.attachUploadsToReview(existing, input.authorUserId, input.mediaUploadIds, nowDate);
         existing.mediaCount = existing.media.length;
       }
+      existing.eligibilitySnapshot = input.eligibilitySnapshot;
       return this.toView(existing, input.authorUserId);
     }
 
@@ -234,7 +235,8 @@ export class MemoryReviewsStore implements ReviewsStore {
       editWindowEndsAt: new Date(nowDate.getTime() + input.editWindowMinutes * 60_000).toISOString(),
       helpfulCount: 0,
       media: [],
-      mediaCount: 0
+      mediaCount: 0,
+      eligibilitySnapshot: input.eligibilitySnapshot
     };
 
     if (input.mediaUploadIds?.length) {

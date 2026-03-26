@@ -83,4 +83,31 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('shows locked review CTA when place is not currently reviewable', (tester) async {
+    const place = MapPin(
+      canonicalPlaceId: 'cp-3',
+      name: 'Remote Venue',
+      category: 'restaurant',
+      latitude: 40,
+      longitude: -73,
+      rating: 4.2,
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: PlacePreviewCard(
+            place: place,
+            proximityState: PlaceProximityState.unknown,
+            reviewCtaEnabled: false,
+            reviewCtaMessage: 'Move closer to this place to review.',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Review locked'), findsOneWidget);
+    expect(find.text('Move closer to this place to review.'), findsOneWidget);
+  });
 }

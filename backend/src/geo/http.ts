@@ -170,10 +170,10 @@ function parseNearbyDiscoveryConfig(env: NodeJS.ProcessEnv = process.env): Nearb
   };
 
   return {
-    targetCandidates: Math.max(20, Math.min(250, readInt("GEO_NEARBY_TARGET_CANDIDATES", 80))),
-    maxQueryFanout: Math.max(4, Math.min(80, readInt("GEO_NEARBY_MAX_QUERY_FANOUT", 20))),
-    cellSubdivisions: Math.max(1, Math.min(7, readInt("GEO_NEARBY_CELL_SUBDIVISIONS", 5))),
-    perQueryLimit: Math.max(5, Math.min(40, readInt("GEO_NEARBY_PER_QUERY_LIMIT", 15))),
+    targetCandidates: Math.max(20, Math.min(250, readInt("GEO_NEARBY_TARGET_CANDIDATES", 140))),
+    maxQueryFanout: Math.max(4, Math.min(80, readInt("GEO_NEARBY_MAX_QUERY_FANOUT", 32))),
+    cellSubdivisions: Math.max(1, Math.min(7, readInt("GEO_NEARBY_CELL_SUBDIVISIONS", 6))),
+    perQueryLimit: Math.max(5, Math.min(40, readInt("GEO_NEARBY_PER_QUERY_LIMIT", 22))),
     queryTimeoutMs: Math.max(200, Math.min(10_000, readInt("GEO_NEARBY_QUERY_TIMEOUT_MS", 2500))),
     queryConcurrency: Math.max(1, Math.min(8, readInt("GEO_NEARBY_QUERY_CONCURRENCY", 3))),
     cacheTtlMs: Math.max(500, Math.min(120_000, readInt("GEO_NEARBY_CACHE_TTL_MS", 15_000))),

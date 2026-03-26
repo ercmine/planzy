@@ -19,6 +19,7 @@ import '../../models/place_review.dart';
 import '../../models/place_review_video.dart';
 import '../../models/plan.dart';
 import '../../providers/app_providers.dart';
+import '../../core/location/location_controller.dart';
 import 'place_detail_models.dart';
 import 'widgets/category_pill.dart';
 import '../../core/widgets/app_back_button.dart';
@@ -294,6 +295,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     setState(() => _isSubmittingReview = true);
     final text = _reviewTextController.text.trim();
     final displayName = _displayNameController.text.trim();
+    final location = ref.read(locationControllerProvider).effectiveLocation;
 
     try {
       if (kDebugMode) {
@@ -304,6 +306,16 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
         rating: _selectedRating == 0 ? null : _selectedRating,
         body: text,
         displayName: _anonymous ? 'Anonymous' : displayName,
+        locationProof: location == null
+            ? null
+            : {
+                'lat': location.lat,
+                'lng': location.lng,
+                'accuracyMeters': location.accuracyMeters,
+                'capturedAt': location.capturedAt?.toUtc().toIso8601String(),
+                'isMocked': location.isMocked,
+                'speedMps': location.speedMps,
+              },
       );
       if (!mounted) return;
       setState(() {

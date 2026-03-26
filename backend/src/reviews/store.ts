@@ -174,6 +174,21 @@ export interface PlaceReview {
   viewerHasHelpfulVote?: boolean;
   canEdit?: boolean;
   trust: ReviewPublicTrustSummary;
+  eligibilitySnapshot?: ReviewEligibilitySnapshot;
+}
+
+export interface ReviewEligibilitySnapshot {
+  reviewEligibilityVersion: string;
+  entryDistanceMeters?: number;
+  submitDistanceMeters?: number;
+  locationAccuracyMeters?: number;
+  locationTimestamp?: string;
+  thresholdMeters?: number;
+  verificationMode?: string;
+  reasonCodeAtEntry?: string;
+  reasonCodeAtSubmit?: string;
+  fraudFlags?: string[];
+  checkInSessionId?: string;
 }
 
 export interface CreateReviewInput {
@@ -188,6 +203,7 @@ export interface CreateReviewInput {
   mediaUploadIds?: string[];
   now?: Date;
   editWindowMinutes: number;
+  eligibilitySnapshot?: ReviewEligibilitySnapshot;
 }
 
 export interface UpdateReviewInput {
