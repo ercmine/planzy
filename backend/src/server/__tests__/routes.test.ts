@@ -263,7 +263,7 @@ describe("server diagnostic and alias routes", () => {
         id: "google:abc",
         title: "Coffee Place",
         photo: "places/abc/photos/def",
-        photoUrl: "https://api.dryad.dev/photo?name=places%2Fabc%2Fphotos%2Fdef&maxWidthPx=800"
+        photoUrl: "https://api.perbug.com/photo?name=places%2Fabc%2Fphotos%2Fdef&maxWidthPx=800"
       }
     ]);
 

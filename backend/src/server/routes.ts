@@ -106,7 +106,7 @@ import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/
 import { createDryadMarketplaceHttpHandlers } from "../dryad/http.js";
 import type { DryadMarketplaceService } from "../dryad/service.js";
 
-const DEFAULT_PUBLIC_API_BASE_URL = "https://api.dryad.dev";
+const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
 
 const PREMIUM_CONTENT: Record<string, PremiumContentDescriptor> = {

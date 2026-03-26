@@ -61,7 +61,7 @@ final envConfigProvider = Provider<EnvConfig>((ref) {
 class Env {
   const Env._();
 
-  static const String _defaultApiBaseUrl = 'https://api.dryad.dev';
+  static const String _defaultApiBaseUrl = 'https://api.perbug.com';
   static const String _defaultMapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';
   static const String _defaultMapStyleDarkUrl = 'https://tiles.openfreemap.org/styles/dark';
 
@@ -101,7 +101,7 @@ class Env {
         dotenv.maybeGet(EnvKeys.enableDebugLogs),
         fallback: defaultDebug,
       ),
-      associatedDomain: dotenv.maybeGet(EnvKeys.associatedDomain) ?? 'dryad.dev',
+      associatedDomain: dotenv.maybeGet(EnvKeys.associatedDomain) ?? 'perbug.com',
       adsConfig: AdsConfig.fromEnv(flavor: flavor),
       fsqApiKey: _resolveFoursquareApiKey(),
       mapStack: _resolveMapStackConfig(),
@@ -115,7 +115,7 @@ class Env {
       flavor: flavor,
       apiBaseUrl: _resolveApiBaseUrl(),
       enableDebugLogs: defaultDebug,
-      associatedDomain: 'dryad.dev',
+      associatedDomain: 'perbug.com',
       adsConfig: AdsConfig.disabled(),
       fsqApiKey: _resolveFoursquareApiKey(),
       mapStack: _resolveMapStackConfig(),
