@@ -81,7 +81,7 @@ class _TreeListingCard extends ConsumerWidget {
               runSpacing: 8,
               children: [
                 AppPill(label: 'Seller ${tree.ownerHandle}', icon: Icons.sell_outlined),
-                AppPill(label: tree.statusLabel, icon: Icons.forest_outlined),
+                AppPill(label: tree.lifecycleLabel, icon: Icons.forest_outlined),
                 AppPill(label: tree.rarity, icon: Icons.auto_awesome),
               ],
             ),

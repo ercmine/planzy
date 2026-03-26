@@ -44,8 +44,67 @@ describe("dryad marketplace routes", () => {
       body: JSON.stringify({ treeId: "tree-004", buyerWallet: "0x6666666666666666666666666666666666666666" })
     });
     expect(buy.status).toBe(200);
-    const bought = await buy.json() as { ownerHandle: string; saleStatus: string };
+    const bought = await buy.json() as { ownerHandle: string; saleStatus: string; lifecycleState: string };
     expect(bought.ownerHandle).toBe("0x6666666666666666666666666666666666666666");
     expect(bought.saleStatus).toBe("not_listed");
+    expect(bought.lifecycleState).toBe("sold");
+  });
+
+  it("enforces dig-up payment and allows replanting on an unclaimed spot", async () => {
+    const baseUrl = await boot();
+    const owner = "0x1111111111111111111111111111111111111111";
+
+    const eligibility = await fetch(`${baseUrl}/v1/dryad/trees/tree-002/dig-up-eligibility?wallet=${owner}`);
+    expect(eligibility.status).toBe(200);
+    const eligibilityJson = await eligibility.json() as { eligible: boolean; feeWei: string; recipient: string };
+    expect(eligibilityJson.eligible).toBe(true);
+    expect(eligibilityJson.feeWei).toBe("100000000000000000");
+
+    const createIntent = await fetch(`${baseUrl}/v1/dryad/trees/tree-002/dig-up-intents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wallet: owner, chainId: 1 })
+    });
+    expect(createIntent.status).toBe(201);
+    const intent = await createIntent.json() as { intentId: string; feeRecipient: string };
+
+    const confirmIntent = await fetch(`${baseUrl}/v1/dryad/dig-up-intents/${intent.intentId}/confirm`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        paymentTxHash: "0xabc0000000000000000000000000000000000000000000000000000000000001",
+        from: owner,
+        to: intent.feeRecipient,
+        valueWei: "100000000000000000",
+        chainId: 1
+      })
+    });
+    expect(confirmIntent.status).toBe(200);
+
+    const treeAfterDigUp = await fetch(`${baseUrl}/v1/dryad/trees/tree-002`);
+    const treeAfterDigUpJson = await treeAfterDigUp.json() as { lifecycleState: string; isPortable: boolean; currentSpotId: string | null };
+    expect(treeAfterDigUpJson.lifecycleState).toBe("ready_to_replant");
+    expect(treeAfterDigUpJson.isPortable).toBe(true);
+    expect(treeAfterDigUpJson.currentSpotId).toBeNull();
+
+    const spots = await fetch(`${baseUrl}/v1/dryad/spots/unclaimed`);
+    const spotsJson = await spots.json() as { spots: Array<{ spotId: string; claimState: string }> };
+    const targetSpot = spotsJson.spots.find((spot) => spot.claimState === "unclaimed");
+    expect(targetSpot).toBeTruthy();
+
+    const createReplantIntent = await fetch(`${baseUrl}/v1/dryad/replant-intents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ treeId: "tree-002", wallet: owner, nextSpotId: targetSpot?.spotId })
+    });
+    expect(createReplantIntent.status).toBe(201);
+    const replantIntent = await createReplantIntent.json() as { intentId: string };
+
+    const confirmReplant = await fetch(`${baseUrl}/v1/dryad/replant-intents/${replantIntent.intentId}/confirm`, { method: "POST" });
+    expect(confirmReplant.status).toBe(200);
+
+    const replantable = await fetch(`${baseUrl}/v1/dryad/trees/replantable?wallet=${owner}`);
+    const replantableJson = await replantable.json() as { trees: Array<unknown> };
+    expect(replantableJson.trees).toHaveLength(0);
   });
 });
