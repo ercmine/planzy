@@ -50,5 +50,10 @@ final placeSearchProvider = FutureProvider.autoDispose.family<List<PlaceSearchRe
   }
 
   final repo = await ref.watch(videoRepositoryProvider.future);
-  return repo.searchPlaces(query: normalized, scope: arg.scope);
+  final primaryResults = await repo.searchPlaces(query: normalized, scope: arg.scope);
+  if (primaryResults.isNotEmpty || arg.scope == FeedScope.local) {
+    return primaryResults;
+  }
+
+  return repo.searchPlaces(query: normalized, scope: FeedScope.local);
 });
