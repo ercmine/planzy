@@ -1345,32 +1345,38 @@ export function createRoutes(
       }
 
 
-      if (req.method === "GET" && normalizedPath === "/api/geo/search") {
+      if (req.method === "GET" && normalizedPath === "/geo/search") {
+        logGeoRouteMatch(req.method, url.pathname, normalizedPath);
         await geoHandlers.apiSearch(req, res);
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/api/geo/reverse") {
+      if (req.method === "GET" && normalizedPath === "/geo/reverse") {
+        logGeoRouteMatch(req.method, url.pathname, normalizedPath);
         await geoHandlers.apiReverse(req, res);
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/api/geo/autocomplete") {
+      if (req.method === "GET" && normalizedPath === "/geo/autocomplete") {
+        logGeoRouteMatch(req.method, url.pathname, normalizedPath);
         await geoHandlers.apiAutocomplete(req, res);
         return;
       }
 
-      if (req.method === "GET" && normalizedPath === "/api/geo/nearby") {
+      if (req.method === "GET" && normalizedPath === "/geo/nearby") {
+        logGeoRouteMatch(req.method, url.pathname, normalizedPath);
         await geoHandlers.apiNearby(req, res);
         return;
       }
 
-      if (req.method === "GET" && (normalizedPath === "/api/geo/health" || normalizedPath === "/geo/health")) {
+      if (req.method === "GET" && normalizedPath === "/geo/health") {
+        logGeoRouteMatch(req.method, url.pathname, normalizedPath);
         await geoHandlers.health(req, res);
         return;
       }
 
-      if (req.method === "GET" && (normalizedPath === "/api/geo/debug/status" || normalizedPath === "/geo/debug/status")) {
+      if (req.method === "GET" && normalizedPath === "/geo/debug/status") {
+        logGeoRouteMatch(req.method, url.pathname, normalizedPath);
         await geoHandlers.debugStatus(req, res);
         return;
       }
@@ -3658,6 +3664,15 @@ function logCategoryDiagnostics(input: {
       rejectedPreview
     })
   );
+}
+
+function logGeoRouteMatch(method: string | undefined, pathname: string, normalizedPath: string): void {
+  if (process.env.NODE_ENV === "production") return;
+  console.info("[geo.route.match]", {
+    method: method ?? "UNKNOWN",
+    pathname,
+    normalizedPath
+  });
 }
 
 function normalizeAliasPath(pathname: string): string {
