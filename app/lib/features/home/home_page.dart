@@ -561,39 +561,51 @@ class _PlaceHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final heroImageUrl = item.heroType == PlaceHeroMediaType.video ? null : item.heroImageUrl;
     return Container(
       decoration: BoxDecoration(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            colorScheme.primary.withOpacity(item.heroType == PlaceHeroMediaType.video ? 0.55 : 0.3),
-            colorScheme.secondary.withOpacity(0.2),
-            Colors.black87,
-          ],
-        ),
+        image: heroImageUrl != null && heroImageUrl.isNotEmpty
+            ? DecorationImage(
+                image: NetworkImage(heroImageUrl),
+                fit: BoxFit.cover,
+                onError: (_, __) {},
+              )
+            : null,
       ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              item.heroType == PlaceHeroMediaType.video
-                  ? Icons.play_circle_fill_rounded
-                  : item.heroType == PlaceHeroMediaType.image
-                      ? Icons.photo_library_outlined
-                      : Icons.place_rounded,
-              size: 88,
-              color: Colors.white.withOpacity(0.92),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              review?.caption.isNotEmpty == true ? review!.caption : item.placeName,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-            ),
-          ],
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              colorScheme.primary.withOpacity(item.heroType == PlaceHeroMediaType.video ? 0.55 : 0.18),
+              colorScheme.secondary.withOpacity(0.16),
+              Colors.black87,
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                item.heroType == PlaceHeroMediaType.video
+                    ? Icons.play_circle_fill_rounded
+                    : item.heroType == PlaceHeroMediaType.image
+                        ? Icons.photo_library_outlined
+                        : Icons.place_rounded,
+                size: 88,
+                color: Colors.white.withOpacity(0.92),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                review?.caption.isNotEmpty == true ? review!.caption : item.placeName,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
         ),
       ),
     );
