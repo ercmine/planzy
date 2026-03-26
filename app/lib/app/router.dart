@@ -6,10 +6,7 @@ import '../core/identity/identity_provider.dart';
 import '../features/dryad/pages/tree_page.dart';
 import '../features/home/home_page.dart';
 import '../features/onboarding/bootstrap_page.dart';
-import '../features/onboarding/onboarding_discovery_page.dart';
-import '../features/onboarding/onboarding_interests_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
-import '../features/onboarding/onboarding_location_page.dart';
 
 final onboardingGateProvider = Provider<ChangeNotifier>((ref) {
   final gate = ValueNotifier<int>(0);
@@ -48,9 +45,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/bootstrap', name: 'bootstrap', builder: (context, state) => const BootstrapPage()),
       GoRoute(path: '/onboarding', name: 'onboarding', builder: (context, state) => const OnboardingIntroPage()),
-      GoRoute(path: '/onboarding/interests', name: 'onboarding-interests', builder: (context, state) => const OnboardingInterestsPage()),
-      GoRoute(path: '/onboarding/location', name: 'onboarding-location', builder: (context, state) => const OnboardingLocationPage()),
-      GoRoute(path: '/onboarding/discovery', name: 'onboarding-discovery', builder: (context, state) => const OnboardingDiscoveryPage()),
       GoRoute(path: '/', name: 'home', builder: (context, state) => const HomePage()),
       GoRoute(path: '/map', name: 'map', builder: (context, state) => const HomePage(initialTab: HomeTab.map)),
       GoRoute(path: '/market', name: 'market', builder: (context, state) => const HomePage(initialTab: HomeTab.market)),

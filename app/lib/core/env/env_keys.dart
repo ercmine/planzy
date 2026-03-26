@@ -22,4 +22,14 @@ class EnvKeys {
   static const String mapEnableClustering = 'MAP_ENABLE_CLUSTERING';
   static const String mapEnableEnhancedPitch = 'MAP_ENABLE_ENHANCED_PITCH';
   static const String mapEnableDiagnostics = 'MAP_ENABLE_DIAGNOSTICS';
+
+  static const String dryadChainId = 'DRYAD_CHAIN_ID';
+  static const String dryadNetworkName = 'DRYAD_NETWORK_NAME';
+  static const String dryadNativeSymbol = 'DRYAD_NATIVE_SYMBOL';
+  static const String dryadExplorerBaseUrl = 'DRYAD_EXPLORER_BASE_URL';
+  static const String dryadRpcUrl = 'DRYAD_RPC_URL';
+  static const String dryadTokenAddress = 'DRYAD_TOKEN_ADDRESS';
+  static const String dryadNftAddress = 'DRYAD_NFT_ADDRESS';
+  static const String dryadMintMethodSignature = 'DRYAD_NFT_MINT_METHOD_SIGNATURE';
 }
+
