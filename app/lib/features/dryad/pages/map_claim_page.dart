@@ -35,13 +35,21 @@ class DryadMapClaimPage extends StatelessWidget {
           (spot) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: AppCard(
-              child: ListTile(
-                title: Text(spot.placeName),
-                subtitle: Text('${spot.locationLabel} • ${spot.eligibilityHint}'),
-                trailing: FilledButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.spa_outlined),
-                  label: const Text('Plant'),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(spot.placeName, style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 4),
+                    Text('${spot.locationLabel} • ${spot.eligibilityHint}'),
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.spa_outlined),
+                      label: const Text('Plant'),
+                    ),
+                  ],
                 ),
               ),
             ),
