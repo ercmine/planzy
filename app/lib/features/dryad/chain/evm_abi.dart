@@ -61,12 +61,17 @@ BigInt decodeUint256(String hexData) {
 
 String decodeString(String hexData) {
   final bytes = _hexToBytes(_strip0x(hexData));
-  if (bytes.length < 96) {
+  if (bytes.length < 64) {
     throw const FormatException('Malformed ABI string return payload');
   }
 
-  final length = _readWordAsInt(bytes, 64);
-  final start = 96;
+  final dynamicOffset = _readWordAsInt(bytes, 0);
+  if (dynamicOffset < 0 || dynamicOffset + 32 > bytes.length) {
+    throw const FormatException('Malformed ABI string return payload');
+  }
+
+  final length = _readWordAsInt(bytes, dynamicOffset);
+  final start = dynamicOffset + 32;
   final end = start + length;
   if (end > bytes.length) {
     throw const FormatException('Malformed ABI string payload length');
