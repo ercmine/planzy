@@ -22,7 +22,7 @@ import '../video_platform/video_providers.dart';
 import 'map_discovery_tab.dart';
 import 'place_video_detail_page.dart';
 
-enum HomeTab { feed, map, search, create, saved, ranks, alerts, profile }
+enum HomeTab { feed, map, create, saved, ranks, alerts, profile }
 
 final profileCollectionsProvider = FutureProvider<List<CollectionCardModel>>((ref) async {
   final apiClient = await ref.watch(apiClientProvider.future);
@@ -53,11 +53,21 @@ class _HomePageState extends ConsumerState<HomePage> {
   int _navIndex = 0;
   FeedScope _scope = FeedScope.local;
   bool _scopeInitialized = false;
+  static const List<HomeTab> _navTabs = [
+    HomeTab.feed,
+    HomeTab.map,
+    HomeTab.create,
+    HomeTab.saved,
+    HomeTab.ranks,
+    HomeTab.alerts,
+    HomeTab.profile,
+  ];
 
   @override
   void initState() {
     super.initState();
-    _navIndex = widget.initialTab.index;
+    _navIndex = _navTabs.indexOf(widget.initialTab);
+    if (_navIndex < 0) _navIndex = 0;
   }
 
   @override
@@ -72,7 +82,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     final pages = [
       _FeedTab(scope: _scope, onScopeChanged: (scope) => setState(() => _scope = scope)),
       const MapDiscoveryTab(),
-      _SearchTab(scope: _scope),
       const _CreateTab(),
       const _SavedTab(),
       const LeaderboardTab(),
@@ -98,7 +107,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         destinations: [
           const NavigationDestination(icon: Icon(Icons.play_circle_outline), selectedIcon: Icon(Icons.play_circle), label: 'Feed'),
           const NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Map'),
-          const NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: 'Search'),
           const NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle), label: 'Create'),
           const NavigationDestination(icon: Icon(Icons.bookmark_border), selectedIcon: Icon(Icons.bookmark), label: 'Saved'),
           const NavigationDestination(icon: Icon(Icons.emoji_events_outlined), selectedIcon: Icon(Icons.emoji_events), label: 'Arena'),
@@ -650,90 +658,6 @@ String _creatorInitial(String? handle) {
   final normalized = (handle ?? '').replaceAll('@', '').trim();
   if (normalized.isEmpty) return 'C';
   return normalized[0].toUpperCase();
-}
-
-class _SearchTab extends ConsumerStatefulWidget {
-  const _SearchTab({required this.scope});
-
-  final FeedScope scope;
-
-  @override
-  ConsumerState<_SearchTab> createState() => _SearchTabState();
-}
-
-class _SearchTabState extends ConsumerState<_SearchTab> with AutomaticKeepAliveClientMixin {
-  final _searchController = TextEditingController();
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    final query = _searchController.text.trim();
-    final results = ref.watch(placeSearchProvider((query: query, scope: widget.scope)));
-
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          const BrandHeroCard(
-            child: PremiumHeader(
-              title: 'Search',
-              subtitle: 'Find places, neighborhoods, and social momentum.',
-              badge: AppPill(label: 'Live index', icon: Icons.travel_explore_rounded),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _searchController,
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search places and neighborhoods'),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: results.when(
-              data: (items) {
-                if (query.isEmpty) {
-                  return const Center(
-                    child: BrandHeroCard(
-                      child: PremiumHeader(
-                        title: 'Search the city',
-                        subtitle: 'Type a place or neighborhood to unlock creator-led discovery.',
-                        badge: AppPill(label: 'Explorer', icon: Icons.location_city_rounded),
-                      ),
-                    ),
-                  );
-                }
-                if (items.isEmpty) return const Center(child: AppCard(tone: AppCardTone.collection, child: Text('No results yet. Try another query.')));
-                return ListView.builder(
-                  itemCount: items.length,
-                  itemBuilder: (_, index) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: AppCard(
-                      tone: AppCardTone.kpi,
-                      child: ListTile(
-                        title: Text(items[index].name),
-                        subtitle: Text('${items[index].category} • ${items[index].regionLabel}'),
-                      ),
-                    ),
-                  ),
-                );
-              },
-              error: (_, __) => const Center(child: Text('Place suggestions unavailable right now.')),
-              loading: () => query.isEmpty ? const SizedBox.shrink() : const Center(child: AppSkeleton(height: 160)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _FeedEmptyState extends StatelessWidget {

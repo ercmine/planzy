@@ -14,6 +14,8 @@ class PlacePreviewCard extends StatelessWidget {
     this.distanceMeters,
     this.saved = false,
     this.onOpenDetails,
+    this.onLeaveReview,
+    this.onAddVideoReview,
     this.onSave,
     this.onShare,
     this.onOpenMaps,
@@ -24,6 +26,8 @@ class PlacePreviewCard extends StatelessWidget {
   final double? distanceMeters;
   final bool saved;
   final VoidCallback? onOpenDetails;
+  final VoidCallback? onLeaveReview;
+  final VoidCallback? onAddVideoReview;
   final VoidCallback? onSave;
   final VoidCallback? onShare;
   final VoidCallback? onOpenMaps;
@@ -150,16 +154,44 @@ class PlacePreviewCard extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
-              child: Row(
+              child: Column(
                 children: [
-                  AppIconButton(onPressed: onSave, icon: saved ? Icons.bookmark : Icons.bookmark_border),
-                  const SizedBox(width: AppSpacing.s),
-                  AppIconButton(onPressed: onShare, icon: Icons.share_outlined),
-                  const SizedBox(width: AppSpacing.s),
-                  AppIconButton(onPressed: onOpenMaps, icon: Icons.map_outlined),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: PrimaryButton(onPressed: onOpenDetails, icon: const Icon(Icons.rate_review_outlined), label: 'Open place & review'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: PrimaryButton(
+                          onPressed: onLeaveReview,
+                          icon: const Icon(Icons.rate_review_outlined),
+                          label: 'Leave review',
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: onAddVideoReview,
+                          icon: const Icon(Icons.videocam_rounded),
+                          label: const Text('Add video'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      AppIconButton(onPressed: onSave, icon: saved ? Icons.bookmark : Icons.bookmark_border),
+                      const SizedBox(width: AppSpacing.s),
+                      AppIconButton(onPressed: onShare, icon: Icons.share_outlined),
+                      const SizedBox(width: AppSpacing.s),
+                      AppIconButton(onPressed: onOpenMaps, icon: Icons.map_outlined),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onOpenDetails,
+                          icon: const Icon(Icons.open_in_new_rounded),
+                          label: const Text('Details'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

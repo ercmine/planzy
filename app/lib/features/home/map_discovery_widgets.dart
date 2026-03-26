@@ -650,6 +650,8 @@ class SelectedPlacePeekCard extends StatelessWidget {
     required this.proximityState,
     required this.distanceMeters,
     required this.onOpenDetails,
+    required this.onLeaveReview,
+    required this.onAddVideoReview,
     required this.onSave,
     required this.onShare,
     required this.onOpenMaps,
@@ -660,6 +662,8 @@ class SelectedPlacePeekCard extends StatelessWidget {
   final PlaceProximityState proximityState;
   final double? distanceMeters;
   final VoidCallback onOpenDetails;
+  final VoidCallback onLeaveReview;
+  final VoidCallback onAddVideoReview;
   final VoidCallback onSave;
   final VoidCallback onShare;
   final VoidCallback onOpenMaps;
@@ -675,6 +679,8 @@ class SelectedPlacePeekCard extends StatelessWidget {
         distanceMeters: distanceMeters,
         saved: saved,
         onOpenDetails: onOpenDetails,
+        onLeaveReview: onLeaveReview,
+        onAddVideoReview: onAddVideoReview,
         onSave: onSave,
         onShare: onShare,
         onOpenMaps: onOpenMaps,
@@ -840,7 +846,8 @@ class _PlaceListCard extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         _MiniAction(icon: saved ? Icons.bookmark_added_rounded : Icons.bookmark_border_rounded, label: saved ? 'Saved' : 'Save', onTap: onSave),
-                        _MiniAction(icon: Icons.rate_review_outlined, label: 'Review', onTap: onReview),
+                        _MiniAction(icon: Icons.rate_review_outlined, label: 'Leave review', onTap: onReview),
+                        _MiniAction(icon: Icons.videocam_rounded, label: 'Add video', onTap: onReview),
                         _MiniAction(icon: Icons.directions_outlined, label: 'Directions', onTap: onDirections),
                         _MiniAction(icon: Icons.share_outlined, label: 'Share', onTap: onShare),
                       ],

@@ -25,6 +25,7 @@ import '../features/sessions/join_session/join_session_page.dart';
 import '../features/sessions/session_page.dart';
 import '../features/sessions/session_settings/session_settings_page.dart';
 import '../features/sessions/sessions_page.dart';
+import '../features/video_platform/video_models.dart';
 
 final onboardingGateProvider = Provider<ChangeNotifier>((ref) {
   final gate = ValueNotifier<int>(0);
@@ -112,7 +113,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/reviews/create',
         name: 'place-review-editor',
-        builder: (context, state) => const PlaceReviewVideoEditorScreen(recoverLatestDraft: true),
+        builder: (context, state) => PlaceReviewVideoEditorScreen(
+          recoverLatestDraft: true,
+          initialPlace: state.extra is PlaceSearchResult ? state.extra as PlaceSearchResult : null,
+        ),
       ),
       GoRoute(
         path: '/invite/:code',
