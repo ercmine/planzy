@@ -15,8 +15,8 @@ class DryadLogo extends StatelessWidget {
   final DryadLogoVariant variant;
   final Brightness? brightness;
 
-  static const _markAsset = 'assets/branding/dryad1.svg';
-  static const _fullAsset = 'assets/branding/dryad.svg';
+  static const _markAsset = 'assets/branding/perbug1.svg';
+  static const _fullAsset = 'assets/branding/perbug.svg';
 
   @override
   Widget build(BuildContext context) {

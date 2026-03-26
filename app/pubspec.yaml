@@ -56,8 +56,8 @@ flutter:
     - .env.dev
     - .env.stage
     - .env.prod
-    - assets/branding/dryad.svg
-    - assets/branding/dryad1.svg
+    - assets/branding/perbug.svg
+    - assets/branding/perbug1.svg
     - assets/game_world/collectibles/common/
     - assets/game_world/collectibles/uncommon/
     - assets/game_world/collectibles/rare/
