@@ -61,7 +61,9 @@ function normalizePlace(result: GeoResult | GeoReverseResult, index: number): Pe
     : undefined;
   const importance = "importance" in result ? result.importance : undefined;
 
-  const base = `${(result.displayName ?? "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${result.lat.toFixed(4)}-${result.lng.toFixed(4)}-${index}`;
+  const base = "osmType" in result && result.osmType && "osmId" in result && result.osmId !== undefined
+    ? `osm-${normalizeToken(result.osmType)}-${result.osmId}`
+    : `${(result.displayName ?? "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${result.lat.toFixed(4)}-${result.lng.toFixed(4)}-${index}`;
 
   return {
     id: `geo:${base}`,
@@ -100,6 +102,222 @@ function toBoundsFromRadius(lat: number, lng: number, radiusMeters: number): Geo
     east: lng + lngDelta,
     west: lng - lngDelta
   };
+}
+
+interface NearbyDiscoveryConfig {
+  targetCandidates: number;
+  maxQueryFanout: number;
+  cellSubdivisions: number;
+  perQueryLimit: number;
+  queryTimeoutMs: number;
+  queryConcurrency: number;
+  cacheTtlMs: number;
+  cacheStaleMs: number;
+}
+
+interface NearbyCacheEntry {
+  payload: {
+    origin: { lat: number; lng: number };
+    radiusMeters: number;
+    places: PerbugGeoPlace[];
+    sourceBreakdown: {
+      canonicalCount: number;
+      geoFallbackCount: number;
+    };
+  };
+  freshUntilMs: number;
+  staleUntilMs: number;
+}
+
+interface NearbyCandidateMeta {
+  source: "canonical" | "geo_fallback";
+  query?: string;
+  categoryToken?: string;
+  anchorLabel?: string;
+  cellLabel?: string;
+}
+
+interface NearbyCandidate {
+  place: PerbugGeoPlace;
+  distanceMeters: number;
+  adminOnly: boolean;
+  categoryMatch: number;
+  canonicalScore: number;
+  meta: NearbyCandidateMeta;
+}
+
+const DEFAULT_CATEGORY_TOKEN_PACKS: Record<string, string[]> = {
+  cafe: ["cafe", "coffee", "coffee shop", "espresso"],
+  restaurant: ["restaurant", "food", "diner", "eatery"],
+  bar: ["bar", "pub", "cocktail", "taproom"],
+  bakery: ["bakery", "dessert", "ice cream", "pastry"],
+  culture: ["museum", "gallery", "attraction", "landmark"],
+  park: ["park", "playground", "garden", "trail"],
+  shopping: ["shopping", "store", "boutique", "market"],
+  hotel: ["hotel", "lodging", "inn", "resort"],
+  gym: ["gym", "fitness", "workout", "yoga"],
+  nightlife: ["nightlife", "club", "music venue", "late night"]
+};
+
+function normalizeToken(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function parseNearbyDiscoveryConfig(env: NodeJS.ProcessEnv = process.env): NearbyDiscoveryConfig {
+  const readInt = (key: string, fallback: number) => {
+    const parsed = Number(env[key]);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  return {
+    targetCandidates: Math.max(20, Math.min(250, readInt("GEO_NEARBY_TARGET_CANDIDATES", 80))),
+    maxQueryFanout: Math.max(4, Math.min(80, readInt("GEO_NEARBY_MAX_QUERY_FANOUT", 20))),
+    cellSubdivisions: Math.max(1, Math.min(7, readInt("GEO_NEARBY_CELL_SUBDIVISIONS", 5))),
+    perQueryLimit: Math.max(5, Math.min(40, readInt("GEO_NEARBY_PER_QUERY_LIMIT", 15))),
+    queryTimeoutMs: Math.max(200, Math.min(10_000, readInt("GEO_NEARBY_QUERY_TIMEOUT_MS", 2500))),
+    queryConcurrency: Math.max(1, Math.min(8, readInt("GEO_NEARBY_QUERY_CONCURRENCY", 3))),
+    cacheTtlMs: Math.max(500, Math.min(120_000, readInt("GEO_NEARBY_CACHE_TTL_MS", 15_000))),
+    cacheStaleMs: Math.max(2_000, Math.min(300_000, readInt("GEO_NEARBY_CACHE_STALE_MS", 45_000)))
+  };
+}
+
+function parseCategoryTokenPacks(raw: string | undefined): Record<string, string[]> {
+  if (!raw?.trim()) return DEFAULT_CATEGORY_TOKEN_PACKS;
+  const next: Record<string, string[]> = {};
+  for (const entry of raw.split(";")) {
+    const [name, values] = entry.split(":");
+    const key = normalizeToken(name ?? "");
+    if (!key || !values) continue;
+    const tokens = values.split("|").map((item) => normalizeToken(item)).filter(Boolean);
+    if (tokens.length > 0) next[key] = [...new Set(tokens)];
+  }
+  return Object.keys(next).length > 0 ? next : DEFAULT_CATEGORY_TOKEN_PACKS;
+}
+
+function haversineMeters(fromLat: number, fromLng: number, toLat: number, toLng: number): number {
+  const earthRadiusMeters = 6_371_000;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRadians(toLat - fromLat);
+  const dLng = toRadians(toLng - fromLng);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(fromLat)) * Math.cos(toRadians(toLat)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusMeters * c;
+}
+
+function buildAnchorPoints(lat: number, lng: number, radiusMeters: number): Array<{ lat: number; lng: number; label: string }> {
+  const latDelta = radiusMeters / 111_000;
+  const lngDelta = radiusMeters / (111_000 * Math.max(Math.cos((lat * Math.PI) / 180), 0.15));
+  const anchors: Array<{ lat: number; lng: number; label: string }> = [
+    { lat, lng, label: "center" },
+    { lat: lat + latDelta * 0.6, lng, label: "north" },
+    { lat: lat - latDelta * 0.6, lng, label: "south" },
+    { lat, lng: lng + lngDelta * 0.6, label: "east" },
+    { lat, lng: lng - lngDelta * 0.6, label: "west" }
+  ];
+  if (radiusMeters >= 4000) {
+    anchors.push(
+      { lat: lat + latDelta * 0.75, lng: lng + lngDelta * 0.75, label: "north-east" },
+      { lat: lat + latDelta * 0.75, lng: lng - lngDelta * 0.75, label: "north-west" },
+      { lat: lat - latDelta * 0.75, lng: lng + lngDelta * 0.75, label: "south-east" },
+      { lat: lat - latDelta * 0.75, lng: lng - lngDelta * 0.75, label: "south-west" }
+    );
+  }
+  return anchors;
+}
+
+function buildCells(bounds: GeoBounds, subdivisions: number): Array<{ bounds: GeoBounds; label: string }> {
+  if (subdivisions <= 1) return [{ bounds, label: "cell-1-1" }];
+  const rows = Math.max(1, Math.round(Math.sqrt(subdivisions)));
+  const cols = Math.max(1, Math.ceil(subdivisions / rows));
+  const latStep = (bounds.north - bounds.south) / rows;
+  const lngStep = (bounds.east - bounds.west) / cols;
+  const cells: Array<{ bounds: GeoBounds; label: string }> = [];
+
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      if (cells.length >= subdivisions) break;
+      cells.push({
+        bounds: {
+          north: bounds.north - r * latStep,
+          south: bounds.north - (r + 1) * latStep,
+          west: bounds.west + c * lngStep,
+          east: bounds.west + (c + 1) * lngStep
+        },
+        label: `cell-${r + 1}-${c + 1}`
+      });
+    }
+  }
+  return cells;
+}
+
+function expandCategoryTokens(categories: string[], packs: Record<string, string[]>): string[] {
+  if (categories.length === 0) {
+    return [...new Set(Object.values(packs).flat().map(normalizeToken).filter(Boolean))];
+  }
+
+  const tokens = new Set<string>();
+  for (const category of categories.map(normalizeToken)) {
+    tokens.add(category);
+    if (packs[category]) {
+      for (const token of packs[category]!) tokens.add(token);
+      continue;
+    }
+    for (const [pack, values] of Object.entries(packs)) {
+      if (pack.includes(category) || category.includes(pack) || values.includes(category)) {
+        for (const token of values) tokens.add(token);
+      }
+    }
+  }
+  return [...tokens].filter(Boolean);
+}
+
+function buildAreaLabels(area: GeoReverseResult): string[] {
+  const labels = [area.neighborhood, area.city, area.state, area.county, area.displayName]
+    .map((item) => item?.trim())
+    .filter((item): item is string => Boolean(item));
+  const unique = new Set(labels);
+  if (area.city && area.state) unique.add(`${area.city}, ${area.state}`);
+  if (area.neighborhood && area.city) unique.add(`${area.neighborhood}, ${area.city}`);
+  return [...unique];
+}
+
+function buildFallbackQueries(categoryTokens: string[], areaLabels: string[]): string[] {
+  const queries = new Set<string>();
+  const templates = [
+    (token: string, area: string) => `${token} near ${area}`,
+    (token: string, area: string) => `${token} ${area}`,
+    (token: string, area: string) => `${token} in ${area}`
+  ];
+
+  for (const area of areaLabels) {
+    queries.add(area);
+    for (const token of categoryTokens) {
+      for (const template of templates) queries.add(template(token, area).trim());
+    }
+  }
+  for (const token of categoryTokens) queries.add(token);
+
+  return [...queries].filter((item) => item.length >= 2);
+}
+
+function isBroadAdministrativeRow(row: GeoResult): boolean {
+  const cls = normalizeToken(row.class ?? "");
+  const type = normalizeToken(row.type ?? "");
+  const broadTypes = new Set(["administrative", "city", "county", "state", "region", "postcode", "political", "municipality"]);
+  if (cls === "boundary") return true;
+  if (cls === "place" && broadTypes.has(type)) return true;
+  return false;
+}
+
+function normalizeNameKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function buildDedupKey(result: GeoResult): string {
+  if (result.osmType && result.osmId !== undefined) {
+    return `osm:${normalizeToken(result.osmType)}:${result.osmId}`;
+  }
+  return `fallback:${normalizeNameKey(result.displayName)}:${result.lat.toFixed(4)}:${result.lng.toFixed(4)}`;
 }
 
 function normalizeCanonicalPlace(place: ReturnType<typeof searchCanonicalPlacesInBounds>[number]): PerbugGeoPlace {
@@ -141,9 +359,13 @@ export function createGeoHttpHandlers(
     rateLimitPerMinute?: number;
     listCanonicalPlaces?: () => CanonicalPlace[];
     getStatus?: () => GeoRuntimeStatus;
+    nearbyConfig?: Partial<NearbyDiscoveryConfig>;
   } = {}
 ) {
   const limiter = new InMemoryGeoRateLimiter({ maxRequestsPerMinute: Math.max(30, options.rateLimitPerMinute ?? 180) });
+  const nearbyConfig = { ...parseNearbyDiscoveryConfig(), ...options.nearbyConfig };
+  const categoryTokenPacks = parseCategoryTokenPacks(process.env.GEO_NEARBY_CATEGORY_TOKEN_PACKS);
+  const nearbyCache = new Map<string, NearbyCacheEntry>();
 
   const requireAuth = (req: IncomingMessage): boolean => {
     try {
@@ -328,6 +550,14 @@ export function createGeoHttpHandlers(
         const limit = Math.max(1, Math.min(120, toNumber(url.searchParams.get("limit")) ?? 60));
         const categories = (url.searchParams.get("categories") ?? "").split(",").map((item) => item.trim()).filter(Boolean);
         const bounds = toBoundsFromRadius(lat, lng, radiusMeters);
+        const language = url.searchParams.get("language") ?? undefined;
+        const cacheKey = `nearby:${lat.toFixed(3)}:${lng.toFixed(3)}:${Math.round(radiusMeters / 100)}:${limit}:${categories.map(normalizeToken).sort().join("|")}:${language ?? ""}`;
+        const now = Date.now();
+        const cached = nearbyCache.get(cacheKey);
+        if (cached && now <= cached.staleUntilMs) {
+          sendJson(res, 200, cached.payload);
+          return;
+        }
 
         const canonicalPlaces = searchCanonicalPlacesInBounds(options.listCanonicalPlaces?.() ?? [], {
           bounds,
@@ -337,47 +567,122 @@ export function createGeoHttpHandlers(
           limit
         });
 
-        const fallbackNeeded = canonicalPlaces.length < Math.min(limit, 12);
+        const fallbackNeeded = canonicalPlaces.length < Math.min(limit, 24);
         const fallbackRows: GeoResult[] = [];
+        const fallbackMeta = new Map<string, NearbyCandidateMeta>();
+        const queryDiagnostics: Array<{ query: string; anchor: string; cell: string; resultCount: number }> = [];
 
         if (fallbackNeeded) {
-          const area = await activeGateway.reverseGeocode({ lat, lng, language: url.searchParams.get("language") ?? undefined });
-          const baseQuery = [area.neighborhood, area.city, area.state].filter((item) => Boolean(item && item.trim().length > 0)).join(" ");
-          const searchQueries = categories.length === 0
-            ? [baseQuery || area.displayName]
-            : categories.map((token) => `${token} ${baseQuery || area.displayName}`.trim());
-          for (const query of searchQueries) {
-            if (!query || fallbackRows.length >= limit) break;
-            const results = await activeGateway.geocode({
-              query,
-              bounds,
-              language: url.searchParams.get("language") ?? undefined,
-              limit: Math.max(6, Math.ceil(limit / Math.max(1, searchQueries.length)))
-            });
-            fallbackRows.push(...results);
+          const area = await activeGateway.reverseGeocode({ lat, lng, language });
+          const areaLabels = buildAreaLabels(area);
+          const categoryTokens = expandCategoryTokens(categories, categoryTokenPacks);
+          const allQueries = buildFallbackQueries(categoryTokens, areaLabels);
+          const anchors = buildAnchorPoints(lat, lng, radiusMeters);
+          const cells = buildCells(bounds, nearbyConfig.cellSubdivisions);
+          const queryPlans: Array<{ query: string; anchor: string; cell: string; bounds: GeoBounds; categoryToken?: string }> = [];
+
+          for (const query of allQueries) {
+            const normalizedQuery = normalizeToken(query);
+            for (const anchor of anchors) {
+              for (const cell of cells) {
+                queryPlans.push({
+                  query,
+                  anchor: anchor.label,
+                  cell: cell.label,
+                  bounds: cell.bounds,
+                  categoryToken: categoryTokens.find((token) => normalizedQuery.includes(normalizeToken(token)))
+                });
+                if (queryPlans.length >= nearbyConfig.maxQueryFanout) break;
+              }
+              if (queryPlans.length >= nearbyConfig.maxQueryFanout) break;
+            }
+            if (queryPlans.length >= nearbyConfig.maxQueryFanout) break;
+          }
+
+          for (let index = 0; index < queryPlans.length; index += nearbyConfig.queryConcurrency) {
+            if (fallbackRows.length >= nearbyConfig.targetCandidates) break;
+            const chunk = queryPlans.slice(index, index + nearbyConfig.queryConcurrency);
+            const chunkResults = await Promise.all(chunk.map(async (plan) => {
+              try {
+                const results = await Promise.race([
+                  activeGateway.geocode({
+                    query: plan.query,
+                    bounds: plan.bounds,
+                    language,
+                    limit: nearbyConfig.perQueryLimit
+                  }),
+                  new Promise<GeoResult[]>((resolve) => setTimeout(() => resolve([]), nearbyConfig.queryTimeoutMs))
+                ]);
+                queryDiagnostics.push({ query: plan.query, anchor: plan.anchor, cell: plan.cell, resultCount: results.length });
+                return { plan, results };
+              } catch {
+                queryDiagnostics.push({ query: plan.query, anchor: plan.anchor, cell: plan.cell, resultCount: 0 });
+                return { plan, results: [] as GeoResult[] };
+              }
+            }));
+
+            for (const result of chunkResults) {
+              for (const row of result.results) {
+                fallbackRows.push(row);
+                const key = buildDedupKey(row);
+                if (!fallbackMeta.has(key)) {
+                  fallbackMeta.set(key, {
+                    source: "geo_fallback",
+                    query: result.plan.query,
+                    anchorLabel: result.plan.anchor,
+                    cellLabel: result.plan.cell,
+                    categoryToken: result.plan.categoryToken
+                  });
+                }
+                if (fallbackRows.length >= nearbyConfig.targetCandidates) break;
+              }
+              if (fallbackRows.length >= nearbyConfig.targetCandidates) break;
+            }
           }
         }
 
-        const deduped = new Map<string, PerbugGeoPlace>();
+        const deduped = new Map<string, NearbyCandidate>();
+        let filteredAdminCount = 0;
         for (const place of canonicalPlaces) {
-          deduped.set(`${place.name.toLowerCase()}|${place.latitude.toFixed(5)}|${place.longitude.toFixed(5)}`, normalizeCanonicalPlace(place));
+          const normalized = normalizeCanonicalPlace(place);
+          const distanceMeters = haversineMeters(lat, lng, normalized.lat, normalized.lon);
+          deduped.set(`canonical:${place.canonicalPlaceId}`, {
+            place: normalized,
+            distanceMeters,
+            adminOnly: false,
+            canonicalScore: 1,
+            categoryMatch: categories.length === 0 || categories.map(normalizeToken).includes(normalizeToken(place.category)) ? 1 : 0.6,
+            meta: { source: "canonical" }
+          });
         }
         for (const [index, row] of fallbackRows.entries()) {
-          const key = `${row.displayName.toLowerCase()}|${row.lat.toFixed(5)}|${row.lng.toFixed(5)}`;
-          if (!deduped.has(key)) deduped.set(key, normalizePlace(row, index));
-          if (deduped.size >= limit) break;
+          const key = buildDedupKey(row);
+          if (deduped.has(key)) continue;
+          const adminOnly = isBroadAdministrativeRow(row);
+          if (adminOnly) filteredAdminCount += 1;
+          const normalized = normalizePlace(row, index);
+          const categoryMatch = categories.length === 0
+            ? (adminOnly ? 0 : 0.8)
+            : categories.some((category) => normalizeToken(normalized.displayName).includes(normalizeToken(category)) || normalizeToken(normalized.category ?? "").includes(normalizeToken(category))) ? 1 : 0.45;
+          deduped.set(key, {
+            place: normalized,
+            distanceMeters: haversineMeters(lat, lng, row.lat, row.lng),
+            adminOnly,
+            categoryMatch,
+            canonicalScore: 0,
+            meta: fallbackMeta.get(key) ?? { source: "geo_fallback" }
+          });
         }
 
-        const places = [...deduped.values()].slice(0, limit);
-        console.info("[geo.api.nearby]", {
-          lat,
-          lng,
-          radiusMeters,
-          categoryCount: categories.length,
-          sourceCounts: { canonical: canonicalPlaces.length, fallback: fallbackRows.length },
-          resultCount: places.length
+        const ranked = [...deduped.values()].sort((a, b) => {
+          const scoreA = a.canonicalScore * 4 + a.categoryMatch * 2 + (a.place.importance ?? 0.15) - (a.distanceMeters / Math.max(radiusMeters * 3, 1000)) - (a.adminOnly ? 2 : 0);
+          const scoreB = b.canonicalScore * 4 + b.categoryMatch * 2 + (b.place.importance ?? 0.15) - (b.distanceMeters / Math.max(radiusMeters * 3, 1000)) - (b.adminOnly ? 2 : 0);
+          return scoreB - scoreA;
         });
-        sendJson(res, 200, {
+        const nonAdmin = ranked.filter((entry) => !entry.adminOnly);
+        const adminFallback = ranked.filter((entry) => entry.adminOnly);
+        const places = [...nonAdmin, ...adminFallback].slice(0, limit).map((entry) => entry.place);
+        const payload = {
           origin: { lat, lng },
           radiusMeters,
           places,
@@ -385,7 +690,26 @@ export function createGeoHttpHandlers(
             canonicalCount: canonicalPlaces.length,
             geoFallbackCount: fallbackRows.length
           }
+        };
+        nearbyCache.set(cacheKey, {
+          payload,
+          freshUntilMs: now + nearbyConfig.cacheTtlMs,
+          staleUntilMs: now + nearbyConfig.cacheStaleMs
         });
+
+        console.info("[geo.api.nearby]", {
+          lat,
+          lng,
+          radiusMeters,
+          categoryCount: categories.length,
+          sourceCounts: { canonical: canonicalPlaces.length, fallback: fallbackRows.length },
+          resultCount: places.length,
+          fallbackQueryCount: queryDiagnostics.length,
+          dedupedCandidateCount: deduped.size,
+          filteredAdminCount,
+          usefulQueries: queryDiagnostics.filter((item) => item.resultCount > 0).slice(0, 8)
+        });
+        sendJson(res, 200, payload);
       } catch (error) {
         console.warn("[geo.api.nearby.error]", { error: error instanceof Error ? error.message : String(error) });
         sendJson(res, 502, { error: "geo_nearby_failed", message: error instanceof Error ? error.message : String(error) });

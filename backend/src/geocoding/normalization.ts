@@ -2,6 +2,8 @@ import type { GeocodeResult, ReverseGeocodeResult } from "./types.js";
 
 export interface NominatimSearchItem {
   display_name?: string;
+  osm_id?: number;
+  osm_type?: string;
   lat?: string;
   lon?: string;
   class?: string;
@@ -13,6 +15,8 @@ export interface NominatimSearchItem {
 
 export interface NominatimReverseItem {
   display_name?: string;
+  osm_id?: number;
+  osm_type?: string;
   lat?: string;
   lon?: string;
   address?: Record<string, string>;
@@ -53,6 +57,8 @@ export function normalizeSearchItem(item: NominatimSearchItem): GeocodeResult | 
     displayName,
     lat,
     lng,
+    osmId: item.osm_id,
+    osmType: item.osm_type,
     city: resolveCity(item.address),
     county: item.address?.county,
     state: item.address?.state,
@@ -78,6 +84,8 @@ export function normalizeReverseItem(item: NominatimReverseItem): ReverseGeocode
     displayName,
     lat,
     lng,
+    osmId: item.osm_id,
+    osmType: item.osm_type,
     city: resolveCity(item.address),
     county: item.address?.county,
     state: item.address?.state,
