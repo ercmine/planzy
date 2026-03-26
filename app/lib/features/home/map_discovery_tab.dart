@@ -714,19 +714,16 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
             ),
           ),
         Positioned(
-          left: 0,
-          right: 0,
+          left: 16,
           bottom: selected != null ? 210 : 96,
           child: IgnorePointer(
             ignoring: !_mapReady,
-            child: Center(
-              child: PulsingSearchAreaButton(
-                isLoading: state.loading,
-                onPressed: () async {
-                  await controller.searchThisArea(mode: 'search_this_area');
-                  await controller.refreshAreaLabel();
-                },
-              ),
+            child: PulsingSearchAreaButton(
+              isLoading: state.loading,
+              onPressed: () async {
+                await controller.searchThisArea(mode: 'search_this_area');
+                await controller.refreshAreaLabel();
+              },
             ),
           ),
         ),
