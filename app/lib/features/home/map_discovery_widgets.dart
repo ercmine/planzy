@@ -580,6 +580,29 @@ class NearbyPlacesSheet extends StatelessWidget {
     );
   }
 
+  String? distanceLabelFor(MapPin place) {
+    final distance = place.distanceMeters;
+    if (distance == null) return null;
+    if (distance < 120) return 'Here now';
+    if (distance < 1000) return '${distance.round()} m';
+    return '${(distance / 1000).toStringAsFixed(1)} km';
+  }
+
+  List<PlaceBadge> badgesFor(MapPin place) {
+    final badges = <PlaceBadge>[];
+    if (_isTrending(place)) badges.add(const PlaceBadge(label: 'Trending', tone: MapBadgeTone.warning));
+    if (place.rating >= 0.82) badges.add(const PlaceBadge(label: 'Must try', tone: MapBadgeTone.brand));
+    if (place.reviewCount <= 6 && place.rating >= 0.75) badges.add(const PlaceBadge(label: 'Hidden gem', tone: MapBadgeTone.info));
+    if ((place.category.contains('park') || place.category.contains('museum')) && place.thumbnailUrl != null) {
+      badges.add(const PlaceBadge(label: 'Scenic', tone: MapBadgeTone.success));
+    }
+    if (place.reviewCount >= 10) badges.add(const PlaceBadge(label: 'Local favorite', tone: MapBadgeTone.brand));
+    if (place.hasCreatorMedia) badges.add(const PlaceBadge(label: 'Recent reviews nearby', tone: MapBadgeTone.info));
+    return badges;
+  }
+
+  bool _isTrending(MapPin place) => place.reviewCount >= 8 || place.creatorVideoCount >= 1;
+
   static String _sortLabel(MapDiscoverySort sort) {
     switch (sort) {
       case MapDiscoverySort.distance:
