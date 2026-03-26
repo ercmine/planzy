@@ -54,6 +54,7 @@ import { createVenueClaimsHttpHandlers, parseJsonBody, readHeader, sendJson } fr
 import type { VenueClaimsService } from "../venues/claims/claimsService.js";
 import type { ReviewsStore } from "../reviews/store.js";
 import { getPlaceReviewVideoSection } from "../reviews/placeVideoSection.js";
+import { ReviewEligibilityService, type DeviceLocationProof } from "../reviews/reviewEligibility.js";
 import type { SavedHttpHandlers } from "../saved/http.js";
 import type { PlaceContentHttpHandlers } from "../placeContent/http.js";
 import type { OutingPlannerService } from "../outingPlanner/service.js";
@@ -137,6 +138,22 @@ function assertAdmin(req: IncomingMessage): boolean {
   return readHeader(req, "x-admin-key") === expectedKey;
 }
 
+function parseLocationProof(input: unknown): DeviceLocationProof {
+  const payload = input && typeof input === "object" && !Array.isArray(input) ? input as Record<string, unknown> : {};
+  const toNumber = (value: unknown): number | undefined => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+  return {
+    lat: toNumber(payload.lat),
+    lng: toNumber(payload.lng),
+    accuracyMeters: toNumber(payload.accuracyMeters ?? payload.accuracy),
+    capturedAt: payload.capturedAt == null ? undefined : String(payload.capturedAt),
+    isMocked: payload.isMocked === true,
+    speedMps: toNumber(payload.speedMps)
+  };
+}
+
 export function createRoutes(
   service: VenueClaimsService,
   merchantService: MerchantService,
@@ -183,6 +200,7 @@ export function createRoutes(
     competitionService?: CompetitionService;
     sponsoredLocationsService?: SponsoredLocationsService;
     perbugEconomyService?: PerbugEconomyService;
+    reviewEligibilityService?: ReviewEligibilityService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -218,6 +236,7 @@ export function createRoutes(
   const notificationHandlers = deps?.notificationService ? createNotificationHttpHandlers(deps.notificationService) : null;
   const analyticsHandlers = deps?.analyticsService && deps?.analyticsQueryService ? createAnalyticsHttpHandlers(deps.analyticsService, deps.analyticsQueryService) : null;
   const videoPlatformHandlers = deps?.videoPlatformService ? createVideoPlatformHttpHandlers(deps.videoPlatformService) : null;
+  const reviewEligibilityService = deps?.reviewEligibilityService ?? new ReviewEligibilityService();
   const onboardingHandlers = deps?.onboardingHandlers ?? null;
   const accomplishmentsHandlers = deps?.accomplishmentsService ? createAccomplishmentsHttpHandlers(deps.accomplishmentsService) : null;
   const challengesHandlers = deps?.challengesService ? createChallengesHttpHandlers(deps.challengesService) : null;
@@ -1777,6 +1796,49 @@ export function createRoutes(
       }
 
       const reviewsMatch = /^\/places\/([^/]+)\/reviews$/.exec(normalizedPath);
+      const reviewEligibilityMatch = /^\/places\/([^/]+)\/review-eligibility$/.exec(normalizedPath);
+      if (reviewEligibilityMatch && req.method === "POST") {
+        const placeId = decodeURIComponent(reviewEligibilityMatch[1] ?? "");
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) {
+          throw new ValidationError(["x-user-id header is required"]);
+        }
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const location = parseLocationProof(payload.locationProof ?? payload.location);
+        const place = deps?.placeService?.listCanonicalPlaces().find((item) => item.canonicalPlaceId === placeId) ?? null;
+        const recentReviews = await deps?.reviewsStore?.listByAuthorProfile({
+          authorProfileType: "PERSONAL",
+          authorProfileId: userIdHeader,
+          viewerUserId: userIdHeader,
+          limit: 20
+        });
+        const eligibility = reviewEligibilityService.evaluate({
+          userId: userIdHeader,
+          place,
+          location,
+          recentReviews: recentReviews ?? []
+        });
+        sendJson(res, 200, { placeId, policyVersion: reviewEligibilityService.getPolicy().version, eligibility });
+        return;
+      }
+
+      if (req.method === "POST" && (normalizedPath === "/v1/reviews/eligibility/map" || normalizedPath === "/reviews/eligibility/map")) {
+        const userIdHeader = String(readHeader(req, "x-user-id") ?? "").trim();
+        if (!userIdHeader) throw new ValidationError(["x-user-id header is required"]);
+        const body = await parseJsonBody(req);
+        const payload = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+        const location = parseLocationProof(payload.locationProof ?? payload.location);
+        const placeIds = Array.isArray(payload.placeIds) ? payload.placeIds.map((item) => String(item ?? "").trim()).filter(Boolean).slice(0, 250) : [];
+        const placesById = new Map((deps?.placeService?.listCanonicalPlaces() ?? []).map((place) => [place.canonicalPlaceId, place]));
+        const results = placeIds.map((placeId) => ({
+          placeId,
+          eligibility: reviewEligibilityService.evaluate({ userId: userIdHeader, place: placesById.get(placeId) ?? null, location })
+        }));
+        sendJson(res, 200, { placeIds, results, policyVersion: reviewEligibilityService.getPolicy().version });
+        return;
+      }
+
       if (reviewsMatch && deps?.reviewsStore) {
         const placeId = decodeURIComponent(reviewsMatch[1] ?? "");
 
@@ -1831,8 +1893,37 @@ export function createRoutes(
           }
 
           const payload = body as Record<string, unknown>;
+          const locationProof = parseLocationProof(payload.locationProof ?? payload.location);
           const videoPayload = payload.video && typeof payload.video === "object" ? payload.video as Record<string, unknown> : undefined;
           const mediaUploadIds = Array.isArray(payload.mediaUploadIds) ? payload.mediaUploadIds.map((item) => String(item ?? "").trim()).filter(Boolean) : [];
+          const place = deps?.placeService?.listCanonicalPlaces().find((item) => item.canonicalPlaceId === placeId) ?? null;
+          const hasLocationFix = locationProof.lat != null && locationProof.lng != null;
+          const recentReviews = await deps.reviewsStore.listByAuthorProfile({
+            authorProfileType: "PERSONAL",
+            authorProfileId: userIdHeader,
+            viewerUserId: userIdHeader,
+            limit: 20
+          });
+          const eligibility = (!hasLocationFix && !place)
+            ? {
+                allowed: true,
+                reasonCode: "allowed",
+                requiresFreshLocation: false,
+                requiresPermission: false,
+                requiresCheckIn: false,
+                message: "Legacy place review accepted without proximity enforcement.",
+                riskFlags: ["legacy_place_without_coordinates"]
+              }
+            : reviewEligibilityService.evaluate({
+                userId: userIdHeader,
+                place,
+                location: locationProof,
+                recentReviews
+              });
+          if (!eligibility.allowed) {
+            sendJson(res, 403, { error: "review_locked_by_policy", eligibility });
+            return;
+          }
 
           if (deps?.accessEngine && deps?.subscriptionService) {
             const resolvedTarget = deps?.accountsService
@@ -1937,7 +2028,17 @@ export function createRoutes(
             rating: typeof rating === "number" ? Math.round(rating) : undefined,
             body: text,
             mediaUploadIds,
-            editWindowMinutes: Number(process.env.REVIEW_EDIT_WINDOW_MINUTES ?? 30)
+            editWindowMinutes: Number(process.env.REVIEW_EDIT_WINDOW_MINUTES ?? 30),
+            eligibilitySnapshot: {
+              reviewEligibilityVersion: reviewEligibilityService.getPolicy().version,
+              submitDistanceMeters: eligibility.distanceMeters,
+              locationAccuracyMeters: locationProof.accuracyMeters,
+              locationTimestamp: locationProof.capturedAt,
+              thresholdMeters: eligibility.thresholdMeters,
+              verificationMode: locationProof.isMocked ? "proximity_with_risk" : "proximity",
+              reasonCodeAtSubmit: eligibility.reasonCode,
+              fraudFlags: eligibility.riskFlags
+            }
           });
 
           if (deps.moderationService) {

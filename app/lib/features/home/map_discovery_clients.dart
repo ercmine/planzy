@@ -138,15 +138,67 @@ class RemoteMapGeoClient implements MapGeoClient {
 
 abstract class PlaceDiscoveryClient {
   Future<List<MapPin>> searchByViewport(SearchAreaContext context);
+  Future<Map<String, ReviewEligibilityStatus>> checkReviewEligibility({
+    required double lat,
+    required double lng,
+    double? accuracyMeters,
+    DateTime? capturedAt,
+    bool isMocked,
+    List<String> placeIds,
+  });
 }
 
 class BackendPlaceDiscoveryClient implements PlaceDiscoveryClient {
-  BackendPlaceDiscoveryClient(this._geoClient);
+  BackendPlaceDiscoveryClient(this._geoClient, this._apiClient);
 
   final MapGeoClient _geoClient;
+  final ApiClient _apiClient;
 
   @override
   Future<List<MapPin>> searchByViewport(SearchAreaContext context) {
     return _geoClient.nearby(context: context);
+  }
+
+  @override
+  Future<Map<String, ReviewEligibilityStatus>> checkReviewEligibility({
+    required double lat,
+    required double lng,
+    double? accuracyMeters,
+    DateTime? capturedAt,
+    bool isMocked = false,
+    List<String> placeIds = const [],
+  }) async {
+    if (placeIds.isEmpty) return const {};
+    final response = await _apiClient.postJson(
+      '/v1/reviews/eligibility/map',
+      body: {
+        'placeIds': placeIds,
+        'locationProof': {
+          'lat': lat,
+          'lng': lng,
+          'accuracyMeters': accuracyMeters,
+          'capturedAt': capturedAt?.toUtc().toIso8601String(),
+          'isMocked': isMocked,
+        }
+      },
+    );
+    final results = response['results'];
+    if (results is! List) return const {};
+    final map = <String, ReviewEligibilityStatus>{};
+    for (final row in results.whereType<Map<String, dynamic>>()) {
+      final placeId = row['placeId']?.toString();
+      final eligibility = row['eligibility'];
+      if (placeId == null || eligibility is! Map<String, dynamic>) continue;
+      map[placeId] = ReviewEligibilityStatus(
+        allowed: eligibility['allowed'] == true,
+        reasonCode: (eligibility['reasonCode'] ?? 'review_locked_by_policy').toString(),
+        distanceMeters: (eligibility['distanceMeters'] as num?)?.toDouble(),
+        thresholdMeters: (eligibility['thresholdMeters'] as num?)?.toDouble(),
+        message: eligibility['message']?.toString(),
+        requiresFreshLocation: eligibility['requiresFreshLocation'] == true,
+        requiresPermission: eligibility['requiresPermission'] == true,
+      );
+    }
+    return map;
   }
 }

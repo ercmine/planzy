@@ -42,6 +42,7 @@ class ReviewsRepository {
     int? rating,
     required String body,
     required String displayName,
+    Map<String, dynamic>? locationProof,
   }) async {
     final response = await apiClient.postJson(
       '/places/$placeId/reviews',
@@ -49,6 +50,7 @@ class ReviewsRepository {
         'rating': rating,
         'body': body,
         'displayName': displayName,
+        if (locationProof != null) 'locationProof': locationProof,
       },
     );
     final review = response['review'];
@@ -56,6 +58,13 @@ class ReviewsRepository {
       return PlaceReview.fromJson(review);
     }
     throw const FormatException('Invalid review response payload');
+  }
+
+  Future<Map<String, dynamic>> checkReviewEligibility({
+    required String placeId,
+    required Map<String, dynamic> locationProof,
+  }) {
+    return apiClient.postJson('/places/$placeId/review-eligibility', body: {'locationProof': locationProof});
   }
 
   Future<PlaceReview> updateReview({required String placeId, required String reviewId, required String body, int? rating}) async {

@@ -69,10 +69,10 @@ export function searchCanonicalPlacesInBounds(places: CanonicalPlace[], query: M
   const categories = new Set((query.categories ?? []).map(normalizeCategory).filter(Boolean));
   const centerLat = query.centerLat ?? (query.bounds.north + query.bounds.south) / 2;
   const centerLng = query.centerLng ?? (query.bounds.east + query.bounds.west) / 2;
-  const baseLimit = Math.min(Math.max(query.limit ?? 80, 1), 200);
+  const baseLimit = Math.min(Math.max(query.limit ?? 120, 1), 300);
   const zoom = Math.max(3, Math.min(20, query.zoom ?? 13));
-  const gridBuckets = zoom >= 14 ? 8 : zoom >= 11 ? 6 : 4;
-  const perBucketCap = zoom >= 14 ? 5 : 3;
+  const gridBuckets = zoom >= 15 ? 12 : zoom >= 13 ? 9 : zoom >= 11 ? 7 : 5;
+  const perBucketCap = zoom >= 15 ? 8 : zoom >= 13 ? 6 : 4;
 
   const filtered = places
     .filter((place) => place.status === "active")
@@ -84,23 +84,34 @@ export function searchCanonicalPlacesInBounds(places: CanonicalPlace[], query: M
     .map((place) => {
       const distanceMeters = haversineMeters(centerLat, centerLng, place.latitude, place.longitude);
       const qualityScore = Math.max(0, Math.min(1, place.dataCompletenessScore / 100));
-      const distanceScore = 1 / (1 + distanceMeters / 3000);
+      const distanceScore = 1 / (1 + distanceMeters / 2200);
       const openNowBonus = place.openNow ? 0.08 : 0;
-      const richnessBonus = (place.photoGallery.length > 0 ? 0.06 : 0) + (place.longDescription || place.shortDescription ? 0.06 : 0);
-      const score = distanceScore * 0.45 + qualityScore * 0.45 + openNowBonus + richnessBonus;
+      const richnessBonus = (place.photoGallery.length > 0 ? 0.08 : 0) + (place.longDescription || place.shortDescription ? 0.07 : 0);
+      const reviewLikeScore = Math.min(1, (place.dataCompletenessScore / 100) * 1.15);
+      const score = distanceScore * 0.4 + qualityScore * 0.3 + reviewLikeScore * 0.15 + openNowBonus + richnessBonus;
       return { place, score, distanceMeters };
     })
     .sort((a, b) => b.score - a.score);
 
   const bucketCounts = new Map<string, number>();
   const selected: Array<{ place: CanonicalPlace; score: number; distanceMeters: number }> = [];
+  const overflow: Array<{ place: CanonicalPlace; score: number; distanceMeters: number }> = [];
   for (const candidate of filtered) {
     const key = buildGridKey(candidate.place, query.bounds, gridBuckets);
     const current = bucketCounts.get(key) ?? 0;
-    if (current >= perBucketCap) continue;
-    bucketCounts.set(key, current + 1);
-    selected.push(candidate);
+    if (current < perBucketCap) {
+      bucketCounts.set(key, current + 1);
+      selected.push(candidate);
+    } else {
+      overflow.push(candidate);
+    }
     if (selected.length >= baseLimit) break;
+  }
+  if (selected.length < baseLimit && overflow.length > 0) {
+    for (const candidate of overflow) {
+      selected.push(candidate);
+      if (selected.length >= baseLimit) break;
+    }
   }
 
   return selected.map(({ place, score, distanceMeters }) => ({
