@@ -579,8 +579,8 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                               ),
                           const SizedBox(height: 12),
                           CollapsibleMapOverlay(
-                            title: 'Map insights',
-                            icon: Icons.insights_rounded,
+                            title: 'Nearby places',
+                            icon: Icons.format_list_bulleted_rounded,
                             iconOnlyWhenCollapsed: true,
                             isCollapsed: _statsOverlayCollapsed,
                             onToggle: () => setState(() => _statsOverlayCollapsed = !_statsOverlayCollapsed),
@@ -592,6 +592,21 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                                   DiscoveryCountPill(
                                     count: visiblePlaces.length,
                                     label: visiblePlaces.length == 1 ? 'place in view' : 'places in view',
+                                  ),
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: FilledButton.icon(
+                                      onPressed: () => _openNearbyPlacesList(
+                                        state: state,
+                                        visiblePlaces: visiblePlaces,
+                                        locationState: locationState,
+                                        connectivityState: connectivityState,
+                                        location: location,
+                                      ),
+                                      icon: const Icon(Icons.map_outlined),
+                                      label: const Text('Open nearby places list screen'),
+                                    ),
                                   ),
                                   const SizedBox(height: 10),
                                   DistrictLegendCard(
