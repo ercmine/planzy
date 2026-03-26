@@ -445,8 +445,6 @@ class NearbyPlacesSheet extends StatelessWidget {
     required this.permissionState,
     required this.errorState,
     required this.collectionSummary,
-    required this.distanceLabelFor,
-    required this.badgesFor,
   });
 
   final List<MapPin> places;
@@ -466,8 +464,6 @@ class NearbyPlacesSheet extends StatelessWidget {
   final Widget? permissionState;
   final Widget? errorState;
   final String? collectionSummary;
-  final String? Function(MapPin place) distanceLabelFor;
-  final List<PlaceBadge> Function(MapPin place) badgesFor;
 
   @override
   Widget build(BuildContext context) {
@@ -620,8 +616,6 @@ class NearbyPlacesPage extends StatelessWidget {
     required this.permissionState,
     required this.errorState,
     required this.collectionSummary,
-    required this.distanceLabelFor,
-    required this.badgesFor,
   });
 
   final List<MapPin> places;
@@ -641,8 +635,6 @@ class NearbyPlacesPage extends StatelessWidget {
   final Widget? permissionState;
   final Widget? errorState;
   final String? collectionSummary;
-  final String? Function(MapPin place) distanceLabelFor;
-  final List<PlaceBadge> Function(MapPin place) badgesFor;
 
   @override
   Widget build(BuildContext context) {
@@ -693,28 +685,43 @@ class NearbyPlacesPage extends StatelessWidget {
                     if (permissionState != null) return permissionState!;
                     if (errorState != null) return errorState!;
                     if (emptyState != null) return emptyState!;
-                    return ListView.separated(
-                      padding: const EdgeInsets.only(bottom: 24),
+                    return PageView.builder(
+                      scrollDirection: Axis.vertical,
+                      padEnds: false,
                       itemCount: places.length + (loading ? 1 : 0),
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      onPageChanged: (index) {
+                        if (index < places.length) onPlaceSelected(places[index]);
+                      },
                       itemBuilder: (context, index) {
                         if (index >= places.length) {
-                          return const LinearProgressIndicator();
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(24),
+                              child: LinearProgressIndicator(),
+                            ),
+                          );
                         }
                         final place = places[index];
-                        final selected = place.canonicalPlaceId == selectedPlaceId;
-                        return _PlaceListCard(
-                          place: place,
-                          selected: selected,
-                          saved: savedPlaceIds.contains(place.canonicalPlaceId),
-                          distanceLabel: distanceLabelFor(place),
-                          badges: badgesFor(place),
-                          onTap: () => onPlaceSelected(place),
-                          onOpen: () => onOpenPlace(place),
-                          onSave: () => onToggleSave(place),
-                          onReview: () => onReview(place),
-                          onDirections: () => onDirections(place),
-                          onShare: () => onShare(place),
+                        final distance = place.distanceMeters;
+                        final proximity = distance == null
+                            ? PlaceProximityState.unknown
+                            : (distance <= 90
+                                  ? PlaceProximityState.here
+                                  : (distance <= 240 ? PlaceProximityState.nearby : PlaceProximityState.unknown));
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 4, 0, 20),
+                          child: PlacePreviewCard(
+                            place: place,
+                            proximityState: proximity,
+                            distanceMeters: distance,
+                            saved: savedPlaceIds.contains(place.canonicalPlaceId),
+                            onOpenDetails: () => onOpenPlace(place),
+                            onLeaveReview: () => onReview(place),
+                            onAddVideoReview: () => onReview(place),
+                            onSave: () => onToggleSave(place),
+                            onShare: () => onShare(place),
+                            onOpenMaps: () => onDirections(place),
+                          ),
                         );
                       },
                     );
