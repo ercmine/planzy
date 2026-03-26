@@ -70,6 +70,7 @@ import { MemoryPerbugTipsStore, PerbugTipsService } from "../perbugTips/index.js
 import { CompetitionService, MemoryCompetitionStore } from "../competition/index.js";
 import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../sponsoredLocations/index.js";
 import { MemoryPerbugEconomyStore, PerbugEconomyService } from "../perbugEconomy/index.js";
+import { MemoryViewerEngagementStore, ViewerEngagementRewardsService } from "../viewerEngagementRewards/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -271,6 +272,10 @@ export function createServer(options?: CreateServerOptions) {
   competitionService.recordApprovedReview({ id: "review_event_1", reviewId: "review_seed_1", videoId: "video_seed_1", userId: "u1", canonicalPlaceId: "place-1", approvedAt: new Date().toISOString(), city: "Bloomington", category: "coffee", discoveryType: "first_review", approved: true, blocked: false });
   competitionService.recordLike({ id: "like_seed_1", videoId: "video_seed_1", userId: "fan_1", createdAt: new Date().toISOString(), valid: true, bannedUser: false, blockedUser: false, fraudFlagged: false });
   const perbugEconomyService = new PerbugEconomyService(new MemoryPerbugEconomyStore());
+  const viewerEngagementRewardsService = new ViewerEngagementRewardsService(new MemoryViewerEngagementStore(), {
+    getVideoContext: (videoId) => ({ creatorId: `creator_${videoId}`, placeId: `place_${videoId}` }),
+    analytics: analyticsService
+  });
   perbugEconomyService.creditUser("u1", 500, "seed");
   perbugEconomyService.creditUser("u2", 250, "seed");
   perbugEconomyService.creditUser("u3", 180, "seed");
@@ -340,7 +345,8 @@ export function createServer(options?: CreateServerOptions) {
     perbugTipsService,
     competitionService,
     sponsoredLocationsService,
-    perbugEconomyService
+    perbugEconomyService,
+    viewerEngagementRewardsService
   });
 }
 

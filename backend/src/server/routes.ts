@@ -101,6 +101,8 @@ import { createSponsoredLocationsHttpHandlers } from "../sponsoredLocations/http
 import type { SponsoredLocationsService } from "../sponsoredLocations/service.js";
 import { createPerbugEconomyHttpHandlers } from "../perbugEconomy/http.js";
 import type { PerbugEconomyService } from "../perbugEconomy/service.js";
+import { createViewerEngagementRewardsHttpHandlers } from "../viewerEngagementRewards/http.js";
+import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -200,6 +202,7 @@ export function createRoutes(
     competitionService?: CompetitionService;
     sponsoredLocationsService?: SponsoredLocationsService;
     perbugEconomyService?: PerbugEconomyService;
+    viewerEngagementRewardsService?: ViewerEngagementRewardsService;
     reviewEligibilityService?: ReviewEligibilityService;
   }
 ) {
@@ -249,6 +252,7 @@ export function createRoutes(
   const competitionHandlers = deps?.competitionService ? createCompetitionHttpHandlers(deps.competitionService) : null;
   const sponsoredLocationHandlers = deps?.sponsoredLocationsService ? createSponsoredLocationsHttpHandlers(deps.sponsoredLocationsService) : null;
   const economyHandlers = deps?.perbugEconomyService ? createPerbugEconomyHttpHandlers(deps.perbugEconomyService) : null;
+  const viewerRewardsHandlers = deps?.viewerEngagementRewardsService ? createViewerEngagementRewardsHttpHandlers(deps.viewerEngagementRewardsService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -516,6 +520,78 @@ export function createRoutes(
       }
       if (req.method === "GET" && normalizedPath === "/v1/business/economy/dashboard" && economyHandlers) {
         await economyHandlers.businessDashboard(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/video-engagement/watch-sessions" && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.startSession(req, res);
+        return;
+      }
+      const watchSessionHeartbeatMatch = matchPath("/v1/video-engagement/watch-sessions/:sessionId/heartbeat", normalizedPath);
+      if (req.method === "POST" && watchSessionHeartbeatMatch && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.heartbeat(req, res, watchSessionHeartbeatMatch.sessionId);
+        return;
+      }
+      const watchSessionPauseMatch = matchPath("/v1/video-engagement/watch-sessions/:sessionId/pause", normalizedPath);
+      if (req.method === "POST" && watchSessionPauseMatch && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.pauseSession(req, res, watchSessionPauseMatch.sessionId);
+        return;
+      }
+      const watchSessionCompleteMatch = matchPath("/v1/video-engagement/watch-sessions/:sessionId/complete", normalizedPath);
+      if (req.method === "POST" && watchSessionCompleteMatch && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.completeSession(req, res, watchSessionCompleteMatch.sessionId);
+        return;
+      }
+      const ratingRewardMatch = matchPath("/v1/video-engagement/videos/:videoId/rating", normalizedPath);
+      if (req.method === "POST" && ratingRewardMatch && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.submitRating(req, res, ratingRewardMatch.videoId);
+        return;
+      }
+      const commentRewardMatch = matchPath("/v1/video-engagement/videos/:videoId/comments", normalizedPath);
+      if (req.method === "POST" && commentRewardMatch && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.submitComment(req, res, commentRewardMatch.videoId);
+        return;
+      }
+      const engagementRewardMatch = matchPath("/v1/video-engagement/videos/:videoId/interactions", normalizedPath);
+      if (req.method === "POST" && engagementRewardMatch && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.submitEngagement(req, res, engagementRewardMatch.videoId);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/video-engagement/eligibility" && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.getEligibility(req, res, url.searchParams);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/video-engagement/rewards/me" && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.listRewards(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/video-engagement/rewards/me/summary" && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.rewardSummary(req, res);
+        return;
+      }
+      const campaignMetaMatch = matchPath("/v1/video-engagement/videos/:videoId/campaign", normalizedPath);
+      if (req.method === "GET" && campaignMetaMatch && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.campaignMetadata(req, res, campaignMetaMatch.videoId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/video-engagement/sponsored-pools" && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.createSponsoredPool(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/admin/video-engagement/video-campaign-map" && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.mapVideoCampaign(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/admin/video-engagement/risk-flags" && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.listRiskFlags(req, res, url.searchParams);
+        return;
+      }
+      if (req.method === "PUT" && normalizedPath === "/v1/admin/video-engagement/rules" && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.updateRule(req, res);
+        return;
+      }
+      const reverseRewardMatch = matchPath("/v1/admin/video-engagement/rewards/:ledgerEntryId/reverse", normalizedPath);
+      if (req.method === "POST" && reverseRewardMatch && viewerRewardsHandlers) {
+        await viewerRewardsHandlers.reverseReward(req, res, reverseRewardMatch.ledgerEntryId);
         return;
       }
 
