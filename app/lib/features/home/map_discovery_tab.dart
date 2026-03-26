@@ -874,11 +874,9 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     required ConnectivityState connectivityState,
     required AppLocation? location,
   }) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => NearbyPlacesSheet(
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NearbyPlacesPage(
         places: visiblePlaces,
         selectedPlaceId: state.selectedPlaceId,
         onPlaceSelected: (place) {
@@ -919,6 +917,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
         collectionSummary: null,
         distanceLabelFor: (place) => _distanceSummary(place, location),
         badgesFor: _badgesFor,
+        ),
       ),
     );
   }
@@ -1046,69 +1045,35 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   Future<void> _handleDistrictSelected(DistrictZone zone) async {
     if (!mounted) return;
     final controller = ref.read(mapDiscoveryControllerProvider.notifier);
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        final theme = Theme.of(context);
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(zone.name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
-                const SizedBox(height: 8),
-                Text(
-                  '${zone.scene} • ${(zone.completion * 100).round()}% discovered',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: () async {
-                        Navigator.of(context).pop();
-                        controller.setViewport(
-                          MapViewport(
-                            centerLat: zone.centerLat,
-                            centerLng: zone.centerLng,
-                            zoom: max(ref.read(mapDiscoveryControllerProvider).viewport.zoom, 14.5),
-                          ),
-                          markPendingSearch: true,
-                        );
-                        _moveMap(state: ref.read(mapDiscoveryControllerProvider));
-                        await controller.searchThisArea(mode: 'district_exploration');
-                      },
-                      icon: const Icon(Icons.travel_explore_rounded),
-                      label: const Text('Open exploration'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        controller.setViewport(
-                          MapViewport(
-                            centerLat: zone.centerLat,
-                            centerLng: zone.centerLng,
-                            zoom: max(ref.read(mapDiscoveryControllerProvider).viewport.zoom, 14),
-                          ),
-                          markPendingSearch: true,
-                        );
-                        _moveMap(state: ref.read(mapDiscoveryControllerProvider));
-                      },
-                      icon: const Icon(Icons.center_focus_strong_rounded),
-                      label: const Text('Center map'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => _DistrictInsightsPage(
+          zone: zone,
+          onOpenExploration: () async {
+            controller.setViewport(
+              MapViewport(
+                centerLat: zone.centerLat,
+                centerLng: zone.centerLng,
+                zoom: max(ref.read(mapDiscoveryControllerProvider).viewport.zoom, 14.5),
+              ),
+              markPendingSearch: true,
+            );
+            _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+            await controller.searchThisArea(mode: 'district_exploration');
+          },
+          onCenterMap: () {
+            controller.setViewport(
+              MapViewport(
+                centerLat: zone.centerLat,
+                centerLng: zone.centerLng,
+                zoom: max(ref.read(mapDiscoveryControllerProvider).viewport.zoom, 14),
+              ),
+              markPendingSearch: true,
+            );
+            _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+          },
+        ),
+      ),
     );
   }
 
@@ -1349,6 +1314,65 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   }
 
   double _toRadians(double value) => value * 3.1415926535897932 / 180;
+}
+
+class _DistrictInsightsPage extends StatelessWidget {
+  const _DistrictInsightsPage({
+    required this.zone,
+    required this.onOpenExploration,
+    required this.onCenterMap,
+  });
+
+  final DistrictZone zone;
+  final Future<void> Function() onOpenExploration;
+  final VoidCallback onCenterMap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Map insight details')),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(zone.name, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              Text(
+                '${zone.scene} • ${(zone.completion * 100).round()}% discovered',
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Energy ${(zone.energy * 100).round()} • Radius ${(zone.radiusMeters / 1000).toStringAsFixed(1)} km',
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: () async {
+                  await onOpenExploration();
+                  if (context.mounted) Navigator.of(context).pop();
+                },
+                icon: const Icon(Icons.travel_explore_rounded),
+                label: const Text('Open exploration'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () {
+                  onCenterMap();
+                  Navigator.of(context).pop();
+                },
+                icon: const Icon(Icons.center_focus_strong_rounded),
+                label: const Text('Center map'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ZoomSliderControl extends StatelessWidget {

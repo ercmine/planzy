@@ -600,6 +600,135 @@ class NearbyPlacesSheet extends StatelessWidget {
   }
 }
 
+class NearbyPlacesPage extends StatelessWidget {
+  const NearbyPlacesPage({
+    super.key,
+    required this.places,
+    required this.selectedPlaceId,
+    required this.onPlaceSelected,
+    required this.onOpenPlace,
+    required this.onToggleSave,
+    required this.onReview,
+    required this.onDirections,
+    required this.onShare,
+    required this.savedPlaceIds,
+    required this.countLabel,
+    required this.sort,
+    required this.onOpenSortSheet,
+    required this.loading,
+    required this.emptyState,
+    required this.permissionState,
+    required this.errorState,
+    required this.collectionSummary,
+    required this.distanceLabelFor,
+    required this.badgesFor,
+  });
+
+  final List<MapPin> places;
+  final String? selectedPlaceId;
+  final ValueChanged<MapPin> onPlaceSelected;
+  final ValueChanged<MapPin> onOpenPlace;
+  final ValueChanged<MapPin> onToggleSave;
+  final ValueChanged<MapPin> onReview;
+  final ValueChanged<MapPin> onDirections;
+  final ValueChanged<MapPin> onShare;
+  final Set<String> savedPlaceIds;
+  final String countLabel;
+  final MapDiscoverySort sort;
+  final VoidCallback onOpenSortSheet;
+  final bool loading;
+  final Widget? emptyState;
+  final Widget? permissionState;
+  final Widget? errorState;
+  final String? collectionSummary;
+  final String? Function(MapPin place) distanceLabelFor;
+  final List<PlaceBadge> Function(MapPin place) badgesFor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Search area results'),
+        actions: [
+          IconButton(
+            tooltip: 'Sort results',
+            onPressed: onOpenSortSheet,
+            icon: const Icon(Icons.swap_vert_rounded),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                countLabel,
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  AppPill(
+                    label: 'Sorted by ${NearbyPlacesSheet._sortLabel(sort)}',
+                    icon: Icons.filter_alt_rounded,
+                    backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
+                  ),
+                  if (collectionSummary != null)
+                    AppPill(
+                      label: collectionSummary!,
+                      icon: Icons.collections_bookmark_outlined,
+                      backgroundColor: theme.colorScheme.secondary.withOpacity(0.12),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: Builder(
+                  builder: (context) {
+                    if (permissionState != null) return permissionState!;
+                    if (errorState != null) return errorState!;
+                    if (emptyState != null) return emptyState!;
+                    return ListView.separated(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      itemCount: places.length + (loading ? 1 : 0),
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        if (index >= places.length) {
+                          return const LinearProgressIndicator();
+                        }
+                        final place = places[index];
+                        final selected = place.canonicalPlaceId == selectedPlaceId;
+                        return _PlaceListCard(
+                          place: place,
+                          selected: selected,
+                          saved: savedPlaceIds.contains(place.canonicalPlaceId),
+                          distanceLabel: distanceLabelFor(place),
+                          badges: badgesFor(place),
+                          onTap: () => onPlaceSelected(place),
+                          onOpen: () => onOpenPlace(place),
+                          onSave: () => onToggleSave(place),
+                          onReview: () => onReview(place),
+                          onDirections: () => onDirections(place),
+                          onShare: () => onShare(place),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class DiscoveryStateCard extends StatelessWidget {
   const DiscoveryStateCard({
     super.key,
