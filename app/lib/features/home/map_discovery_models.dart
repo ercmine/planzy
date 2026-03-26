@@ -42,11 +42,13 @@ class SearchAreaContext {
     required this.viewport,
     this.categories = const <String>[],
     this.mode = 'search_this_area',
+    this.radiusMeters,
   });
 
   final MapViewport viewport;
   final List<String> categories;
   final String mode;
+  final double? radiusMeters;
 }
 
 class MapPin {
