@@ -41,6 +41,7 @@ class EnvConfig {
     required this.adsConfig,
     required this.fsqApiKey,
     required this.mapStack,
+    this.rawEnv = const <String, String>{},
   });
 
   final EnvFlavor flavor;
@@ -50,6 +51,7 @@ class EnvConfig {
   final AdsConfig adsConfig;
   final String? fsqApiKey;
   final MapStackConfig mapStack;
+  final Map<String, String> rawEnv;
 }
 
 final envConfigProvider = Provider<EnvConfig>((ref) {
@@ -103,6 +105,7 @@ class Env {
       adsConfig: AdsConfig.fromEnv(flavor: flavor),
       fsqApiKey: _resolveFoursquareApiKey(),
       mapStack: _resolveMapStackConfig(),
+      rawEnv: _resolveRawEnv(),
     );
   }
 
@@ -116,6 +119,7 @@ class Env {
       adsConfig: AdsConfig.disabled(),
       fsqApiKey: _resolveFoursquareApiKey(),
       mapStack: _resolveMapStackConfig(),
+      rawEnv: _resolveRawEnv(),
     );
   }
 
@@ -192,6 +196,11 @@ class Env {
       return fromDotEnv;
     }
     return null;
+  }
+
+
+  static Map<String, String> _resolveRawEnv() {
+    return Map<String, String>.from(dotenv.env);
   }
 
   static bool _parseBool(String? value, {required bool fallback}) {

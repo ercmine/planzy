@@ -44,7 +44,7 @@ void main() {
     );
 
     final router = container.read(routerProvider);
-    router.go('/onboarding/discovery');
+    router.go('/onboarding');
     expect(router.routeInformationProvider.value.uri.path, '/');
 
     router.dispose();
