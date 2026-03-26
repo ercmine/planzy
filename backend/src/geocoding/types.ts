@@ -17,6 +17,8 @@ export interface GeocodeResult {
   displayName: string;
   lat: number;
   lng: number;
+  osmId?: number;
+  osmType?: string;
   city?: string;
   county?: string;
   state?: string;
@@ -35,6 +37,8 @@ export interface ReverseGeocodeResult {
   displayName: string;
   lat: number;
   lng: number;
+  osmId?: number;
+  osmType?: string;
   city?: string;
   county?: string;
   state?: string;

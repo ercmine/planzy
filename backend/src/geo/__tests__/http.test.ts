@@ -142,6 +142,62 @@ describe("createGeoHttpHandlers", () => {
     expect(res.statusCode).toBe(200);
     expect(String(res.body)).toContain("Perbug Cafe");
   });
+
+  it("fans out fallback nearby queries and filters broad admin rows", async () => {
+    const geocode = vi.fn(async ({ query }: { query: string }) => {
+      if (query.includes("Austin")) {
+        return [
+          { displayName: "Austin, Travis County, Texas", lat: 30.2672, lng: -97.7431, class: "boundary", type: "administrative", source: "nominatim" as const },
+          { displayName: "Coffee Lab Austin", lat: 30.268, lng: -97.742, class: "amenity", type: "cafe", source: "nominatim" as const }
+        ];
+      }
+      return [
+        { displayName: "Trail House Gym", lat: 30.266, lng: -97.741, class: "amenity", type: "gym", source: "nominatim" as const }
+      ];
+    });
+    const handlers = createGeoHttpHandlers({
+      geocode,
+      reverseGeocode: vi.fn(async () => ({ displayName: "Austin, Texas", lat: 30.2672, lng: -97.7431, neighborhood: "Downtown", city: "Austin", state: "Texas", source: "nominatim" as const })),
+      autocomplete: vi.fn(),
+      placeLookup: vi.fn(),
+      areaContext: vi.fn(),
+      health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
+    }, {
+      nearbyConfig: { maxQueryFanout: 8, targetCandidates: 20, cellSubdivisions: 3, perQueryLimit: 10, queryConcurrency: 2 }
+    });
+
+    const res = createMockResponse();
+    await handlers.apiNearby({ method: "GET", headers: {}, url: "/api/geo/nearby?lat=30.2672&lng=-97.7431&radius=4500&categories=coffee,gym" } as never, res as never);
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(String(res.body));
+    expect(geocode.mock.calls.length).toBeGreaterThan(1);
+    expect(body.sourceBreakdown.geoFallbackCount).toBeGreaterThan(1);
+    expect(body.places.length).toBeGreaterThan(0);
+    expect(body.places[0].displayName).not.toContain("Travis County");
+  });
+
+  it("dedupes fallback places by osm identity when available", async () => {
+    const handlers = createGeoHttpHandlers({
+      geocode: vi.fn(async () => [
+        { displayName: "Coffee House", lat: 30.2672, lng: -97.7431, osmId: 123, osmType: "node", class: "amenity", type: "cafe", source: "nominatim" as const },
+        { displayName: "Coffee House Downtown", lat: 30.26721, lng: -97.74311, osmId: 123, osmType: "node", class: "amenity", type: "cafe", source: "nominatim" as const }
+      ]),
+      reverseGeocode: vi.fn(async () => ({ displayName: "Austin, Texas", lat: 30.2672, lng: -97.7431, city: "Austin", state: "Texas", source: "nominatim" as const })),
+      autocomplete: vi.fn(),
+      placeLookup: vi.fn(),
+      areaContext: vi.fn(),
+      health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
+    }, {
+      nearbyConfig: { maxQueryFanout: 4, targetCandidates: 10, perQueryLimit: 10 }
+    });
+
+    const res = createMockResponse();
+    await handlers.apiNearby({ method: "GET", headers: {}, url: "/api/geo/nearby?lat=30.2672&lng=-97.7431&radius=1500&categories=coffee" } as never, res as never);
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(String(res.body));
+    const names = body.places.map((place: { displayName: string }) => place.displayName);
+    expect(names.filter((name: string) => name.includes("Coffee House")).length).toBe(1);
+  });
 });
 
 function createMockResponse() {

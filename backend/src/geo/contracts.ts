@@ -54,6 +54,8 @@ export interface GeoResult {
   normalizedName?: string;
   lat: number;
   lng: number;
+  osmId?: number;
+  osmType?: string;
   city?: string;
   county?: string;
   state?: string;
