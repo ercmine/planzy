@@ -48,7 +48,7 @@ export function readGeoRuntimeConfig(env: NodeJS.ProcessEnv): GeoRuntimeConfig {
   return {
     client: {
       enabled: parseBool(env.GEO_SERVICE_ENABLED, false),
-      baseUrl: env.GEO_SERVICE_BASE_URL ?? "https://geo.dryad.dev",
+      baseUrl: env.GEO_SERVICE_BASE_URL ?? "https://geo.perbug.com",
       timeoutMs: parseNum(env.GEO_SERVICE_TIMEOUT_MS, 2000),
       retries: parseNum(env.GEO_SERVICE_RETRIES, 1),
       authSecret: env.GEO_SERVICE_AUTH_SECRET,

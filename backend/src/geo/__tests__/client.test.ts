@@ -16,7 +16,7 @@ describe("GeoServiceClient", () => {
 
     const client = new GeoServiceClient({
       enabled: true,
-      baseUrl: "https://geo.dryad.dev",
+      baseUrl: "https://geo.perbug.com",
       timeoutMs: 500,
       retries: 0,
       authSecret: "shh",
@@ -34,7 +34,7 @@ describe("GeoServiceClient", () => {
 
     const client = new GeoServiceClient({
       enabled: true,
-      baseUrl: "https://geo.dryad.dev",
+      baseUrl: "https://geo.perbug.com",
       timeoutMs: 500,
       retries: 0,
       authSecret: "shh",
