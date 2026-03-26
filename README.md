@@ -85,3 +85,39 @@ The website is static and can be deployed to any static host with custom domains
 - Base directory: `web`
 - Build command: `pnpm build`
 - Publish directory: `dist`
+
+
+## Backend CORS configuration
+
+Configure backend CORS via environment variables (see `.env.example`).
+
+- `CORS_ALLOWED_ORIGINS` — comma-separated allowlist of exact origins (include `https://app.perbug.com` in production).
+- `CORS_ALLOW_CREDENTIALS` — `true` or `false` for cookie/auth credentialed requests.
+- `CORS_ALLOWED_METHODS` — allowed methods for preflight and normal browser requests.
+- `CORS_ALLOWED_HEADERS` — allowed request headers (e.g. `Authorization`, `x-user-id`, `x-request-id`).
+- `CORS_EXPOSE_HEADERS` — response headers available to browser JS (e.g. `x-request-id`).
+- `CORS_MAX_AGE_SECONDS` — preflight cache TTL in seconds.
+
+Example production value:
+
+```bash
+CORS_ALLOWED_ORIGINS=https://app.perbug.com
+```
+
+Example local Flutter/web values:
+
+```bash
+CORS_ALLOWED_ORIGINS=https://app.perbug.com,http://localhost:3000,http://localhost:5173,http://localhost:8080
+```
+
+Quick verification:
+
+```bash
+curl -i -X OPTIONS https://api.perbug.com/api/geo/search \
+  -H "Origin: https://app.perbug.com" \
+  -H "Access-Control-Request-Method: GET" \
+  -H "Access-Control-Request-Headers: content-type,x-user-id,x-request-id"
+
+curl -i "https://api.perbug.com/api/geo/search?q=Berlin" \
+  -H "Origin: https://app.perbug.com"
+```
