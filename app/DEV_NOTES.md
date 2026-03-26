@@ -16,14 +16,14 @@
 - Permission requests are now user-action driven (from the button press), not triggered during startup.
 - Debug builds print permission transition logs under `[LocationPermissionService]`.
 
-## Backend integration verification (Perbug API)
+## Backend integration verification (Dryad API)
 1. Clean install on simulator/emulator:
    - remove app from device
    - rebuild and launch with:
-     - `flutter run --dart-define=API_BASE_URL=https://api.perbug.com`
+     - `flutter run --dart-define=API_BASE_URL=https://api.dryad.dev`
 2. At startup, confirm debug logs include:
-   - `App startup baseUrl=https://api.perbug.com`
-   - `EnvConfig resolved: ... baseUrl=https://api.perbug.com`
+   - `App startup baseUrl=https://api.dryad.dev`
+   - `EnvConfig resolved: ... baseUrl=https://api.dryad.dev`
 3. Open a session deck and verify real API traffic appears in logs (request URL + status), and live plans are rendered (not static placeholder/demo cards).
 4. Disable network and refresh deck:
    - if cached deck exists, UI must show `Offline / Using cached data`

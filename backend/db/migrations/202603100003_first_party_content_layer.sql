@@ -1,4 +1,4 @@
--- First-party Perbug content layer anchored on canonical places.
+-- First-party Dryad content layer anchored on canonical places.
 
 CREATE TABLE IF NOT EXISTS place_reviews (
   id TEXT PRIMARY KEY,

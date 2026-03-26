@@ -5,10 +5,10 @@ import '../../core/env/env.dart';
 import '../../core/logging/log.dart';
 import 'map_discovery_models.dart';
 import 'map_game_world.dart';
-import 'perbug_map_theme.dart';
+import 'dryad_map_theme.dart';
 
-class PerbugMapLibreView extends StatefulWidget {
-  const PerbugMapLibreView({
+class DryadMapLibreView extends StatefulWidget {
+  const DryadMapLibreView({
     super.key,
     required this.viewport,
     required this.pins,
@@ -44,10 +44,10 @@ class PerbugMapLibreView extends StatefulWidget {
   final void Function(String placeId) onPlaceSelected;
 
   @override
-  State<PerbugMapLibreView> createState() => _PerbugMapLibreViewState();
+  State<DryadMapLibreView> createState() => _DryadMapLibreViewState();
 }
 
-class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
+class _DryadMapLibreViewState extends State<DryadMapLibreView> {
   static const double _minPerspectiveTilt = 24;
   static const double _maxPerspectiveTilt = 78;
   static const double _dragTiltSensitivity = 0.24;
@@ -58,10 +58,10 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
   VoidCallback? _cameraListener;
   double? _manualTilt;
 
-  PerbugMapTheme get _theme => PerbugMapTheme.resolve(brightness: Theme.of(context).brightness, config: widget.config);
+  DryadMapTheme get _theme => DryadMapTheme.resolve(brightness: Theme.of(context).brightness, config: widget.config);
 
   @override
-  void didUpdateWidget(covariant PerbugMapLibreView oldWidget) {
+  void didUpdateWidget(covariant DryadMapLibreView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!widget.is3dMode && oldWidget.is3dMode) {
       _manualTilt = null;
@@ -219,7 +219,7 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
       try {
         await controller.addLayer(
           'composite',
-          'perbug-3d-buildings',
+          'dryad-3d-buildings',
           FillExtrusionLayerProperties(
             fillExtrusionColor: mapTheme.building.wall,
             fillExtrusionOpacity: mapTheme.isDark ? 0.74 : 0.62,
@@ -255,7 +255,7 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
       try {
         await controller.addLayer(
           'composite',
-          'perbug-3d-building-roofs',
+          'dryad-3d-building-roofs',
           FillLayerProperties(
             fillColor: mapTheme.building.roof,
             fillOpacity: mapTheme.isDark ? 0.34 : 0.26,
@@ -325,11 +325,11 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
             },
           ];
 
-    await _upsertGeoJsonSource('perbug-places', placeFeatures);
-    await _upsertGeoJsonSource('perbug-districts', districtFeatures);
-    await _upsertGeoJsonSource('perbug-user', userFeatures);
+    await _upsertGeoJsonSource('dryad-places', placeFeatures);
+    await _upsertGeoJsonSource('dryad-districts', districtFeatures);
+    await _upsertGeoJsonSource('dryad-user', userFeatures);
 
-    await _ensurePerbugLayers();
+    await _ensureDryadLayers();
 
     if (widget.config.enableDiagnostics) {
       Log.d('map.sync style=${_theme.styleUrl} places=${placeFeatures.length} districts=${districtFeatures.length} user=${userFeatures.length}');
@@ -347,7 +347,7 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
         id,
         GeojsonSourceProperties(
           data: payload,
-          cluster: id == 'perbug-places' && widget.config.enableClustering,
+          cluster: id == 'dryad-places' && widget.config.enableClustering,
           clusterRadius: 58,
           clusterMaxZoom: 13,
         ),
@@ -355,15 +355,15 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
     }
   }
 
-  Future<void> _ensurePerbugLayers() async {
+  Future<void> _ensureDryadLayers() async {
     final controller = _controller;
     if (controller == null) return;
     final mapTheme = _theme;
 
     try {
       await controller.addLayer(
-        'perbug-districts',
-        'perbug-district-halo-layer',
+        'dryad-districts',
+        'dryad-district-halo-layer',
         CircleLayerProperties(
           circleColor: mapTheme.overlay.district,
           circleOpacity: ['interpolate', ['linear'], ['zoom'], 9, 0.08, 14, 0.18],
@@ -375,8 +375,8 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
 
     try {
       await controller.addLayer(
-        'perbug-districts',
-        'perbug-district-core-layer',
+        'dryad-districts',
+        'dryad-district-core-layer',
         CircleLayerProperties(
           circleColor: mapTheme.overlay.districtEdge,
           circleOpacity: ['interpolate', ['linear'], ['zoom'], 9, 0.2, 14, 0.35],
@@ -387,8 +387,8 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
 
     try {
       await controller.addLayer(
-        'perbug-places',
-        'perbug-cluster-halo-layer',
+        'dryad-places',
+        'dryad-cluster-halo-layer',
         CircleLayerProperties(
           circleColor: mapTheme.marker.cluster,
           circleOpacity: 0.25,
@@ -398,8 +398,8 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
         filter: ['has', 'point_count'],
       );
       await controller.addLayer(
-        'perbug-places',
-        'perbug-cluster-layer',
+        'dryad-places',
+        'dryad-cluster-layer',
         CircleLayerProperties(
           circleColor: mapTheme.marker.cluster,
           circleStrokeColor: mapTheme.marker.outline,
@@ -410,8 +410,8 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
         filter: ['has', 'point_count'],
       );
       await controller.addLayer(
-        'perbug-places',
-        'perbug-cluster-count-layer',
+        'dryad-places',
+        'dryad-cluster-count-layer',
         SymbolLayerProperties(
           textField: ['to-string', ['get', 'point_count_abbreviated']],
           textSize: 12,
@@ -426,8 +426,8 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
 
     try {
       await controller.addLayer(
-        'perbug-places',
-        'perbug-place-selection-halo-layer',
+        'dryad-places',
+        'dryad-place-selection-halo-layer',
         CircleLayerProperties(
           circleColor: mapTheme.overlay.selectionHalo,
           circleOpacity: 0.22,
@@ -442,8 +442,8 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
       );
 
       await controller.addLayer(
-        'perbug-places',
-        'perbug-place-focus-ring-layer',
+        'dryad-places',
+        'dryad-place-focus-ring-layer',
         CircleLayerProperties(
           circleColor: mapTheme.overlay.focusRing,
           circleOpacity: 0.16,
@@ -457,8 +457,8 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
       );
 
       await controller.addLayer(
-        'perbug-places',
-        'perbug-place-layer',
+        'dryad-places',
+        'dryad-place-layer',
         CircleLayerProperties(
           circleColor: [
             'case',
@@ -483,8 +483,8 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
       );
 
       await controller.addLayer(
-        'perbug-places',
-        'perbug-place-label-layer',
+        'dryad-places',
+        'dryad-place-label-layer',
         SymbolLayerProperties(
           textField: ['get', 'name'],
           textSize: ['interpolate', ['linear'], ['zoom'], 11, 9, 15.8, 12.2],
@@ -511,8 +511,8 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
 
     try {
       await controller.addLayer(
-        'perbug-user',
-        'perbug-user-halo-layer',
+        'dryad-user',
+        'dryad-user-halo-layer',
         CircleLayerProperties(
           circleColor: mapTheme.marker.user,
           circleOpacity: 0.22,
@@ -521,8 +521,8 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
         ),
       );
       await controller.addLayer(
-        'perbug-user',
-        'perbug-user-layer',
+        'dryad-user',
+        'dryad-user-layer',
         CircleLayerProperties(
           circleColor: mapTheme.marker.user,
           circleStrokeColor: mapTheme.marker.outline,

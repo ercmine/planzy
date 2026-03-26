@@ -12,8 +12,8 @@ import '../home/map_discovery_tab.dart';
 import '../home/home_page.dart';
 import 'economy_models.dart';
 
-class PerbugEconomyHubPage extends ConsumerWidget {
-  const PerbugEconomyHubPage({super.key});
+class DryadEconomyHubPage extends ConsumerWidget {
+  const DryadEconomyHubPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,7 +23,7 @@ class PerbugEconomyHubPage extends ConsumerWidget {
     final collections = ref.watch(profileCollectionsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Perbug Balance')),
+      appBar: AppBar(title: const Text('Dryad Balance')),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(rewardDashboardProvider);
@@ -35,7 +35,7 @@ class PerbugEconomyHubPage extends ConsumerWidget {
           padding: const EdgeInsets.all(AppSpacing.m),
           children: [
             const PremiumHeader(
-              title: 'Perbug Balance',
+              title: 'Dryad Balance',
               subtitle: 'A premium view of your earnings, claim flow, active quests, and collection loops.',
               badge: AppPill(label: 'Rewards hub', icon: Icons.auto_awesome_rounded),
             ),
@@ -94,16 +94,16 @@ class _BalanceHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              const AppPill(label: 'Perbug Balance', icon: Icons.account_balance_wallet_outlined),
+              const AppPill(label: 'Dryad Balance', icon: Icons.account_balance_wallet_outlined),
               const Spacer(),
               if (membership?.active == true)
-                AppPill(label: 'PERBUG ${membership!.tier.toUpperCase()}', icon: Icons.workspace_premium_outlined),
+                AppPill(label: 'DRYAD ${membership!.tier.toUpperCase()}', icon: Icons.workspace_premium_outlined),
             ],
           ),
           const SizedBox(height: AppSpacing.m),
           AnimatedCountText(
-            value: data.wallet.balancePerbug,
-            suffix: ' PERBUG',
+            value: data.wallet.balanceDryad,
+            suffix: ' DRYAD',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -221,7 +221,7 @@ class _QuestAndCollectionGrid extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.flag_outlined),
                 title: Text(quest.title),
-                subtitle: Text('Quest reward · ${quest.rewardPerbug.toStringAsFixed(1)} PERBUG · Ends ${_formatDate(quest.endsAt)}'),
+                subtitle: Text('Quest reward · ${quest.rewardDryad.toStringAsFixed(1)} DRYAD · Ends ${_formatDate(quest.endsAt)}'),
                 trailing: const AppPill(label: 'Claim now', icon: Icons.arrow_forward),
               ),
             ),

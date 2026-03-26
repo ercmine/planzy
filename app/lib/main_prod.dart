@@ -17,7 +17,7 @@ Future<void> main() async {
       overrides: [
         envConfigProvider.overrideWithValue(envConfig),
       ],
-      child: const PerbugApp(),
+      child: const DryadApp(),
     ),
   );
 }

@@ -335,7 +335,7 @@ Plan _planFromApi(Map<String, dynamic> json, {required ApiClient apiClient}) {
         ? PlanDeepLinks(mapsLink: mapsUri, websiteLink: websiteUri)
         : null,
     metadata: {
-      'source': 'api.perbug.com',
+      'source': 'api.dryad.dev',
       'placeId': json['placeId']?.toString(),
       'address': address,
       'photo': photo,

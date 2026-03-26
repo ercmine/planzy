@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 const DEFAULT_ALLOWED_ORIGINS = [
-  "https://app.perbug.com",
+  "https://app.dryad.dev",
   "http://localhost:3000",
   "http://localhost:5173",
   "http://localhost:8080"

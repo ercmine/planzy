@@ -1,4 +1,4 @@
--- Foundational identity, roles, profiles, and memberships schema for Perbug.
+-- Foundational identity, roles, profiles, and memberships schema for Dryad.
 -- This migration is intentionally additive and non-destructive to preserve existing userId-linked content.
 
 -- Core user identity

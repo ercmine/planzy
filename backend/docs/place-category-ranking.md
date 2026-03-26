@@ -1,6 +1,6 @@
 # Place category normalization + ranking engine
 
-Perbug discovery now uses a dedicated taxonomy + scoring layer for canonical places.
+Dryad discovery now uses a dedicated taxonomy + scoring layer for canonical places.
 
 ## Taxonomy and normalization
 

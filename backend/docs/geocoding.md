@@ -1,12 +1,12 @@
-# Geospatial integration (`geo.perbug.com`)
+# Geospatial integration (`geo.dryad.dev`)
 
-Perbug mobile clients **must only call backend geo endpoints**. The backend is the single integration point for `geo.perbug.com` and shields app clients from raw Nominatim schema.
+Dryad mobile clients **must only call backend geo endpoints**. The backend is the single integration point for `geo.dryad.dev` and shields app clients from raw Nominatim schema.
 
 ## Runtime architecture
 
-- **Flutter app** → `api.perbug.com` (`/api/geo/*`)
-- **Backend geo layer** (`backend/src/geo`) → `geo.perbug.com` (or local fallback)
-- **Geo service** (`geo.perbug.com`) → self-hosted Nominatim
+- **Flutter app** → `api.dryad.dev` (`/api/geo/*`)
+- **Backend geo layer** (`backend/src/geo`) → `geo.dryad.dev` (or local fallback)
+- **Geo service** (`geo.dryad.dev`) → self-hosted Nominatim
 
 ## Backend geo module
 
@@ -24,7 +24,7 @@ Perbug mobile clients **must only call backend geo endpoints**. The backend is t
 - `GET /api/geo/health`
 - `GET /api/geo/debug/status`
 
-The payloads are Perbug-friendly DTOs (`PerbugGeoPlace`) and are intentionally stable for mobile clients.
+The payloads are Dryad-friendly DTOs (`DryadGeoPlace`) and are intentionally stable for mobile clients.
 
 ## Internal compatibility endpoints
 
@@ -38,7 +38,7 @@ The payloads are Perbug-friendly DTOs (`PerbugGeoPlace`) and are intentionally s
 ## Environment variables
 
 - `GEO_SERVICE_ENABLED`
-- `GEO_SERVICE_BASE_URL` (use `https://geo.perbug.com` in prod)
+- `GEO_SERVICE_BASE_URL` (use `https://geo.dryad.dev` in prod)
 - `GEO_SERVICE_TIMEOUT_MS`
 - `GEO_SERVICE_RETRIES`
 - `GEO_SERVICE_AUTH_SECRET`
@@ -55,4 +55,4 @@ On startup, backend logs a structured `[geo.startup]` event with:
 
 ## Security model
 
-Internal service-to-service requests may include `x-perbug-geo-service` (`GEO_SERVICE_AUTH_SECRET`). Public `/api/geo/*` endpoints are rate-limited and validated by backend before upstream calls.
+Internal service-to-service requests may include `x-dryad-geo-service` (`GEO_SERVICE_AUTH_SECRET`). Public `/api/geo/*` endpoints are rate-limited and validated by backend before upstream calls.

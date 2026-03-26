@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/app/router.dart';
-import 'package:perbug/core/identity/identity_provider.dart';
+import 'package:dryad/app/router.dart';
+import 'package:dryad/core/identity/identity_provider.dart';
 
 void main() {
   test('routes to bootstrap while onboarding state is loading', () {

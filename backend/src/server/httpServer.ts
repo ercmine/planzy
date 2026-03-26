@@ -40,11 +40,11 @@ import type { LeaderboardsService } from "../leaderboards/service.js";
 import type { CollectionsService } from "../collections/service.js";
 import type { SocialGamificationService } from "../socialGamification/service.js";
 import type { GamificationControlService } from "../gamificationControl/service.js";
-import type { PerbugRewardsService } from "../perbugRewards/service.js";
-import type { PerbugTipsService } from "../perbugTips/service.js";
+import type { DryadRewardsService } from "../dryadRewards/service.js";
+import type { DryadTipsService } from "../dryadTips/service.js";
 import type { CompetitionService } from "../competition/service.js";
 import type { SponsoredLocationsService } from "../sponsoredLocations/service.js";
-import type { PerbugEconomyService } from "../perbugEconomy/service.js";
+import type { DryadEconomyService } from "../dryadEconomy/service.js";
 import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
 import { createRoutes } from "./routes.js";
 
@@ -119,11 +119,11 @@ export function createHttpServer(
     collectionsService?: CollectionsService;
     socialGamificationService?: SocialGamificationService;
     gamificationControlService?: GamificationControlService;
-    perbugRewardsService?: PerbugRewardsService;
-    perbugTipsService?: PerbugTipsService;
+    dryadRewardsService?: DryadRewardsService;
+    dryadTipsService?: DryadTipsService;
     competitionService?: CompetitionService;
     sponsoredLocationsService?: SponsoredLocationsService;
-    perbugEconomyService?: PerbugEconomyService;
+    dryadEconomyService?: DryadEconomyService;
     viewerEngagementRewardsService?: ViewerEngagementRewardsService;
   }
 ): Server {

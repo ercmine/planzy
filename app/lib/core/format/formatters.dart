@@ -43,6 +43,6 @@ String? formatReviewCount(int? reviewCount) {
 
 String formatSourceLabel(String source) {
   final clean = source.trim();
-  if (clean.isEmpty) return 'Perbug';
+  if (clean.isEmpty) return 'Dryad';
   return clean[0].toUpperCase() + clean.substring(1);
 }

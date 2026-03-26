@@ -1,4 +1,4 @@
-# Perbug ops / monitoring / backup hardening design
+# Dryad ops / monitoring / backup hardening design
 
 This document defines the production safety layer implemented in `src/ops` and `../ops/scripts`.
 
@@ -21,13 +21,13 @@ Recommended endpoint mapping:
 - Use for backend, worker, geo, media and backup instrumentation.
 
 Suggested metric names:
-- `perbug_requests_total`
-- `perbug_request_latency_ms`
-- `perbug_queue_depth`
-- `perbug_worker_heartbeat_lag_ms`
-- `perbug_backups_age_hours`
-- `perbug_backup_failures_total`
-- `perbug_media_anomalies_total`
+- `dryad_requests_total`
+- `dryad_request_latency_ms`
+- `dryad_queue_depth`
+- `dryad_worker_heartbeat_lag_ms`
+- `dryad_backups_age_hours`
+- `dryad_backup_failures_total`
+- `dryad_media_anomalies_total`
 
 ## 3) Queue / worker hardening
 - `src/ops/queueWatchdog.ts` evaluates queue health from queue depth, oldest age, heartbeat lag, and failure spike rates.

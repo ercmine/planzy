@@ -1,4 +1,4 @@
-export type SourceName = "osm" | "wikidata" | "geonames" | "opentripmap" | "perbug" | (string & {});
+export type SourceName = "osm" | "wikidata" | "geonames" | "opentripmap" | "dryad" | (string & {});
 
 export interface CanonicalPlace {
   id: string;

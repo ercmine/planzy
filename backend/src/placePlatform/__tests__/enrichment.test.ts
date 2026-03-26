@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { OSM_CATEGORY_RULES, PERBUG_CATEGORIES } from "../categoryIntelligence.js";
+import { OSM_CATEGORY_RULES, DRYAD_CATEGORIES } from "../categoryIntelligence.js";
 import {
   EnrichmentJobRunner,
   InMemoryEnrichmentRepository,
@@ -14,7 +14,7 @@ import {
 import { CategoryNormalizationService, PlaceImportService } from "../services.js";
 
 function setup() {
-  const placeRepo = new InMemoryPlacePlatformRepository({ categories: PERBUG_CATEGORIES, rules: OSM_CATEGORY_RULES });
+  const placeRepo = new InMemoryPlacePlatformRepository({ categories: DRYAD_CATEGORIES, rules: OSM_CATEGORY_RULES });
   const enrichmentRepo = new InMemoryEnrichmentRepository();
   const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const importer = new PlaceImportService(placeRepo, placeRepo, placeRepo, placeRepo, new CategoryNormalizationService(placeRepo), logger);

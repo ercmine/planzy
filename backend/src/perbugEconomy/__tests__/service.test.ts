@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { MemoryPerbugEconomyStore } from "../memoryStore.js";
-import { PerbugEconomyService } from "../service.js";
+import { MemoryDryadEconomyStore } from "../memoryStore.js";
+import { DryadEconomyService } from "../service.js";
 
-describe("PerbugEconomyService", () => {
+describe("DryadEconomyService", () => {
   it("supports quest funding/completion and treasury burn splits", () => {
-    const service = new PerbugEconomyService(new MemoryPerbugEconomyStore());
+    const service = new DryadEconomyService(new MemoryDryadEconomyStore());
     service.creditBusiness("owner", 1000, "seed");
     service.creditUser("explorer", 10, "seed");
     service.updateTokenSplitConfig({
@@ -25,8 +25,8 @@ describe("PerbugEconomyService", () => {
       placeId: "place-1",
       title: "Lunch check-in",
       actionType: "visit_checkin",
-      rewardPerbug: 3,
-      budgetPerbug: 30,
+      rewardDryad: 3,
+      budgetDryad: 30,
       dailyCap: 20,
       totalCap: 100,
       startsAt: new Date(Date.now() - 1000).toISOString(),
@@ -46,7 +46,7 @@ describe("PerbugEconomyService", () => {
   });
 
   it("tracks exploration streaks, collections, creator claims and membership purchase", () => {
-    const service = new PerbugEconomyService(new MemoryPerbugEconomyStore());
+    const service = new DryadEconomyService(new MemoryDryadEconomyStore());
     service.creditUser("user-1", 500, "seed");
 
     const checkIn = service.recordExplorationCheckIn({

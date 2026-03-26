@@ -2,7 +2,7 @@
 
 ## Auth
 All `/v1/*` endpoints require:
-- Header `x-perbug-geo-service: <GEO_INTERNAL_AUTH_SECRET>`
+- Header `x-dryad-geo-service: <GEO_INTERNAL_AUTH_SECRET>`
 
 ## POST `/v1/geocode`
 Request:

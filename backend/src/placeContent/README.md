@@ -1,6 +1,6 @@
-# Perbug first-party content layer
+# Dryad first-party content layer
 
-This module implements Perbug-owned content anchored to canonical place IDs.
+This module implements Dryad-owned content anchored to canonical place IDs.
 
 ## Domain model
 - `ReviewRecord`: user/creator review content with moderation, trust, and quality placeholders.

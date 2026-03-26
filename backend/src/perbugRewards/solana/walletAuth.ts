@@ -9,7 +9,7 @@ export function createWalletLoginNonce(): string {
 
 export function formatWalletSignInMessage(input: { publicKey: string; nonce: string; timestamp: string }): string {
   return [
-    "Sign this message to authenticate with Perbug.",
+    "Sign this message to authenticate with Dryad.",
     `Wallet: ${input.publicKey}`,
     `Nonce: ${input.nonce}`,
     `Timestamp: ${input.timestamp}`,

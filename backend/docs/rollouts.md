@@ -2,7 +2,7 @@
 
 ## Evaluation order
 
-Perbug rollout checks are evaluated centrally in `RolloutService` with deterministic precedence:
+Dryad rollout checks are evaluated centrally in `RolloutService` with deterministic precedence:
 
 1. Unknown feature keys are denied (`unknown_feature`).
 2. Internal override (role/cohort) can force-enable for trusted internal audiences.

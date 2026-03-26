@@ -1,5 +1,5 @@
 [package]
-name = "perbug-rewards-program"
+name = "dryad-rewards-program"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,7 +12,7 @@ crate-type = ["cdylib", "lib"]
 borsh.workspace = true
 solana-program.workspace = true
 thiserror.workspace = true
-perbug-common = { path = "../perbug-common" }
+dryad-common = { path = "../dryad-common" }
 
 [dev-dependencies]
 solana-sdk.workspace = true

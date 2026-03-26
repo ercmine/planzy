@@ -6,12 +6,12 @@ class RewardRepository {
   final ApiClient apiClient;
 
   Future<RewardDashboard> fetchDashboard() async {
-    final response = await apiClient.getJson('/v1/perbug/rewards/me');
+    final response = await apiClient.getJson('/v1/dryad/rewards/me');
     return RewardDashboard.fromJson(response);
   }
 
   Future<Map<String, dynamic>> fetchPlacePreview(String placeId) {
-    return apiClient.getJson('/v1/perbug/rewards/places/$placeId/next');
+    return apiClient.getJson('/v1/dryad/rewards/places/$placeId/next');
   }
 
   Future<List<Map<String, dynamic>>> fetchWallets() async {

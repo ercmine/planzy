@@ -13,7 +13,7 @@ class AdMobConfig {
   static const String iosAppId = 'ca-app-pub-9929942639121200~6500929043';
   static const String iosNativeUnitId = 'ca-app-pub-9929942639121200/9298482776';
 
-  static const String nativeFactoryId = 'perbugNativeAdFactory';
+  static const String nativeFactoryId = 'dryadNativeAdFactory';
 
   static const int firstAdAfterItem = 3;
   static const int adInterval = 8;

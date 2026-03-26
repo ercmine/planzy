@@ -11,7 +11,7 @@ const toDateKey = (iso: string) => iso.slice(0, 10);
 
 const ALL_FEATURES: EconomyFeatureType[] = ["business_sponsorship", "business_quest", "premium_membership", "ad_marketplace", "offer_redemption", "creator_reward", "curator_reward", "exploration_reward", "collection_reward"];
 
-export class PerbugEconomyService {
+export class DryadEconomyService {
   constructor(private readonly store: EconomyStore) {
     this.seedSplitConfig("system");
     this.getOrCreateAccount("platform", "treasury");
@@ -36,22 +36,22 @@ export class PerbugEconomyService {
     }
   }
 
-  creditUser(userId: string, amountPerbug: number, actor = "system") {
-    if (amountPerbug <= 0) throw new ValidationError(["amountPerbug must be positive"]);
-    const amountAtomic = atomic(amountPerbug);
+  creditUser(userId: string, amountDryad: number, actor = "system") {
+    if (amountDryad <= 0) throw new ValidationError(["amountDryad must be positive"]);
+    const amountAtomic = atomic(amountDryad);
     this.adjustBalance({ ownerType: "user", ownerId: userId, delta: amountAtomic, actor, feature: "exploration_reward", type: "admin_adjustment", referenceType: "credit", referenceId: userId });
     return this.getOrCreateAccount("user", userId);
   }
 
-  creditBusiness(businessId: string, amountPerbug: number, actor = "system") {
-    if (amountPerbug <= 0) throw new ValidationError(["amountPerbug must be positive"]);
-    const amountAtomic = atomic(amountPerbug);
+  creditBusiness(businessId: string, amountDryad: number, actor = "system") {
+    if (amountDryad <= 0) throw new ValidationError(["amountDryad must be positive"]);
+    const amountAtomic = atomic(amountDryad);
     this.adjustBalance({ ownerType: "business", ownerId: businessId, delta: amountAtomic, actor, feature: "business_quest", type: "admin_adjustment", referenceType: "credit_business", referenceId: businessId });
     return this.getOrCreateAccount("business", businessId);
   }
 
-  createBusinessQuest(input: Omit<BusinessQuest, "id" | "status" | "paidAtomic" | "createdAt" | "updatedAt" | "rewardAtomic" | "budgetAtomic"> & { rewardPerbug: number; budgetPerbug: number }) {
-    if (input.rewardPerbug <= 0 || input.budgetPerbug <= 0) throw new ValidationError(["reward and budget must be positive"]);
+  createBusinessQuest(input: Omit<BusinessQuest, "id" | "status" | "paidAtomic" | "createdAt" | "updatedAt" | "rewardAtomic" | "budgetAtomic"> & { rewardDryad: number; budgetDryad: number }) {
+    if (input.rewardDryad <= 0 || input.budgetDryad <= 0) throw new ValidationError(["reward and budget must be positive"]);
     const quest: BusinessQuest = {
       id: `quest_${randomUUID()}`,
       businessId: input.businessId,
@@ -59,8 +59,8 @@ export class PerbugEconomyService {
       title: input.title,
       status: "draft",
       actionType: input.actionType,
-      rewardAtomic: atomic(input.rewardPerbug),
-      budgetAtomic: atomic(input.budgetPerbug),
+      rewardAtomic: atomic(input.rewardDryad),
+      budgetAtomic: atomic(input.budgetDryad),
       paidAtomic: 0n,
       dailyCap: input.dailyCap,
       totalCap: input.totalCap,
@@ -263,13 +263,13 @@ export class PerbugEconomyService {
     return membership;
   }
 
-  createOffer(input: Omit<Offer, "id" | "redeemed" | "status" | "costAtomic" | "createdAt" | "updatedAt"> & { costPerbug: number }) {
+  createOffer(input: Omit<Offer, "id" | "redeemed" | "status" | "costAtomic" | "createdAt" | "updatedAt"> & { costDryad: number }) {
     const offer: Offer = {
       id: `offer_${randomUUID()}`,
       businessId: input.businessId,
       placeId: input.placeId,
       title: input.title,
-      costAtomic: atomic(input.costPerbug),
+      costAtomic: atomic(input.costDryad),
       inventory: input.inventory,
       redeemed: 0,
       status: "active",

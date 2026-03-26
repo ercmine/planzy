@@ -1,13 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:perbug/config/dryad_chain_config.dart';
-import 'package:perbug/core/identity/identity_store.dart';
-import 'package:perbug/features/dryad/chain/dryad_chain_providers.dart';
-import 'package:perbug/features/dryad/chain/grove_nft_service.dart';
-import 'package:perbug/features/dryad/chain/nft_metadata.dart';
-import 'package:perbug/features/onboarding/onboarding_controller.dart';
-import 'package:perbug/features/onboarding/onboarding_state.dart';
+import 'package:dryad/config/dryad_chain_config.dart';
+import 'package:dryad/core/identity/identity_store.dart';
+import 'package:dryad/features/dryad/chain/dryad_chain_providers.dart';
+import 'package:dryad/features/dryad/chain/grove_nft_service.dart';
+import 'package:dryad/features/dryad/chain/nft_metadata.dart';
+import 'package:dryad/features/onboarding/onboarding_controller.dart';
+import 'package:dryad/features/onboarding/onboarding_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeService extends GroveNftService {

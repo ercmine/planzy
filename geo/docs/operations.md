@@ -2,17 +2,17 @@
 
 ## Deploy target
 - Host: home server (Dell R910 supported) or equivalent Linux host.
-- Public endpoint: `https://geo.perbug.com` via nginx reverse proxy + TLS.
+- Public endpoint: `https://geo.dryad.dev` via nginx reverse proxy + TLS.
 
 ## Critical checks
-1. `curl -f https://geo.perbug.com/health`
-2. `curl -f https://geo.perbug.com/ready`
-3. `curl -f https://geo.perbug.com/version`
-4. `curl -f https://geo.perbug.com/metrics`
+1. `curl -f https://geo.dryad.dev/health`
+2. `curl -f https://geo.dryad.dev/ready`
+3. `curl -f https://geo.dryad.dev/version`
+4. `curl -f https://geo.dryad.dev/metrics`
 
 ## Security
 - Set `GEO_INTERNAL_AUTH_SECRET` on geo service and backend.
-- Reject all `/v1/*` requests missing `x-perbug-geo-service`.
+- Reject all `/v1/*` requests missing `x-dryad-geo-service`.
 - Keep health/readiness public for external uptime checks.
 
 ## Home-hosted hardening

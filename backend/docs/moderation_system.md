@@ -1,7 +1,7 @@
-# Perbug Moderation System (Reviews + Media)
+# Dryad Moderation System (Reviews + Media)
 
 ## Overview
-Perbug now uses a centralized moderation domain that combines automated safety signals with user reports and admin decisions across:
+Dryad now uses a centralized moderation domain that combines automated safety signals with user reports and admin decisions across:
 - text reviews
 - review media (photo/video)
 - media metadata (captions/titles)

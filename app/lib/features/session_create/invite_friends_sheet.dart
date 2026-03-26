@@ -124,8 +124,8 @@ class _InviteFriendsSheetState extends ConsumerState<InviteFriendsSheet> {
                   child: FilledButton.icon(
                     onPressed: () {
                       ref.read(shareServiceProvider).shareText(
-                            'Join my Perbug session: ${widget.inviteLink}',
-                            subject: 'Perbug invite',
+                            'Join my Dryad session: ${widget.inviteLink}',
+                            subject: 'Dryad invite',
                           );
                     },
                     icon: const Icon(Icons.share),

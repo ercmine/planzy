@@ -59,7 +59,7 @@ export class GeoServiceClient {
           method,
           headers: {
             "content-type": "application/json",
-            ...(this.config.authSecret ? { "x-perbug-geo-service": this.config.authSecret } : {})
+            ...(this.config.authSecret ? { "x-dryad-geo-service": this.config.authSecret } : {})
           },
           body: body ? JSON.stringify(body) : undefined,
           signal: controller.signal

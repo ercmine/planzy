@@ -34,7 +34,7 @@ export class WebhookModerationAlertDispatcher implements ModerationAlertDispatch
 
   async sendCaseAlert(input: { recipient: string; snapshot: ModerationCaseSnapshot; dedupeKey: string }): Promise<ModerationAlertRecord> {
     const reviewUrl = `${this.cfg.reviewBaseUrl.replace(/\/$/, "")}/moderation/targets/${encodeURIComponent(input.snapshot.target.targetType)}/${encodeURIComponent(input.snapshot.target.targetId)}`;
-    const subject = `Perbug moderation case: ${input.snapshot.target.targetId}`;
+    const subject = `Dryad moderation case: ${input.snapshot.target.targetId}`;
     const body = {
       from: this.cfg.fromEmail,
       to: [input.recipient],

@@ -1,6 +1,6 @@
--- Perbug creator rewards schema reference migration.
+-- Dryad creator rewards schema reference migration.
 -- The current backend uses in-memory stores in development, but this migration documents
--- the production relational schema required for the Solana-based PERBUG rewards system.
+-- the production relational schema required for the Solana-based DRYAD rewards system.
 
 create table if not exists users (
   id text primary key,

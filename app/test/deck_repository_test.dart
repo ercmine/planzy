@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:perbug/api/api_client.dart';
-import 'package:perbug/core/ads/ads_config.dart';
-import 'package:perbug/core/cache/local_store.dart';
-import 'package:perbug/core/env/env.dart';
-import 'package:perbug/repositories/deck_repository.dart';
-import 'package:perbug/services/foursquare/foursquare_client.dart';
+import 'package:dryad/api/api_client.dart';
+import 'package:dryad/core/ads/ads_config.dart';
+import 'package:dryad/core/cache/local_store.dart';
+import 'package:dryad/core/env/env.dart';
+import 'package:dryad/repositories/deck_repository.dart';
+import 'package:dryad/services/foursquare/foursquare_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

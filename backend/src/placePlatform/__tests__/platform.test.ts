@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildNearbyPlacesSqlQuery, InMemoryPlacePlatformRepository } from "../repositories.js";
 import { CategoryNormalizationService, NearbyPlacesService, OsmImportRunnerService, PlaceImportService } from "../services.js";
-import { OSM_CATEGORY_RULES, PERBUG_CATEGORIES } from "../categoryIntelligence.js";
+import { OSM_CATEGORY_RULES, DRYAD_CATEGORIES } from "../categoryIntelligence.js";
 
 function makeDeps() {
   const repo = new InMemoryPlacePlatformRepository({
-    categories: PERBUG_CATEGORIES,
+    categories: DRYAD_CATEGORIES,
     rules: OSM_CATEGORY_RULES
   });
   const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };

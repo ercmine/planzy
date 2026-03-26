@@ -6,7 +6,7 @@ import { createSeo } from '@/lib/seo';
 
 const seo = createSeo({
   title: 'Support',
-  description: 'Contact Perbug support and find help resources.',
+  description: 'Contact Dryad support and find help resources.',
   path: '/support/'
 });
 ---
@@ -18,9 +18,9 @@ const seo = createSeo({
     <div class="mt-8 grid gap-4 sm:grid-cols-2">
       <article class="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <h2 class="text-lg font-semibold">Email</h2>
-        {publicConfig.PERBUG_SUPPORT_EMAIL ? (
-          <a class="mt-2 block text-brand-600 hover:text-brand-700" href={`mailto:${publicConfig.PERBUG_SUPPORT_EMAIL}`}>
-            {publicConfig.PERBUG_SUPPORT_EMAIL}
+        {publicConfig.DRYAD_SUPPORT_EMAIL ? (
+          <a class="mt-2 block text-brand-600 hover:text-brand-700" href={`mailto:${publicConfig.DRYAD_SUPPORT_EMAIL}`}>
+            {publicConfig.DRYAD_SUPPORT_EMAIL}
           </a>
         ) : (
           <p class="mt-2 text-slate-600 dark:text-slate-300">Support email coming soon.</p>

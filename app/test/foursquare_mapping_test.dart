@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/services/foursquare/foursquare_category_mapping.dart';
-import 'package:perbug/services/foursquare/foursquare_models.dart';
-import 'package:perbug/services/foursquare/foursquare_plan_mapper.dart';
+import 'package:dryad/services/foursquare/foursquare_category_mapping.dart';
+import 'package:dryad/services/foursquare/foursquare_models.dart';
+import 'package:dryad/services/foursquare/foursquare_plan_mapper.dart';
 
 void main() {
   test('category mapping returns smart query terms', () {

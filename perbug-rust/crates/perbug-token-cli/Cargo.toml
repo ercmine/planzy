@@ -1,5 +1,5 @@
 [package]
-name = "perbug-token-cli"
+name = "dryad-token-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -16,4 +16,4 @@ solana-sdk.workspace = true
 spl-associated-token-account.workspace = true
 spl-token.workspace = true
 spl-token-2022.workspace = true
-perbug-common = { path = "../perbug-common" }
+dryad-common = { path = "../dryad-common" }

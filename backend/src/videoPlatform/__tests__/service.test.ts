@@ -11,7 +11,7 @@ function createService(deps?: { verifier?: UploadObjectVerifier; processor?: Vid
       awsRegion: "us-east-1",
       rawBucket: "raw-bucket",
       processedBucket: "processed-bucket",
-      cloudFrontBaseUrl: "https://cdn.perbug.com",
+      cloudFrontBaseUrl: "https://cdn.dryad.dev",
       uploadTtlSeconds: 900,
       maxUploadBytes: 1024 * 1024 * 1024,
       multipartThresholdBytes: 10 * 1024 * 1024,
@@ -50,7 +50,7 @@ describe("VideoPlatformService lifecycle", () => {
 
     const feed = await service.listFeed({ scope: "local", limit: 10 });
     expect(feed.items).toHaveLength(1);
-    expect(feed.items[0]?.playbackUrl).toBe(`https://cdn.perbug.com/processed/place-review-videos/${draft.id}/playback.mp4`);
+    expect(feed.items[0]?.playbackUrl).toBe(`https://cdn.dryad.dev/processed/place-review-videos/${draft.id}/playback.mp4`);
   });
 
   it("rejects invalid transition when publishing before processed", async () => {

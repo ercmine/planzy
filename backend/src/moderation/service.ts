@@ -27,7 +27,7 @@ const REPORT_RATE_LIMIT_WINDOW_MS = 60_000;
 const REPORT_RATE_LIMIT_MAX = 12;
 const AUTO_HIDE_THRESHOLD = 0.92;
 const AUTO_LIMIT_THRESHOLD = 0.7;
-const DEFAULT_REPORT_ALERT_RECIPIENT = "alex@perbug.com";
+const DEFAULT_REPORT_ALERT_RECIPIENT = "dryadtoken@gmail.com";
 
 function keyForTarget(target: ModerationTargetRef): string {
   return `${target.targetType}:${target.targetId}`;

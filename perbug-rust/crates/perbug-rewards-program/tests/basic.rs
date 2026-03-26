@@ -1,13 +1,13 @@
 use borsh::{to_vec, BorshDeserialize};
-use perbug_common::derive_config_pda;
-use perbug_rewards_program::{
+use dryad_common::derive_config_pda;
+use dryad_rewards_program::{
     instruction::RewardsInstruction, processor::Processor, state::RewardsConfig,
 };
 use solana_program::{account_info::AccountInfo, pubkey::Pubkey};
 
 fn account<'a>(key: Pubkey, is_signer: bool, data_len: usize) -> AccountInfo<'a> {
     let key_ref = Box::leak(Box::new(key));
-    let owner_ref = Box::leak(Box::new(perbug_rewards_program::id()));
+    let owner_ref = Box::leak(Box::new(dryad_rewards_program::id()));
     let lamports = Box::leak(Box::new(0_u64));
     let data = Box::leak(vec![0_u8; data_len].into_boxed_slice());
     AccountInfo::new(key_ref, is_signer, true, lamports, data, owner_ref, false, 0)
@@ -15,7 +15,7 @@ fn account<'a>(key: Pubkey, is_signer: bool, data_len: usize) -> AccountInfo<'a>
 
 #[test]
 fn initialize_config_and_serialize_instruction() {
-    let program_id = perbug_rewards_program::id();
+    let program_id = dryad_rewards_program::id();
     let payer = Pubkey::new_unique();
     let admin = Pubkey::new_unique();
     let (config_key, _) = derive_config_pda(&program_id);

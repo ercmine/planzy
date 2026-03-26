@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/features/dryad/chain/nft_metadata.dart';
+import 'package:dryad/features/dryad/chain/nft_metadata.dart';
 
 void main() {
   test('parses base64 JSON tokenURI with image_data SVG', () {

@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/api/models.dart';
-import 'package:perbug/core/json_parsers.dart';
-import 'package:perbug/models/deck_batch.dart';
-import 'package:perbug/models/plan.dart';
-import 'package:perbug/models/telemetry.dart';
+import 'package:dryad/api/models.dart';
+import 'package:dryad/core/json_parsers.dart';
+import 'package:dryad/models/deck_batch.dart';
+import 'package:dryad/models/plan.dart';
+import 'package:dryad/models/telemetry.dart';
 
 void main() {
   group('Plan and PlanDeepLinks JSON', () {
@@ -150,7 +150,7 @@ void main() {
         'googleMapsUri': 'https://maps.google.com',
         'websiteUri': 'https://venue.example',
         'photo': 'places/abc/photos/def',
-        'photoUrl': 'https://api.perbug.com/photos?name=places%2Fabc%2Fphotos%2Fdef&maxWidthPx=800',
+        'photoUrl': 'https://api.dryad.dev/photos?name=places%2Fabc%2Fphotos%2Fdef&maxWidthPx=800',
         'unexpected': 'ignored',
       });
       expect(plan.id, 'sample-plan-1');

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/features/results/results_mapper.dart';
-import 'package:perbug/features/results/results_state.dart';
-import 'package:perbug/models/plan.dart';
+import 'package:dryad/features/results/results_mapper.dart';
+import 'package:dryad/features/results/results_state.dart';
+import 'package:dryad/models/plan.dart';
 
 void main() {
   test('mapper builds fallback description and rating metadata', () {

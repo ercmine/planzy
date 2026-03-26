@@ -22,7 +22,7 @@ class BootstrapPage extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const PerbugLogo(size: 56, variant: PerbugLogoVariant.withWordmark),
+                const DryadLogo(size: 56, variant: DryadLogoVariant.withWordmark),
                 const SizedBox(height: AppSpacing.m),
                 onboardingState.when(
                   loading: () => const Column(

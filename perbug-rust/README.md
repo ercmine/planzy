@@ -1,13 +1,13 @@
-# Perbug Rust Workspace
+# Dryad Rust Workspace
 
-`perbug-rust/` is the dedicated Solana/Rust workspace for the Perbug token ecosystem. It contains the shared Rust code needed to manage an SPL mint, prepare for Token-2022 support, and scaffold two on-chain programs for creator rewards and tipping.
+`dryad-rust/` is the dedicated Solana/Rust workspace for the Dryad token ecosystem. It contains the shared Rust code needed to manage an SPL mint, prepare for Token-2022 support, and scaffold two on-chain programs for creator rewards and tipping.
 
 ## What is implemented now
 
-- `perbug-common`: shared constants, typed token amounts, PDA seeds, checked math, events, and error helpers.
-- `perbug-token-cli`: a developer-oriented CLI for mint creation, ATA derivation, minting, treasury inspection, and account inspection.
-- `perbug-rewards-program`: a real Solana program state machine for reward config, place registration, reward receipts, duplicate-prevention, admin changes, and pause controls.
-- `perbug-tipping-program`: a real Solana program state machine for tipping config, fee validation, tip receipts, duplicate-prevention, admin changes, and pause controls.
+- `dryad-common`: shared constants, typed token amounts, PDA seeds, checked math, events, and error helpers.
+- `dryad-token-cli`: a developer-oriented CLI for mint creation, ATA derivation, minting, treasury inspection, and account inspection.
+- `dryad-rewards-program`: a real Solana program state machine for reward config, place registration, reward receipts, duplicate-prevention, admin changes, and pause controls.
+- `dryad-tipping-program`: a real Solana program state machine for tipping config, fee validation, tip receipts, duplicate-prevention, admin changes, and pause controls.
 - Docs and shell scripts for local development, linting, testing, and devnet token setup.
 
 ## What is scaffolded for next
@@ -40,7 +40,7 @@ The CLI reads RPC/keypair settings from flags or environment variables and suppo
 Example:
 
 ```bash
-cargo run -p perbug-token-cli -- \
+cargo run -p dryad-token-cli -- \
   --rpc-url https://api.devnet.solana.com \
   --keypair ~/.config/solana/id.json \
   inspect-mint --mint <MINT_PUBKEY>

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { MemoryPerbugTipsStore } from "./memoryStore.js";
-import { PerbugTipsService } from "./service.js";
+import { MemoryDryadTipsStore } from "./memoryStore.js";
+import { DryadTipsService } from "./service.js";
 
-describe("PerbugTipsService", () => {
-  const makeService = () => new PerbugTipsService(new MemoryPerbugTipsStore(), {
+describe("DryadTipsService", () => {
+  const makeService = () => new DryadTipsService(new MemoryDryadTipsStore(), {
     getVideo: async () => ({ id: "video-1", canonicalPlaceId: "place-1", authorUserId: "creator-1", authorProfileId: "creator-profile-1", status: "published", moderationStatus: "approved" }),
     getPrimaryWallet: (userId) => userId === "creator-1" ? { publicKey: "11111111111111111111111111111111" } : undefined
   });

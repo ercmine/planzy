@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { ValidationError } from "../plans/errors.js";
 import { parseJsonBody, readHeader, sendJson } from "../venues/claims/http.js";
-import type { PerbugEconomyService } from "./service.js";
+import type { DryadEconomyService } from "./service.js";
 
 const requireHeader = (req: IncomingMessage, key: string) => {
   const value = readHeader(req, key);
@@ -10,11 +10,11 @@ const requireHeader = (req: IncomingMessage, key: string) => {
   return value;
 };
 
-export function createPerbugEconomyHttpHandlers(service: PerbugEconomyService) {
+export function createDryadEconomyHttpHandlers(service: DryadEconomyService) {
   return {
     creditUser: async (req: IncomingMessage, res: ServerResponse) => {
-      const body = await parseJsonBody(req) as { userId?: string; amountPerbug?: number };
-      sendJson(res, 200, { wallet: service.creditUser(String(body.userId ?? ""), Number(body.amountPerbug ?? 0), requireHeader(req, "x-admin-id")) });
+      const body = await parseJsonBody(req) as { userId?: string; amountDryad?: number };
+      sendJson(res, 200, { wallet: service.creditUser(String(body.userId ?? ""), Number(body.amountDryad ?? 0), requireHeader(req, "x-admin-id")) });
     },
     createQuest: async (req: IncomingMessage, res: ServerResponse) => {
       const body = await parseJsonBody(req) as Record<string, unknown>;
@@ -24,8 +24,8 @@ export function createPerbugEconomyHttpHandlers(service: PerbugEconomyService) {
         placeId: String(body.placeId ?? ""),
         title: String(body.title ?? ""),
         actionType: String(body.actionType ?? "visit_checkin") as never,
-        rewardPerbug: Number(body.rewardPerbug ?? 0),
-        budgetPerbug: Number(body.budgetPerbug ?? 0),
+        rewardDryad: Number(body.rewardDryad ?? 0),
+        budgetDryad: Number(body.budgetDryad ?? 0),
         dailyCap: Number(body.dailyCap ?? 100),
         totalCap: Number(body.totalCap ?? 1000),
         startsAt: String(body.startsAt ?? new Date().toISOString()),
@@ -53,8 +53,8 @@ export function createPerbugEconomyHttpHandlers(service: PerbugEconomyService) {
         id: String(body.id ?? ""),
         title: String(body.title ?? ""),
         placeIds: Array.isArray(body.placeIds) ? body.placeIds.map(String) : [],
-        milestoneRewardsAtomic: Array.isArray(body.milestoneRewardsPerbug) ? body.milestoneRewardsPerbug.map((value) => BigInt(Math.round(Number(value) * 1_000_000))) : [],
-        completionRewardAtomic: BigInt(Math.round(Number(body.completionRewardPerbug ?? 0) * 1_000_000)),
+        milestoneRewardsAtomic: Array.isArray(body.milestoneRewardsDryad) ? body.milestoneRewardsDryad.map((value) => BigInt(Math.round(Number(value) * 1_000_000))) : [],
+        completionRewardAtomic: BigInt(Math.round(Number(body.completionRewardDryad ?? 0) * 1_000_000)),
         sponsoredByBusinessId: typeof body.sponsoredByBusinessId === "string" ? body.sponsoredByBusinessId : undefined,
         startsAt: typeof body.startsAt === "string" ? body.startsAt : undefined,
         endsAt: typeof body.endsAt === "string" ? body.endsAt : undefined,
@@ -112,7 +112,7 @@ export function createPerbugEconomyHttpHandlers(service: PerbugEconomyService) {
         businessId: requireHeader(req, "x-business-id"),
         placeId: String(body.placeId ?? ""),
         title: String(body.title ?? ""),
-        costPerbug: Number(body.costPerbug ?? 0),
+        costDryad: Number(body.costDryad ?? 0),
         inventory: Number(body.inventory ?? 0),
         startsAt: String(body.startsAt ?? new Date().toISOString()),
         endsAt: String(body.endsAt ?? new Date(Date.now() + 30 * 86400000).toISOString()),

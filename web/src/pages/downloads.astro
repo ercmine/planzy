@@ -7,19 +7,19 @@ import { publicConfig } from '@/env/public';
 
 const seo = createSeo({
   title: 'Downloads',
-  description: 'Download Perbug on iOS and Android.',
+  description: 'Download Dryad on iOS and Android.',
   path: '/downloads/'
 });
 
 const links = [
-  { platform: 'App Store', href: publicConfig.PERBUG_APPSTORE_URL },
-  { platform: 'Google Play', href: publicConfig.PERBUG_PLAYSTORE_URL }
+  { platform: 'App Store', href: publicConfig.DRYAD_APPSTORE_URL },
+  { platform: 'Google Play', href: publicConfig.DRYAD_PLAYSTORE_URL }
 ];
 ---
 
 <BaseLayout {...seo}>
   <Container class="py-20">
-    <h1 class="text-4xl font-bold">Download Perbug</h1>
+    <h1 class="text-4xl font-bold">Download Dryad</h1>
     <p class="mt-3 text-slate-600 dark:text-slate-300">Get the app from your preferred store. Missing links will appear as coming soon.</p>
     <div class="mt-8">
       <CTAButtons />

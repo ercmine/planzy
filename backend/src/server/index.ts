@@ -65,11 +65,11 @@ import { LeaderboardsService, MemoryLeaderboardsStore } from "../leaderboards/in
 import { CollectionsService, MemoryCollectionStore } from "../collections/index.js";
 import { MemorySocialGamificationStore, SocialGamificationService } from "../socialGamification/index.js";
 import { GamificationControlService, MemoryGamificationControlStore } from "../gamificationControl/index.js";
-import { MemoryPerbugRewardsStore, PerbugRewardsService } from "../perbugRewards/index.js";
-import { MemoryPerbugTipsStore, PerbugTipsService } from "../perbugTips/index.js";
+import { MemoryDryadRewardsStore, DryadRewardsService } from "../dryadRewards/index.js";
+import { MemoryDryadTipsStore, DryadTipsService } from "../dryadTips/index.js";
 import { CompetitionService, MemoryCompetitionStore } from "../competition/index.js";
 import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../sponsoredLocations/index.js";
-import { MemoryPerbugEconomyStore, PerbugEconomyService } from "../perbugEconomy/index.js";
+import { MemoryDryadEconomyStore, DryadEconomyService } from "../dryadEconomy/index.js";
 import { MemoryViewerEngagementStore, ViewerEngagementRewardsService } from "../viewerEngagementRewards/index.js";
 import { createHttpServer } from "./httpServer.js";
 
@@ -115,14 +115,14 @@ export function createServer(options?: CreateServerOptions) {
     ? new WebhookModerationAlertDispatcher({
         endpoint: process.env.MODERATION_EMAIL_API_URL,
         apiKey: process.env.MODERATION_EMAIL_API_KEY,
-        fromEmail: process.env.MODERATION_EMAIL_FROM ?? "moderation@perbug.com",
-        reviewBaseUrl: process.env.MODERATION_REVIEW_BASE_URL ?? "https://admin.perbug.com"
+        fromEmail: process.env.MODERATION_EMAIL_FROM ?? "moderation@dryad.dev",
+        reviewBaseUrl: process.env.MODERATION_REVIEW_BASE_URL ?? "https://admin.dryad.dev"
       })
     : new MemoryModerationAlertDispatcher();
   const moderationService = new ModerationService({
     enforcement: new ReviewsModerationEnforcementAdapter(reviewsStore),
     alertDispatcher: moderationAlertDispatcher,
-    reportAlertRecipient: process.env.MODERATION_ALERT_EMAIL ?? "alex@perbug.com",
+    reportAlertRecipient: process.env.MODERATION_ALERT_EMAIL ?? "dryadtoken@gmail.com",
     targetContextLoader: async (target) => {
       if (target.targetType !== "place_review_video") return undefined;
       const video = await videoPlatformService?.getVideoById?.(target.targetId);
@@ -229,8 +229,8 @@ export function createServer(options?: CreateServerOptions) {
     { exists: (placeId) => Boolean(placeService.getCanonicalPlace(placeId)) },
     {
       awsRegion: process.env.AWS_REGION ?? "us-east-1",
-      rawBucket: process.env.AWS_S3_VIDEO_RAW_BUCKET ?? "perbug-media-raw-dev",
-      processedBucket: process.env.AWS_S3_VIDEO_PROCESSED_BUCKET ?? "perbug-media-processed-dev",
+      rawBucket: process.env.AWS_S3_VIDEO_RAW_BUCKET ?? "dryad-media-raw-dev",
+      processedBucket: process.env.AWS_S3_VIDEO_PROCESSED_BUCKET ?? "dryad-media-processed-dev",
       cloudFrontBaseUrl: process.env.AWS_CLOUDFRONT_MEDIA_BASE_URL,
       uploadTtlSeconds: Number.parseInt(process.env.VIDEO_UPLOAD_URL_TTL_SECONDS ?? "900", 10),
       maxUploadBytes: Number.parseInt(process.env.VIDEO_MAX_UPLOAD_BYTES ?? String(2 * 1024 * 1024 * 1024), 10),
@@ -252,14 +252,14 @@ export function createServer(options?: CreateServerOptions) {
   const collectionsService = new CollectionsService(new MemoryCollectionStore(), analyticsService, notificationService);
   const socialGamificationService = new SocialGamificationService(new MemorySocialGamificationStore(), analyticsService, notificationService);
   const gamificationControlService = new GamificationControlService(new MemoryGamificationControlStore(), analyticsService);
-  const perbugRewardsService = new PerbugRewardsService(new MemoryPerbugRewardsStore());
-  perbugRewardsService.createPlace({ id: "place-1", name: "Perbug Test Cafe" });
-  perbugRewardsService.createPlace({ id: "place-2", name: "Perbug Arcade" });
-  const perbugTipsService = new PerbugTipsService(new MemoryPerbugTipsStore(), {
+  const dryadRewardsService = new DryadRewardsService(new MemoryDryadRewardsStore());
+  dryadRewardsService.createPlace({ id: "place-1", name: "Dryad Test Cafe" });
+  dryadRewardsService.createPlace({ id: "place-2", name: "Dryad Arcade" });
+  const dryadTipsService = new DryadTipsService(new MemoryDryadTipsStore(), {
     getVideo: (videoId) => videoPlatformService?.getVideoById(videoId),
-    getPrimaryWallet: (userId) => perbugRewardsService.listWallets(userId).find((wallet) => wallet.isPrimary)
+    getPrimaryWallet: (userId) => dryadRewardsService.listWallets(userId).find((wallet) => wallet.isPrimary)
   });
-  const competitionService = new CompetitionService(new MemoryCompetitionStore(), perbugRewardsService);
+  const competitionService = new CompetitionService(new MemoryCompetitionStore(), dryadRewardsService);
   const sponsoredLocationsService = new SponsoredLocationsService(new MemorySponsoredLocationStore(), {
     placeCoordinates: (placeId) => {
       const place = placeService.getCanonicalPlace(placeId);
@@ -271,18 +271,18 @@ export function createServer(options?: CreateServerOptions) {
   competitionService.recordVideoPublished({ videoId: "video_seed_1", reviewId: "review_seed_1", userId: "u1", publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), city: "Bloomington", category: "coffee", canonicalPlaceId: "place-1" });
   competitionService.recordApprovedReview({ id: "review_event_1", reviewId: "review_seed_1", videoId: "video_seed_1", userId: "u1", canonicalPlaceId: "place-1", approvedAt: new Date().toISOString(), city: "Bloomington", category: "coffee", discoveryType: "first_review", approved: true, blocked: false });
   competitionService.recordLike({ id: "like_seed_1", videoId: "video_seed_1", userId: "fan_1", createdAt: new Date().toISOString(), valid: true, bannedUser: false, blockedUser: false, fraudFlagged: false });
-  const perbugEconomyService = new PerbugEconomyService(new MemoryPerbugEconomyStore());
+  const dryadEconomyService = new DryadEconomyService(new MemoryDryadEconomyStore());
   const viewerEngagementRewardsService = new ViewerEngagementRewardsService(new MemoryViewerEngagementStore(), {
     getVideoContext: (videoId) => ({ creatorId: `creator_${videoId}`, placeId: `place_${videoId}` }),
     analytics: analyticsService
   });
-  perbugEconomyService.creditUser("u1", 500, "seed");
-  perbugEconomyService.creditUser("u2", 250, "seed");
-  perbugEconomyService.creditUser("u3", 180, "seed");
-  perbugEconomyService.creditBusiness("biz_owner_seed", 1000, "seed");
-  perbugEconomyService.creditUser("creator_seed", 300, "seed");
-  perbugEconomyService.creditUser("curator_seed", 250, "seed");
-  perbugEconomyService.upsertCollection({
+  dryadEconomyService.creditUser("u1", 500, "seed");
+  dryadEconomyService.creditUser("u2", 250, "seed");
+  dryadEconomyService.creditUser("u3", 180, "seed");
+  dryadEconomyService.creditBusiness("biz_owner_seed", 1000, "seed");
+  dryadEconomyService.creditUser("creator_seed", 300, "seed");
+  dryadEconomyService.creditUser("curator_seed", 250, "seed");
+  dryadEconomyService.upsertCollection({
     id: "collection_downtown_coffee",
     title: "Downtown Coffee Circuit",
     placeIds: ["place-1", "place-2"],
@@ -341,11 +341,11 @@ export function createServer(options?: CreateServerOptions) {
     collectionsService,
     socialGamificationService,
     gamificationControlService,
-    perbugRewardsService,
-    perbugTipsService,
+    dryadRewardsService,
+    dryadTipsService,
     competitionService,
     sponsoredLocationsService,
-    perbugEconomyService,
+    dryadEconomyService,
     viewerEngagementRewardsService
   });
 }

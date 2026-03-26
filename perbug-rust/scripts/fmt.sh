@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[perbug] formatting workspace"
+echo "[dryad] formatting workspace"
 cargo fmt --all

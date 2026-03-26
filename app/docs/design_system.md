@@ -1,4 +1,4 @@
-# Perbug design system foundations
+# Dryad design system foundations
 
 This document defines the shared UI foundation used across Flutter surfaces.
 

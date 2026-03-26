@@ -5,7 +5,7 @@ export type MonetizationReasonCode = "creator_profile_missing" | "creator_not_ac
 export type PayoutReadinessStatus = "not_started" | "pending" | "ready" | "blocked";
 export type ComplianceReadinessStatus = "not_started" | "pending" | "ready" | "blocked";
 
-export type MonetizationCapability = "canReceiveTips" | "canReceivePerbugTips" | "canClaimPerbugRewards" | "canPublishPremiumContent" | "canBeFeatured" | "canAccessHigherUploadLimits" | "canOfferSubscriptionsFuture" | "canAccessCreatorAnalyticsPremium" | "canUploadExtendedVideo" | "canCreatePremiumGuides";
+export type MonetizationCapability = "canReceiveTips" | "canReceiveDryadTips" | "canClaimDryadRewards" | "canPublishPremiumContent" | "canBeFeatured" | "canAccessHigherUploadLimits" | "canOfferSubscriptionsFuture" | "canAccessCreatorAnalyticsPremium" | "canUploadExtendedVideo" | "canCreatePremiumGuides";
 
 export interface CreatorMonetizationProfile {
   id: string;

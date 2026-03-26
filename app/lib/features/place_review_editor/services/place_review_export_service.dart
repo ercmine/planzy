@@ -27,7 +27,7 @@ class PlaceReviewExportService {
       throw const FormatException('No clip selected for export');
     }
     final tempDir = await getTemporaryDirectory();
-    final exportDir = Directory(p.join(tempDir.path, 'perbug-review-exports'));
+    final exportDir = Directory(p.join(tempDir.path, 'dryad-review-exports'));
     if (!await exportDir.exists()) {
       await exportDir.create(recursive: true);
     }

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:perbug/features/viewer_rewards/viewer_reward_models.dart';
+import 'package:dryad/features/viewer_rewards/viewer_reward_models.dart';
 
 void main() {
   test('video status maps denied and cap states correctly', () {
@@ -16,7 +16,7 @@ void main() {
       'id': 'h1',
       'videoTitle': 'Downtown Pizza Tour',
       'action': 'comment',
-      'perbug': 0,
+      'dryad': 0,
       'status': 'pending',
       'occurredAt': '2026-03-26T10:00:00Z',
     });

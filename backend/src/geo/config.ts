@@ -48,7 +48,7 @@ export function readGeoRuntimeConfig(env: NodeJS.ProcessEnv): GeoRuntimeConfig {
   return {
     client: {
       enabled: parseBool(env.GEO_SERVICE_ENABLED, false),
-      baseUrl: env.GEO_SERVICE_BASE_URL ?? "https://geo.perbug.com",
+      baseUrl: env.GEO_SERVICE_BASE_URL ?? "https://geo.dryad.dev",
       timeoutMs: parseNum(env.GEO_SERVICE_TIMEOUT_MS, 2000),
       retries: parseNum(env.GEO_SERVICE_RETRIES, 1),
       authSecret: env.GEO_SERVICE_AUTH_SECRET,
@@ -60,7 +60,7 @@ export function readGeoRuntimeConfig(env: NodeJS.ProcessEnv): GeoRuntimeConfig {
       geocodeCacheTtlMs: parseNum(env.NOMINATIM_GEOCODE_CACHE_TTL_MS, 3_600_000),
       reverseCacheTtlMs: parseNum(env.NOMINATIM_REVERSE_CACHE_TTL_MS, 86_400_000),
       defaultLimit: parseNum(env.NOMINATIM_DEFAULT_LIMIT, 5),
-      userAgent: env.NOMINATIM_USER_AGENT ?? "perbug-geocoder/1.0"
+      userAgent: env.NOMINATIM_USER_AGENT ?? "dryad-geocoder/1.0"
     }
   };
 }

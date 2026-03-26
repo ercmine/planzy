@@ -40,7 +40,7 @@ class SettingsPage extends ConsumerWidget {
         actions: const [
           Padding(
             padding: EdgeInsets.only(right: AppSpacing.m),
-            child: AppPill(label: 'Perbug', icon: Icons.palette_outlined),
+            child: AppPill(label: 'Dryad', icon: Icons.palette_outlined),
           ),
         ],
       ),
@@ -49,7 +49,7 @@ class SettingsPage extends ConsumerWidget {
           const BrandHeroCard(
             child: AppSectionHeader(
               title: 'Tune your experience',
-              subtitle: 'Everything from permissions to privacy now sits inside the premium Perbug system.',
+              subtitle: 'Everything from permissions to privacy now sits inside the premium Dryad system.',
             ),
           ),
           const SizedBox(height: AppSpacing.m),
@@ -192,7 +192,7 @@ class SettingsPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Track claimable PERBUG, review reward status, and open the claim dashboard.'),
+                const Text('Track claimable DRYAD, review reward status, and open the claim dashboard.'),
                 const SizedBox(height: AppSpacing.s),
                 FilledButton.tonal(
                   onPressed: () => context.go('/creator/rewards'),
@@ -224,7 +224,7 @@ class SettingsPage extends ConsumerWidget {
                 SizedBox(height: AppSpacing.xs),
                 Text('Location-aware review prompts are explicit opt-in and can be disabled at any time.'),
                 SizedBox(height: AppSpacing.xs),
-                Text('Perbug matches on-device location to canonical places and suppresses ambiguous dense-area prompts.'),
+                Text('Dryad matches on-device location to canonical places and suppresses ambiguous dense-area prompts.'),
               ],
             ),
           ),
@@ -234,9 +234,9 @@ class SettingsPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const PerbugLogo(size: 40, variant: PerbugLogoVariant.withWordmark),
+                const DryadLogo(size: 40, variant: DryadLogoVariant.withWordmark),
                 const SizedBox(height: AppSpacing.s),
-                const Text('Perbug helps you discover great places, follow creators, and share real reviews.'),
+                const Text('Dryad helps you discover great places, follow creators, and share real reviews.'),
                 const SizedBox(height: AppSpacing.xs),
                 Text('Version: ${state.appVersion}'),
               ],
@@ -300,8 +300,8 @@ class SettingsPage extends ConsumerWidget {
   }
 
   Future<void> _emailSupport(BuildContext context, String appVersion) async {
-    final subject = Uri.encodeComponent('Perbug support ($appVersion)');
-    final uri = Uri.parse('mailto:alex@perbug.com?subject=$subject');
+    final subject = Uri.encodeComponent('Dryad support ($appVersion)');
+    final uri = Uri.parse('mailto:dryadtoken@gmail.com?subject=$subject');
     final launched = await launchUrl(uri);
     if (!launched && context.mounted) {
       AppSnackbar.show(context, 'Could not open email client.', isError: true);

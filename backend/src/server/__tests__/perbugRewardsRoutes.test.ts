@@ -15,7 +15,7 @@ async function boot() {
   return `http://127.0.0.1:${address.port}`;
 }
 
-describe("perbug reward routes", () => {
+describe("dryad reward routes", () => {
   it("supports reward previews, review approval ladder, and idempotent claims", async () => {
     const baseUrl = await boot();
     const preview = await fetch(`${baseUrl}/v1/places/place-1/reward-preview`);
