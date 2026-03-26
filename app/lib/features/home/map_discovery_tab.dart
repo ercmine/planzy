@@ -343,7 +343,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   bool _topOverlayCollapsed = false;
   bool _statsOverlayCollapsed = false;
   bool _searchAreaOverlayCollapsed = false;
-  bool _selectedPlaceOverlayCollapsed = false;
   bool _is3dMode = false;
   ({double lat, double lng})? _lastMapCenter;
   double? _lastMapZoom;
@@ -398,7 +397,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     final location = locationState.effectiveLocation;
     final connectivityState = ref.watch(connectivityControllerProvider);
     final permissionService = ref.read(locationPermissionServiceProvider);
-    final linkLauncher = ref.read(linkLauncherProvider);
     final economy = ref.watch(economyDashboardProvider).valueOrNull;
     final sponsoredPlacements = ref.watch(
       sponsoredPlacementsProvider((lat: state.viewport.centerLat, lng: state.viewport.centerLng)),
@@ -711,43 +709,10 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
             ),
           ),
         ),
-        if (selected != null)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 20,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: CollapsibleMapOverlay(
-                title: selected.name,
-                isCollapsed: _selectedPlaceOverlayCollapsed,
-                onToggle: () => setState(() => _selectedPlaceOverlayCollapsed = !_selectedPlaceOverlayCollapsed),
-                collapsedChild: Text(
-                  selected.neighborhoodLabel,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: SelectedPlacePeekCard(
-                    place: selected,
-                    proximityState: _proximityFor(selected, location),
-                    distanceMeters: _distanceMeters(location?.lat, location?.lng, selected.latitude, selected.longitude),
-                    saved: _savedPlaceIds.contains(selected.canonicalPlaceId),
-                    onLeaveReview: () => _startReviewFromMap(selected),
-                    onAddVideoReview: () => _startReviewFromMap(selected),
-                    onOpenDetails: () => _openPlaceDetails(selected),
-                    onOpenMaps: () => _openPlaceInMaps(linkLauncher, selected),
-                    onSave: () => _toggleSave(selected),
-                    onShare: () => _sharePlace(selected),
-                  ),
-                ),
-              ),
-            ),
-          ),
         Positioned(
           right: 10,
           top: 192,
-          bottom: selected != null ? 224 : 110,
+          bottom: 110,
           child: _ZoomSliderControl(
             zoom: state.viewport.zoom.clamp(_minMapZoom, _maxMapZoom),
             minZoom: _minMapZoom,
@@ -766,7 +731,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
         ),
         Positioned(
           left: 16,
-          bottom: selected != null ? 210 : 96,
+          bottom: 96,
           child: IgnorePointer(
             ignoring: !_mapReady,
             child: PulsingSearchAreaButton(
