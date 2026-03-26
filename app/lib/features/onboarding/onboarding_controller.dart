@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/identity/identity_provider.dart';
 import '../dryad/chain/dryad_chain_providers.dart';
+import '../dryad/chain/evm_abi.dart';
 import '../dryad/chain/grove_nft_service.dart';
 import 'onboarding_state.dart';
 
@@ -31,6 +32,31 @@ class OnboardingController extends Notifier<OnboardingState> {
     ref.read(walletAddressProvider.notifier).state = value.trim().isEmpty ? null : value.trim();
   }
 
+
+  Future<void> connectWallet() async {
+    final connector = ref.read(walletConnectorProvider);
+    if (!connector.isAvailable) {
+      state = state.copyWith(
+        status: OnboardingFlowStatus.onboardingFailed,
+        errorMessage: 'No browser wallet detected. Install MetaMask (or compatible wallet) in Flutter Web, or paste your wallet manually.',
+      );
+      return;
+    }
+
+    state = state.copyWith(isBusy: true, clearError: true);
+    try {
+      final account = await connector.connectWallet();
+      setWalletAddress(account);
+      state = state.copyWith(isBusy: false, status: OnboardingFlowStatus.walletConnected);
+    } catch (error) {
+      state = state.copyWith(
+        status: OnboardingFlowStatus.onboardingFailed,
+        isBusy: false,
+        errorMessage: 'Wallet connection failed: $error',
+      );
+    }
+  }
+
   Future<void> refreshNftStatus() async {
     if (state.walletAddress.isEmpty) {
       state = state.copyWith(status: OnboardingFlowStatus.walletDisconnected, errorMessage: 'Connect a wallet address first.');
@@ -42,12 +68,14 @@ class OnboardingController extends Notifier<OnboardingState> {
       final service = ref.read(groveNftServiceProvider);
       final snapshot = await service.fetchWalletSnapshot(state.walletAddress);
       final expectedChain = ref.read(dryadContractConfigProvider).chainId;
-      if (snapshot.chainId != expectedChain) {
+      final connector = ref.read(walletConnectorProvider);
+      final activeWalletChain = connector.isAvailable ? await connector.readChainId() : snapshot.chainId;
+      if (activeWalletChain != expectedChain) {
         state = state.copyWith(
           status: OnboardingFlowStatus.wrongNetwork,
           isBusy: false,
           snapshot: snapshot,
-          errorMessage: 'Wrong network. Expected chain ID $expectedChain but RPC returned ${snapshot.chainId}.',
+          errorMessage: 'Wrong network. Expected chain ID $expectedChain but connected wallet is on $activeWalletChain.',
         );
         return;
       }
@@ -68,10 +96,17 @@ class OnboardingController extends Notifier<OnboardingState> {
   Future<void> mintNft() async {
     final service = ref.read(groveNftServiceProvider);
     final config = ref.read(dryadContractConfigProvider);
+    final connector = ref.read(walletConnectorProvider);
     state = state.copyWith(status: OnboardingFlowStatus.mintInProgress, isBusy: true, clearError: true);
 
     try {
-      final txHash = await service.mint(walletAddress: state.walletAddress, methodSignature: config.mintMethodSignature);
+      final txHash = connector.isAvailable
+          ? await connector.sendTransaction(
+              from: state.walletAddress,
+              to: config.groveNftAddress,
+              data: encodeWriteCall(config.mintMethodSignature, walletAddress: state.walletAddress),
+            )
+          : await service.mint(walletAddress: state.walletAddress, methodSignature: config.mintMethodSignature);
       state = state.copyWith(status: OnboardingFlowStatus.mintSucceeded, isBusy: false, txHash: txHash);
       await refreshNftStatus();
     } catch (error) {
@@ -79,7 +114,7 @@ class OnboardingController extends Notifier<OnboardingState> {
         status: OnboardingFlowStatus.onboardingFailed,
         isBusy: false,
         errorMessage:
-            'Mint failed. This app uses eth_sendTransaction and requires a wallet-enabled RPC/provider. Error: $error',
+            'On-chain transaction failed. Connect a browser wallet and approve the request, or provide a wallet-enabled RPC. Error: $error',
       );
     }
   }
