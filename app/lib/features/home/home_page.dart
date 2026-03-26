@@ -7,10 +7,10 @@ import '../dryad/pages/market_page.dart';
 import '../dryad/pages/wallet_page.dart';
 import 'map_discovery_tab.dart';
 
-enum HomeTab { planting, market, grove, wallet, profile }
+enum HomeTab { smartMap, market, grove, wallet, profile }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.initialTab = HomeTab.planting});
+  const HomePage({super.key, this.initialTab = HomeTab.smartMap});
 
   final HomeTab initialTab;
 
@@ -19,7 +19,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const List<HomeTab> _tabs = [HomeTab.planting, HomeTab.market, HomeTab.grove, HomeTab.wallet, HomeTab.profile];
+  static const List<HomeTab> _tabs = [HomeTab.smartMap, HomeTab.market, HomeTab.grove, HomeTab.wallet, HomeTab.profile];
   late int _navIndex;
 
   @override
@@ -47,7 +47,7 @@ class _HomePageState extends State<HomePage> {
         selectedIndex: _navIndex,
         onDestinationSelected: (value) => setState(() => _navIndex = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.spa_outlined), selectedIcon: Icon(Icons.spa), label: 'Planting'),
+          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Smart Map'),
           NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Marketplace'),
           NavigationDestination(icon: Icon(Icons.forest_outlined), selectedIcon: Icon(Icons.forest), label: 'My Trees'),
           NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
