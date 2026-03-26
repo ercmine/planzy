@@ -21,6 +21,8 @@ Perbug mobile clients **must only call backend geo endpoints**. The backend is t
 - `GET /api/geo/reverse`
 - `GET /api/geo/autocomplete`
 - `GET /api/geo/nearby` (discovery-backed)
+- `GET /api/geo/health`
+- `GET /api/geo/debug/status`
 
 The payloads are Perbug-friendly DTOs (`PerbugGeoPlace`) and are intentionally stable for mobile clients.
 
@@ -41,7 +43,15 @@ The payloads are Perbug-friendly DTOs (`PerbugGeoPlace`) and are intentionally s
 - `GEO_SERVICE_RETRIES`
 - `GEO_SERVICE_AUTH_SECRET`
 - `GEO_PUBLIC_RATE_LIMIT_PER_MINUTE`
+- `GEO_REQUIRED` (defaults to true in prod; startup fails fast if geo is disabled/misconfigured)
 - `NOMINATIM_*` fallback env values for local mode
+
+On startup, backend logs a structured `[geo.startup]` event with:
+
+- mode (`remote` | `local` | `disabled`)
+- effective upstream URL
+- env validation warnings/errors
+- whether routes are mounted
 
 ## Security model
 

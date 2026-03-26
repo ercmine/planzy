@@ -48,10 +48,12 @@ class ApiClient {
                 .map((entry) => MapEntry(entry.key, entry.value!)),
           );
 
-    return Uri.https(
-      base.authority,
-      '${base.path}$normalizedPath',
-      sanitized.isEmpty ? null : sanitized,
+    final mergedPath = '${base.path}${normalizedPath}'
+        .replaceAll('//', '/')
+        .replaceAllMapped(RegExp(r'/{2,}'), (_) => '/');
+    return base.replace(
+      path: mergedPath,
+      queryParameters: sanitized.isEmpty ? null : sanitized,
     );
   }
 

@@ -179,4 +179,23 @@ void main() {
     );
   });
 
+  test('buildUri preserves scheme, port, and base path', () async {
+    const localEnv = EnvConfig(
+      flavor: EnvFlavor.dev,
+      apiBaseUrl: 'http://localhost:8080/api',
+      enableDebugLogs: true,
+      associatedDomain: 'localhost',
+      fsqApiKey: null,
+      adsConfig: AdsConfig(enabled: false, admobAppIdIos: '', admobAppIdAndroid: '', nativeUnitIdIos: '', nativeUnitIdAndroid: '', frequencyN: 10, placeFirstAfter: 3, maxAdsPerWindow: 3, adsWindowSize: 50),
+    );
+    final client = ApiClient(
+      httpClient: MockClient((request) async => http.Response(jsonEncode({'ok': true}), 200)),
+      envConfig: localEnv,
+      userIdResolver: () async => 'user-1',
+    );
+
+    final uri = client.buildUri('/geo/health', {'debug': '1'});
+    expect(uri.toString(), 'http://localhost:8080/api/geo/health?debug=1');
+  });
+
 }

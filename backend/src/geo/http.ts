@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { searchCanonicalPlacesInBounds } from "../places/mapDiscovery.js";
+import type { CanonicalPlace } from "../places/types.js";
 import { parseJsonBody, sendJson } from "../venues/claims/http.js";
 import type { GeoGateway } from "./gateway.js";
 import type { GeoBounds, GeoGeocodeRequest, GeoResult, GeoReverseResult, PerbugGeoPlace } from "./contracts.js";
@@ -7,6 +9,14 @@ import { assertGeoAuth } from "./middleware.js";
 
 interface RateLimitOptions {
   maxRequestsPerMinute: number;
+}
+
+export interface GeoRuntimeStatus {
+  mode: "remote" | "local" | "disabled";
+  routesMounted: boolean;
+  upstreamBaseUrl?: string;
+  envValidationErrors: string[];
+  envValidationWarnings: string[];
 }
 
 class InMemoryGeoRateLimiter {
@@ -92,7 +102,47 @@ function toBoundsFromRadius(lat: number, lng: number, radiusMeters: number): Geo
   };
 }
 
-export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret?: string; rateLimitPerMinute?: number } = {}) {
+function normalizeCanonicalPlace(place: ReturnType<typeof searchCanonicalPlacesInBounds>[number]): PerbugGeoPlace {
+  return {
+    id: place.canonicalPlaceId,
+    name: place.name,
+    displayName: place.name,
+    shortAddress: [place.city, place.region].filter(Boolean).join(", ") || undefined,
+    lat: place.latitude,
+    lon: place.longitude,
+    category: place.category,
+    city: place.city,
+    region: place.region,
+    source: "nominatim",
+    importance: place.rating,
+    match: {
+      knownPlace: true,
+      internalPlaceId: place.canonicalPlaceId,
+      rewardEnabled: false,
+      sponsored: false,
+      hasReviews: place.reviewCount > 0,
+      checkInEligible: true
+    }
+  };
+}
+
+function geoUnavailablePayload(status: GeoRuntimeStatus) {
+  return {
+    error: "geo_unavailable",
+    message: "Geo service is not configured on this deployment.",
+    status
+  };
+}
+
+export function createGeoHttpHandlers(
+  gateway: GeoGateway | null,
+  options: {
+    authSecret?: string;
+    rateLimitPerMinute?: number;
+    listCanonicalPlaces?: () => CanonicalPlace[];
+    getStatus?: () => GeoRuntimeStatus;
+  } = {}
+) {
   const limiter = new InMemoryGeoRateLimiter({ maxRequestsPerMinute: Math.max(30, options.rateLimitPerMinute ?? 180) });
 
   const requireAuth = (req: IncomingMessage): boolean => {
@@ -115,8 +165,23 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
     return true;
   };
 
+  const status = () => options.getStatus?.() ?? {
+    mode: gateway ? "remote" : "disabled",
+    routesMounted: true,
+    envValidationErrors: gateway ? [] : ["geo gateway unavailable"],
+    envValidationWarnings: []
+  };
+
+  const getGatewayOrRespond = (res: ServerResponse): GeoGateway | null => {
+    if (gateway) return gateway;
+    sendJson(res, 503, geoUnavailablePayload(status()));
+    return null;
+  };
+
   return {
     async geocode(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const activeGateway = getGatewayOrRespond(res);
+      if (!activeGateway) return;
       if (!requireAuth(req)) {
         sendJson(res, 401, { error: "geo_service_unauthorized" });
         return;
@@ -130,7 +195,7 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
           ? body.countryCodes.split(",").map((v) => v.trim()).filter(Boolean)
           : Array.isArray(body.countryCodes) ? body.countryCodes.map((value) => String(value)) : undefined;
 
-        const results = await gateway.geocode({
+        const results = await activeGateway.geocode({
           query: String(body.q ?? body.query ?? ""),
           limit: body.limit ? Number(body.limit) : undefined,
           language: body.language ? String(body.language) : undefined,
@@ -143,6 +208,8 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
     },
 
     async reverseGeocode(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const activeGateway = getGatewayOrRespond(res);
+      if (!activeGateway) return;
       if (!requireAuth(req)) {
         sendJson(res, 401, { error: "geo_service_unauthorized" });
         return;
@@ -152,7 +219,7 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
           ? Object.fromEntries(new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`).searchParams.entries())
           : (await parseJsonBody(req)) as Record<string, unknown>;
 
-        const result = await gateway.reverseGeocode({
+        const result = await activeGateway.reverseGeocode({
           lat: Number(body.lat),
           lng: Number(body.lng),
           zoom: body.zoom ? Number(body.zoom) : undefined,
@@ -165,6 +232,8 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
     },
 
     async apiSearch(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const activeGateway = getGatewayOrRespond(res);
+      if (!activeGateway) return;
       if (!guardPublicEndpoint(req, res)) return;
       try {
         const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -180,8 +249,9 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
           countryCodes: (url.searchParams.get("countryCodes") ?? "").split(",").map((v) => v.trim()).filter(Boolean),
           bounds: parseBounds(Object.fromEntries(url.searchParams.entries()))
         };
-        const results = await gateway.geocode(request);
-        console.info("[geo.api.search]", { query, limit: request.limit, resultCount: results.length });
+        const startedAt = Date.now();
+        const results = await activeGateway.geocode(request);
+        console.info("[geo.api.search]", { query, limit: request.limit, resultCount: results.length, latencyMs: Date.now() - startedAt });
         sendJson(res, 200, { results: results.map(normalizePlace) });
       } catch (error) {
         console.warn("[geo.api.search.error]", { error: error instanceof Error ? error.message : String(error) });
@@ -190,6 +260,8 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
     },
 
     async apiReverse(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const activeGateway = getGatewayOrRespond(res);
+      if (!activeGateway) return;
       if (!guardPublicEndpoint(req, res)) return;
       try {
         const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -199,8 +271,9 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
           sendJson(res, 400, { error: "invalid_coordinates", message: "lat and lon are required numbers" });
           return;
         }
-        const result = await gateway.reverseGeocode({ lat, lng, language: url.searchParams.get("language") ?? undefined });
-        console.info("[geo.api.reverse]", { lat, lng, hasResult: Boolean(result.displayName) });
+        const startedAt = Date.now();
+        const result = await activeGateway.reverseGeocode({ lat, lng, language: url.searchParams.get("language") ?? undefined });
+        console.info("[geo.api.reverse]", { lat, lng, hasResult: Boolean(result.displayName), latencyMs: Date.now() - startedAt });
         sendJson(res, 200, { result: normalizePlace(result, 0) });
       } catch (error) {
         console.warn("[geo.api.reverse.error]", { error: error instanceof Error ? error.message : String(error) });
@@ -209,6 +282,8 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
     },
 
     async apiAutocomplete(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const activeGateway = getGatewayOrRespond(res);
+      if (!activeGateway) return;
       if (!guardPublicEndpoint(req, res)) return;
       try {
         const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -217,7 +292,8 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
           sendJson(res, 400, { error: "invalid_query", message: "q must be at least 2 characters" });
           return;
         }
-        const suggestions = await gateway.autocomplete({
+        const startedAt = Date.now();
+        const suggestions = await activeGateway.autocomplete({
           query,
           limit: toNumber(url.searchParams.get("limit")) ?? 8,
           language: url.searchParams.get("language") ?? undefined,
@@ -227,7 +303,7 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
             lng: toNumber(url.searchParams.get("lon") ?? url.searchParams.get("lng"))
           }
         });
-        console.info("[geo.api.autocomplete]", { query, count: suggestions.length });
+        console.info("[geo.api.autocomplete]", { query, count: suggestions.length, latencyMs: Date.now() - startedAt });
         sendJson(res, 200, { suggestions });
       } catch (error) {
         console.warn("[geo.api.autocomplete.error]", { error: error instanceof Error ? error.message : String(error) });
@@ -236,6 +312,8 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
     },
 
     async apiNearby(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const activeGateway = getGatewayOrRespond(res);
+      if (!activeGateway) return;
       if (!guardPublicEndpoint(req, res)) return;
       try {
         const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
@@ -248,37 +326,65 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
 
         const radiusMeters = Math.max(200, Math.min(25_000, toNumber(url.searchParams.get("radius")) ?? 3_500));
         const limit = Math.max(1, Math.min(120, toNumber(url.searchParams.get("limit")) ?? 60));
-        const categoryTokens = (url.searchParams.get("categories") ?? "").split(",").map((item) => item.trim()).filter(Boolean);
-        const area = await gateway.reverseGeocode({ lat, lng, language: url.searchParams.get("language") ?? undefined });
-        const baseQuery = [area.neighborhood, area.city, area.state].filter((item) => Boolean(item && item.trim().length > 0)).join(" ");
-        const searchQueries = categoryTokens.length === 0
-          ? [baseQuery || area.displayName]
-          : categoryTokens.map((token) => `${token} ${baseQuery || area.displayName}`.trim());
+        const categories = (url.searchParams.get("categories") ?? "").split(",").map((item) => item.trim()).filter(Boolean);
         const bounds = toBoundsFromRadius(lat, lng, radiusMeters);
-        const rows: GeoResult[] = [];
-        for (const query of searchQueries) {
-          if (!query || rows.length >= limit) break;
-          const results = await gateway.geocode({
-            query,
-            bounds,
-            language: url.searchParams.get("language") ?? undefined,
-            limit: Math.max(6, Math.ceil(limit / Math.max(1, searchQueries.length)))
-          });
-          rows.push(...results);
+
+        const canonicalPlaces = searchCanonicalPlacesInBounds(options.listCanonicalPlaces?.() ?? [], {
+          bounds,
+          categories,
+          centerLat: lat,
+          centerLng: lng,
+          limit
+        });
+
+        const fallbackNeeded = canonicalPlaces.length < Math.min(limit, 12);
+        const fallbackRows: GeoResult[] = [];
+
+        if (fallbackNeeded) {
+          const area = await activeGateway.reverseGeocode({ lat, lng, language: url.searchParams.get("language") ?? undefined });
+          const baseQuery = [area.neighborhood, area.city, area.state].filter((item) => Boolean(item && item.trim().length > 0)).join(" ");
+          const searchQueries = categories.length === 0
+            ? [baseQuery || area.displayName]
+            : categories.map((token) => `${token} ${baseQuery || area.displayName}`.trim());
+          for (const query of searchQueries) {
+            if (!query || fallbackRows.length >= limit) break;
+            const results = await activeGateway.geocode({
+              query,
+              bounds,
+              language: url.searchParams.get("language") ?? undefined,
+              limit: Math.max(6, Math.ceil(limit / Math.max(1, searchQueries.length)))
+            });
+            fallbackRows.push(...results);
+          }
         }
 
-        const deduped = new Map<string, GeoResult>();
-        for (const row of rows) {
+        const deduped = new Map<string, PerbugGeoPlace>();
+        for (const place of canonicalPlaces) {
+          deduped.set(`${place.name.toLowerCase()}|${place.latitude.toFixed(5)}|${place.longitude.toFixed(5)}`, normalizeCanonicalPlace(place));
+        }
+        for (const [index, row] of fallbackRows.entries()) {
           const key = `${row.displayName.toLowerCase()}|${row.lat.toFixed(5)}|${row.lng.toFixed(5)}`;
-          if (!deduped.has(key)) deduped.set(key, row);
+          if (!deduped.has(key)) deduped.set(key, normalizePlace(row, index));
           if (deduped.size >= limit) break;
         }
-        const places = [...deduped.values()].slice(0, limit).map(normalizePlace);
-        console.info("[geo.api.nearby]", { lat, lng, radiusMeters, categoryCount: categoryTokens.length, resultCount: places.length });
+
+        const places = [...deduped.values()].slice(0, limit);
+        console.info("[geo.api.nearby]", {
+          lat,
+          lng,
+          radiusMeters,
+          categoryCount: categories.length,
+          sourceCounts: { canonical: canonicalPlaces.length, fallback: fallbackRows.length },
+          resultCount: places.length
+        });
         sendJson(res, 200, {
           origin: { lat, lng },
           radiusMeters,
-          places
+          places,
+          sourceBreakdown: {
+            canonicalCount: canonicalPlaces.length,
+            geoFallbackCount: fallbackRows.length
+          }
         });
       } catch (error) {
         console.warn("[geo.api.nearby.error]", { error: error instanceof Error ? error.message : String(error) });
@@ -287,13 +393,15 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
     },
 
     async autocomplete(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const activeGateway = getGatewayOrRespond(res);
+      if (!activeGateway) return;
       if (!requireAuth(req)) {
         sendJson(res, 401, { error: "geo_service_unauthorized" });
         return;
       }
       try {
         const body = (await parseJsonBody(req)) as Record<string, unknown>;
-        const suggestions = await gateway.autocomplete({
+        const suggestions = await activeGateway.autocomplete({
           query: String(body.q ?? body.query ?? ""),
           limit: body.limit ? Number(body.limit) : undefined,
           language: body.language ? String(body.language) : undefined,
@@ -312,13 +420,15 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
     },
 
     async placeLookup(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const activeGateway = getGatewayOrRespond(res);
+      if (!activeGateway) return;
       if (!requireAuth(req)) {
         sendJson(res, 401, { error: "geo_service_unauthorized" });
         return;
       }
       try {
         const body = (await parseJsonBody(req)) as Record<string, unknown>;
-        const candidates = await gateway.placeLookup({
+        const candidates = await activeGateway.placeLookup({
           query: String(body.q ?? body.query ?? ""),
           limit: body.limit ? Number(body.limit) : undefined,
           language: body.language ? String(body.language) : undefined
@@ -330,13 +440,15 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
     },
 
     async areaContext(req: IncomingMessage, res: ServerResponse): Promise<void> {
+      const activeGateway = getGatewayOrRespond(res);
+      if (!activeGateway) return;
       if (!requireAuth(req)) {
         sendJson(res, 401, { error: "geo_service_unauthorized" });
         return;
       }
       try {
         const body = (await parseJsonBody(req)) as Record<string, unknown>;
-        const context = await gateway.areaContext({
+        const context = await activeGateway.areaContext({
           lat: Number(body.lat),
           lng: Number(body.lng),
           language: body.language ? String(body.language) : undefined
@@ -348,22 +460,42 @@ export function createGeoHttpHandlers(gateway: GeoGateway, options: { authSecret
     },
 
     async health(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+      if (!gateway) {
+        sendJson(res, 503, { ok: false, mode: status().mode, version: "1.0.0", status: status() });
+        return;
+      }
       const payload = await gateway.health();
-      sendJson(res, payload.ok ? 200 : 503, payload);
+      sendJson(res, payload.ok ? 200 : 503, { ...payload, status: status() });
+    },
+
+    async debugStatus(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+      sendJson(res, gateway ? 200 : 503, {
+        ok: Boolean(gateway),
+        gatewayAvailable: Boolean(gateway),
+        status: status()
+      });
     },
 
     async ready(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+      if (!gateway) {
+        sendJson(res, 503, { ok: false, ready: false, mode: status().mode, status: status() });
+        return;
+      }
       const payload = await gateway.health();
-      sendJson(res, payload.ok ? 200 : 503, { ok: payload.ok, ready: payload.ok, mode: payload.mode });
+      sendJson(res, payload.ok ? 200 : 503, { ok: payload.ok, ready: payload.ok, mode: payload.mode, status: status() });
     },
 
     async version(_req: IncomingMessage, res: ServerResponse): Promise<void> {
-      sendJson(res, 200, { service: "perbug-geo", version: "1.0.0" });
+      sendJson(res, 200, { service: "perbug-geo", version: "1.0.0", status: status() });
     },
 
     async metrics(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+      if (!gateway) {
+        sendJson(res, 503, { service: "perbug-geo", metrics: null, upstream: null, status: status() });
+        return;
+      }
       const payload = await gateway.health();
-      sendJson(res, 200, { service: "perbug-geo", metrics: payload.metrics ?? null, upstream: payload.upstream ?? null });
+      sendJson(res, 200, { service: "perbug-geo", metrics: payload.metrics ?? null, upstream: payload.upstream ?? null, status: status() });
     }
   };
 }

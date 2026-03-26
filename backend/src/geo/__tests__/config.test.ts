@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readGeoRuntimeConfig } from "../config.js";
+import { readGeoRuntimeConfig, validateGeoRuntimeConfig } from "../config.js";
 
 describe("readGeoRuntimeConfig", () => {
   it("parses remote geo settings", () => {
@@ -18,5 +18,15 @@ describe("readGeoRuntimeConfig", () => {
     expect(config.client.retries).toBe(2);
     expect(config.client.failOpen).toBe(false);
     expect(config.client.authSecret).toBe("secret");
+  });
+
+  it("flags disabled geo in production", () => {
+    const config = readGeoRuntimeConfig({
+      APP_ENV: "prod"
+    });
+    const validation = validateGeoRuntimeConfig(config, { APP_ENV: "prod" });
+    expect(validation.mode).toBe("disabled");
+    expect(validation.shouldFailFast).toBe(true);
+    expect(validation.errors.length).toBeGreaterThan(0);
   });
 });

@@ -138,6 +138,12 @@ describe("server diagnostic and alias routes", () => {
       service: "perbug-api",
       version: "1.0.0"
     });
+
+    const geoHealthResponse = await fetch(`${baseUrl}/api/geo/health`);
+    expect([200, 503]).toContain(geoHealthResponse.status);
+    await expect(geoHealthResponse.json()).resolves.toMatchObject({
+      status: expect.any(Object)
+    });
   });
 
 

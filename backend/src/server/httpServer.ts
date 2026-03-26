@@ -30,6 +30,7 @@ import type { AnalyticsQueryService } from "../analytics/queryService.js";
 import type { AnalyticsService } from "../analytics/service.js";
 import type { RolloutService } from "../rollouts/service.js";
 import type { GeoGateway } from "../geo/gateway.js";
+import type { BackendGeoRuntime } from "../geo/gateway.js";
 import type { VideoPlatformService } from "../videoPlatform/service.js";
 import type { TrustSafetyService } from "../trustSafety/service.js";
 import type { OnboardingHttpHandlers } from "../onboarding/http.js";
@@ -108,6 +109,7 @@ export function createHttpServer(
     analyticsQueryService?: AnalyticsQueryService;
     rolloutService?: RolloutService;
     geoGateway?: GeoGateway;
+    geoStatus?: BackendGeoRuntime;
     videoPlatformService?: VideoPlatformService;
     onboardingHandlers?: OnboardingHttpHandlers;
     accomplishmentsService?: AccomplishmentsService;

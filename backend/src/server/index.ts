@@ -46,7 +46,7 @@ import { SubscriptionService } from "../subscriptions/service.js";
 import { MemoryUsageStore } from "../subscriptions/usage.js";
 import { TelemetryService } from "../telemetry/telemetryService.js";
 import { createSavedHttpHandlers } from "../saved/http.js";
-import { createBackendGeoGatewayFromEnv } from "../geo/gateway.js";
+import { initBackendGeoRuntime } from "../geo/gateway.js";
 import { SavedService } from "../saved/service.js";
 import { MemorySavedStore } from "../saved/store.js";
 import { createPlaceContentHttpHandlers, MemoryPlaceContentStore, PlaceContentService } from "../placeContent/index.js";
@@ -215,7 +215,14 @@ export function createServer(options?: CreateServerOptions) {
     logger: options?.logger
   });
   const rolloutService = new RolloutService(new MemoryRolloutStore(rolloutSeedForLocalDev()), accountsService, subscriptionService);
-  const geoGateway = createBackendGeoGatewayFromEnv();
+  const geoRuntime = initBackendGeoRuntime();
+  console.info("[geo.startup]", {
+    mode: geoRuntime.mode,
+    routesMounted: geoRuntime.routesMounted,
+    upstreamBaseUrl: geoRuntime.upstreamBaseUrl ?? null,
+    validationErrors: geoRuntime.validationErrors,
+    validationWarnings: geoRuntime.validationWarnings
+  });
   videoPlatformService = new VideoPlatformService(
     new MemoryVideoPlatformStore(),
     { exists: (placeId) => Boolean(placeService.getCanonicalPlace(placeId)) },
@@ -319,7 +326,8 @@ export function createServer(options?: CreateServerOptions) {
     analyticsService,
     analyticsQueryService,
     rolloutService,
-    geoGateway: geoGateway ?? undefined,
+    geoGateway: geoRuntime.gateway ?? undefined,
+    geoStatus: geoRuntime,
     videoPlatformService,
     onboardingHandlers: createOnboardingHttpHandlers(onboardingService),
     accomplishmentsService,
