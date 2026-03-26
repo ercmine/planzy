@@ -6,6 +6,9 @@ import '../chain/dryad_chain_providers.dart';
 import '../dryad_providers.dart';
 import '../models/dryad_models.dart';
 
+const _digUpFeeWei = '100000000000000000';
+const _digUpRecipient = '0xB7cfa0de6975311DD0fFF05f71FD2110caC0B227';
+
 class DryadTreePage extends ConsumerWidget {
   const DryadTreePage({super.key, required this.treeId});
 
@@ -40,9 +43,13 @@ class DryadTreePage extends ConsumerWidget {
                     const SizedBox(height: 6),
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       AppPill(label: tree.statusLabel, icon: Icons.park_outlined),
+                      AppPill(label: tree.lifecycleLabel, icon: Icons.sync_alt_outlined),
                       AppPill(label: 'Owner ${tree.ownerHandle}', icon: Icons.person_outline),
+                      if (tree.isPortable) const AppPill(label: 'Portable', icon: Icons.luggage_outlined),
                       if (tree.isListed) AppPill(label: '${tree.priceEth?.toStringAsFixed(2)} ETH', icon: Icons.sell_outlined),
                     ]),
+                    const SizedBox(height: 8),
+                    Text('Spot: ${tree.currentSpotId ?? 'Not planted'}'),
                   ],
                 ),
               ),
@@ -58,45 +65,162 @@ class DryadTreePage extends ConsumerWidget {
   }
 }
 
-class _Actions extends ConsumerWidget {
+class _Actions extends ConsumerStatefulWidget {
   const _Actions({required this.tree, required this.wallet});
 
   final DryadTree tree;
   final String? wallet;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    Future<void> claimAndPlant() async {
-      if (wallet == null) return;
-      final repo = await ref.read(dryadRepositoryProvider.future);
-      await repo.claimAndPlant(tree.id, wallet: wallet!);
-      ref.invalidate(treeDetailProvider(tree.id));
-      ref.invalidate(plantingTreesProvider);
-    }
+  ConsumerState<_Actions> createState() => _ActionsState();
+}
 
-    Future<void> buy() async {
-      if (wallet == null) return;
-      final repo = await ref.read(dryadRepositoryProvider.future);
-      await repo.buyTree(tree.id, buyerWallet: wallet!);
-      ref.invalidate(treeDetailProvider(tree.id));
-      ref.invalidate(marketplaceTreesProvider);
-    }
+class _ActionsState extends ConsumerState<_Actions> {
+  bool _isProcessing = false;
 
-    Future<void> list() async {
-      if (wallet == null) return;
-      final repo = await ref.read(dryadRepositoryProvider.future);
-      await repo.listTree(tree.id, wallet: wallet!, priceEth: tree.priceEth ?? 0.2);
-      ref.invalidate(treeDetailProvider(tree.id));
-      ref.invalidate(marketplaceTreesProvider);
-    }
+  Future<void> _claimAndPlant() async {
+    if (widget.wallet == null) return;
+    final repo = await ref.read(dryadRepositoryProvider.future);
+    await repo.claimAndPlant(widget.tree.id, wallet: widget.wallet!);
+    _refresh();
+  }
 
-    Future<void> unlist() async {
-      if (wallet == null) return;
+  Future<void> _buy() async {
+    if (widget.wallet == null) return;
+    final repo = await ref.read(dryadRepositoryProvider.future);
+    await repo.buyTree(widget.tree.id, buyerWallet: widget.wallet!);
+    _refresh();
+  }
+
+  Future<void> _list() async {
+    if (widget.wallet == null) return;
+    final repo = await ref.read(dryadRepositoryProvider.future);
+    await repo.listTree(widget.tree.id, wallet: widget.wallet!, priceEth: widget.tree.priceEth ?? 0.2);
+    _refresh();
+  }
+
+  Future<void> _unlist() async {
+    if (widget.wallet == null) return;
+    final repo = await ref.read(dryadRepositoryProvider.future);
+    await repo.unlistTree(widget.tree.id, wallet: widget.wallet!);
+    _refresh();
+  }
+
+  Future<void> _digUp() async {
+    final wallet = widget.wallet;
+    if (wallet == null) return;
+    setState(() => _isProcessing = true);
+
+    try {
+      final config = ref.read(dryadContractConfigProvider);
+      final connector = ref.read(walletConnectorProvider);
       final repo = await ref.read(dryadRepositoryProvider.future);
-      await repo.unlistTree(tree.id, wallet: wallet!);
-      ref.invalidate(treeDetailProvider(tree.id));
-      ref.invalidate(marketplaceTreesProvider);
+
+      if (!connector.isAvailable) throw StateError('Connect a browser wallet first.');
+      final connectedChainId = await connector.readChainId();
+      if (connectedChainId != config.chainId) throw StateError('Wrong network. Switch to chain ${config.chainId}.');
+
+      final eligibility = await repo.digUpEligibility(widget.tree.id, wallet: wallet);
+      if (eligibility['eligible'] != true) throw StateError('Tree is not eligible: ${eligibility['reason'] ?? 'unknown'}');
+
+      final intent = await repo.createDigUpIntent(widget.tree.id, wallet: wallet, chainId: config.chainId);
+      final txHash = await connector.sendTransaction(
+        from: wallet,
+        to: _digUpRecipient,
+        data: '0x',
+        valueHex: '0x${BigInt.parse(_digUpFeeWei).toRadixString(16)}',
+      );
+
+      await repo.confirmDigUpIntent(
+        intentId: (intent['intentId'] ?? '').toString(),
+        paymentTxHash: txHash,
+        from: wallet,
+        to: _digUpRecipient,
+        valueWei: _digUpFeeWei,
+        chainId: config.chainId,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dig-up confirmed. Tree is now portable and ready to replant.')));
+      _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Dig-up failed: $error')));
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  Future<void> _startReplant() async {
+    final wallet = widget.wallet;
+    if (wallet == null) return;
+    setState(() => _isProcessing = true);
+    try {
+      final repo = await ref.read(dryadRepositoryProvider.future);
+      final spots = await repo.fetchUnclaimedSpots();
+      final available = spots.where((spot) => spot.isUnclaimed).toList(growable: false);
+      if (available.isEmpty) throw StateError('No unclaimed spots available.');
+
+      String? selected = available.first.spotId;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Replant tree'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Select an unclaimed spot for this portable tree.'),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selected,
+                  items: available
+                      .map((spot) => DropdownMenuItem<String>(
+                            value: spot.spotId,
+                            child: Text('${spot.label} (${spot.spotId})'),
+                          ))
+                      .toList(growable: false),
+                  onChanged: (value) => setDialogState(() => selected = value),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm replant')),
+            ],
+          ),
+        ),
+      );
+      if (confirmed != true || selected == null) return;
+
+      final intentId = await repo.createReplantIntent(treeId: widget.tree.id, wallet: wallet, nextSpotId: selected!);
+      await repo.confirmReplantIntent(intentId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Replant complete. Tree has a new planted location.')));
+      _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Replant failed: $error')));
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  void _refresh() {
+    ref.invalidate(treeDetailProvider(widget.tree.id));
+    ref.invalidate(marketplaceTreesProvider);
+    ref.invalidate(plantingTreesProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canDigUp = widget.wallet != null &&
+        widget.tree.ownerHandle.toLowerCase() == widget.wallet!.toLowerCase() &&
+        !widget.tree.isPortable &&
+        !widget.tree.isListed;
+
+    final canReplant = widget.wallet != null &&
+        widget.tree.ownerHandle.toLowerCase() == widget.wallet!.toLowerCase() &&
+        widget.tree.readyToReplant;
 
     return AppCard(
       child: Column(
@@ -109,18 +233,31 @@ class _Actions extends ConsumerWidget {
             runSpacing: 8,
             children: [
               FilledButton.icon(
-                onPressed: wallet == null || tree.claimState == TreeClaimState.unavailable ? null : claimAndPlant,
+                onPressed: _isProcessing || widget.wallet == null || widget.tree.claimState == TreeClaimState.unavailable ? null : _claimAndPlant,
                 icon: const Icon(Icons.forest_outlined),
                 label: const Text('CLAIM AND PLANT'),
               ),
-              if (tree.isListed)
-                FilledButton.icon(onPressed: wallet == null ? null : buy, icon: const Icon(Icons.shopping_cart_checkout), label: const Text('Buy')),
-              if (!tree.isListed)
-                OutlinedButton.icon(onPressed: wallet == null ? null : list, icon: const Icon(Icons.sell_outlined), label: const Text('List tree')),
-              if (tree.isListed)
-                OutlinedButton.icon(onPressed: wallet == null ? null : unlist, icon: const Icon(Icons.cancel_outlined), label: const Text('Unlist')),
+              if (widget.tree.isListed)
+                FilledButton.icon(onPressed: _isProcessing || widget.wallet == null ? null : _buy, icon: const Icon(Icons.shopping_cart_checkout), label: const Text('Buy')),
+              if (!widget.tree.isListed)
+                OutlinedButton.icon(onPressed: _isProcessing || widget.wallet == null ? null : _list, icon: const Icon(Icons.sell_outlined), label: const Text('List tree')),
+              if (widget.tree.isListed)
+                OutlinedButton.icon(onPressed: _isProcessing || widget.wallet == null ? null : _unlist, icon: const Icon(Icons.cancel_outlined), label: const Text('Unlist')),
+              FilledButton.icon(
+                onPressed: _isProcessing || !canDigUp ? null : _digUp,
+                icon: const Icon(Icons.grass_outlined),
+                label: const Text('DIG UP (0.1 ETH)'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _isProcessing || !canReplant ? null : _startReplant,
+                icon: const Icon(Icons.my_location_outlined),
+                label: const Text('Replant'),
+              ),
             ],
           ),
+          if (_isProcessing) ...const [SizedBox(height: 8), LinearProgressIndicator()],
+          const SizedBox(height: 8),
+          const Text('Dig up sends exactly 0.1 ETH to 0xB7cfa0de6975311DD0fFF05f71FD2110caC0B227.'),
         ],
       ),
     );

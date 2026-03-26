@@ -1,11 +1,34 @@
 export type TreeId = string;
 export type WalletAddress = `0x${string}`;
 
+export type TreeLifecycleState = "planted" | "listed" | "sold" | "dug_up" | "ready_to_replant" | "replanted";
+export type SpotClaimState = "unclaimed" | "claimed" | "reserved";
+
 export interface PlaceRef {
   readonly placeId: string;
   readonly label: string;
   readonly lat: number;
   readonly lng: number;
+}
+
+export interface SpotRef {
+  readonly spotId: string;
+  readonly placeId: string;
+  readonly label: string;
+  readonly lat: number;
+  readonly lng: number;
+  readonly claimState: SpotClaimState;
+}
+
+export interface TreeLifecycleEvent {
+  readonly eventId: string;
+  readonly treeId: TreeId;
+  readonly state: TreeLifecycleState;
+  readonly action: string;
+  readonly at: string;
+  readonly initiatedBy: WalletAddress;
+  readonly txHash?: `0x${string}`;
+  readonly details?: string;
 }
 
 export interface DryadTree {
@@ -18,6 +41,48 @@ export interface DryadTree {
   readonly contributionCount: number;
   readonly listedPriceEth?: string;
   readonly listedPriceDryad?: string;
+  readonly lifecycleState?: TreeLifecycleState;
+  readonly portable?: boolean;
+  readonly currentSpotId?: string;
+  readonly dugUpAt?: string;
+  readonly digUpFeeWei?: string;
+  readonly digUpTxHash?: `0x${string}`;
+}
+
+export interface DigUpEligibility {
+  readonly treeId: TreeId;
+  readonly wallet: WalletAddress;
+  readonly eligible: boolean;
+  readonly reason?: string;
+  readonly feeWei: string;
+  readonly feeEth: string;
+  readonly recipient: WalletAddress;
+}
+
+export interface DigUpIntent {
+  readonly intentId: string;
+  readonly treeId: TreeId;
+  readonly ownerWallet: WalletAddress;
+  readonly chainId: number;
+  readonly feeWei: string;
+  readonly feeRecipient: WalletAddress;
+  readonly status: "created" | "pending_confirmation" | "confirmed" | "failed";
+  readonly createdAt: string;
+  readonly paymentTxHash?: `0x${string}`;
+  readonly paymentConfirmedAt?: string;
+  readonly failureReason?: string;
+}
+
+export interface ReplantIntent {
+  readonly intentId: string;
+  readonly treeId: TreeId;
+  readonly ownerWallet: WalletAddress;
+  readonly currentSpotId: string;
+  readonly nextSpotId: string;
+  readonly status: "created" | "confirmed" | "failed";
+  readonly createdAt: string;
+  readonly confirmedAt?: string;
+  readonly failureReason?: string;
 }
 
 export interface PlantEligibility {

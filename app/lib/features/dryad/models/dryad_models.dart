@@ -4,6 +4,8 @@ enum TreeSaleStatus { notListed, listed, sold }
 
 enum TreeClaimState { claimable, claimed, planted, unavailable }
 
+enum TreeLifecycleState { planted, listed, sold, dugUp, readyToReplant, replanted }
+
 @immutable
 class DryadTree {
   const DryadTree({
@@ -21,9 +23,13 @@ class DryadTree {
     required this.category,
     required this.saleStatus,
     required this.claimState,
+    required this.lifecycleState,
+    required this.isPortable,
+    this.currentSpotId,
     this.priceEth,
     this.priceDryad,
     this.treeImageUrl,
+    this.digUpTxHash,
   });
 
   final String id;
@@ -40,11 +46,16 @@ class DryadTree {
   final String category;
   final TreeSaleStatus saleStatus;
   final TreeClaimState claimState;
+  final TreeLifecycleState lifecycleState;
+  final bool isPortable;
+  final String? currentSpotId;
   final double? priceEth;
   final double? priceDryad;
   final String? treeImageUrl;
+  final String? digUpTxHash;
 
   bool get isListed => saleStatus == TreeSaleStatus.listed;
+  bool get readyToReplant => isPortable || lifecycleState == TreeLifecycleState.readyToReplant;
 
   String get statusLabel {
     switch (claimState) {
@@ -56,6 +67,23 @@ class DryadTree {
         return 'Planted';
       case TreeClaimState.unavailable:
         return 'Unavailable';
+    }
+  }
+
+  String get lifecycleLabel {
+    switch (lifecycleState) {
+      case TreeLifecycleState.planted:
+        return 'Planted';
+      case TreeLifecycleState.listed:
+        return 'Listed';
+      case TreeLifecycleState.sold:
+        return 'Sold';
+      case TreeLifecycleState.dugUp:
+        return 'Dug up';
+      case TreeLifecycleState.readyToReplant:
+        return 'Ready to replant';
+      case TreeLifecycleState.replanted:
+        return 'Replanted';
     }
   }
 
@@ -87,6 +115,27 @@ class DryadTree {
         claim = TreeClaimState.claimable;
     }
 
+    TreeLifecycleState lifecycle;
+    switch ((json['lifecycleState'] ?? '').toString()) {
+      case 'listed':
+        lifecycle = TreeLifecycleState.listed;
+        break;
+      case 'sold':
+        lifecycle = TreeLifecycleState.sold;
+        break;
+      case 'dug_up':
+        lifecycle = TreeLifecycleState.dugUp;
+        break;
+      case 'ready_to_replant':
+        lifecycle = TreeLifecycleState.readyToReplant;
+        break;
+      case 'replanted':
+        lifecycle = TreeLifecycleState.replanted;
+        break;
+      default:
+        lifecycle = TreeLifecycleState.planted;
+    }
+
     return DryadTree(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
@@ -102,9 +151,13 @@ class DryadTree {
       category: (json['category'] ?? '').toString(),
       saleStatus: sale,
       claimState: claim,
+      lifecycleState: lifecycle,
+      isPortable: json['isPortable'] == true,
+      currentSpotId: json['currentSpotId']?.toString(),
       priceEth: (json['priceEth'] as num?)?.toDouble(),
       priceDryad: (json['priceDryad'] as num?)?.toDouble(),
       treeImageUrl: json['treeImageUrl']?.toString(),
+      digUpTxHash: json['digUpTxHash']?.toString(),
     );
   }
 }
@@ -116,4 +169,34 @@ class WalletAsset {
   final String symbol;
   final String balance;
   final String fiatValue;
+}
+
+@immutable
+class DryadSpot {
+  const DryadSpot({
+    required this.spotId,
+    required this.placeId,
+    required this.label,
+    required this.lat,
+    required this.lng,
+    required this.claimState,
+  });
+
+  final String spotId;
+  final String placeId;
+  final String label;
+  final double lat;
+  final double lng;
+  final String claimState;
+
+  bool get isUnclaimed => claimState == 'unclaimed';
+
+  factory DryadSpot.fromJson(Map<String, dynamic> json) => DryadSpot(
+        spotId: (json['spotId'] ?? '').toString(),
+        placeId: (json['placeId'] ?? '').toString(),
+        label: (json['label'] ?? '').toString(),
+        lat: (json['lat'] as num?)?.toDouble() ?? 0,
+        lng: (json['lng'] as num?)?.toDouble() ?? 0,
+        claimState: (json['claimState'] ?? '').toString(),
+      );
 }

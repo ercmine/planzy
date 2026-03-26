@@ -71,6 +71,7 @@ import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../spon
 import { MemoryDryadEconomyStore, DryadEconomyService } from "../perbugEconomy/index.js";
 import { MemoryViewerEngagementStore, ViewerEngagementRewardsService } from "../viewerEngagementRewards/index.js";
 import { DryadMarketplaceService } from "../dryad/service.js";
+import type { DryadTree } from "../dryad/domain.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -267,7 +268,7 @@ export function createServer(options?: CreateServerOptions) {
   competitionService.recordVideoPublished({ videoId: "video_seed_1", reviewId: "review_seed_1", userId: "u1", publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), city: "Bloomington", category: "coffee", canonicalPlaceId: "place-1" });
   competitionService.recordApprovedReview({ id: "review_event_1", reviewId: "review_seed_1", videoId: "video_seed_1", userId: "u1", canonicalPlaceId: "place-1", approvedAt: new Date().toISOString(), city: "Bloomington", category: "coffee", discoveryType: "first_review", approved: true, blocked: false });
   competitionService.recordLike({ id: "like_seed_1", videoId: "video_seed_1", userId: "fan_1", createdAt: new Date().toISOString(), valid: true, bannedUser: false, blockedUser: false, fraudFlagged: false });
-  const dryadMarketplaceService = new DryadMarketplaceService([
+  const seededTrees: DryadTree[] = [
     {
       treeId: "tree-001",
       nftTokenId: "1001",
@@ -306,6 +307,11 @@ export function createServer(options?: CreateServerOptions) {
       growthLevel: 0,
       contributionCount: 0
     }
+  ];
+  const dryadMarketplaceService = new DryadMarketplaceService(seededTrees, [], [
+    { spotId: "spot-100", placeId: "spot-100", label: "Oracle Meadow, SF", lat: 37.7682, lng: -122.401, claimState: "unclaimed" },
+    { spotId: "spot-101", placeId: "spot-101", label: "Golden Path Grove, SF", lat: 37.7714, lng: -122.4032, claimState: "unclaimed" },
+    { spotId: "spot-102", placeId: "spot-102", label: "South Congress Bloomfield, Austin", lat: 30.248, lng: -97.752, claimState: "unclaimed" },
   ]);
 
   const dryadEconomyService = new DryadEconomyService(new MemoryDryadEconomyStore());

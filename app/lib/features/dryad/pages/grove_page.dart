@@ -36,7 +36,7 @@ class DryadGrovePage extends ConsumerWidget {
                         child: AppCard(
                           child: ListTile(
                             title: Text(tree.name),
-                            subtitle: Text('${tree.placeName} • ${tree.statusLabel}'),
+                            subtitle: Text('${tree.placeName} • ${tree.lifecycleLabel}${tree.isPortable ? ' • Portable' : ''}'),
                             trailing: TextButton(onPressed: () => onOpenTree(tree.id), child: const Text('Open')),
                           ),
                         ),

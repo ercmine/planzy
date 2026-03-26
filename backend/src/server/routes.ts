@@ -304,9 +304,48 @@ export function createRoutes(
         await dryadMarketplaceHandlers.listListings(req, res);
         return;
       }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/spots/unclaimed" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.listUnclaimedSpots(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/trees/replantable" && dryadMarketplaceHandlers) {
+        const wallet = String(url.searchParams.get("wallet") ?? "") as `0x${string}`;
+        await dryadMarketplaceHandlers.listReplantableTrees(req, res, wallet);
+        return;
+      }
       const dryadTreeMatch = matchPath("/v1/dryad/trees/:treeId", normalizedPath);
       if (req.method === "GET" && dryadTreeMatch && dryadMarketplaceHandlers) {
         await dryadMarketplaceHandlers.getTree(req, res, dryadTreeMatch.treeId);
+        return;
+      }
+      const dryadTreeEligibilityMatch = matchPath("/v1/dryad/trees/:treeId/dig-up-eligibility", normalizedPath);
+      if (req.method === "GET" && dryadTreeEligibilityMatch && dryadMarketplaceHandlers) {
+        const wallet = String(url.searchParams.get("wallet") ?? "") as `0x${string}`;
+        await dryadMarketplaceHandlers.getDigUpEligibility(req, res, dryadTreeEligibilityMatch.treeId, wallet);
+        return;
+      }
+      const dryadLifecycleMatch = matchPath("/v1/dryad/trees/:treeId/lifecycle", normalizedPath);
+      if (req.method === "GET" && dryadLifecycleMatch && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.getTreeLifecycle(req, res, dryadLifecycleMatch.treeId);
+        return;
+      }
+      const digUpIntentCreationMatch = matchPath("/v1/dryad/trees/:treeId/dig-up-intents", normalizedPath);
+      if (req.method === "POST" && digUpIntentCreationMatch && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.createDigUpIntent(req, res, digUpIntentCreationMatch.treeId);
+        return;
+      }
+      const digUpConfirmMatch = matchPath("/v1/dryad/dig-up-intents/:intentId/confirm", normalizedPath);
+      if (req.method === "POST" && digUpConfirmMatch && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.confirmDigUpIntent(req, res, digUpConfirmMatch.intentId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/dryad/replant-intents" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.createReplantIntent(req, res);
+        return;
+      }
+      const replantConfirmMatch = matchPath("/v1/dryad/replant-intents/:intentId/confirm", normalizedPath);
+      if (req.method === "POST" && replantConfirmMatch && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.confirmReplantIntent(req, res, replantConfirmMatch.intentId);
         return;
       }
       const claimPlantMatch = matchPath("/v1/dryad/trees/:treeId/claim-plant", normalizedPath);

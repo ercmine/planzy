@@ -21,6 +21,10 @@ function toTreeResponse(tree: DryadTree): Record<string, unknown> {
     category: "Location",
     claimState,
     saleStatus: tree.listedPriceEth ? "listed" : "not_listed",
+    lifecycleState: tree.lifecycleState ?? "planted",
+    isPortable: tree.portable === true,
+    currentSpotId: tree.currentSpotId ?? null,
+    digUpTxHash: tree.digUpTxHash ?? null,
     priceEth: tree.listedPriceEth == null ? null : Number(tree.listedPriceEth),
     treeImageUrl: `https://metadata.dryad.dev/trees/${tree.treeId}.svg`
   };
@@ -34,6 +38,15 @@ export function createDryadMarketplaceHttpHandlers(service: DryadMarketplaceServ
     listListings: async (_req: IncomingMessage, res: ServerResponse) => {
       sendJson(res, 200, { trees: service.listMarketTrees().filter((t) => t.listedPriceEth).map(toTreeResponse) });
     },
+    listUnclaimedSpots: async (_req: IncomingMessage, res: ServerResponse) => {
+      sendJson(res, 200, { spots: service.listUnclaimedSpots() });
+    },
+    listReplantableTrees: async (req: IncomingMessage, res: ServerResponse, wallet: WalletAddress) => {
+      sendJson(res, 200, { trees: service.listReplantableTrees(wallet).map(toTreeResponse) });
+    },
+    getTreeLifecycle: async (_req: IncomingMessage, res: ServerResponse, treeId: string) => {
+      sendJson(res, 200, { events: service.getTreeLifecycle(treeId) });
+    },
     getTree: async (_req: IncomingMessage, res: ServerResponse, treeId: string) => {
       const tree = service.getTree(treeId);
       if (!tree) {
@@ -41,6 +54,43 @@ export function createDryadMarketplaceHttpHandlers(service: DryadMarketplaceServ
         return;
       }
       sendJson(res, 200, toTreeResponse(tree));
+    },
+    getDigUpEligibility: async (req: IncomingMessage, res: ServerResponse, treeId: string, wallet: WalletAddress) => {
+      sendJson(res, 200, service.getDigUpEligibility(treeId, wallet));
+    },
+    createDigUpIntent: async (req: IncomingMessage, res: ServerResponse, treeId: string) => {
+      const body = await parseJsonBody(req) as Record<string, unknown>;
+      const intent = service.createDigUpIntent(
+        treeId,
+        String(body.wallet ?? "") as WalletAddress,
+        Number(body.chainId ?? 0),
+      );
+      sendJson(res, 201, intent);
+    },
+    confirmDigUpIntent: async (req: IncomingMessage, res: ServerResponse, intentId: string) => {
+      const body = await parseJsonBody(req) as Record<string, unknown>;
+      const intent = service.confirmDigUpIntent({
+        intentId,
+        paymentTxHash: String(body.paymentTxHash ?? "") as `0x${string}`,
+        from: String(body.from ?? "") as WalletAddress,
+        to: String(body.to ?? "") as WalletAddress,
+        valueWei: String(body.valueWei ?? ""),
+        chainId: Number(body.chainId ?? 0),
+      });
+      sendJson(res, 200, intent);
+    },
+    createReplantIntent: async (req: IncomingMessage, res: ServerResponse) => {
+      const body = await parseJsonBody(req) as Record<string, unknown>;
+      const intent = service.createReplantIntent(
+        String(body.treeId ?? ""),
+        String(body.wallet ?? "") as WalletAddress,
+        String(body.nextSpotId ?? ""),
+      );
+      sendJson(res, 201, intent);
+    },
+    confirmReplantIntent: async (_req: IncomingMessage, res: ServerResponse, intentId: string) => {
+      const intent = service.confirmReplantIntent(intentId);
+      sendJson(res, 200, intent);
     },
     claimAndPlant: async (req: IncomingMessage, res: ServerResponse, treeId: string) => {
       const body = await parseJsonBody(req) as Record<string, unknown>;
