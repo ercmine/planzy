@@ -23,6 +23,14 @@ If Flutter reports a package resolution error such as
 stale generated artifacts and rebuild:
 
 ```bash
+./scripts/flutter_reset.sh
+cd app
+flutter build web
+```
+
+Equivalent manual commands:
+
+```bash
 cd app
 flutter clean
 rm -rf .dart_tool build
