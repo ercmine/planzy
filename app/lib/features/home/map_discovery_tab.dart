@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/connectivity/connectivity_state.dart';
@@ -15,6 +16,7 @@ import '../../providers/app_providers.dart';
 import '../collections/collection_models.dart';
 import '../collections/collection_repository.dart';
 import '../economy/economy_models.dart';
+import '../video_platform/video_models.dart';
 import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_widgets.dart';
@@ -716,6 +718,8 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                     proximityState: _proximityFor(selected, location),
                     distanceMeters: _distanceMeters(location?.lat, location?.lng, selected.latitude, selected.longitude),
                     saved: _savedPlaceIds.contains(selected.canonicalPlaceId),
+                    onLeaveReview: () => _startReviewFromMap(selected),
+                    onAddVideoReview: () => _startReviewFromMap(selected),
                     onOpenDetails: () => _openPlaceDetails(selected),
                     onOpenMaps: () => _openPlaceInMaps(linkLauncher, selected),
                     onSave: () => _toggleSave(selected),
@@ -883,7 +887,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
         },
         onOpenPlace: _openPlaceDetails,
         onToggleSave: _toggleSave,
-        onReview: _openPlaceDetails,
+        onReview: _startReviewFromMap,
         onDirections: (place) => _openPlaceInMaps(ref.read(linkLauncherProvider), place),
         onShare: _sharePlace,
         savedPlaceIds: _savedPlaceIds,
@@ -1122,6 +1126,25 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
       MaterialPageRoute<void>(
         builder: (_) => PlaceVideoDetailPage(placeId: place.canonicalPlaceId, placeName: place.name),
       ),
+    );
+  }
+
+  void _startReviewFromMap(MapPin place) {
+    context.pushNamed(
+      'place-review-editor',
+      extra: _toPlaceSearchResult(place),
+    );
+  }
+
+  PlaceSearchResult _toPlaceSearchResult(MapPin place) {
+    return PlaceSearchResult(
+      placeId: place.canonicalPlaceId,
+      name: place.name,
+      category: place.categoryLabel,
+      regionLabel: place.neighborhoodLabel,
+      addressSnippet: [place.neighborhood, place.city, place.region].whereType<String>().where((item) => item.isNotEmpty).join(', '),
+      distanceKm: place.distanceMeters == null ? null : place.distanceMeters! / 1000,
+      thumbnailUrl: place.thumbnailUrl,
     );
   }
 

@@ -35,7 +35,9 @@ void main() {
     expect(find.text('Bluebird Coffee'), findsOneWidget);
     expect(find.text('You’re here'), findsOneWidget);
     expect(find.text('Creator videos'), findsOneWidget);
-    expect(find.text('Open place & review'), findsOneWidget);
+    expect(find.text('Leave review'), findsOneWidget);
+    expect(find.text('Add video'), findsOneWidget);
+    expect(find.text('Details'), findsOneWidget);
   });
 
   testWidgets('keeps overlay chips inside a horizontal scroller when multiple pills are present', (tester) async {
