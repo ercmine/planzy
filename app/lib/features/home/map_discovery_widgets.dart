@@ -297,33 +297,80 @@ class PulsingSearchAreaButton extends StatefulWidget {
 }
 
 class _PulsingSearchAreaButtonState extends State<PulsingSearchAreaButton> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _scale;
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseScale;
+  late final Animation<double> _pulseOpacity;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
-      ..repeat(reverse: true);
-    _scale = Tween<double>(begin: 0.96, end: 1.04).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 560));
+    _pulseScale = Tween<double>(begin: 0.75, end: 2.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeOutCubic),
+    );
+    _pulseOpacity = Tween<double>(begin: 0.42, end: 0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
+    );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _pulseController.dispose();
     super.dispose();
+  }
+
+  Future<void> _onPressed() async {
+    if (widget.isLoading) return;
+    _pulseController
+      ..stop()
+      ..reset();
+    _pulseController.forward();
+    widget.onPressed();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scale,
-      child: FilledButton.icon(
-        onPressed: widget.isLoading ? null : widget.onPressed,
-        icon: widget.isLoading
-            ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
-            : const Icon(Icons.radar_rounded),
-        label: const Text('Pulse this area'),
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 56,
+      height: 56,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              if (_pulseController.value == 0) {
+                return const SizedBox.shrink();
+              }
+              return IgnorePointer(
+                child: Transform.scale(
+                  scale: _pulseScale.value,
+                  child: Opacity(
+                    opacity: _pulseOpacity.value,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: colorScheme.primary,
+                      ),
+                      child: const SizedBox.square(dimension: 56),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton.filled(
+            onPressed: widget.isLoading ? null : _onPressed,
+            icon: widget.isLoading
+                ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.radar_rounded),
+            tooltip: 'Pulse this area',
+            style: IconButton.styleFrom(
+              fixedSize: const Size.square(56),
+            ),
+          ),
+        ],
       ),
     );
   }
