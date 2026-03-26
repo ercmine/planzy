@@ -33,6 +33,13 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
     final state = ref.watch(onboardingControllerProvider);
     final config = ref.watch(dryadContractConfigProvider);
 
+    if (_walletController.text != state.walletAddress) {
+      _walletController.value = _walletController.value.copyWith(
+        text: state.walletAddress,
+        selection: TextSelection.collapsed(offset: state.walletAddress.length),
+      );
+    }
+
     if (state.hasCompleted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.go('/');
@@ -60,6 +67,14 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
               ]),
             ),
             const SizedBox(height: AppSpacing.m),
+            PrimaryButton(
+              label: 'Connect browser wallet',
+              onPressed: state.isBusy ? null : ref.read(onboardingControllerProvider.notifier).connectWallet,
+              isLoading: state.isBusy,
+            ),
+            const SizedBox(height: AppSpacing.s),
+            const Text('or paste an address manually'),
+            const SizedBox(height: AppSpacing.s),
             TextField(
               controller: _walletController,
               decoration: const InputDecoration(
@@ -77,7 +92,7 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
             if (state.status == OnboardingFlowStatus.nftNotMinted) ...[
               const SizedBox(height: AppSpacing.s),
               SecondaryButton(
-                label: 'Mint NFT on-chain',
+                label: 'Submit on-chain plant transaction',
                 onPressed: state.isBusy ? null : ref.read(onboardingControllerProvider.notifier).mintNft,
               ),
             ],

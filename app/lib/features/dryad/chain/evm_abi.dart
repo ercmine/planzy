@@ -1,16 +1,13 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+import 'package:web3dart/crypto.dart' as web3_crypto;
+
 String methodSelector(String signature) {
-  switch (signature) {
-    case 'balanceOf(address)':
-      return '0x70a08231';
-    case 'tokenOfOwnerByIndex(address,uint256)':
-      return '0x2f745c59';
-    case 'tokenURI(uint256)':
-      return '0xc87b56dd';
-    case 'mint()':
-      return '0x1249c58b';
-    default:
-      throw UnsupportedError('Unsupported method signature: $signature');
-  }
+  if (signature.startsWith('0x') && signature.length == 10) return signature.toLowerCase();
+  final digest = web3_crypto.keccakUtf8(signature);
+  final selector = web3_crypto.bytesToHex(digest.sublist(0, 4), include0x: true);
+  return selector;
 }
 
 String encodeAddressCall(String signature, String address) {
@@ -35,10 +32,24 @@ String encodeUintCall(String signature, BigInt value) {
   return '${methodSelector(signature)}$encodedValue';
 }
 
-String encodeNoArgCall(String signature) {
-  if (signature.startsWith('0x') && signature.length == 10) {
-    return signature.toLowerCase();
+String encodeBytes32Call(String signature, List<int> bytes32) {
+  if (bytes32.length != 32) {
+    throw FormatException('bytes32 requires exactly 32 bytes');
   }
+  final encoded = bytes32.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+  return '${methodSelector(signature)}$encoded';
+}
+
+String encodeWriteCall(String signature, {required String walletAddress}) {
+  if (signature == 'plant(bytes32)') {
+    final digest = sha256.convert(utf8.encode('$walletAddress:${DateTime.now().microsecondsSinceEpoch}'));
+    return encodeBytes32Call(signature, digest.bytes);
+  }
+
+  if (signature == 'water(uint256)') {
+    return encodeUintCall(signature, BigInt.one);
+  }
+
   return methodSelector(signature);
 }
 
