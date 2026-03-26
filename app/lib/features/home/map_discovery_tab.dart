@@ -859,49 +859,48 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     required ConnectivityState connectivityState,
     required AppLocation? location,
   }) async {
+    final placesForList = visiblePlaces.isNotEmpty ? visiblePlaces : state.pins;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => NearbyPlacesPage(
-        places: visiblePlaces,
-        selectedPlaceId: state.selectedPlaceId,
-        onPlaceSelected: (place) {
-          ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(place.canonicalPlaceId);
-          _moveMapToPlace(place);
-        },
-        onOpenPlace: _openPlaceDetails,
-        onToggleSave: _toggleSave,
-        onReview: _startReviewFromMap,
-        onDirections: (place) => _openPlaceInMaps(ref.read(linkLauncherProvider), place),
-        onShare: _sharePlace,
-        savedPlaceIds: _savedPlaceIds,
-        countLabel: _countLabel(visiblePlaces, state: state),
-        sort: state.sort,
-        onOpenSortSheet: _openSortSheet,
-        loading: state.loading,
-        emptyState: _emptyStateFor(
-          state: state,
-          locationState: locationState,
-          connectivityState: connectivityState,
-          noLocationAvailable: location == null,
-          visiblePlaces: visiblePlaces,
-        ),
-        permissionState: _shouldShowPermissionOverlay(locationState)
-            ? const DiscoveryStateCard(
-                icon: Icons.location_searching_rounded,
-                title: 'Location required',
-                body: 'Enable location to improve nearby ranking and distance estimates.',
-              )
-            : null,
-        errorState: state.discoveryError == null
-            ? null
-            : DiscoveryStateCard(
-                icon: Icons.error_outline,
-                title: 'Nearby places unavailable',
-                body: state.discoveryError!,
-              ),
-        collectionSummary: null,
-        distanceLabelFor: (place) => _distanceSummary(place, location),
-        badgesFor: _badgesFor,
+          places: placesForList,
+          selectedPlaceId: state.selectedPlaceId,
+          onPlaceSelected: (place) {
+            ref.read(mapDiscoveryControllerProvider.notifier).selectPlace(place.canonicalPlaceId);
+            _moveMapToPlace(place);
+          },
+          onOpenPlace: _openPlaceDetails,
+          onToggleSave: _toggleSave,
+          onReview: _startReviewFromMap,
+          onDirections: (place) => _openPlaceInMaps(ref.read(linkLauncherProvider), place),
+          onShare: _sharePlace,
+          savedPlaceIds: _savedPlaceIds,
+          countLabel: _countLabel(placesForList, state: state),
+          sort: state.sort,
+          onOpenSortSheet: _openSortSheet,
+          loading: state.loading,
+          emptyState: _emptyStateFor(
+            state: state,
+            locationState: locationState,
+            connectivityState: connectivityState,
+            noLocationAvailable: location == null,
+            visiblePlaces: placesForList,
+          ),
+          permissionState: _shouldShowPermissionOverlay(locationState)
+              ? const DiscoveryStateCard(
+                  icon: Icons.location_searching_rounded,
+                  title: 'Location required',
+                  body: 'Enable location to improve nearby ranking and distance estimates.',
+                )
+              : null,
+          errorState: state.discoveryError == null
+              ? null
+              : DiscoveryStateCard(
+                  icon: Icons.error_outline,
+                  title: 'Nearby places unavailable',
+                  body: state.discoveryError!,
+                ),
+          collectionSummary: null,
         ),
       ),
     );
