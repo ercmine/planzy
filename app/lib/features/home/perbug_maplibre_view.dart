@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
@@ -50,9 +48,10 @@ class PerbugMapLibreView extends StatefulWidget {
 }
 
 class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
-  MaplibreMapController? _controller;
+  MapLibreMapController? _controller;
   CameraPosition? _lastCamera;
   bool _styleLoaded = false;
+  VoidCallback? _cameraListener;
 
   PerbugMapTheme get _theme => PerbugMapTheme.resolve(brightness: Theme.of(context).brightness, config: widget.config);
 
@@ -82,14 +81,25 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
   @override
   Widget build(BuildContext context) {
     final mapTheme = _theme;
-    return MaplibreMap(
+    return MapLibreMap(
       styleString: mapTheme.styleUrl,
       initialCameraPosition: _cameraPositionForState(),
+      // maplibre_gl 0.21.x exposes camera updates through the controller
+      // listener API instead of a Map widget `onCameraMove` callback.
+      trackCameraPosition: true,
       compassEnabled: false,
       rotateGesturesEnabled: true,
       tiltGesturesEnabled: widget.config.enableEnhancedPitch,
       myLocationEnabled: false,
-      onMapCreated: (controller) => _controller = controller,
+      onMapCreated: (controller) {
+        final previousListener = _cameraListener;
+        if (previousListener != null) {
+          _controller?.removeListener(previousListener);
+        }
+        _controller = controller;
+        _cameraListener = () => _lastCamera = controller.cameraPosition;
+        controller.addListener(_cameraListener!);
+      },
       onStyleLoadedCallback: () async {
         _styleLoaded = true;
         widget.onMapReady();
@@ -107,8 +117,16 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
         );
       },
       onCameraTrackingChanged: (_) {},
-      onCameraMove: (camera) => _lastCamera = camera,
     );
+  }
+
+  @override
+  void dispose() {
+    final listener = _cameraListener;
+    if (listener != null) {
+      _controller?.removeListener(listener);
+    }
+    super.dispose();
   }
 
   CameraPosition _cameraPositionForState() {
@@ -134,7 +152,6 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
           'composite',
           'perbug-3d-buildings',
           FillExtrusionLayerProperties(
-            sourceLayer: 'building',
             fillExtrusionColor: mapTheme.building.wall,
             fillExtrusionOpacity: mapTheme.isDark ? 0.74 : 0.62,
             fillExtrusionHeight: [
@@ -157,6 +174,7 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
             ],
             fillExtrusionVerticalGradient: true,
           ),
+          sourceLayer: 'building',
           belowLayerId: 'waterway-label',
         );
       } catch (error) {
@@ -170,11 +188,11 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
           'composite',
           'perbug-3d-building-roofs',
           FillLayerProperties(
-            sourceLayer: 'building',
             fillColor: mapTheme.building.roof,
             fillOpacity: mapTheme.isDark ? 0.34 : 0.26,
             fillOutlineColor: mapTheme.building.edge,
           ),
+          sourceLayer: 'building',
           minzoom: 15.4,
           belowLayerId: 'waterway-label',
         );
@@ -182,15 +200,11 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
     }
 
     if (widget.config.enableTerrain && widget.config.terrainSourceUrl != null && widget.config.terrainSourceUrl!.isNotEmpty) {
-      try {
-        await controller.addSource(
-          'perbug-dem',
-          RasterDemSourceProperties(url: widget.config.terrainSourceUrl!, tileSize: 512, maxzoom: 14),
-        );
-        await controller.setTerrain(TerrainSourceProperties(sourceId: 'perbug-dem', exaggeration: mapTheme.terrain.exaggeration));
-      } catch (error) {
-        Log.warn('map.style terrain disabled (unsupported or unavailable): $error');
-      }
+      // maplibre_gl 0.21.0 does not expose a Terrain API (`setTerrain` /
+      // `TerrainSourceProperties`) on Flutter, so terrain must remain disabled.
+      Log.warn(
+        'map.style terrain requested but disabled: maplibre_gl 0.21.0 has no Flutter terrain API',
+      );
     }
   }
 
@@ -256,7 +270,7 @@ class _PerbugMapLibreViewState extends State<PerbugMapLibreView> {
   Future<void> _upsertGeoJsonSource(String id, List<Map<String, dynamic>> features) async {
     final controller = _controller;
     if (controller == null) return;
-    final payload = jsonEncode({'type': 'FeatureCollection', 'features': features});
+    final payload = <String, dynamic>{'type': 'FeatureCollection', 'features': features};
     try {
       await controller.setGeoJsonSource(id, payload);
     } catch (_) {
