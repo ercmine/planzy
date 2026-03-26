@@ -65,11 +65,11 @@ import { LeaderboardsService, MemoryLeaderboardsStore } from "../leaderboards/in
 import { CollectionsService, MemoryCollectionStore } from "../collections/index.js";
 import { MemorySocialGamificationStore, SocialGamificationService } from "../socialGamification/index.js";
 import { GamificationControlService, MemoryGamificationControlStore } from "../gamificationControl/index.js";
-import { MemoryDryadRewardsStore, DryadRewardsService } from "../dryadRewards/index.js";
-import { MemoryDryadTipsStore, DryadTipsService } from "../dryadTips/index.js";
+import { MemoryDryadRewardsStore, DryadRewardsService } from "../perbugRewards/index.js";
+import { MemoryDryadTipsStore, DryadTipsService } from "../perbugTips/index.js";
 import { CompetitionService, MemoryCompetitionStore } from "../competition/index.js";
 import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../sponsoredLocations/index.js";
-import { MemoryDryadEconomyStore, DryadEconomyService } from "../dryadEconomy/index.js";
+import { MemoryDryadEconomyStore, DryadEconomyService } from "../perbugEconomy/index.js";
 import { MemoryViewerEngagementStore, ViewerEngagementRewardsService } from "../viewerEngagementRewards/index.js";
 import { DryadMarketplaceService } from "../dryad/service.js";
 import { createHttpServer } from "./httpServer.js";

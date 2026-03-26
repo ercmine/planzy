@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { ValidationError } from "../plans/errors.js";
-import { amountToDisplay, isValidSolanaPublicKey } from "../dryadRewards/solana/token.js";
-import { stableIdempotencyKey } from "../dryadRewards/solana/walletAuth.js";
+import { amountToDisplay, isValidSolanaPublicKey } from "../perbugRewards/solana/token.js";
+import { stableIdempotencyKey } from "../perbugRewards/solana/walletAuth.js";
 import type { DryadTipsAdapter, DryadTipsStore, DryadVideoTipIntent, VideoTipSummary } from "./types.js";
 
 function nowIso(): string { return new Date().toISOString(); }
