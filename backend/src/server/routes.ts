@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { matchPath } from "./httpServer.js";
+import { applyCors, handleCorsPreflight } from "./cors.js";
 
 import type { SessionDeckHandler } from "../api/sessions/deckHandler.js";
 import { createAccountsHttpHandlers } from "../accounts/http.js";
@@ -109,13 +110,6 @@ const PREMIUM_CONTENT: Record<string, PremiumContentDescriptor> = {
   "creator-growth-playbook": { contentId: "creator-growth-playbook", visibility: "creator_only" },
   "business-ads-template-pack": { contentId: "business-ads-template-pack", visibility: "business_only" }
 };
-
-export function applyCors(res: ServerResponse): void {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-user-id, x-admin-key, x-request-id, x-acting-profile-type, x-acting-profile-id, x-market, x-region, x-cohorts, x-account-type, x-admin-id");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-}
-
 
 
 function normalizeReportReason(value: unknown): ReportReasonCode {
@@ -256,11 +250,9 @@ export function createRoutes(
   };
 
   return async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    applyCors(res);
+    const corsResult = applyCors(req, res);
 
-    if (req.method === "OPTIONS") {
-      res.statusCode = 204;
-      res.end();
+    if (handleCorsPreflight(req, res, corsResult)) {
       return;
     }
 
