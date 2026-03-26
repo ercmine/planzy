@@ -26,6 +26,7 @@ import type { CollaborationService } from "../collaboration/service.js";
 import type { BusinessPremiumService } from "../businessPremium/service.js";
 import type { DiscoveryHttpHandlerDeps } from "../discovery/http.js";
 import type { GeoGateway } from "../geo/gateway.js";
+import type { BackendGeoRuntime } from "../geo/gateway.js";
 import { PermissionAction, ProfileType } from "../accounts/types.js";
 import type { ActorContextResolved } from "../accounts/types.js";
 import type { SessionIdeasHandlers } from "../api/sessions/ideasHandler.js";
@@ -174,6 +175,7 @@ export function createRoutes(
     analyticsQueryService?: AnalyticsQueryService;
     rolloutService?: RolloutService;
     geoGateway?: GeoGateway;
+    geoStatus?: BackendGeoRuntime;
     videoPlatformService?: VideoPlatformService;
     onboardingHandlers?: OnboardingHttpHandlers;
     accomplishmentsService?: AccomplishmentsService;
@@ -197,7 +199,18 @@ export function createRoutes(
     : null;
   const accountHandlers = deps?.accountsService ? createAccountsHttpHandlers(deps.accountsService) : null;
   const discoveryHandlers = deps?.discovery ? createDiscoveryHttpHandlers(deps.discovery) : null;
-  const geoHandlers = deps?.geoGateway ? createGeoHttpHandlers(deps.geoGateway, { authSecret: process.env.GEO_INTERNAL_AUTH_SECRET, rateLimitPerMinute: Number(process.env.GEO_PUBLIC_RATE_LIMIT_PER_MINUTE ?? 180) }) : null;
+  const geoHandlers = createGeoHttpHandlers(deps?.geoGateway ?? null, {
+    authSecret: process.env.GEO_INTERNAL_AUTH_SECRET,
+    rateLimitPerMinute: Number(process.env.GEO_PUBLIC_RATE_LIMIT_PER_MINUTE ?? 180),
+    listCanonicalPlaces: () => deps?.placeService?.listCanonicalPlaces() ?? [],
+    getStatus: () => ({
+      mode: deps?.geoStatus?.mode ?? (deps?.geoGateway ? "remote" : "disabled"),
+      routesMounted: true,
+      upstreamBaseUrl: deps?.geoStatus?.upstreamBaseUrl,
+      envValidationErrors: deps?.geoStatus?.validationErrors ?? [],
+      envValidationWarnings: deps?.geoStatus?.validationWarnings ?? []
+    })
+  });
   const rankingTuningHandlers = deps?.rankingTuning ? createRankingTuningHandlers(deps.rankingTuning.service, deps.rankingTuning.resolver, deps.rankingTuning.repo) : null;
   const creatorHandlers = deps?.creatorService ? createCreatorHttpHandlers(deps.creatorService) : null;
   const creatorVerificationHandlers = deps?.creatorVerificationService ? createCreatorVerificationHttpHandlers(deps.creatorVerificationService) : null;
@@ -791,22 +804,22 @@ export function createRoutes(
       }
 
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/health") {
+      if (deps?.geoGateway && req.method === "GET" && normalizedPath === "/health") {
         await geoHandlers.health(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/ready") {
+      if (deps?.geoGateway && req.method === "GET" && normalizedPath === "/ready") {
         await geoHandlers.ready(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/version") {
+      if (deps?.geoGateway && req.method === "GET" && normalizedPath === "/version") {
         await geoHandlers.version(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/metrics") {
+      if (deps?.geoGateway && req.method === "GET" && normalizedPath === "/metrics") {
         await geoHandlers.metrics(req, res);
         return;
       }
@@ -1332,62 +1345,72 @@ export function createRoutes(
       }
 
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/api/geo/search") {
+      if (req.method === "GET" && normalizedPath === "/api/geo/search") {
         await geoHandlers.apiSearch(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/api/geo/reverse") {
+      if (req.method === "GET" && normalizedPath === "/api/geo/reverse") {
         await geoHandlers.apiReverse(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/api/geo/autocomplete") {
+      if (req.method === "GET" && normalizedPath === "/api/geo/autocomplete") {
         await geoHandlers.apiAutocomplete(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/api/geo/nearby") {
+      if (req.method === "GET" && normalizedPath === "/api/geo/nearby") {
         await geoHandlers.apiNearby(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/v1/geocode") {
+      if (req.method === "GET" && (normalizedPath === "/api/geo/health" || normalizedPath === "/geo/health")) {
+        await geoHandlers.health(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && (normalizedPath === "/api/geo/debug/status" || normalizedPath === "/geo/debug/status")) {
+        await geoHandlers.debugStatus(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/geocode") {
         await geoHandlers.geocode(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/geocode") {
+      if (req.method === "POST" && normalizedPath === "/v1/geocode") {
         await geoHandlers.geocode(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/v1/reverse-geocode") {
+      if (req.method === "GET" && normalizedPath === "/v1/reverse-geocode") {
         await geoHandlers.reverseGeocode(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/reverse-geocode") {
+      if (req.method === "POST" && normalizedPath === "/v1/reverse-geocode") {
         await geoHandlers.reverseGeocode(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/autocomplete") {
+      if (req.method === "POST" && normalizedPath === "/v1/autocomplete") {
         await geoHandlers.autocomplete(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/place-lookup") {
+      if (req.method === "POST" && normalizedPath === "/v1/place-lookup") {
         await geoHandlers.placeLookup(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "POST" && normalizedPath === "/v1/area-context") {
+      if (req.method === "POST" && normalizedPath === "/v1/area-context") {
         await geoHandlers.areaContext(req, res);
         return;
       }
 
-      if (geoHandlers && req.method === "GET" && normalizedPath === "/v1/geocoding/health") {
+      if (req.method === "GET" && normalizedPath === "/v1/geocoding/health") {
         await geoHandlers.health(req, res);
         return;
       }

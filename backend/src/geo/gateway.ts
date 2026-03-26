@@ -1,6 +1,6 @@
 import { GeocodingService } from "../geocoding/service.js";
 import { GeoServiceClient } from "./client.js";
-import { readGeoRuntimeConfig } from "./config.js";
+import { readGeoRuntimeConfig, validateGeoRuntimeConfig } from "./config.js";
 import type {
   GeoAreaContext,
   GeoAreaContextRequest,
@@ -22,6 +22,15 @@ export interface GeoGateway {
   placeLookup(input: GeoPlaceLookupRequest): Promise<GeoPlaceLookupCandidate[]>;
   areaContext(input: GeoAreaContextRequest): Promise<GeoAreaContext>;
   health(): Promise<GeoHealthResponse>;
+}
+
+export interface BackendGeoRuntime {
+  gateway: GeoGateway | null;
+  mode: "remote" | "local" | "disabled";
+  routesMounted: boolean;
+  upstreamBaseUrl?: string;
+  validationErrors: string[];
+  validationWarnings: string[];
 }
 
 class RemoteGeoGateway implements GeoGateway {
@@ -112,27 +121,45 @@ class LocalGeoGateway implements GeoGateway {
   }
 }
 
-export function createBackendGeoGatewayFromEnv(env: NodeJS.ProcessEnv = process.env): GeoGateway | null {
+export function initBackendGeoRuntime(env: NodeJS.ProcessEnv = process.env): BackendGeoRuntime {
   const config = readGeoRuntimeConfig(env);
-  const hasExplicitRemoteBaseUrl = typeof env.GEO_SERVICE_BASE_URL === "string" && env.GEO_SERVICE_BASE_URL.trim().length > 0;
+  const validation = validateGeoRuntimeConfig(config, env);
+  let gateway: GeoGateway | null = null;
+  let upstreamBaseUrl: string | undefined;
 
-  if (config.client.enabled || hasExplicitRemoteBaseUrl) {
-    return new RemoteGeoGateway(new GeoServiceClient(config.client));
+  if (validation.mode === "remote" && validation.errors.length === 0) {
+    upstreamBaseUrl = config.client.baseUrl;
+    gateway = new RemoteGeoGateway(new GeoServiceClient(config.client));
   }
 
-  if (!config.local.nominatimBaseUrl) {
-    return null;
+  if (validation.mode === "local" && validation.errors.length === 0 && config.local.nominatimBaseUrl) {
+    upstreamBaseUrl = config.local.nominatimBaseUrl;
+    const service = new GeocodingService({
+      baseUrl: config.local.nominatimBaseUrl,
+      timeoutMs: config.local.timeoutMs,
+      geocodeCacheTtlMs: config.local.geocodeCacheTtlMs,
+      reverseCacheTtlMs: config.local.reverseCacheTtlMs,
+      defaultLimit: config.local.defaultLimit,
+      userAgent: config.local.userAgent,
+      env: (env.APP_ENV as "dev" | "stage" | "prod" | undefined) ?? "dev"
+    });
+    gateway = new LocalGeoGateway(service);
   }
 
-  const service = new GeocodingService({
-    baseUrl: config.local.nominatimBaseUrl,
-    timeoutMs: config.local.timeoutMs,
-    geocodeCacheTtlMs: config.local.geocodeCacheTtlMs,
-    reverseCacheTtlMs: config.local.reverseCacheTtlMs,
-    defaultLimit: config.local.defaultLimit,
-    userAgent: config.local.userAgent,
-    env: (env.APP_ENV as "dev" | "stage" | "prod" | undefined) ?? "dev"
-  });
+  if (validation.shouldFailFast && (validation.errors.length > 0 || gateway === null)) {
+    throw new Error(`Geo misconfiguration: ${validation.errors.join(" ")}`);
+  }
 
-  return new LocalGeoGateway(service);
+  return {
+    gateway,
+    mode: validation.mode,
+    routesMounted: true,
+    upstreamBaseUrl,
+    validationErrors: validation.errors,
+    validationWarnings: validation.warnings
+  };
+}
+
+export function createBackendGeoGatewayFromEnv(env: NodeJS.ProcessEnv = process.env): GeoGateway | null {
+  return initBackendGeoRuntime(env).gateway;
 }

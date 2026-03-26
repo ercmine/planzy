@@ -108,8 +108,13 @@ class Env {
     if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
       throw StateError('Invalid API base URL configured: "$raw"');
     }
-    if (parsed.scheme != 'https') {
-      throw StateError('API base URL must use https: "$raw"');
+    if (parsed.scheme != 'https' && parsed.scheme != 'http') {
+      throw StateError('API base URL must use http or https: "$raw"');
+    }
+    final allowHttp = parsed.scheme == 'http' &&
+        (parsed.host == 'localhost' || parsed.host == '127.0.0.1');
+    if (parsed.scheme == 'http' && !allowHttp) {
+      throw StateError('HTTP API base URL is only allowed for localhost: "$raw"');
     }
     return raw;
   }

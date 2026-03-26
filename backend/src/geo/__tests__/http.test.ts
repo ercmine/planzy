@@ -90,6 +90,58 @@ describe("createGeoHttpHandlers", () => {
     expect(res.statusCode).toBe(200);
     expect(String(res.body)).toContain("Coffee Austin");
   });
+
+  it("returns structured 503 when geo gateway is unavailable", async () => {
+    const handlers = createGeoHttpHandlers(null, {
+      getStatus: () => ({
+        mode: "disabled",
+        routesMounted: true,
+        envValidationErrors: ["Geo disabled"],
+        envValidationWarnings: []
+      })
+    });
+    const res = createMockResponse();
+    await handlers.apiSearch({ method: "GET", headers: {}, url: "/api/geo/search?q=austin" } as never, res as never);
+    expect(res.statusCode).toBe(503);
+    expect(String(res.body)).toContain("geo_unavailable");
+  });
+
+  it("prioritizes canonical places for nearby map discovery", async () => {
+    const handlers = createGeoHttpHandlers({
+      geocode: vi.fn(async () => []),
+      reverseGeocode: vi.fn(async () => ({ displayName: "Austin, Texas", lat: 30.2672, lng: -97.7431, city: "Austin", state: "Texas", source: "nominatim" as const })),
+      autocomplete: vi.fn(),
+      placeLookup: vi.fn(),
+      areaContext: vi.fn(),
+      health: vi.fn(async () => ({ ok: true, mode: "local" as const, version: "1" }))
+    }, {
+      listCanonicalPlaces: () => [{
+        canonicalPlaceId: "pl_1",
+        status: "active",
+        primaryDisplayName: "Perbug Cafe",
+        canonicalCategory: "coffee",
+        latitude: 30.2673,
+        longitude: -97.7432,
+        region: "TX",
+        locality: "Austin",
+        neighborhood: "Downtown",
+        dataCompletenessScore: 84,
+        openNow: true,
+        photoGallery: [],
+        providerStats: {},
+        sourceRecordIds: [],
+        tags: [],
+        mergedFromProviders: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }] as never
+    });
+
+    const res = createMockResponse();
+    await handlers.apiNearby({ method: "GET", headers: {}, url: "/api/geo/nearby?lat=30.2672&lng=-97.7431&radius=1500" } as never, res as never);
+    expect(res.statusCode).toBe(200);
+    expect(String(res.body)).toContain("Perbug Cafe");
+  });
 });
 
 function createMockResponse() {

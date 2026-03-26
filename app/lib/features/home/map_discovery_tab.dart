@@ -209,10 +209,14 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
       await searchThisArea(mode: 'search_this_area');
       return match;
     } on ApiError catch (error) {
-      final message = error.statusCode == 502
+      final message = error.statusCode == 503
+          ? 'Search service is unavailable right now.'
+          : error.statusCode == 502
           ? 'Search is temporarily unavailable.'
           : error.statusCode == 429
               ? 'Search is temporarily busy. Please retry in a moment.'
+              : error.kind == ApiErrorKind.decoding
+                  ? 'Search returned an invalid response. Please update the app or retry.'
               : 'Search failed. Please retry.';
       state = state.copyWith(geoStatus: message);
       return null;
@@ -267,10 +271,14 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
       );
     } on ApiError catch (error) {
       if (requestId != _searchRequestId) return;
-      final message = error.statusCode == 502
+      final message = error.statusCode == 503
+          ? 'Nearby service is unavailable right now.'
+          : error.statusCode == 502
           ? 'Nearby places are temporarily unavailable.'
           : error.statusCode == 429
               ? 'Nearby search is busy. Please retry shortly.'
+              : error.kind == ApiErrorKind.decoding
+                  ? 'Nearby service returned an invalid response.'
               : 'Could not load nearby places. Retry to refresh this area.';
       state = state.copyWith(loading: false, pendingViewportSearch: false, discoveryError: message);
     } catch (_) {

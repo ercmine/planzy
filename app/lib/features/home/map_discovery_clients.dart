@@ -1,4 +1,6 @@
 import '../../api/api_client.dart';
+import '../../api/api_error.dart';
+import '../../core/logging/log.dart';
 import 'map_discovery_models.dart';
 
 abstract class MapGeoClient {
@@ -16,32 +18,32 @@ class RemoteMapGeoClient implements MapGeoClient {
   @override
   Future<List<GeocodeResult>> geocode(String query) async {
     if (query.trim().isEmpty) return const [];
-    final response = await _requestWithFallback(
-      primaryPath: '/api/geo/search',
-      fallbackPath: '/v1/geocode',
+    final response = await _apiClient.getJson(
+      '/api/geo/search',
       queryParameters: {'q': query, 'limit': '5'},
     );
-    return _parseGeocodeRows(response['results']);
+    final rows = _parseGeocodeRows(response['results']);
+    Log.d('geo.search query="$query" parsed=${rows.length}');
+    return rows;
   }
-
 
   @override
   Future<List<GeocodeResult>> autocomplete(String query) async {
     if (query.trim().isEmpty) return const [];
-    final response = await _requestWithFallback(
-      primaryPath: '/api/geo/autocomplete',
-      fallbackPath: '/v1/autocomplete',
+    final response = await _apiClient.getJson(
+      '/api/geo/autocomplete',
       queryParameters: {'q': query, 'limit': '8'},
     );
-    return _parseGeocodeRows(response['suggestions']);
+    final rows = _parseGeocodeRows(response['suggestions']);
+    Log.d('geo.autocomplete query="$query" parsed=${rows.length}');
+    return rows;
   }
 
   @override
   Future<List<MapPin>> nearby({required SearchAreaContext context}) async {
     final viewport = context.viewport;
-    final response = await _requestWithFallback(
-      primaryPath: '/api/geo/nearby',
-      fallbackPath: '/v1/discovery/nearby',
+    final response = await _apiClient.getJson(
+      '/api/geo/nearby',
       queryParameters: {
         'lat': viewport.centerLat.toString(),
         'lng': viewport.centerLng.toString(),
@@ -51,9 +53,17 @@ class RemoteMapGeoClient implements MapGeoClient {
         'mode': context.mode,
       },
     );
-    final rows = response['places'] ?? response['items'];
-    if (rows is! List) return const [];
-    return rows.whereType<Map<String, dynamic>>().map(_toMapPin).where((pin) => pin.latitude != 0 && pin.longitude != 0).toList(growable: false);
+    final rows = response['places'];
+    if (rows is! List) {
+      throw ApiError.decoding('Invalid /api/geo/nearby payload: expected places[]', details: response);
+    }
+    final pins = rows
+        .whereType<Map<String, dynamic>>()
+        .map(_toMapPin)
+        .where((pin) => pin.latitude != 0 && pin.longitude != 0)
+        .toList(growable: false);
+    Log.d('geo.nearby mode=${context.mode} categories=${context.categories.length} parsed=${pins.length}');
+    return pins;
   }
 
   double _radiusMetersFromViewport(MapViewport viewport) {
@@ -93,30 +103,19 @@ class RemoteMapGeoClient implements MapGeoClient {
 
   @override
   Future<ReverseGeocodeResult?> reverseGeocode({required double lat, required double lng}) async {
-    final response = await _requestWithFallback(
-      primaryPath: '/api/geo/reverse',
-      fallbackPath: '/v1/reverse-geocode',
+    final response = await _apiClient.getJson(
+      '/api/geo/reverse',
       queryParameters: {'lat': lat.toString(), 'lon': lng.toString(), 'lng': lng.toString()},
     );
     final row = response['result'];
-    if (row is! Map<String, dynamic>) return null;
+    if (row is! Map<String, dynamic>) {
+      throw ApiError.decoding('Invalid /api/geo/reverse payload: expected result object', details: response);
+    }
     return ReverseGeocodeResult(
       displayName: (row['displayName'] ?? '').toString(),
       city: row['city']?.toString(),
-      region: row['region']?.toString(),
+      region: row['region']?.toString() ?? row['state']?.toString(),
     );
-  }
-
-  Future<Map<String, dynamic>> _requestWithFallback({
-    required String primaryPath,
-    required String fallbackPath,
-    required Map<String, String> queryParameters,
-  }) async {
-    try {
-      return await _apiClient.getJson(primaryPath, queryParameters: queryParameters);
-    } catch (_) {
-      return _apiClient.getJson(fallbackPath, queryParameters: queryParameters);
-    }
   }
 
   List<GeocodeResult> _parseGeocodeRows(Object? rows) {
