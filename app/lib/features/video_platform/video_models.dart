@@ -81,6 +81,7 @@ class PlaceVideoFeedItem {
     this.creatorHandle = '@creator',
     this.thumbnailUrl,
     this.coverUrl,
+    this.placeImageUrl,
     this.trustTier,
     this.trustBadges = const [],
   });
@@ -97,6 +98,7 @@ class PlaceVideoFeedItem {
   final String videoUrl;
   final String? thumbnailUrl;
   final String? coverUrl;
+  final String? placeImageUrl;
   final String? trustTier;
   final List<String> trustBadges;
   final int rating;
@@ -119,6 +121,13 @@ class PlaceVideoFeedItem {
       videoUrl: (json['playbackUrl'] ?? json['videoUrl'] ?? '').toString(),
       thumbnailUrl: json['thumbnailUrl']?.toString(),
       coverUrl: json['coverUrl']?.toString(),
+      placeImageUrl: ((json['placeSummary'] is Map
+                  ? ((json['placeSummary'] as Map)['thumbnailUrl'] ??
+                      (json['placeSummary'] as Map)['photoUrl'] ??
+                      (json['placeSummary'] as Map)['photo'])
+                  : null) ??
+              json['placeImageUrl'])
+          ?.toString(),
       trustTier: (json['trust'] is Map ? (json['trust'] as Map)['trustTier'] : null)?.toString(),
       trustBadges: (json['trust'] is Map && (json['trust'] as Map)['badges'] is List)
           ? ((json['trust'] as Map)['badges'] as List).map((e) => e.toString()).toList(growable: false)
@@ -264,7 +273,7 @@ class PlaceStreamItem {
       scope: scope,
       reviewCount: reviews.length,
       selectedHero: 0,
-      heroImageUrl: firstReview?.thumbnailUrl ?? firstReview?.coverUrl ?? fallbackImageUrl,
+      heroImageUrl: firstReview?.thumbnailUrl ?? firstReview?.coverUrl ?? lead.placeImageUrl ?? fallbackImageUrl,
       heroVideoUrl: firstReview?.videoUrl,
       socialProof: reviews.length > 1 ? '${reviews.length} reviews here' : 'Creator review',
       reviews: reviews,
