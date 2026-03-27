@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import '../puzzles/grid_path_puzzle.dart';
+import '../puzzles/puzzle_framework.dart';
 import 'map_discovery_models.dart';
 
 enum PerbugNodeState { available, completed, locked, exhausted, special, futureChallengeReady }
@@ -56,6 +58,86 @@ class PerbugMoveCandidate {
   final String reason;
 }
 
+class PuzzleNodeProgress {
+  const PuzzleNodeProgress({
+    required this.completed,
+    required this.attemptCount,
+    required this.retryCount,
+    this.bestDuration,
+    this.lastDifficultyTier,
+  });
+
+  final bool completed;
+  final int attemptCount;
+  final int retryCount;
+  final Duration? bestDuration;
+  final String? lastDifficultyTier;
+
+  PuzzleNodeProgress copyWith({
+    bool? completed,
+    int? attemptCount,
+    int? retryCount,
+    Duration? bestDuration,
+    bool clearBestDuration = false,
+    String? lastDifficultyTier,
+    bool clearLastDifficultyTier = false,
+  }) {
+    return PuzzleNodeProgress(
+      completed: completed ?? this.completed,
+      attemptCount: attemptCount ?? this.attemptCount,
+      retryCount: retryCount ?? this.retryCount,
+      bestDuration: clearBestDuration ? null : (bestDuration ?? this.bestDuration),
+      lastDifficultyTier: clearLastDifficultyTier ? null : (lastDifficultyTier ?? this.lastDifficultyTier),
+    );
+  }
+}
+
+class GridPathPuzzleSessionState {
+  const GridPathPuzzleSessionState({
+    required this.session,
+    required this.puzzle,
+    required this.path,
+    required this.status,
+    required this.invalidReason,
+    required this.remainingTime,
+    required this.analytics,
+    this.result,
+  });
+
+  final PuzzleSession session;
+  final GridPathPuzzleInstance puzzle;
+  final List<GridPoint> path;
+  final PuzzleSessionStatus status;
+  final String? invalidReason;
+  final Duration? remainingTime;
+  final Map<String, Object> analytics;
+  final PuzzleResult? result;
+
+  GridPathPuzzleSessionState copyWith({
+    PuzzleSession? session,
+    List<GridPoint>? path,
+    PuzzleSessionStatus? status,
+    String? invalidReason,
+    bool clearInvalidReason = false,
+    Duration? remainingTime,
+    bool clearRemainingTime = false,
+    Map<String, Object>? analytics,
+    PuzzleResult? result,
+    bool clearResult = false,
+  }) {
+    return GridPathPuzzleSessionState(
+      session: session ?? this.session,
+      puzzle: puzzle,
+      path: path ?? this.path,
+      status: status ?? this.status,
+      invalidReason: clearInvalidReason ? null : (invalidReason ?? this.invalidReason),
+      remainingTime: clearRemainingTime ? null : (remainingTime ?? this.remainingTime),
+      analytics: analytics ?? this.analytics,
+      result: clearResult ? null : (result ?? this.result),
+    );
+  }
+}
+
 class PerbugGameState {
   const PerbugGameState({
     required this.nodes,
@@ -66,6 +148,9 @@ class PerbugGameState {
     required this.loading,
     required this.visitedNodeIds,
     required this.history,
+    required this.puzzleProgressByNode,
+    required this.puzzleSession,
+    required this.puzzleTelemetry,
     this.error,
   });
 
@@ -78,6 +163,9 @@ class PerbugGameState {
         loading: false,
         visitedNodeIds: {},
         history: [],
+        puzzleProgressByNode: {},
+        puzzleSession: null,
+        puzzleTelemetry: [],
       );
 
   final List<PerbugNode> nodes;
@@ -88,6 +176,9 @@ class PerbugGameState {
   final bool loading;
   final Set<String> visitedNodeIds;
   final List<String> history;
+  final Map<String, PuzzleNodeProgress> puzzleProgressByNode;
+  final GridPathPuzzleSessionState? puzzleSession;
+  final List<Map<String, Object>> puzzleTelemetry;
   final String? error;
 
   PerbugNode? get currentNode {
@@ -109,6 +200,10 @@ class PerbugGameState {
     bool? loading,
     Set<String>? visitedNodeIds,
     List<String>? history,
+    Map<String, PuzzleNodeProgress>? puzzleProgressByNode,
+    GridPathPuzzleSessionState? puzzleSession,
+    bool clearPuzzleSession = false,
+    List<Map<String, Object>>? puzzleTelemetry,
     String? error,
     bool clearError = false,
   }) {
@@ -121,6 +216,9 @@ class PerbugGameState {
       loading: loading ?? this.loading,
       visitedNodeIds: visitedNodeIds ?? this.visitedNodeIds,
       history: history ?? this.history,
+      puzzleProgressByNode: puzzleProgressByNode ?? this.puzzleProgressByNode,
+      puzzleSession: clearPuzzleSession ? null : (puzzleSession ?? this.puzzleSession),
+      puzzleTelemetry: puzzleTelemetry ?? this.puzzleTelemetry,
       error: clearError ? null : (error ?? this.error),
     );
   }

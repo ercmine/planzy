@@ -16,6 +16,9 @@ void main() {
       loading: false,
       visitedNodeIds: {'a'},
       history: [],
+      puzzleProgressByNode: {},
+      puzzleSession: null,
+      puzzleTelemetry: [],
     );
 
     final moves = state.reachableMoves();
