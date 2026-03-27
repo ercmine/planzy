@@ -1,7 +1,6 @@
-import 'dart:convert';
-
-import 'package:crypto/crypto.dart';
 import 'package:web3dart/crypto.dart' as web3_crypto;
+
+import 'seed_codec.dart';
 
 String methodSelector(String signature) {
   if (signature.startsWith('0x') && signature.length == 10) return signature.toLowerCase();
@@ -40,10 +39,14 @@ String encodeBytes32Call(String signature, List<int> bytes32) {
   return '${methodSelector(signature)}$encoded';
 }
 
-String encodeWriteCall(String signature, {required String walletAddress}) {
+String encodeWriteCall(String signature, {required String walletAddress, String? seedInput}) {
   if (signature == 'plant(bytes32)') {
-    final digest = sha256.convert(utf8.encode('$walletAddress:${DateTime.now().microsecondsSinceEpoch}'));
-    return encodeBytes32Call(signature, digest.bytes);
+    final seedValidation = validatePlantSeed(seedInput ?? '');
+    if (!seedValidation.isValid || seedValidation.normalizedSeedHex == null) {
+      throw FormatException(seedValidation.errorMessage ?? 'Invalid plant seed.');
+    }
+    final normalized = _strip0x(seedValidation.normalizedSeedHex!);
+    return '${methodSelector(signature)}$normalized';
   }
 
   if (signature == 'water(uint256)') {

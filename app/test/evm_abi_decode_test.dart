@@ -19,4 +19,15 @@ void main() {
 
     expect(decodeString(encodedHex), value);
   });
+
+  test('encodeWriteCall for plant(bytes32) uses provided seed deterministically', () {
+    final txData = encodeWriteCall(
+      'plant(bytes32)',
+      walletAddress: '0x1234567890123456789012345678901234567890',
+      seedInput: 'oak-seed',
+    );
+
+    expect(txData.startsWith('0x9dcf89ff'), isTrue);
+    expect(txData, contains('6f616b2d73656564'));
+  });
 }

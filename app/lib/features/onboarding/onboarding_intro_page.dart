@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import '../dryad/chain/dryad_chain_providers.dart';
+import '../dryad/chain/seed_codec.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_state.dart';
 import 'onboarding_widgets.dart';
@@ -21,10 +22,13 @@ class OnboardingIntroPage extends ConsumerStatefulWidget {
 
 class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
   final _walletController = TextEditingController();
+  final _seedController = TextEditingController();
+  bool _seedTouched = false;
 
   @override
   void dispose() {
     _walletController.dispose();
+    _seedController.dispose();
     super.dispose();
   }
 
@@ -32,6 +36,8 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(onboardingControllerProvider);
     final config = ref.watch(dryadContractConfigProvider);
+    final seedValidation = validatePlantSeed(_seedController.text);
+    final showSeedError = _seedTouched && !seedValidation.isValid;
 
     if (_walletController.text != state.walletAddress) {
       _walletController.value = _walletController.value.copyWith(
@@ -103,9 +109,42 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
             ),
             if (state.status == OnboardingFlowStatus.nftNotMinted) ...[
               const SizedBox(height: AppSpacing.s),
+              AppCard(
+                tone: AppCardTone.featured,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Plant seed', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: AppSpacing.xs),
+                    const Text(
+                      'Your seed is submitted on-chain to plant(bytes32). Enter up to 32 UTF-8 bytes, or paste a 0x-prefixed bytes32 value.',
+                    ),
+                    const SizedBox(height: AppSpacing.s),
+                    TextField(
+                      controller: _seedController,
+                      decoration: const InputDecoration(
+                        labelText: 'Seed',
+                        hintText: 'e.g. solstice-grove-01 or 0x…64 hex chars',
+                      ),
+                      onChanged: (_) {
+                        setState(() {
+                          _seedTouched = true;
+                        });
+                      },
+                    ),
+                    if (showSeedError) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(seedValidation.errorMessage ?? 'Invalid seed.', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s),
               SecondaryButton(
                 label: 'Submit on-chain plant transaction',
-                onPressed: state.isBusy ? null : ref.read(onboardingControllerProvider.notifier).mintNft,
+                onPressed: state.isBusy || !seedValidation.isValid
+                    ? null
+                    : () => ref.read(onboardingControllerProvider.notifier).mintNft(seedInput: _seedController.text),
               ),
             ],
             if (state.errorMessage != null) ...[

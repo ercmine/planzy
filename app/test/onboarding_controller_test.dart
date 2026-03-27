@@ -18,6 +18,7 @@ class _FakeService extends GroveNftService {
         );
 
   final GroveNftSnapshot snapshot;
+  String? lastMintSeedInput;
 
   @override
   Future<GroveNftSnapshot> fetchWalletSnapshot(String walletAddress) async => snapshot;
@@ -26,7 +27,10 @@ class _FakeService extends GroveNftService {
   Future<int> readChainId() async => snapshot.chainId;
 
   @override
-  Future<String> mint({required String walletAddress, required String methodSignature}) async => '0xtest';
+  Future<String> mint({required String walletAddress, required String methodSignature, required String seedInput}) async {
+    lastMintSeedInput = seedInput;
+    return '0xtest';
+  }
 }
 
 void main() {
@@ -96,5 +100,34 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     final store = IdentityStore(sharedPreferences: prefs);
     expect(await store.isOnboardingCompleted(), isTrue);
+  });
+
+  test('requires seed input when submitting plant transaction', () async {
+    SharedPreferences.setMockInitialValues({});
+    final service = _FakeService(
+      const GroveNftSnapshot(
+        chainId: 1,
+        wallet: '0xabc',
+        ownedBalance: BigInt.zero,
+        tokenId: null,
+        tokenUri: null,
+        artwork: null,
+      ),
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        groveNftServiceProvider.overrideWithValue(service),
+      ],
+    );
+
+    final controller = container.read(onboardingControllerProvider.notifier);
+    controller.setWalletAddress('0xabc');
+    await controller.mintNft(seedInput: '   ');
+
+    final state = container.read(onboardingControllerProvider);
+    expect(state.status, OnboardingFlowStatus.onboardingFailed);
+    expect(state.errorMessage, contains('Enter a seed'));
+    expect(service.lastMintSeedInput, isNull);
   });
 }

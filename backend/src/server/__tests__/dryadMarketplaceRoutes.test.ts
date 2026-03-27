@@ -27,7 +27,10 @@ describe("dryad marketplace routes", () => {
     const claim = await fetch(`${baseUrl}/v1/dryad/trees/tree-004/claim-plant`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ wallet: "0x5555555555555555555555555555555555555555" })
+      body: JSON.stringify({
+        wallet: "0x5555555555555555555555555555555555555555",
+        seed: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      })
     });
     expect(claim.status).toBe(200);
 

@@ -59,7 +59,7 @@ export class DryadMarketplaceService {
     return this.trees.find((tree) => tree.treeId === treeId);
   }
 
-  claimAndPlant(treeId: string, wallet: WalletAddress): DryadTree {
+  claimAndPlant(treeId: string, wallet: WalletAddress, seed: `0x${string}`): DryadTree {
     const tree = this.requireTree(treeId);
     if (tree.owner !== ZERO_WALLET) {
       throw new Error("tree_not_claimable");
@@ -77,7 +77,7 @@ export class DryadMarketplaceService {
     };
     this.replaceTree(updated);
     this.replaceSpot({ ...targetSpot, claimState: "claimed" });
-    this.logEvent(updated.treeId, "planted", "claim_and_plant", wallet);
+    this.logEvent(updated.treeId, "planted", "claim_and_plant", wallet, `seed:${seed}`);
     return updated;
   }
 

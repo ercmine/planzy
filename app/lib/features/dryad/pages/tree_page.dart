@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/widgets.dart';
 import '../chain/dryad_chain_providers.dart';
+import '../chain/seed_codec.dart';
 import '../dryad_providers.dart';
 import '../models/dryad_models.dart';
 
@@ -80,9 +81,67 @@ class _ActionsState extends ConsumerState<_Actions> {
 
   Future<void> _claimAndPlant() async {
     if (widget.wallet == null) return;
+    final seedInput = await _promptPlantSeed();
+    if (seedInput == null) return;
+    final seedValidation = validatePlantSeed(seedInput);
+    if (!seedValidation.isValid || seedValidation.normalizedSeedHex == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(seedValidation.errorMessage ?? 'Invalid seed.')));
+      return;
+    }
     final repo = await ref.read(dryadRepositoryProvider.future);
-    await repo.claimAndPlant(widget.tree.id, wallet: widget.wallet!);
+    await repo.claimAndPlant(widget.tree.id, wallet: widget.wallet!, seed: seedValidation.normalizedSeedHex!);
     _refresh();
+  }
+
+  Future<String?> _promptPlantSeed() async {
+    final controller = TextEditingController();
+    String? value;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final validation = validatePlantSeed(controller.text);
+          return AlertDialog(
+            title: const Text('Plant with seed'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Your seed is submitted to the live plant(bytes32) contract call and shapes the resulting tree.'),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    labelText: 'Seed',
+                    hintText: 'Text (<=32 bytes) or 0x + 64 hex chars',
+                  ),
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+                if (!validation.isValid && controller.text.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(validation.errorMessage ?? 'Invalid seed.', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              FilledButton(
+                onPressed: validation.isValid
+                    ? () {
+                        value = controller.text;
+                        Navigator.pop(context);
+                      }
+                    : null,
+                child: const Text('Continue'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    controller.dispose();
+    return value;
   }
 
   Future<void> _buy() async {
