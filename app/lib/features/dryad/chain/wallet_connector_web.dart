@@ -22,6 +22,15 @@ class _BrowserWalletConnector implements WalletConnector {
   List<String> get supportedWalletIds => const <String>[_metaMask, _phantom, _coinbase];
 
   @override
+  bool get isMobileBrowser {
+    final agent = web.window.navigator.userAgent.toLowerCase();
+    return agent.contains('iphone') ||
+        agent.contains('ipad') ||
+        agent.contains('android') ||
+        agent.contains('mobile');
+  }
+
+  @override
   bool get isAvailable => _resolveDefaultProvider() != null;
 
   Object? get _ethereum {
@@ -38,6 +47,25 @@ class _BrowserWalletConnector implements WalletConnector {
 
   @override
   bool isWalletInstalled(String walletId) => _resolveProvider(walletId) != null;
+
+  @override
+  Future<bool> launchWalletApp({required String walletId, required Uri dappUri}) async {
+    if (!isMobileBrowser) return false;
+    final normalized = walletId.toLowerCase();
+    final target = dappUri.toString();
+    final encodedTarget = Uri.encodeComponent(target);
+
+    final deepLink = switch (normalized) {
+      _metaMask => 'https://metamask.app.link/dapp/${dappUri.host}${dappUri.path}${dappUri.hasQuery ? '?${dappUri.query}' : ''}',
+      _coinbase => 'https://go.cb-w.com/dapp?cb_url=$encodedTarget',
+      _phantom => 'https://phantom.app/ul/browse/$encodedTarget?ref=${Uri.encodeComponent(dappUri.origin)}',
+      _ => null,
+    };
+
+    if (deepLink == null) return false;
+    web.window.location.href = deepLink;
+    return true;
+  }
 
   @override
   Future<String> connectWallet({String? walletId}) async {

@@ -7,10 +7,16 @@ class _UnsupportedWalletConnector implements WalletConnector {
   bool get isAvailable => false;
 
   @override
+  bool get isMobileBrowser => false;
+
+  @override
   List<String> get supportedWalletIds => const <String>[];
 
   @override
   bool isWalletInstalled(String walletId) => false;
+
+  @override
+  Future<bool> launchWalletApp({required String walletId, required Uri dappUri}) async => false;
 
   @override
   Future<String> connectWallet({String? walletId}) async {
