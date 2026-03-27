@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../core/env/env.dart';
@@ -59,13 +60,19 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
   MapLibreMapController? _controller;
   CameraPosition? _lastCamera;
   bool _styleLoaded = false;
-  bool _forceBuiltinWebStyle = false;
+  bool _forceBuiltinStyle = false;
+  bool _hasLoggedContainerSize = false;
   VoidCallback? _cameraListener;
   Timer? _styleFallbackTimer;
   double? _manualTilt;
 
   DryadMapTheme get _theme => DryadMapTheme.resolve(brightness: Theme.of(context).brightness, config: widget.config);
-  String get _resolvedStyleString => _forceBuiltinWebStyle ? _builtinRasterStyleJson : _theme.styleUrl;
+  String get _resolvedStyleString => _forceBuiltinStyle ? _builtinRasterStyleJson : _theme.styleUrl;
+  String get _stylePreview {
+    final value = _resolvedStyleString;
+    final end = value.length > 160 ? 160 : value.length;
+    return value.substring(0, end);
+  }
 
   @override
   void didUpdateWidget(covariant DryadMapLibreView oldWidget) {
@@ -95,10 +102,13 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: MapLibreMap(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _logContainerSizeOnce(constraints);
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: MapLibreMap(
             key: ValueKey<String>(_resolvedStyleString),
             styleString: _resolvedStyleString,
             initialCameraPosition: _cameraPositionForState(),
@@ -112,6 +122,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
             tiltGesturesEnabled: widget.config.enableEnhancedPitch,
             myLocationEnabled: false,
             onMapCreated: (controller) {
+              if (widget.config.enableDiagnostics) {
+                Log.d('map.lifecycle onMapCreated style=${_theme.styleUrl} fallbackActive=$_forceBuiltinStyle');
+              }
               final previousListener = _cameraListener;
               if (previousListener != null) {
                 _controller?.removeListener(previousListener);
@@ -125,6 +138,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
             onStyleLoadedCallback: () async {
               _styleFallbackTimer?.cancel();
               _styleLoaded = true;
+              if (widget.config.enableDiagnostics) {
+                Log.d('map.style loaded style=$_stylePreview');
+              }
               widget.onMapReady();
               await _applyStyleEnhancements();
               await _syncMapData();
@@ -143,22 +159,24 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
               );
             },
             onCameraTrackingChanged: (_) {},
-          ),
-        ),
-        if (_showPerspectiveHandle)
-          Positioned(
-            right: 12,
-            top: 84,
-            bottom: 164,
-            child: _PerspectiveDragHandle(
-              tilt: _resolvedTilt(),
-              minTilt: _minPerspectiveTilt,
-              maxTilt: _maxPerspectiveTilt,
-              onDrag: _applyPerspectiveDrag,
-              onReset: _resetPerspective,
+              ),
             ),
-          ),
-      ],
+            if (_showPerspectiveHandle)
+              Positioned(
+                right: 12,
+                top: 84,
+                bottom: 164,
+                child: _PerspectiveDragHandle(
+                  tilt: _resolvedTilt(),
+                  minTilt: _minPerspectiveTilt,
+                  maxTilt: _maxPerspectiveTilt,
+                  onDrag: _applyPerspectiveDrag,
+                  onReset: _resetPerspective,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -224,13 +242,49 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
   }
 
   void _scheduleWebStyleFallback() {
-    if (!kIsWeb || _forceBuiltinWebStyle) return;
+    _styleFallbackTimer?.cancel();
+    _probeStyleUrlInBackground();
+    if (_forceBuiltinStyle) return;
     _styleFallbackTimer?.cancel();
     _styleFallbackTimer = Timer(const Duration(seconds: 4), () {
-      if (!mounted || _styleLoaded || _forceBuiltinWebStyle) return;
-      Log.warn('map.style falling back to built-in web raster style after remote style timeout');
-      setState(() => _forceBuiltinWebStyle = true);
+      if (!mounted || _styleLoaded || _forceBuiltinStyle) return;
+      Log.warn('map.style timeout waiting for style load; falling back to built-in raster style');
+      setState(() => _forceBuiltinStyle = true);
     });
+  }
+
+  void _logContainerSizeOnce(BoxConstraints constraints) {
+    if (_hasLoggedContainerSize || !widget.config.enableDiagnostics) return;
+    _hasLoggedContainerSize = true;
+    Log.d('map.layout maxWidth=${constraints.maxWidth} maxHeight=${constraints.maxHeight} hasBounded=${constraints.hasBoundedHeight && constraints.hasBoundedWidth}');
+  }
+
+  Future<void> _probeStyleUrlInBackground() async {
+    if (_forceBuiltinStyle) return;
+    final style = _theme.styleUrl;
+    if (style.trimLeft().startsWith('{')) return;
+    final uri = Uri.tryParse(style);
+    if (uri == null || !uri.hasScheme) return;
+
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 3));
+      if (response.statusCode >= 400) {
+        Log.warn('map.style preflight failed status=${response.statusCode} url=$style');
+        if (mounted && !_styleLoaded && !_forceBuiltinStyle) {
+          setState(() => _forceBuiltinStyle = true);
+        }
+      } else if (widget.config.enableDiagnostics) {
+        Log.d('map.style preflight ok status=${response.statusCode} url=$style');
+      }
+    } catch (error, stackTrace) {
+      Log.warn('map.style preflight exception url=$style error=$error');
+      if (widget.config.enableDiagnostics) {
+        Log.error('map.style preflight stacktrace', error: error, stackTrace: stackTrace);
+      }
+      if (mounted && !_styleLoaded && !_forceBuiltinStyle) {
+        setState(() => _forceBuiltinStyle = true);
+      }
+    }
   }
 
   String get _builtinRasterStyleJson => jsonEncode({
@@ -259,7 +313,7 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
     if (controller == null) return;
     final mapTheme = _theme;
     if (widget.config.enableDiagnostics) {
-      Log.d('map.style loading style=${mapTheme.styleUrl} 3d=${widget.config.enable3dBuildings}');
+      Log.d('map.style loading style=$_stylePreview 3d=${widget.config.enable3dBuildings}');
     }
 
     if (widget.config.enable3dBuildings) {
@@ -409,16 +463,23 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
     final payload = <String, dynamic>{'type': 'FeatureCollection', 'features': features};
     try {
       await controller.setGeoJsonSource(id, payload);
-    } catch (_) {
-      await controller.addSource(
-        id,
-        GeojsonSourceProperties(
-          data: payload,
-          cluster: id == 'dryad-places' && widget.config.enableClustering,
-          clusterRadius: 58,
-          clusterMaxZoom: 13,
-        ),
-      );
+    } catch (setError) {
+      if (widget.config.enableDiagnostics) {
+        Log.warn('map.source set failed id=$id error=$setError; attempting addSource');
+      }
+      try {
+        await controller.addSource(
+          id,
+          GeojsonSourceProperties(
+            data: payload,
+            cluster: id == 'dryad-places' && widget.config.enableClustering,
+            clusterRadius: 58,
+            clusterMaxZoom: 13,
+          ),
+        );
+      } catch (addError, stackTrace) {
+        Log.error('map.source add failed id=$id', error: addError, stackTrace: stackTrace);
+      }
     }
   }
 
@@ -438,7 +499,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
           circleBlur: 0.6,
         ),
       );
-    } catch (_) {}
+    } catch (error) {
+      if (widget.config.enableDiagnostics) Log.warn('map.layer dryad-district-halo-layer skipped error=$error');
+    }
 
     try {
       await controller.addLayer(
@@ -450,7 +513,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
           circleRadius: ['interpolate', ['linear'], ['zoom'], 9, 6, 14, 16],
         ),
       );
-    } catch (_) {}
+    } catch (error) {
+      if (widget.config.enableDiagnostics) Log.warn('map.layer dryad-district-core-layer skipped error=$error');
+    }
 
     try {
       await controller.addLayer(
@@ -489,7 +554,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
         ),
         filter: ['has', 'point_count'],
       );
-    } catch (_) {}
+    } catch (error) {
+      if (widget.config.enableDiagnostics) Log.warn('map.layer cluster layers skipped error=$error');
+    }
 
     try {
       await controller.addLayer(
@@ -574,7 +641,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
         ),
         filter: ['!', ['has', 'point_count']],
       );
-    } catch (_) {}
+    } catch (error) {
+      if (widget.config.enableDiagnostics) Log.warn('map.layer place layers skipped error=$error');
+    }
 
     try {
       await controller.addLayer(
@@ -598,7 +667,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
           circleOpacity: 0.98,
         ),
       );
-    } catch (_) {}
+    } catch (error) {
+      if (widget.config.enableDiagnostics) Log.warn('map.layer dryad-user layers skipped error=$error');
+    }
   }
 }
 
