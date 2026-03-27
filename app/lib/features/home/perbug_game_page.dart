@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/widgets.dart';
+import '../puzzles/grid_path_puzzle_sheet.dart';
 import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
 
@@ -26,6 +27,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     final state = ref.watch(perbugGameControllerProvider);
     final controller = ref.read(perbugGameControllerProvider.notifier);
     final moves = state.reachableMoves().take(8).toList(growable: false);
+    final currentProgress = state.currentNode == null ? null : state.puzzleProgressByNode[state.currentNode!.id];
 
     return RefreshIndicator(
       onRefresh: controller.initialize,
@@ -35,8 +37,8 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
         children: [
           const PremiumHeader(
             title: 'Perbug World Board',
-            subtitle: 'Jump between real-world nodes, spend energy, and expand your route.',
-            badge: AppPill(label: 'Fixed 2D mode', icon: Icons.grid_3x3),
+            subtitle: 'Jump between real-world nodes, spend energy, and solve node puzzles.',
+            badge: AppPill(label: 'Grid Path live', icon: Icons.extension_rounded),
           ),
           const SizedBox(height: 12),
           AppCard(
@@ -80,6 +82,30 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
           if (state.loading) const AppCard(child: LinearProgressIndicator()),
           if (state.error != null) AppCard(child: Text(state.error!)),
           _Section(
+            title: 'Node puzzle: Perbug Grid Path',
+            subtitle: 'Deterministic from node latitude/longitude with tunable difficulty knobs.',
+            children: [
+              if (state.currentNode != null)
+                Text('Current node seed: ${state.currentNode!.latitude.toStringAsFixed(4)}, ${state.currentNode!.longitude.toStringAsFixed(4)}'),
+              if (currentProgress != null)
+                Text(
+                  'Progress • completed: ${currentProgress.completed} • attempts: ${currentProgress.attemptCount} '
+                  '• best: ${currentProgress.bestDuration?.inSeconds ?? '-'}s',
+                ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: state.currentNode == null
+                    ? null
+                    : () {
+                        controller.launchPuzzleForCurrentNode();
+                        _openPuzzleSheet(context);
+                      },
+                icon: const Icon(Icons.grid_4x4_rounded),
+                label: const Text('Open Grid Path puzzle'),
+              ),
+            ],
+          ),
+          _Section(
             title: 'Reachable jumps',
             subtitle: 'Movement is restricted by distance and energy. No unrestricted teleporting.',
             children: moves
@@ -112,24 +138,40 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 )
                 .toList(growable: false),
           ),
-          _Section(
-            title: 'Upcoming node challenge slots',
-            subtitle: 'Puzzle systems are not enabled yet, but node states and rewards are puzzle-ready.',
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: const [
-                  AppPill(label: 'available', icon: Icons.check_circle_outline),
-                  AppPill(label: 'completed', icon: Icons.task_alt),
-                  AppPill(label: 'locked', icon: Icons.lock_outline),
-                  AppPill(label: 'future-challenge-ready', icon: Icons.extension_outlined),
-                ],
-              ),
-            ],
-          ),
         ],
       ),
+    );
+  }
+
+  Future<void> _openPuzzleSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final session = ref.watch(perbugGameControllerProvider).puzzleSession;
+            final controller = ref.read(perbugGameControllerProvider.notifier);
+            if (session == null) return const SizedBox.shrink();
+            return FractionallySizedBox(
+              heightFactor: 0.95,
+              child: GridPathPuzzleSheet(
+                session: session,
+                onStart: controller.startActivePuzzle,
+                onTapCell: controller.tapPuzzleCell,
+                onUndo: controller.undoPuzzleMove,
+                onReset: controller.resetPuzzleSession,
+                onAbandon: controller.abandonPuzzleSession,
+                onClose: () {
+                  controller.clearPuzzleSession();
+                  Navigator.of(context).pop();
+                },
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

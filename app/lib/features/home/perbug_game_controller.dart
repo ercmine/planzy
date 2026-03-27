@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/location/location_controller.dart';
+import '../puzzles/grid_path_puzzle.dart';
+import '../puzzles/puzzle_framework.dart';
 import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_tab.dart' show mapGeoClientProvider;
@@ -11,9 +15,13 @@ final perbugGameControllerProvider = StateNotifierProvider<PerbugGameController,
 });
 
 class PerbugGameController extends StateNotifier<PerbugGameState> {
-  PerbugGameController(this._ref) : super(PerbugGameState.initial());
+  PerbugGameController(this._ref)
+      : _gridPathGenerator = const GridPathGenerator(),
+        super(PerbugGameState.initial());
 
   final Ref _ref;
+  final GridPathGenerator _gridPathGenerator;
+  Timer? _puzzleTimer;
 
   static const MapViewport _fixedGameplayViewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
 
@@ -84,6 +92,364 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     );
   }
 
+  void launchPuzzleForCurrentNode() {
+    final node = state.currentNode;
+    if (node == null) return;
+
+    final config = _difficultyConfigForNode(node);
+    final puzzle = _gridPathGenerator.generate(
+      seedInput: PuzzleSeedInput(nodeId: node.id, latitude: node.latitude, longitude: node.longitude),
+      config: config,
+    );
+
+    final session = PuzzleSession(
+      sessionId: '${node.id}-${DateTime.now().millisecondsSinceEpoch}',
+      nodeId: node.id,
+      nodeRegion: node.region,
+      instance: puzzle,
+      status: PuzzleSessionStatus.preview,
+      startedAt: DateTime.now().toUtc(),
+      retryCount: 0,
+      moveCount: 0,
+      elapsed: Duration.zero,
+    );
+
+    state = state.copyWith(
+      puzzleSession: GridPathPuzzleSessionState(
+        session: session,
+        puzzle: puzzle,
+        path: const [],
+        status: PuzzleSessionStatus.preview,
+        invalidReason: null,
+        remainingTime: puzzle.rules.timerSeconds == null ? null : Duration(seconds: puzzle.rules.timerSeconds!),
+        analytics: {
+          'event': 'puzzle_generated',
+          'node_id': node.id,
+          'region': node.region,
+          'difficulty_score': puzzle.preview.difficulty.score,
+          'difficulty_tier': puzzle.preview.difficulty.tier,
+          ...puzzle.preview.difficulty.explanation,
+          ...puzzle.debug,
+        },
+      ),
+      puzzleTelemetry: [
+        {
+          'event': 'puzzle_generated',
+          'node_id': node.id,
+          'seed': puzzle.seed.value,
+          'difficulty_score': puzzle.preview.difficulty.score,
+          'difficulty_tier': puzzle.preview.difficulty.tier,
+          'generated_at': DateTime.now().toIso8601String(),
+        },
+        ...state.puzzleTelemetry,
+      ],
+    );
+  }
+
+  void startActivePuzzle() {
+    final session = state.puzzleSession;
+    if (session == null) return;
+    _puzzleTimer?.cancel();
+    final startedAt = DateTime.now().toUtc();
+    final sessionData = session.copyWith(
+      session: PuzzleSession(
+        sessionId: session.session.sessionId,
+        nodeId: session.session.nodeId,
+        nodeRegion: session.session.nodeRegion,
+        instance: session.session.instance,
+        status: PuzzleSessionStatus.active,
+        startedAt: startedAt,
+        retryCount: session.session.retryCount,
+        moveCount: 0,
+        elapsed: Duration.zero,
+      ),
+      status: PuzzleSessionStatus.active,
+      path: const [],
+      clearInvalidReason: true,
+      clearResult: true,
+      analytics: {
+        ...session.analytics,
+        'event': 'puzzle_started',
+        'started_at': startedAt.toIso8601String(),
+      },
+    );
+
+    state = state.copyWith(
+      puzzleSession: sessionData,
+      puzzleTelemetry: [
+        {
+          'event': 'puzzle_started',
+          'node_id': session.session.nodeId,
+          'session_id': session.session.sessionId,
+          'started_at': startedAt.toIso8601String(),
+        },
+        ...state.puzzleTelemetry,
+      ],
+    );
+
+    final timerSeconds = session.puzzle.rules.timerSeconds;
+    if (timerSeconds != null) {
+      _puzzleTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tickTimer());
+    }
+  }
+
+  void tapPuzzleCell(GridPoint point) {
+    final session = state.puzzleSession;
+    if (session == null || session.status != PuzzleSessionStatus.active) return;
+
+    final validation = GridPathValidator.validateMove(instance: session.puzzle, path: session.path, move: point);
+    if (!validation.isValid) {
+      state = state.copyWith(puzzleSession: session.copyWith(invalidReason: validation.reason));
+      return;
+    }
+
+    final updatedPath = [...session.path, point];
+    final moveCount = updatedPath.length;
+    final elapsed = DateTime.now().toUtc().difference(session.session.startedAt);
+    var nextSession = session.copyWith(
+      path: updatedPath,
+      session: PuzzleSession(
+        sessionId: session.session.sessionId,
+        nodeId: session.session.nodeId,
+        nodeRegion: session.session.nodeRegion,
+        instance: session.session.instance,
+        status: session.session.status,
+        startedAt: session.session.startedAt,
+        retryCount: session.session.retryCount,
+        moveCount: moveCount,
+        elapsed: elapsed,
+      ),
+      clearInvalidReason: true,
+    );
+
+    if (GridPathValidator.isCompleted(instance: session.puzzle, path: updatedPath)) {
+      _completePuzzle(session: nextSession, succeeded: true);
+      return;
+    }
+
+    state = state.copyWith(puzzleSession: nextSession);
+  }
+
+  void undoPuzzleMove() {
+    final session = state.puzzleSession;
+    if (session == null || session.path.isEmpty || session.status != PuzzleSessionStatus.active) return;
+    state = state.copyWith(
+      puzzleSession: session.copyWith(
+        path: session.path.sublist(0, session.path.length - 1),
+        clearInvalidReason: true,
+      ),
+    );
+  }
+
+  void resetPuzzleSession() {
+    final session = state.puzzleSession;
+    if (session == null) return;
+    _puzzleTimer?.cancel();
+
+    final retries = session.session.retryCount + 1;
+    final refreshed = session.copyWith(
+      status: PuzzleSessionStatus.preview,
+      path: const [],
+      clearInvalidReason: true,
+      remainingTime: session.puzzle.rules.timerSeconds == null ? null : Duration(seconds: session.puzzle.rules.timerSeconds!),
+      session: PuzzleSession(
+        sessionId: session.session.sessionId,
+        nodeId: session.session.nodeId,
+        nodeRegion: session.session.nodeRegion,
+        instance: session.session.instance,
+        status: PuzzleSessionStatus.preview,
+        startedAt: session.session.startedAt,
+        retryCount: retries,
+        moveCount: 0,
+        elapsed: Duration.zero,
+      ),
+      clearResult: true,
+    );
+
+    state = state.copyWith(
+      puzzleSession: refreshed,
+      puzzleTelemetry: [
+        {
+          'event': 'puzzle_retry',
+          'node_id': session.session.nodeId,
+          'session_id': session.session.sessionId,
+          'retry_count': retries,
+          'at': DateTime.now().toIso8601String(),
+        },
+        ...state.puzzleTelemetry,
+      ],
+    );
+  }
+
+  void abandonPuzzleSession() {
+    final session = state.puzzleSession;
+    if (session == null) return;
+    _puzzleTimer?.cancel();
+    final elapsed = DateTime.now().toUtc().difference(session.session.startedAt);
+    final result = PuzzleResult(
+      sessionId: session.session.sessionId,
+      nodeId: session.session.nodeId,
+      status: PuzzleSessionStatus.abandoned,
+      duration: elapsed,
+      moveCount: session.path.length,
+      retryCount: session.session.retryCount,
+      difficulty: session.puzzle.preview.difficulty,
+      seed: session.puzzle.seed,
+      metadata: {
+        'reason': 'user_abandon',
+      },
+    );
+
+    state = state.copyWith(
+      puzzleSession: session.copyWith(status: PuzzleSessionStatus.abandoned, result: result),
+      puzzleTelemetry: [
+        {
+          'event': 'puzzle_abandoned',
+          'node_id': session.session.nodeId,
+          'session_id': session.session.sessionId,
+          'move_count': session.path.length,
+          'duration_ms': elapsed.inMilliseconds,
+          'at': DateTime.now().toIso8601String(),
+        },
+        ...state.puzzleTelemetry,
+      ],
+    );
+  }
+
+  void clearPuzzleSession() {
+    _puzzleTimer?.cancel();
+    state = state.copyWith(clearPuzzleSession: true);
+  }
+
+  void _tickTimer() {
+    final session = state.puzzleSession;
+    if (session == null || session.status != PuzzleSessionStatus.active) return;
+    final remaining = session.remainingTime;
+    if (remaining == null) return;
+
+    final next = remaining - const Duration(seconds: 1);
+    if (next <= Duration.zero) {
+      _completePuzzle(session: session.copyWith(remainingTime: Duration.zero), succeeded: false, failureReason: 'Timer expired');
+      return;
+    }
+    state = state.copyWith(puzzleSession: session.copyWith(remainingTime: next));
+  }
+
+  void _completePuzzle({required GridPathPuzzleSessionState session, required bool succeeded, String? failureReason}) {
+    _puzzleTimer?.cancel();
+    final elapsed = DateTime.now().toUtc().difference(session.session.startedAt);
+    final status = succeeded ? PuzzleSessionStatus.succeeded : PuzzleSessionStatus.failed;
+    final result = PuzzleResult(
+      sessionId: session.session.sessionId,
+      nodeId: session.session.nodeId,
+      status: status,
+      duration: elapsed,
+      moveCount: session.path.length,
+      retryCount: session.session.retryCount,
+      difficulty: session.puzzle.preview.difficulty,
+      seed: session.puzzle.seed,
+      metadata: {
+        'generated_solution_length': session.puzzle.suggestedSolutionLength,
+        'failure_reason': failureReason,
+      },
+    );
+
+    final nodeProgress = state.puzzleProgressByNode[session.session.nodeId] ??
+        const PuzzleNodeProgress(completed: false, attemptCount: 0, retryCount: 0);
+    final updatedNodeProgress = nodeProgress.copyWith(
+      completed: succeeded ? true : nodeProgress.completed,
+      attemptCount: nodeProgress.attemptCount + 1,
+      retryCount: session.session.retryCount,
+      bestDuration: succeeded
+          ? (nodeProgress.bestDuration == null || elapsed < nodeProgress.bestDuration! ? elapsed : nodeProgress.bestDuration)
+          : nodeProgress.bestDuration,
+      lastDifficultyTier: session.puzzle.preview.difficulty.tier,
+    );
+
+    final rewardEnergy = succeeded ? _energyRewardFor(session.puzzle.preview.difficulty.tier) : 0;
+    final updatedEnergy = (state.energy + rewardEnergy).clamp(0, state.maxEnergy);
+
+    state = state.copyWith(
+      energy: updatedEnergy,
+      puzzleProgressByNode: {
+        ...state.puzzleProgressByNode,
+        session.session.nodeId: updatedNodeProgress,
+      },
+      puzzleSession: session.copyWith(
+        status: status,
+        result: result,
+        invalidReason: failureReason,
+        session: PuzzleSession(
+          sessionId: session.session.sessionId,
+          nodeId: session.session.nodeId,
+          nodeRegion: session.session.nodeRegion,
+          instance: session.session.instance,
+          status: status,
+          startedAt: session.session.startedAt,
+          retryCount: session.session.retryCount,
+          moveCount: session.path.length,
+          elapsed: elapsed,
+        ),
+      ),
+      history: [
+        succeeded
+            ? 'Solved ${session.puzzle.preview.name} at ${session.session.nodeRegion} (+$rewardEnergy energy)'
+            : 'Failed ${session.puzzle.preview.name} at ${session.session.nodeRegion}${failureReason == null ? '' : ' ($failureReason)'}',
+        ...state.history,
+      ],
+      puzzleTelemetry: [
+        {
+          'event': succeeded ? 'puzzle_completed' : 'puzzle_failed',
+          'node_id': session.session.nodeId,
+          'session_id': session.session.sessionId,
+          'difficulty_score': session.puzzle.preview.difficulty.score,
+          'difficulty_tier': session.puzzle.preview.difficulty.tier,
+          'move_count': session.path.length,
+          'retry_count': session.session.retryCount,
+          'duration_ms': elapsed.inMilliseconds,
+          'reward_energy': rewardEnergy,
+          'seed': session.puzzle.seed.value,
+          'node_region': session.session.nodeRegion,
+          'at': DateTime.now().toIso8601String(),
+        },
+        ...state.puzzleTelemetry,
+      ],
+    );
+  }
+
+  int _energyRewardFor(String tier) {
+    return switch (tier) {
+      'Easy' => 1,
+      'Medium' => 2,
+      'Hard' => 3,
+      _ => 4,
+    };
+  }
+
+  GridPathDifficultyConfig _difficultyConfigForNode(PerbugNode node) {
+    final coordSpread = (node.latitude.abs() + node.longitude.abs()) % 1;
+    final width = 5 + ((coordSpread * 3).round());
+    final height = 5 + (((coordSpread * 100).round() % 3));
+    final branchComplexity = node.state == PerbugNodeState.special ? 5 : (node.state == PerbugNodeState.futureChallengeReady ? 4 : 3);
+    final falsePaths = node.state == PerbugNodeState.special ? 4 : 2;
+    final timerEnabled = node.state == PerbugNodeState.special;
+
+    return GridPathDifficultyConfig(
+      width: width,
+      height: height,
+      obstacleDensity: 0.22 + ((coordSpread * 0.15).clamp(0.0, 0.15)),
+      branchComplexity: branchComplexity,
+      falsePathCount: falsePaths,
+      timePressureEnabled: timerEnabled,
+      rules: GridPathMovementRules(
+        orthogonalOnly: true,
+        disallowRevisit: true,
+        moveLimit: (width * height * 0.55).round(),
+        timerSeconds: timerEnabled ? 45 : null,
+      ),
+    );
+  }
+
   PerbugNode _mapPinToNode(MapPin pin) {
     return PerbugNode(
       id: pin.canonicalPlaceId,
@@ -99,5 +465,11 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
   String _formatDistance(double meters) {
     if (meters >= 1000) return '${(meters / 1000).toStringAsFixed(1)}km';
     return '${meters.toStringAsFixed(0)}m';
+  }
+
+  @override
+  void dispose() {
+    _puzzleTimer?.cancel();
+    super.dispose();
   }
 }
