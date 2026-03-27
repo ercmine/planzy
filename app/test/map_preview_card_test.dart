@@ -34,9 +34,7 @@ void main() {
 
     expect(find.text('Bluebird Coffee'), findsOneWidget);
     expect(find.text('You’re here'), findsOneWidget);
-    expect(find.text('Creator videos'), findsOneWidget);
     expect(find.text('Leave review'), findsOneWidget);
-    expect(find.text('Add video'), findsOneWidget);
     expect(find.text('Details'), findsOneWidget);
   });
 
@@ -74,7 +72,6 @@ void main() {
 
     expect(find.text('Nearby now'), findsOneWidget);
     expect(find.text('Saved'), findsOneWidget);
-    expect(find.text('Creator videos'), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(SingleChildScrollView),

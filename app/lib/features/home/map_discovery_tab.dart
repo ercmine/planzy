@@ -16,15 +16,13 @@ import '../../providers/app_providers.dart';
 import '../collections/collection_models.dart';
 import '../collections/collection_repository.dart';
 import '../economy/economy_models.dart';
-import '../video_platform/video_models.dart';
 import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_widgets.dart';
 import 'map_game_world.dart';
 import 'map_game_world_widgets.dart';
+import 'place_detail_page.dart';
 import 'place_preview_card.dart';
-import 'place_video_detail_page.dart';
-import '../video_platform/video_providers.dart';
 import '../../api/api_error.dart';
 import '../../core/env/env.dart';
 import 'dryad_maplibre_view.dart';
@@ -1124,7 +1122,15 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   void _openPlaceDetails(MapPin place) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => PlaceVideoDetailPage(placeId: place.canonicalPlaceId, placeName: place.name),
+        builder: (_) => PlaceDetailPage(
+          place: place,
+          onLeaveReview: () => _startReviewFromMap(place),
+          onOpenMaps: () async {
+            final launcher = ref.read(linkLauncherProvider);
+            await _openPlaceInMaps(launcher, place);
+          },
+          onShare: () => _sharePlace(place),
+        ),
       ),
     );
   }

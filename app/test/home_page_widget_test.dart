@@ -8,6 +8,7 @@ import 'package:dryad/features/accomplishments/accomplishment_models.dart';
 import 'package:dryad/features/challenges/challenge_models.dart';
 import 'package:dryad/features/collections/collection_models.dart';
 import 'package:dryad/features/home/home_page.dart';
+import 'package:dryad/features/home/place_detail_page.dart';
 import 'package:dryad/features/home/place_video_detail_page.dart';
 import 'package:dryad/features/video_platform/video_models.dart';
 import 'package:dryad/features/video_platform/video_providers.dart';
@@ -190,7 +191,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.open_in_new_rounded));
     await tester.pumpAndSettle();
-    expect(find.byType(PlaceVideoDetailPage), findsOneWidget);
+    expect(find.byType(PlaceDetailPage), findsOneWidget);
   });
 
   testWidgets('Sparse-media place renders gracefully in the place stream', (tester) async {
