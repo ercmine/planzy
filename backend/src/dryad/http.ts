@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { DryadTree, WalletAddress } from "./domain.js";
+import { validatePlantSeed } from "./seed.js";
 import type { DryadMarketplaceService } from "./service.js";
 import { parseJsonBody, sendJson } from "../venues/claims/http.js";
 
@@ -95,7 +96,8 @@ export function createDryadMarketplaceHttpHandlers(service: DryadMarketplaceServ
     claimAndPlant: async (req: IncomingMessage, res: ServerResponse, treeId: string) => {
       const body = await parseJsonBody(req) as Record<string, unknown>;
       const wallet = String(body.wallet ?? "") as WalletAddress;
-      const tree = service.claimAndPlant(treeId, wallet);
+      const seed = validatePlantSeed(String(body.seed ?? ""));
+      const tree = service.claimAndPlant(treeId, wallet, seed);
       sendJson(res, 200, toTreeResponse(tree));
     },
     listTree: async (req: IncomingMessage, res: ServerResponse) => {

@@ -81,8 +81,8 @@ class GroveNftService {
     );
   }
 
-  Future<String> mint({required String walletAddress, required String methodSignature}) async {
-    final data = encodeWriteCall(methodSignature, walletAddress: walletAddress);
+  Future<String> mint({required String walletAddress, required String methodSignature, required String seedInput}) async {
+    final data = encodeWriteCall(methodSignature, walletAddress: walletAddress, seedInput: seedInput);
     final response = await _postRpc('eth_sendTransaction', [
       {
         'from': walletAddress,

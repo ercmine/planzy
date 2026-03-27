@@ -91,8 +91,8 @@ class DryadRepository {
     await apiClient.postJson('/v1/dryad/replant-intents/$intentId/confirm', body: const {});
   }
 
-  Future<void> claimAndPlant(String treeId, {required String wallet}) async {
-    await apiClient.postJson('/v1/dryad/trees/$treeId/claim-plant', body: {'wallet': wallet});
+  Future<void> claimAndPlant(String treeId, {required String wallet, required String seed}) async {
+    await apiClient.postJson('/v1/dryad/trees/$treeId/claim-plant', body: {'wallet': wallet, 'seed': seed});
   }
 
   Future<void> listTree(String treeId, {required String wallet, required double priceEth}) async {

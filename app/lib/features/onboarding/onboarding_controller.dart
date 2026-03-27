@@ -4,6 +4,7 @@ import '../../core/identity/identity_provider.dart';
 import '../dryad/chain/dryad_chain_providers.dart';
 import '../dryad/chain/evm_abi.dart';
 import '../dryad/chain/grove_nft_service.dart';
+import '../dryad/chain/seed_codec.dart';
 import 'onboarding_state.dart';
 
 class OnboardingController extends Notifier<OnboardingState> {
@@ -112,10 +113,19 @@ class OnboardingController extends Notifier<OnboardingState> {
     }
   }
 
-  Future<void> mintNft() async {
+  Future<void> mintNft({required String seedInput}) async {
     final service = ref.read(groveNftServiceProvider);
     final config = ref.read(dryadContractConfigProvider);
     final connector = ref.read(walletConnectorProvider);
+    final seedValidation = validatePlantSeed(seedInput);
+    if (!seedValidation.isValid) {
+      state = state.copyWith(
+        status: OnboardingFlowStatus.onboardingFailed,
+        isBusy: false,
+        errorMessage: seedValidation.errorMessage ?? 'Invalid plant seed.',
+      );
+      return;
+    }
     state = state.copyWith(status: OnboardingFlowStatus.mintInProgress, isBusy: true, clearError: true);
 
     try {
@@ -123,9 +133,13 @@ class OnboardingController extends Notifier<OnboardingState> {
           ? await connector.sendTransaction(
               from: state.walletAddress,
               to: config.groveNftAddress,
-              data: encodeWriteCall(config.mintMethodSignature, walletAddress: state.walletAddress),
+              data: encodeWriteCall(
+                config.mintMethodSignature,
+                walletAddress: state.walletAddress,
+                seedInput: seedInput,
+              ),
             )
-          : await service.mint(walletAddress: state.walletAddress, methodSignature: config.mintMethodSignature);
+          : await service.mint(walletAddress: state.walletAddress, methodSignature: config.mintMethodSignature, seedInput: seedInput);
       state = state.copyWith(status: OnboardingFlowStatus.mintSucceeded, isBusy: false, txHash: txHash);
       await refreshNftStatus();
     } catch (error) {
