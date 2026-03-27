@@ -48,8 +48,44 @@ export function createDryadMarketplaceHttpHandlers(service: DryadMarketplaceServ
     listUnclaimedSpots: async (_req: IncomingMessage, res: ServerResponse) => {
       sendJson(res, 200, { spots: service.listUnclaimedSpots() });
     },
+    worldSnapshot: async (_req: IncomingMessage, res: ServerResponse) => {
+      sendJson(res, 200, service.worldSnapshot());
+    },
+    marketPulse: async (_req: IncomingMessage, res: ServerResponse) => {
+      sendJson(res, 200, service.marketPulse());
+    },
+    mapPulse: async (_req: IncomingMessage, res: ServerResponse) => {
+      sendJson(res, 200, service.mapPulse());
+    },
+    creatorTreeProfiles: async (_req: IncomingMessage, res: ServerResponse) => {
+      sendJson(res, 200, { creators: service.creatorTreeProfiles() });
+    },
     listReplantableTrees: async (req: IncomingMessage, res: ServerResponse, wallet: WalletAddress) => {
       sendJson(res, 200, { trees: service.listReplantableTrees(wallet).map(toTreeResponse) });
+    },
+    tendQueue: async (_req: IncomingMessage, res: ServerResponse, wallet: WalletAddress) => {
+      sendJson(res, 200, { tasks: service.tendQueue(wallet) });
+    },
+    progression: async (_req: IncomingMessage, res: ServerResponse, wallet: WalletAddress) => {
+      sendJson(res, 200, service.progression(wallet));
+    },
+    returnTriggers: async (_req: IncomingMessage, res: ServerResponse, wallet: WalletAddress) => {
+      sendJson(res, 200, { triggers: service.returnTriggers(wallet) });
+    },
+    watchTree: async (req: IncomingMessage, res: ServerResponse) => {
+      const body = await parseJsonBody(req) as Record<string, unknown>;
+      const wallet = String(body.wallet ?? "") as WalletAddress;
+      const treeId = String(body.treeId ?? "");
+      sendJson(res, 200, service.watchTree(wallet, treeId));
+    },
+    unwatchTree: async (req: IncomingMessage, res: ServerResponse) => {
+      const body = await parseJsonBody(req) as Record<string, unknown>;
+      const wallet = String(body.wallet ?? "") as WalletAddress;
+      const treeId = String(body.treeId ?? "");
+      sendJson(res, 200, service.unwatchTree(wallet, treeId));
+    },
+    loopMetrics: async (_req: IncomingMessage, res: ServerResponse) => {
+      sendJson(res, 200, service.loopMetrics());
     },
     getTreeLifecycle: async (_req: IncomingMessage, res: ServerResponse, treeId: string) => {
       sendJson(res, 200, { events: service.getTreeLifecycle(treeId) });

@@ -122,3 +122,73 @@ export interface GrovePortfolio {
   readonly contributedTreeIds: TreeId[];
   readonly watchlistTreeIds: TreeId[];
 }
+
+export interface TendTask {
+  readonly treeId: TreeId;
+  readonly priority: "urgent" | "soon" | "stable";
+  readonly reason: "needs_watering" | "cooldown" | "listed" | "ready_to_replant";
+  readonly title: string;
+  readonly dueAt?: string;
+}
+
+export interface MarketPulse {
+  readonly listedCount: number;
+  readonly soldCount24h: number;
+  readonly newlyListedTreeIds: TreeId[];
+  readonly recentlyReplantedTreeIds: TreeId[];
+  readonly trendingTreeIds: TreeId[];
+}
+
+export interface MapPulse {
+  readonly plantedTreeCount: number;
+  readonly replantedCount24h: number;
+  readonly newlyPlantedTreeIds: TreeId[];
+  readonly hottestRegions: Array<{
+    readonly regionKey: string;
+    readonly activityCount: number;
+  }>;
+}
+
+export interface CreatorTreeProfile {
+  readonly creatorWallet: WalletAddress;
+  readonly treeIds: TreeId[];
+  readonly totalWaterCount: number;
+  readonly totalGrowthLevel: number;
+  readonly supportMomentum: "rising" | "steady";
+}
+
+export interface ProgressionSnapshot {
+  readonly ownedTreeCount: number;
+  readonly regionsPlantedCount: number;
+  readonly totalWaterActions: number;
+  readonly plantedMilestoneNext: number;
+  readonly wateredMilestoneNext: number;
+}
+
+export interface ReturnTrigger {
+  readonly kind:
+    | "tree_needs_water"
+    | "watchlist_tree_moved"
+    | "watchlist_tree_listed"
+    | "listing_sold"
+    | "tree_received_support";
+  readonly treeId: TreeId;
+  readonly message: string;
+  readonly createdAt: string;
+}
+
+export interface LoopMetrics {
+  readonly firstPlantCompletedWallets: number;
+  readonly firstWaterActionWallets: number;
+  readonly firstMarketplaceBuyWallets: number;
+  readonly firstReplantWallets: number;
+  readonly repeatTendingWallets: number;
+}
+
+export interface ForestWorldSnapshot {
+  readonly generatedAt: string;
+  readonly map: MapPulse;
+  readonly market: MarketPulse;
+  readonly creatorProfiles: CreatorTreeProfile[];
+  readonly trendingTreeIds: TreeId[];
+}
