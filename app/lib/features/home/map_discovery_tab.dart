@@ -386,6 +386,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   ({double lat, double lng})? _lastMapCenter;
   double? _lastMapZoom;
   Timer? _viewportDebounce;
+  Timer? _threeDLoadFallbackTimer;
   MapViewport? _lastAutoSearchViewport;
   late final ProviderSubscription<MapViewportState> _mapStateSubscription;
   late final ProviderSubscription<LocationControllerState> _locationSubscription;
@@ -420,6 +421,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   @override
   void dispose() {
     _viewportDebounce?.cancel();
+    _threeDLoadFallbackTimer?.cancel();
     _mapStateSubscription.close();
     _locationSubscription.close();
     _connectivitySubscription.close();
@@ -470,6 +472,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                 children: [
                   Positioned.fill(
                     child: DryadMapLibreView(
+                      key: ValueKey<String>('map-mode-${_is3dMode ? '3d' : '2d'}'),
                       viewport: state.viewport,
                       pins: visiblePlaces,
                       selectedPlaceId: selected?.canonicalPlaceId,
@@ -482,6 +485,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                       config: ref.watch(envConfigProvider).mapStack,
                       onMapReady: () {
                         if (!mounted) return;
+                        _threeDLoadFallbackTimer?.cancel();
                         setState(() => _mapReady = true);
                       },
                       onTapEmpty: () => controller.clearSelectedPlace(),
@@ -574,7 +578,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                                             selected: _is3dMode,
                                             label: const Text('3D map mode (beta)'),
                                             avatar: const Icon(Icons.view_in_ar_rounded, size: 18),
-                                            onSelected: (value) => setState(() => _is3dMode = value),
+                                            onSelected: _set3dMode,
                                           ),
                                         ),
                                       ],
@@ -778,6 +782,23 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
         ),
       ],
     );
+  }
+
+  void _set3dMode(bool enabled) {
+    if (_is3dMode == enabled) return;
+    _threeDLoadFallbackTimer?.cancel();
+    setState(() {
+      _is3dMode = enabled;
+      _mapReady = false;
+    });
+    if (!enabled) return;
+    _threeDLoadFallbackTimer = Timer(const Duration(seconds: 10), () {
+      if (!mounted || !_is3dMode || _mapReady) return;
+      setState(() => _is3dMode = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('3D map timed out. Switched back to 2D map.')),
+      );
+    });
   }
 
   Widget? _emptyStateFor({
