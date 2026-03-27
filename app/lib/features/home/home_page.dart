@@ -5,13 +5,13 @@ import '../../app/theme/widgets.dart';
 import '../dryad/pages/grove_page.dart';
 import '../dryad/pages/market_page.dart';
 import '../dryad/pages/tend_page.dart';
-import '../dryad/pages/wallet_page.dart';
-import 'map_discovery_tab.dart';
+import '../dryad/pages/creator_page.dart';
+import '../dryad/pages/map_page.dart';
 
-enum HomeTab { smartMap, market, tend, grove, wallet }
+enum HomeTab { map, tend, market, grove, creator }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.initialTab = HomeTab.smartMap});
+  const HomePage({super.key, this.initialTab = HomeTab.map});
 
   final HomeTab initialTab;
 
@@ -20,7 +20,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const List<HomeTab> _tabs = [HomeTab.smartMap, HomeTab.market, HomeTab.tend, HomeTab.grove, HomeTab.wallet];
+  static const List<HomeTab> _tabs = [HomeTab.map, HomeTab.tend, HomeTab.market, HomeTab.grove, HomeTab.creator];
   late int _navIndex;
 
   @override
@@ -33,11 +33,11 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      const MapDiscoveryTab(),
-      DryadMarketPage(onOpenTree: _openTree),
+      DryadMapPage(onOpenTree: _openTree),
       DryadTendPage(onOpenTree: _openTree),
+      DryadMarketPage(onOpenTree: _openTree),
       DryadGrovePage(onOpenTree: _openTree),
-      const DryadWalletPage(),
+      DryadCreatorPage(onOpenTree: _openTree),
     ];
 
     return AppScaffold(
@@ -48,11 +48,11 @@ class _HomePageState extends State<HomePage> {
         selectedIndex: _navIndex,
         onDestinationSelected: (value) => setState(() => _navIndex = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Smart Map'),
-          NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Marketplace'),
+          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Map'),
           NavigationDestination(icon: Icon(Icons.water_drop_outlined), selectedIcon: Icon(Icons.water_drop), label: 'Tend'),
+          NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Marketplace'),
           NavigationDestination(icon: Icon(Icons.forest_outlined), selectedIcon: Icon(Icons.forest), label: 'My Trees'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Creator'),
         ],
       ),
     );

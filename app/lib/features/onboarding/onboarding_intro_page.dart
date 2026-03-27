@@ -195,14 +195,14 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
         Text('Enable location', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
         const SizedBox(height: AppSpacing.s),
         const Text(
-          'Location helps us discover nearby plans and personalize your map. You can change this later in Settings.',
+          'Location unlocks planting and map-native tree discovery. You can change this later in Settings.',
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.m),
         const PermissionInfoCard(
           icon: Icons.my_location,
           title: 'Nearby recommendations',
-          description: 'Allow While Using App to see places and plans that match where you are.',
+          description: 'Allow While Using App to claim spots, plant trees, and browse your local forest.',
         ),
         const SizedBox(height: AppSpacing.s),
         const PermissionInfoCard(
