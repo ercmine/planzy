@@ -53,11 +53,11 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
             children: [
               Text('Target network: ${config.networkName} (${config.chainId})'),
               const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton(
                     onPressed: _isConnecting ? null : () => _connectWallet(walletId: 'metamask'),
                     child: Text(_isConnecting ? 'Connecting…' : 'Connect MetaMask'),
                   ),
@@ -92,17 +92,36 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
         snapshot.when(
           data: (value) {
             if (value == null) return const AppCard(child: Text('Connect wallet from onboarding or paste wallet there to load on-chain tree artwork.'));
-            final svg = value.artwork?.svgMarkup;
-            if (svg == null) {
+            if (value.tokens.isEmpty) {
               return AppCard(child: Text(value.hasNft ? 'NFT found but no SVG render path was available.' : 'No NFT owned yet.'));
             }
+
             return AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Token #${value.tokenId}'),
-                  const SizedBox(height: 8),
-                  Center(child: SvgPicture.string(svg, height: 240)),
+                  Text('NFTs in wallet: ${value.tokens.length}'),
+                  const SizedBox(height: 12),
+                  ...value.tokens.map((token) {
+                    final svg = token.artwork?.svgMarkup;
+                    if (svg == null) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text('Token #${token.tokenId} found but no SVG render path was available.'),
+                      );
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Token #${token.tokenId}'),
+                          const SizedBox(height: 8),
+                          Center(child: SvgPicture.string(svg, height: 240)),
+                        ],
+                      ),
+                    );
+                  }),
                 ],
               ),
             );
