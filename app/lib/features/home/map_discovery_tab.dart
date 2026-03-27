@@ -354,8 +354,6 @@ class MapDiscoveryTab extends ConsumerStatefulWidget {
 }
 
 class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
-  static const double _minMapZoom = 3;
-  static const double _maxMapZoom = 20;
   static const List<MapFilterOption> filters = [
     MapFilterOption(id: 'cuisine', label: 'Cuisine', icon: Icons.restaurant_rounded, discoveryCategories: ['food']),
     MapFilterOption(id: 'coffee', label: 'Coffee', icon: Icons.local_cafe_rounded, discoveryCategories: ['coffee']),
@@ -753,26 +751,6 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                 ],
               ),
             ),
-          ),
-        ),
-        Positioned(
-          right: 10,
-          top: 192,
-          bottom: 110,
-          child: _ZoomSliderControl(
-            zoom: state.viewport.zoom.clamp(_minMapZoom, _maxMapZoom),
-            minZoom: _minMapZoom,
-            maxZoom: _maxMapZoom,
-            onZoomChanged: (zoom) {
-              controller.setViewport(
-                MapViewport(
-                  centerLat: state.viewport.centerLat,
-                  centerLng: state.viewport.centerLng,
-                  zoom: zoom,
-                ),
-                markPendingSearch: true,
-              );
-            },
           ),
         ),
         Positioned(
@@ -1423,58 +1401,6 @@ class _DistrictInsightsPage extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ZoomSliderControl extends StatelessWidget {
-  const _ZoomSliderControl({
-    required this.zoom,
-    required this.minZoom,
-    required this.maxZoom,
-    required this.onZoomChanged,
-  });
-
-  final double zoom;
-  final double minZoom;
-  final double maxZoom;
-  final ValueChanged<double> onZoomChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withOpacity(0.94),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.45)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x33000000), blurRadius: 16, offset: Offset(0, 8)),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
-        child: Column(
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            Icon(Icons.add_rounded, color: theme.colorScheme.onSurfaceVariant),
-            Expanded(
-              child: RotatedBox(
-                quarterTurns: 3,
-                child: Slider(
-                  value: zoom,
-                  min: minZoom,
-                  max: maxZoom,
-                  divisions: ((maxZoom - minZoom) * 2).round(),
-                  label: 'Zoom ${zoom.toStringAsFixed(1)}',
-                  onChanged: onZoomChanged,
-                ),
-              ),
-            ),
-            Icon(Icons.remove_rounded, color: theme.colorScheme.onSurfaceVariant),
-          ],
         ),
       ),
     );

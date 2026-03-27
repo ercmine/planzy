@@ -99,6 +99,8 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
             // listener API instead of a Map widget `onCameraMove` callback.
             trackCameraPosition: true,
             compassEnabled: false,
+            zoomGesturesEnabled: true,
+            scrollGesturesEnabled: true,
             rotateGesturesEnabled: true,
             tiltGesturesEnabled: widget.config.enableEnhancedPitch,
             myLocationEnabled: false,
