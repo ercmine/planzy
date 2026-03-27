@@ -20,6 +20,8 @@ class PlacePreviewCard extends StatelessWidget {
     this.onOpenMaps,
     this.reviewCtaEnabled = true,
     this.reviewCtaMessage,
+    this.primaryActionLabel,
+    this.primaryActionIcon,
   });
 
   final MapPin place;
@@ -33,6 +35,8 @@ class PlacePreviewCard extends StatelessWidget {
   final VoidCallback? onOpenMaps;
   final bool reviewCtaEnabled;
   final String? reviewCtaMessage;
+  final String? primaryActionLabel;
+  final IconData? primaryActionIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +52,9 @@ class PlacePreviewCard extends StatelessWidget {
         : distanceMeters! < 120
             ? 'Looks like you’re here'
             : '${(distanceMeters! / 1000).toStringAsFixed(1)} km away';
+
+    final actionLabel = primaryActionLabel ?? (reviewCtaEnabled ? 'Leave review' : 'Review locked');
+    final actionIcon = primaryActionIcon ?? Icons.rate_review_outlined;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 260),
@@ -159,8 +166,8 @@ class PlacePreviewCard extends StatelessWidget {
                       Expanded(
                         child: PrimaryButton(
                           onPressed: reviewCtaEnabled ? onLeaveReview : null,
-                          icon: const Icon(Icons.rate_review_outlined),
-                          label: reviewCtaEnabled ? 'Leave review' : 'Review locked',
+                          icon: Icon(actionIcon),
+                          label: actionLabel,
                         ),
                       ),
                     ],
