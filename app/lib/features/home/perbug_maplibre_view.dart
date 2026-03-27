@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
@@ -55,10 +59,13 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
   MapLibreMapController? _controller;
   CameraPosition? _lastCamera;
   bool _styleLoaded = false;
+  bool _forceBuiltinWebStyle = false;
   VoidCallback? _cameraListener;
+  Timer? _styleFallbackTimer;
   double? _manualTilt;
 
   DryadMapTheme get _theme => DryadMapTheme.resolve(brightness: Theme.of(context).brightness, config: widget.config);
+  String get _resolvedStyleString => _forceBuiltinWebStyle ? _builtinRasterStyleJson : _theme.styleUrl;
 
   @override
   void didUpdateWidget(covariant DryadMapLibreView oldWidget) {
@@ -88,12 +95,12 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
 
   @override
   Widget build(BuildContext context) {
-    final mapTheme = _theme;
     return Stack(
       children: [
         Positioned.fill(
           child: MapLibreMap(
-            styleString: mapTheme.styleUrl,
+            key: ValueKey<String>(_resolvedStyleString),
+            styleString: _resolvedStyleString,
             initialCameraPosition: _cameraPositionForState(),
             // maplibre_gl 0.21.x exposes camera updates through the controller
             // listener API instead of a Map widget `onCameraMove` callback.
@@ -112,8 +119,11 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
               _controller = controller;
               _cameraListener = () => _lastCamera = controller.cameraPosition;
               controller.addListener(_cameraListener!);
+              _styleLoaded = false;
+              _scheduleWebStyleFallback();
             },
             onStyleLoadedCallback: () async {
+              _styleFallbackTimer?.cancel();
               _styleLoaded = true;
               widget.onMapReady();
               await _applyStyleEnhancements();
@@ -154,6 +164,7 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
 
   @override
   void dispose() {
+    _styleFallbackTimer?.cancel();
     final listener = _cameraListener;
     if (listener != null) {
       _controller?.removeListener(listener);
@@ -211,6 +222,37 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
     if (controller == null) return;
     controller.animateCamera(CameraUpdate.newCameraPosition(_cameraPositionForState()));
   }
+
+  void _scheduleWebStyleFallback() {
+    if (!kIsWeb || _forceBuiltinWebStyle) return;
+    _styleFallbackTimer?.cancel();
+    _styleFallbackTimer = Timer(const Duration(seconds: 4), () {
+      if (!mounted || _styleLoaded || _forceBuiltinWebStyle) return;
+      Log.warn('map.style falling back to built-in web raster style after remote style timeout');
+      setState(() => _forceBuiltinWebStyle = true);
+    });
+  }
+
+  String get _builtinRasterStyleJson => jsonEncode({
+        'version': 8,
+        'name': 'Perbug Web Fallback',
+        'sources': {
+          'openstreetmap': {
+            'type': 'raster',
+            'tiles': ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            'tileSize': 256,
+            'attribution': '© OpenStreetMap contributors',
+            'maxzoom': 19,
+          },
+        },
+        'layers': [
+          {
+            'id': 'openstreetmap-raster',
+            'type': 'raster',
+            'source': 'openstreetmap',
+          },
+        ],
+      });
 
   Future<void> _applyStyleEnhancements() async {
     final controller = _controller;
