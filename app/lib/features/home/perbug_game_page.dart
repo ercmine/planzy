@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/widgets.dart';
 import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
+import 'puzzles/pattern_recall/pattern_recall_puzzle_sheet.dart';
 
 class PerbugGamePage extends ConsumerStatefulWidget {
   const PerbugGamePage({super.key});
@@ -114,7 +115,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
           ),
           _Section(
             title: 'Upcoming node challenge slots',
-            subtitle: 'Puzzle systems are not enabled yet, but node states and rewards are puzzle-ready.',
+            subtitle: 'Launch deterministic node puzzles tied to latitude/longitude seed.',
             children: [
               Wrap(
                 spacing: 8,
@@ -124,6 +125,43 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   AppPill(label: 'completed', icon: Icons.task_alt),
                   AppPill(label: 'locked', icon: Icons.lock_outline),
                   AppPill(label: 'future-challenge-ready', icon: Icons.extension_outlined),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  PrimaryButton(
+                    label: 'Launch Pattern Recall',
+                    onPressed: state.currentNode == null
+                        ? null
+                        : () {
+                            final session = controller.launchPatternRecallForCurrentNode();
+                            if (session == null) return;
+                            showModalBottomSheet<void>(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: const Color(0xFF111827),
+                              builder: (context) => Consumer(
+                                builder: (context, ref, _) {
+                                  final latest = ref.watch(perbugGameControllerProvider);
+                                  return PatternRecallPuzzleSheet(
+                                    controller: ref.read(perbugGameControllerProvider.notifier),
+                                    state: latest,
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      state.activePatternRecall == null
+                          ? 'Difficulty is generated before preview. Rewards/energy hooks are active.'
+                          : 'Active difficulty: ${state.activePatternRecall!.instance.difficulty.tier} '
+                              '(${state.activePatternRecall!.instance.difficulty.score.toStringAsFixed(0)})',
+                    ),
+                  ),
                 ],
               ),
             ],
