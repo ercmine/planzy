@@ -154,19 +154,19 @@ class _BrowserWalletConnector implements WalletConnector {
     if (provider == null) return;
     detachSessionListeners();
 
-    final accountHandler = ((dynamic accounts) {
+    final accountHandler = ((JSAny? accounts) {
       final parsed = _asStringList(js_util.dartify(accounts));
       onAccountChanged?.call(parsed.isEmpty ? null : parsed.first);
       Log.d('wallet.accountsChanged count=${parsed.length}');
     }).toJS;
 
-    final chainHandler = ((dynamic chainId) {
+    final chainHandler = ((JSAny? chainId) {
       final parsed = _parseChainId(chainId);
       onChainChanged?.call(parsed);
       Log.d('wallet.chainChanged chainId=$parsed');
     }).toJS;
 
-    final disconnectHandler = ((dynamic payload) {
+    final disconnectHandler = ((JSAny? payload) {
       final reason = payload?.toString() ?? 'Wallet disconnected';
       onDisconnected?.call(reason);
       Log.warn('wallet.disconnect payload=$reason');
