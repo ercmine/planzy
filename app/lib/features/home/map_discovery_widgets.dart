@@ -664,7 +664,7 @@ class NearbyPlacesPage extends StatelessWidget {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Search area results'),
+        title: const Text('Claim areas & plant trees'),
         actions: [
           IconButton(
             tooltip: 'Sort results',
@@ -688,6 +688,11 @@ class NearbyPlacesPage extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  AppPill(
+                    label: 'Claim areas and plant trees',
+                    icon: Icons.forest_outlined,
+                    backgroundColor: theme.colorScheme.tertiary.withOpacity(0.16),
+                  ),
                   AppPill(
                     label: 'Sorted by ${NearbyPlacesSheet._sortLabel(sort)}',
                     icon: Icons.filter_alt_rounded,
@@ -731,6 +736,7 @@ class NearbyPlacesPage extends StatelessWidget {
                             : (distance <= 90
                                   ? PlaceProximityState.here
                                   : (distance <= 240 ? PlaceProximityState.nearby : PlaceProximityState.unknown));
+                        final canPlantTree = proximity == PlaceProximityState.here;
                         return Padding(
                           padding: const EdgeInsets.fromLTRB(0, 4, 0, 20),
                           child: PlacePreviewCard(
@@ -742,6 +748,8 @@ class NearbyPlacesPage extends StatelessWidget {
                             onLeaveReview: () => onReview(place),
                             reviewCtaEnabled: place.reviewEligibility?.allowed ?? false,
                             reviewCtaMessage: place.reviewEligibility?.message ?? place.reviewEligibility?.shortLabel,
+                            primaryActionLabel: canPlantTree ? 'Plant tree' : 'Claim area',
+                            primaryActionIcon: canPlantTree ? Icons.spa_outlined : Icons.flag_outlined,
                             onSave: () => onToggleSave(place),
                             onShare: () => onShare(place),
                             onOpenMaps: () => onDirections(place),
