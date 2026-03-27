@@ -46,11 +46,16 @@ class DryadTreePage extends ConsumerWidget {
                       AppPill(label: tree.statusLabel, icon: Icons.park_outlined),
                       AppPill(label: tree.lifecycleLabel, icon: Icons.sync_alt_outlined),
                       AppPill(label: 'Owner ${tree.ownerHandle}', icon: Icons.person_outline),
+                      AppPill(
+                        label: tree.canWaterNow ? 'Ready to water' : 'Water cooldown',
+                        icon: Icons.water_drop_outlined,
+                      ),
                       if (tree.isPortable) const AppPill(label: 'Portable', icon: Icons.luggage_outlined),
                       if (tree.isListed) AppPill(label: '${tree.priceEth?.toStringAsFixed(2)} ETH', icon: Icons.sell_outlined),
                     ]),
                     const SizedBox(height: 8),
                     Text('Spot: ${tree.currentSpotId ?? 'Not planted'}'),
+                    if (tree.lastWateredAt != null) Text('Last watered: ${tree.lastWateredAt!.toLocal()}'),
                   ],
                 ),
               ),
@@ -264,10 +269,31 @@ class _ActionsState extends ConsumerState<_Actions> {
     }
   }
 
+  Future<void> _water() async {
+    final wallet = widget.wallet;
+    if (wallet == null) return;
+    setState(() => _isProcessing = true);
+    try {
+      final repo = await ref.read(dryadRepositoryProvider.future);
+      final eligibility = await repo.waterEligibility(widget.tree.id, wallet: wallet);
+      if (eligibility['eligible'] != true) throw StateError('Water unavailable: ${eligibility['reason'] ?? 'cooldown'}');
+      await repo.waterTree(widget.tree.id, wallet: wallet);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tree watered successfully.')));
+      _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Watering failed: $error')));
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
   void _refresh() {
     ref.invalidate(treeDetailProvider(widget.tree.id));
     ref.invalidate(marketplaceTreesProvider);
     ref.invalidate(plantingTreesProvider);
+    ref.invalidate(ownedTreesProvider);
   }
 
   @override
@@ -295,6 +321,11 @@ class _ActionsState extends ConsumerState<_Actions> {
                 onPressed: _isProcessing || widget.wallet == null || widget.tree.claimState == TreeClaimState.unavailable ? null : _claimAndPlant,
                 icon: const Icon(Icons.forest_outlined),
                 label: const Text('CLAIM AND PLANT'),
+              ),
+              FilledButton.icon(
+                onPressed: _isProcessing || widget.wallet == null || !widget.tree.canWaterNow ? null : _water,
+                icon: const Icon(Icons.water_drop_outlined),
+                label: Text(widget.tree.canWaterNow ? 'Water' : 'Water cooldown'),
               ),
               if (widget.tree.isListed)
                 FilledButton.icon(onPressed: _isProcessing || widget.wallet == null ? null : _buy, icon: const Icon(Icons.shopping_cart_checkout), label: const Text('Buy')),

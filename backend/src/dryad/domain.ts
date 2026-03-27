@@ -47,6 +47,18 @@ export interface DryadTree {
   readonly dugUpAt?: string;
   readonly digUpFeeWei?: string;
   readonly digUpTxHash?: `0x${string}`;
+  readonly lastWateredAt?: string;
+  readonly nextWateringAvailableAt?: string;
+  readonly waterCooldownSeconds?: number;
+}
+
+export interface WaterEligibility {
+  readonly treeId: TreeId;
+  readonly wallet: WalletAddress;
+  readonly eligible: boolean;
+  readonly reason?: string;
+  readonly now: string;
+  readonly nextEligibleAt?: string;
 }
 
 export interface DigUpEligibility {

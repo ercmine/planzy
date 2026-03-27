@@ -110,4 +110,39 @@ describe("dryad marketplace routes", () => {
     const replantableJson = await replantable.json() as { trees: Array<unknown> };
     expect(replantableJson.trees).toHaveLength(0);
   });
+
+  it("supports owned trees query and remote watering cooldown", async () => {
+    const baseUrl = await boot();
+    const owner = "0x1111111111111111111111111111111111111111";
+
+    const owned = await fetch(`${baseUrl}/v1/dryad/trees/owned?wallet=${owner}`);
+    expect(owned.status).toBe(200);
+    const ownedJson = await owned.json() as { trees: Array<{ ownerHandle: string; id: string }> };
+    expect(ownedJson.trees.length).toBeGreaterThan(0);
+    expect(ownedJson.trees.every((tree) => tree.ownerHandle.toLowerCase() === owner.toLowerCase())).toBe(true);
+
+    const treeId = ownedJson.trees[0]?.id;
+    expect(treeId).toBeTruthy();
+
+    const waterEligibility = await fetch(`${baseUrl}/v1/dryad/trees/${treeId}/water-eligibility?wallet=${owner}`);
+    expect(waterEligibility.status).toBe(200);
+    const waterEligibilityJson = await waterEligibility.json() as { eligible: boolean };
+    expect(waterEligibilityJson.eligible).toBe(true);
+
+    const water = await fetch(`${baseUrl}/v1/dryad/trees/${treeId}/water`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wallet: owner }),
+    });
+    expect(water.status).toBe(200);
+    const wateredTree = await water.json() as { lastWateredAt: string | null; nextWateringAvailableAt: string | null };
+    expect(wateredTree.lastWateredAt).toBeTruthy();
+    expect(wateredTree.nextWateringAvailableAt).toBeTruthy();
+
+    const cooldownEligibility = await fetch(`${baseUrl}/v1/dryad/trees/${treeId}/water-eligibility?wallet=${owner}`);
+    expect(cooldownEligibility.status).toBe(200);
+    const cooldownEligibilityJson = await cooldownEligibility.json() as { eligible: boolean; reason?: string };
+    expect(cooldownEligibilityJson.eligible).toBe(false);
+    expect(cooldownEligibilityJson.reason).toBe("watering_cooldown_active");
+  });
 });

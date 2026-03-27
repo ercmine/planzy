@@ -9,6 +9,7 @@ import type {
   ReplantIntent,
   SpotRef,
   TreeLifecycleEvent,
+  WaterEligibility,
   WalletAddress,
 } from "./domain.js";
 
@@ -17,6 +18,7 @@ const ZERO_WALLET = "0x0000000000000000000000000000000000000000" as WalletAddres
 const DIG_UP_FEE_WEI = "100000000000000000";
 const DIG_UP_FEE_ETH = "0.1";
 const DIG_UP_FEE_RECIPIENT = "0xB7cfa0de6975311DD0fFF05f71FD2110caC0B227" as WalletAddress;
+const WATER_COOLDOWN_SECONDS = 60 * 60 * 6;
 
 export class DryadMarketplaceService {
   constructor(
@@ -57,6 +59,10 @@ export class DryadMarketplaceService {
 
   getTree(treeId: string): DryadTree | undefined {
     return this.trees.find((tree) => tree.treeId === treeId);
+  }
+
+  listOwnedTrees(wallet: WalletAddress): DryadTree[] {
+    return this.trees.filter((tree) => tree.owner.toLowerCase() === wallet.toLowerCase());
   }
 
   claimAndPlant(treeId: string, wallet: WalletAddress, seed: `0x${string}`): DryadTree {
@@ -106,6 +112,41 @@ export class DryadMarketplaceService {
     const updated: DryadTree = { ...tree, owner: buyerWallet, listedPriceEth: undefined, lifecycleState: "sold", portable: false };
     this.replaceTree(updated);
     this.logEvent(treeId, "sold", "buy_tree", buyerWallet);
+    return updated;
+  }
+
+  getWaterEligibility(treeId: string, wallet: WalletAddress): WaterEligibility {
+    const tree = this.requireTree(treeId);
+    const now = new Date();
+    if (tree.owner.toLowerCase() !== wallet.toLowerCase()) {
+      return { treeId, wallet, eligible: false, reason: "forbidden_owner_mismatch", now: now.toISOString() };
+    }
+    if (tree.owner === ZERO_WALLET) {
+      return { treeId, wallet, eligible: false, reason: "tree_not_owned", now: now.toISOString() };
+    }
+    const next = tree.nextWateringAvailableAt ? new Date(tree.nextWateringAvailableAt) : null;
+    if (next && next.getTime() > now.getTime()) {
+      return { treeId, wallet, eligible: false, reason: "watering_cooldown_active", now: now.toISOString(), nextEligibleAt: next.toISOString() };
+    }
+    return { treeId, wallet, eligible: true, now: now.toISOString() };
+  }
+
+  waterTree(treeId: string, wallet: WalletAddress): DryadTree {
+    const eligibility = this.getWaterEligibility(treeId, wallet);
+    if (!eligibility.eligible) throw new Error(eligibility.reason ?? "watering_not_allowed");
+    const tree = this.requireTree(treeId);
+    const now = new Date();
+    const next = new Date(now.getTime() + WATER_COOLDOWN_SECONDS * 1000);
+    const updated: DryadTree = {
+      ...tree,
+      growthLevel: tree.growthLevel + 1,
+      contributionCount: tree.contributionCount + 1,
+      lastWateredAt: now.toISOString(),
+      nextWateringAvailableAt: next.toISOString(),
+      waterCooldownSeconds: WATER_COOLDOWN_SECONDS,
+    };
+    this.replaceTree(updated);
+    this.logEvent(treeId, updated.lifecycleState ?? "planted", "water_tree_remote", wallet);
     return updated;
   }
 

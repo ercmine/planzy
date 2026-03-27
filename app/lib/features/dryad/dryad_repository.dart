@@ -1,6 +1,4 @@
 import '../../api/api_client.dart';
-import '../../api/api_error.dart';
-import 'data/dryad_seed_data.dart';
 import 'models/dryad_models.dart';
 
 class DryadRepository {
@@ -9,40 +7,31 @@ class DryadRepository {
   final ApiClient apiClient;
 
   Future<List<DryadTree>> fetchPlanting({double? north, double? south, double? east, double? west}) async {
-    try {
-      final payload = await apiClient.getJson('/v1/dryad/trees', queryParameters: {
-        if (north != null) 'north': north.toStringAsFixed(6),
-        if (south != null) 'south': south.toStringAsFixed(6),
-        if (east != null) 'east': east.toStringAsFixed(6),
-        if (west != null) 'west': west.toStringAsFixed(6),
-      });
-      final rows = (payload['trees'] as List?) ?? const [];
-      return rows.whereType<Map<String, dynamic>>().map(DryadTree.fromJson).toList(growable: false);
-    } on ApiError {
-      return DryadSeedData.trees;
-    }
+    final payload = await apiClient.getJson('/v1/dryad/trees', queryParameters: {
+      if (north != null) 'north': north.toStringAsFixed(6),
+      if (south != null) 'south': south.toStringAsFixed(6),
+      if (east != null) 'east': east.toStringAsFixed(6),
+      if (west != null) 'west': west.toStringAsFixed(6),
+    });
+    final rows = (payload['trees'] as List?) ?? const [];
+    return rows.whereType<Map<String, dynamic>>().map(DryadTree.fromJson).toList(growable: false);
   }
 
   Future<List<DryadTree>> fetchMarketplace() async {
-    try {
-      final payload = await apiClient.getJson('/v1/dryad/market/listings');
-      final rows = (payload['trees'] as List?) ?? const [];
-      return rows.whereType<Map<String, dynamic>>().map(DryadTree.fromJson).toList(growable: false);
-    } on ApiError {
-      return const [];
-    }
+    final payload = await apiClient.getJson('/v1/dryad/market/listings');
+    final rows = (payload['trees'] as List?) ?? const [];
+    return rows.whereType<Map<String, dynamic>>().map(DryadTree.fromJson).toList(growable: false);
+  }
+
+  Future<List<DryadTree>> fetchOwnedTrees({required String wallet}) async {
+    final payload = await apiClient.getJson('/v1/dryad/trees/owned', queryParameters: {'wallet': wallet});
+    final rows = (payload['trees'] as List?) ?? const [];
+    return rows.whereType<Map<String, dynamic>>().map(DryadTree.fromJson).toList(growable: false);
   }
 
   Future<DryadTree?> fetchTree(String treeId) async {
-    try {
-      final payload = await apiClient.getJson('/v1/dryad/trees/$treeId');
-      return DryadTree.fromJson(payload);
-    } on ApiError {
-      for (final tree in DryadSeedData.trees) {
-        if (tree.id == treeId) return tree;
-      }
-      return null;
-    }
+    final payload = await apiClient.getJson('/v1/dryad/trees/$treeId');
+    return DryadTree.fromJson(payload);
   }
 
   Future<Map<String, dynamic>> digUpEligibility(String treeId, {required String wallet}) {
@@ -105,5 +94,13 @@ class DryadRepository {
 
   Future<void> buyTree(String treeId, {required String buyerWallet}) async {
     await apiClient.postJson('/v1/dryad/market/buy', body: {'treeId': treeId, 'buyerWallet': buyerWallet});
+  }
+
+  Future<Map<String, dynamic>> waterEligibility(String treeId, {required String wallet}) {
+    return apiClient.getJson('/v1/dryad/trees/$treeId/water-eligibility', queryParameters: {'wallet': wallet});
+  }
+
+  Future<void> waterTree(String treeId, {required String wallet}) async {
+    await apiClient.postJson('/v1/dryad/trees/$treeId/water', body: {'wallet': wallet});
   }
 }

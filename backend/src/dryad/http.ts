@@ -27,7 +27,10 @@ function toTreeResponse(tree: DryadTree): Record<string, unknown> {
     currentSpotId: tree.currentSpotId ?? null,
     digUpTxHash: tree.digUpTxHash ?? null,
     priceEth: tree.listedPriceEth == null ? null : Number(tree.listedPriceEth),
-    treeImageUrl: `https://metadata.dryad.dev/trees/${tree.treeId}.svg`
+    treeImageUrl: `https://metadata.dryad.dev/trees/${tree.treeId}.svg`,
+    lastWateredAt: tree.lastWateredAt ?? null,
+    nextWateringAvailableAt: tree.nextWateringAvailableAt ?? null,
+    waterCooldownSeconds: tree.waterCooldownSeconds ?? null,
   };
 }
 
@@ -35,6 +38,9 @@ export function createDryadMarketplaceHttpHandlers(service: DryadMarketplaceServ
   return {
     listTrees: async (_req: IncomingMessage, res: ServerResponse) => {
       sendJson(res, 200, { trees: service.listMarketTrees().map(toTreeResponse) });
+    },
+    listOwnedTrees: async (_req: IncomingMessage, res: ServerResponse, wallet: WalletAddress) => {
+      sendJson(res, 200, { trees: service.listOwnedTrees(wallet).map(toTreeResponse) });
     },
     listListings: async (_req: IncomingMessage, res: ServerResponse) => {
       sendJson(res, 200, { trees: service.listMarketTrees().filter((t) => t.listedPriceEth).map(toTreeResponse) });
@@ -58,6 +64,9 @@ export function createDryadMarketplaceHttpHandlers(service: DryadMarketplaceServ
     },
     getDigUpEligibility: async (req: IncomingMessage, res: ServerResponse, treeId: string, wallet: WalletAddress) => {
       sendJson(res, 200, service.getDigUpEligibility(treeId, wallet));
+    },
+    getWaterEligibility: async (_req: IncomingMessage, res: ServerResponse, treeId: string, wallet: WalletAddress) => {
+      sendJson(res, 200, service.getWaterEligibility(treeId, wallet));
     },
     createDigUpIntent: async (req: IncomingMessage, res: ServerResponse, treeId: string) => {
       const body = await parseJsonBody(req) as Record<string, unknown>;
@@ -113,6 +122,11 @@ export function createDryadMarketplaceHttpHandlers(service: DryadMarketplaceServ
     buyTree: async (req: IncomingMessage, res: ServerResponse) => {
       const body = await parseJsonBody(req) as Record<string, unknown>;
       const tree = service.buyTree(String(body.treeId ?? ""), String(body.buyerWallet ?? "") as WalletAddress);
+      sendJson(res, 200, toTreeResponse(tree));
+    },
+    waterTree: async (req: IncomingMessage, res: ServerResponse, treeId: string) => {
+      const body = await parseJsonBody(req) as Record<string, unknown>;
+      const tree = service.waterTree(treeId, String(body.wallet ?? "") as WalletAddress);
       sendJson(res, 200, toTreeResponse(tree));
     }
   };

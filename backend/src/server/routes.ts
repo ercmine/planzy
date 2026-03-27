@@ -300,6 +300,11 @@ export function createRoutes(
         await dryadMarketplaceHandlers.listTrees(req, res);
         return;
       }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/trees/owned" && dryadMarketplaceHandlers) {
+        const wallet = String(url.searchParams.get("wallet") ?? "") as `0x${string}`;
+        await dryadMarketplaceHandlers.listOwnedTrees(req, res, wallet);
+        return;
+      }
       if (req.method === "GET" && normalizedPath === "/v1/dryad/market/listings" && dryadMarketplaceHandlers) {
         await dryadMarketplaceHandlers.listListings(req, res);
         return;
@@ -322,6 +327,12 @@ export function createRoutes(
       if (req.method === "GET" && dryadTreeEligibilityMatch && dryadMarketplaceHandlers) {
         const wallet = String(url.searchParams.get("wallet") ?? "") as `0x${string}`;
         await dryadMarketplaceHandlers.getDigUpEligibility(req, res, dryadTreeEligibilityMatch.treeId, wallet);
+        return;
+      }
+      const dryadTreeWaterEligibilityMatch = matchPath("/v1/dryad/trees/:treeId/water-eligibility", normalizedPath);
+      if (req.method === "GET" && dryadTreeWaterEligibilityMatch && dryadMarketplaceHandlers) {
+        const wallet = String(url.searchParams.get("wallet") ?? "") as `0x${string}`;
+        await dryadMarketplaceHandlers.getWaterEligibility(req, res, dryadTreeWaterEligibilityMatch.treeId, wallet);
         return;
       }
       const dryadLifecycleMatch = matchPath("/v1/dryad/trees/:treeId/lifecycle", normalizedPath);
@@ -351,6 +362,11 @@ export function createRoutes(
       const claimPlantMatch = matchPath("/v1/dryad/trees/:treeId/claim-plant", normalizedPath);
       if (req.method === "POST" && claimPlantMatch && dryadMarketplaceHandlers) {
         await dryadMarketplaceHandlers.claimAndPlant(req, res, claimPlantMatch.treeId);
+        return;
+      }
+      const waterTreeMatch = matchPath("/v1/dryad/trees/:treeId/water", normalizedPath);
+      if (req.method === "POST" && waterTreeMatch && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.waterTree(req, res, waterTreeMatch.treeId);
         return;
       }
       if (req.method === "POST" && normalizedPath === "/v1/dryad/market/listings" && dryadMarketplaceHandlers) {
