@@ -39,9 +39,8 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
   return {
     async createDraft(req, res) {
       const userId = requireUserId(req);
-      const body = await parseJsonBody(req) as { canonicalPlaceId?: string; title?: string; caption?: string; rating?: number };
-      if (!body?.canonicalPlaceId) throw new ValidationError(["canonicalPlaceId is required"]);
-      const video = await service.createDraft({ userId, canonicalPlaceId: body.canonicalPlaceId, title: body.title, caption: body.caption, rating: body.rating });
+      const body = await parseJsonBody(req) as { creatorId?: string; creatorWallet?: string; primaryTreeId?: string; title?: string; caption?: string; tags?: string[]; rating?: number };
+      const video = await service.createDraft({ userId, creatorId: body.creatorId, creatorWallet: body.creatorWallet, primaryTreeId: body.primaryTreeId, title: body.title, caption: body.caption, tags: body.tags, rating: body.rating });
       sendJson(res, 201, { video });
     },
     async requestUpload(req, res, videoId) {
@@ -75,7 +74,7 @@ export function createVideoPlatformHttpHandlers(service: VideoPlatformService): 
     },
     async updateDraft(req, res, videoId) {
       const userId = requireUserId(req);
-      const body = await parseJsonBody(req) as { title?: string; caption?: string; rating?: number; canonicalPlaceId?: string; visibility?: "public" | "private" | "unlisted" };
+      const body = await parseJsonBody(req) as { title?: string; caption?: string; rating?: number; creatorWallet?: string; primaryTreeId?: string; tags?: string[]; visibility?: "public" | "private" | "unlisted" };
       sendJson(res, 200, { video: await service.updateDraft({ userId, videoId, ...body }) });
     },
     async listStudio(req, res) {

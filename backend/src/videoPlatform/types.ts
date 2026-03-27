@@ -20,7 +20,7 @@ export type ModerationStatus = "pending" | "approved" | "review" | "flagged" | "
 export interface VideoModerationFrameEvidence { timestampMs: number; thumbnailUrl?: string; labels: string[]; score: number; }
 export interface VideoModerationSummary { nudityScore: number; sexualContentScore: number; graphicSexualContentScore: number; violenceScore: number; graphicViolenceScore: number; decision: "safe" | "review" | "block"; policyVersion: string; provider: string; scannedAt: string; }
 export type Visibility = "public" | "unlisted" | "private";
-export type UploadPurpose = "place_review_video" | "thumbnail" | "cover" | "draft_asset";
+export type UploadPurpose = "creator_video" | "thumbnail" | "cover" | "draft_asset";
 export type FeedScope = "local" | "regional" | "global";
 
 export interface VideoLifecycleTimestamps {
@@ -38,7 +38,10 @@ export interface VideoLifecycleTimestamps {
 
 export interface VideoAsset {
   id: string;
-  canonicalPlaceId: string;
+  creatorId?: string;
+  creatorWallet?: string;
+  primaryTreeId?: string;
+  canonicalPlaceId?: string;
   authorUserId: string;
   authorProfileId?: string;
   status: VideoLifecycleStatus;
@@ -46,6 +49,7 @@ export interface VideoAsset {
   visibility: Visibility;
   title?: string;
   caption?: string;
+  tags?: string[];
   rating?: number;
   lifecycle: VideoLifecycleTimestamps;
   rawAssetKey?: string;
@@ -68,6 +72,12 @@ export interface VideoAsset {
     saves: number;
     shares: number;
     completionRate: number;
+  };
+  tipStats?: {
+    waterTipsCount: number;
+    waterTipsWei: string;
+    directTipsCount: number;
+    directTipsWei: string;
   };
   processedPlaybackUrl?: string;
   thumbnailPlaybackUrl?: string;
@@ -193,7 +203,9 @@ export interface VideoProcessingJob {
 
 export interface VideoFeedItem {
   videoId: string;
-  placeId: string;
+  placeId?: string;
+  treeId?: string;
+  creatorWallet?: string;
   placeName?: string;
   placeCategory?: string;
   regionLabel?: string;
@@ -231,6 +243,12 @@ export interface VideoFeedItem {
     saves: number;
     shares: number;
     completionRate: number;
+  };
+  supportSummary?: {
+    waterTipsCount: number;
+    waterTipsWei: string;
+    directTipsCount: number;
+    directTipsWei: string;
   };
   scope?: FeedScope;
   ranking?: RankingSignalBreakdown;
