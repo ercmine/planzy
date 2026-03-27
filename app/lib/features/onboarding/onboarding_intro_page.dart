@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
@@ -22,7 +21,6 @@ class OnboardingIntroPage extends ConsumerStatefulWidget {
 
 class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
   final _walletController = TextEditingController();
-  static const String _walletDappUrl = 'https://app.dryad.dev';
 
   @override
   void dispose() {
@@ -70,8 +68,8 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
             ),
             const SizedBox(height: AppSpacing.m),
             PrimaryButton(
-              label: 'Connect MetaMask app',
-              onPressed: state.isBusy ? null : () => _launchWallet(_WalletApp.metaMask),
+              label: 'Connect MetaMask',
+              onPressed: state.isBusy ? null : () => _connectWallet('metamask'),
               isLoading: state.isBusy,
             ),
             const SizedBox(height: AppSpacing.s),
@@ -79,10 +77,10 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                SecondaryButton(label: 'Connect Phantom app', onPressed: () => _launchWallet(_WalletApp.phantom)),
+                SecondaryButton(label: 'Connect Phantom (EVM)', onPressed: state.isBusy ? null : () => _connectWallet('phantom')),
                 SecondaryButton(
-                  label: 'Connect Coinbase Wallet app',
-                  onPressed: () => _launchWallet(_WalletApp.coinbase),
+                  label: 'Connect Coinbase Wallet',
+                  onPressed: state.isBusy ? null : () => _connectWallet('coinbase'),
                 ),
               ],
             ),
@@ -145,25 +143,39 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
     );
   }
 
-  Future<void> _launchWallet(_WalletApp wallet) async {
-    final uri = _buildWalletConnectUri(wallet);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
+  Future<void> _connectWallet(String walletId) async {
+    final connector = ref.read(walletConnectorProvider);
+    final controller = ref.read(onboardingControllerProvider.notifier);
+    if (!connector.isAvailable) {
+      controller.state = controller.state.copyWith(
+        status: OnboardingFlowStatus.onboardingFailed,
+        errorMessage: 'No injected EVM wallet detected. Install MetaMask, Phantom EVM, or Coinbase Wallet extension.',
+      );
+      return;
+    }
 
-  Uri _buildWalletConnectUri(_WalletApp wallet) {
-    final encodedDappUrl = Uri.encodeComponent(_walletDappUrl);
-    switch (wallet) {
-      case _WalletApp.metaMask:
-        return Uri.parse('https://metamask.app.link/dapp/$encodedDappUrl');
-      case _WalletApp.phantom:
-        return Uri.parse('https://phantom.app/ul/browse/$encodedDappUrl');
-      case _WalletApp.coinbase:
-        return Uri.parse('https://go.cb-w.com/dapp?cb_url=$encodedDappUrl');
+    if (!connector.isWalletInstalled(walletId)) {
+      controller.state = controller.state.copyWith(
+        status: OnboardingFlowStatus.onboardingFailed,
+        errorMessage: '$walletId is not installed in this browser.',
+      );
+      return;
+    }
+
+    controller.state = controller.state.copyWith(isBusy: true, clearError: true);
+    try {
+      final account = await connector.connectWallet(walletId: walletId);
+      controller.setWalletAddress(account);
+      controller.state = controller.state.copyWith(isBusy: false, status: OnboardingFlowStatus.walletConnected);
+    } catch (error) {
+      controller.state = controller.state.copyWith(
+        status: OnboardingFlowStatus.onboardingFailed,
+        isBusy: false,
+        errorMessage: 'Wallet connection failed: $error',
+      );
     }
   }
 }
-
-enum _WalletApp { metaMask, phantom, coinbase }
 
 class _ArtworkCard extends StatelessWidget {
   const _ArtworkCard({required this.svg, required this.imageSource});
