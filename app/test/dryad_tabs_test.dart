@@ -30,7 +30,7 @@ void main() {
     waterCooldownSeconds: 21600,
   );
 
-  testWidgets('bottom nav includes Tend and renders owned trees on Tend/My Trees', (tester) async {
+  testWidgets('bottom nav is tree-centric and renders map/tend/market/my trees/creator', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -43,6 +43,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Map'), findsWidgets);
+    expect(find.text('Creator'), findsWidgets);
     expect(find.text('Tend'), findsWidgets);
 
     await tester.tap(find.text('Tend').last);
