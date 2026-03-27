@@ -40,7 +40,7 @@ class SettingsPage extends ConsumerWidget {
         actions: const [
           Padding(
             padding: EdgeInsets.only(right: AppSpacing.m),
-            child: AppPill(label: 'Dryad', icon: Icons.palette_outlined),
+            child: AppPill(label: 'Perbug', icon: Icons.palette_outlined),
           ),
         ],
       ),
@@ -49,7 +49,7 @@ class SettingsPage extends ConsumerWidget {
           const BrandHeroCard(
             child: AppSectionHeader(
               title: 'Tune your experience',
-              subtitle: 'Everything from permissions to privacy now sits inside the premium Dryad system.',
+              subtitle: 'Everything from permissions to privacy now sits inside the Perbug game system.',
             ),
           ),
           const SizedBox(height: AppSpacing.m),

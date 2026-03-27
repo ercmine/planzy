@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../app/theme/widgets.dart';
-import '../dryad/pages/grove_page.dart';
-import '../dryad/pages/market_page.dart';
-import '../dryad/pages/tend_page.dart';
-import '../dryad/pages/creator_page.dart';
-import '../dryad/pages/map_page.dart';
+import '../collections/collections_page.dart';
+import '../settings/settings_page.dart';
+import 'perbug_game_page.dart';
 
-enum HomeTab { map, tend, market, grove, creator }
+enum HomeTab { world, collection, profile }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, this.initialTab = HomeTab.map});
+  const HomePage({super.key, this.initialTab = HomeTab.world});
 
   final HomeTab initialTab;
 
@@ -20,7 +17,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const List<HomeTab> _tabs = [HomeTab.map, HomeTab.tend, HomeTab.market, HomeTab.grove, HomeTab.creator];
+  static const List<HomeTab> _tabs = [HomeTab.world, HomeTab.collection, HomeTab.profile];
   late int _navIndex;
 
   @override
@@ -32,33 +29,25 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      DryadMapPage(onOpenTree: _openTree),
-      DryadTendPage(onOpenTree: _openTree),
-      DryadMarketPage(onOpenTree: _openTree),
-      DryadGrovePage(onOpenTree: _openTree),
-      DryadCreatorPage(onOpenTree: _openTree),
+    final pages = const [
+      PerbugGamePage(),
+      CollectionsPage(),
+      SettingsPage(),
     ];
 
     return AppScaffold(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-      appBar: AppBar(title: const Text('Dryad')),
+      appBar: AppBar(title: const Text('Perbug')),
       body: IndexedStack(index: _navIndex, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
         onDestinationSelected: (value) => setState(() => _navIndex = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Map'),
-          NavigationDestination(icon: Icon(Icons.water_drop_outlined), selectedIcon: Icon(Icons.water_drop), label: 'Tend'),
-          NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Marketplace'),
-          NavigationDestination(icon: Icon(Icons.forest_outlined), selectedIcon: Icon(Icons.forest), label: 'My Trees'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Creator'),
+          NavigationDestination(icon: Icon(Icons.public_outlined), selectedIcon: Icon(Icons.public), label: 'World'),
+          NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view), label: 'Collection'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );
-  }
-
-  void _openTree(String treeId) {
-    context.push('/tree/$treeId');
   }
 }
