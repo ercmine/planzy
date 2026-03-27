@@ -22,9 +22,7 @@ class OnboardingIntroPage extends ConsumerStatefulWidget {
 
 class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
   final _walletController = TextEditingController();
-  static const String _metaMaskMobileUri = 'https://metamask.app.link/';
-  static const String _phantomMobileUri = 'https://phantom.app/ul/v1/connect';
-  static const String _coinbaseWalletMobileUri = 'https://go.cb-w.com/';
+  static const String _walletDappUrl = 'https://app.dryad.dev';
 
   @override
   void dispose() {
@@ -73,7 +71,7 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
             const SizedBox(height: AppSpacing.m),
             PrimaryButton(
               label: 'Connect MetaMask app',
-              onPressed: state.isBusy ? null : () => _launchWallet(_metaMaskMobileUri),
+              onPressed: state.isBusy ? null : () => _launchWallet(_WalletApp.metaMask),
               isLoading: state.isBusy,
             ),
             const SizedBox(height: AppSpacing.s),
@@ -81,10 +79,10 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                SecondaryButton(label: 'Connect Phantom app', onPressed: () => _launchWallet(_phantomMobileUri)),
+                SecondaryButton(label: 'Connect Phantom app', onPressed: () => _launchWallet(_WalletApp.phantom)),
                 SecondaryButton(
                   label: 'Connect Coinbase Wallet app',
-                  onPressed: () => _launchWallet(_coinbaseWalletMobileUri),
+                  onPressed: () => _launchWallet(_WalletApp.coinbase),
                 ),
               ],
             ),
@@ -147,10 +145,25 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
     );
   }
 
-  Future<void> _launchWallet(String uri) async {
-    await launchUrl(Uri.parse(uri), mode: LaunchMode.externalApplication);
+  Future<void> _launchWallet(_WalletApp wallet) async {
+    final uri = _buildWalletConnectUri(wallet);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Uri _buildWalletConnectUri(_WalletApp wallet) {
+    final encodedDappUrl = Uri.encodeComponent(_walletDappUrl);
+    switch (wallet) {
+      case _WalletApp.metaMask:
+        return Uri.parse('https://metamask.app.link/dapp/$encodedDappUrl');
+      case _WalletApp.phantom:
+        return Uri.parse('https://phantom.app/ul/browse/$encodedDappUrl');
+      case _WalletApp.coinbase:
+        return Uri.parse('https://go.cb-w.com/dapp?cb_url=$encodedDappUrl');
+    }
   }
 }
+
+enum _WalletApp { metaMask, phantom, coinbase }
 
 class _ArtworkCard extends StatelessWidget {
   const _ArtworkCard({required this.svg, required this.imageSource});
