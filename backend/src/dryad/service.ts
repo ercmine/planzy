@@ -279,14 +279,24 @@ export class DryadMarketplaceService {
 
   private seedTreeDefaults(): void {
     for (const tree of this.trees) {
-      const inferredState = tree.listedPriceEth ? "listed" : tree.owner === ZERO_WALLET ? "planted" : "planted";
+      const assignedSpotId = tree.currentSpotId ?? tree.place.placeId;
+      const hasAssignedSpot = Boolean(assignedSpotId);
+      const inferredState = hasAssignedSpot
+        ? (tree.listedPriceEth ? "listed" : "planted")
+        : "ready_to_replant";
+      const inferredPortable = hasAssignedSpot ? false : true;
       this.replaceTree({
         ...tree,
         lifecycleState: tree.lifecycleState ?? inferredState,
-        portable: tree.portable ?? false,
-        currentSpotId: tree.currentSpotId ?? tree.place.placeId,
+        portable: tree.portable ?? inferredPortable,
+        currentSpotId: hasAssignedSpot ? assignedSpotId : undefined,
       });
-      const spotId = tree.currentSpotId ?? tree.place.placeId;
+
+      if (!hasAssignedSpot) {
+        continue;
+      }
+
+      const spotId = assignedSpotId as string;
       const existingSpot = this.spots.find((spot) => spot.spotId === spotId);
       if (!existingSpot) {
         this.spots.push({
