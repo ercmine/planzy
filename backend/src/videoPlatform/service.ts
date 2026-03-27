@@ -438,7 +438,7 @@ export class VideoPlatformService {
     const topVideos = published
       .map((row) => ({
         videoId: row.id,
-        placeId: row.canonicalPlaceId,
+        placeId: row.canonicalPlaceId ?? "creator",
         title: row.title,
         views: row.engagement?.views ?? 0,
         likes: row.engagement?.likes ?? 0,
@@ -452,7 +452,7 @@ export class VideoPlatformService {
 
     const placeMap = new Map<string, { videos: number; views: number; saves: number; completion: number }>();
     for (const row of published) {
-      const key = row.canonicalPlaceId;
+      const key = row.canonicalPlaceId ?? "creator";
       const current = placeMap.get(key) ?? { videos: 0, views: 0, saves: 0, completion: 0 };
       current.videos += 1;
       current.views += row.engagement?.views ?? 0;
@@ -813,7 +813,7 @@ export class VideoPlatformService {
   private isVisibleVideo(video: VideoAsset): boolean {
     if (!["published", "moderation_pending", "publish_pending"].includes(video.status)) return false;
     if (!this.moderationService) return true;
-    return this.moderationService.isPubliclyVisible({ targetType: "creator_video", targetId: video.id, placeId: video.canonicalPlaceId ?? "creator", subjectUserId: video.authorUserId });
+    return this.moderationService.isPubliclyVisible({ targetType: "place_review_video", targetId: video.id, placeId: video.canonicalPlaceId ?? "creator", subjectUserId: video.authorUserId });
   }
 
   private playbackUrl(key?: string): string | undefined {
