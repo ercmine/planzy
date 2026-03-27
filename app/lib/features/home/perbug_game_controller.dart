@@ -5,6 +5,8 @@ import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_tab.dart' show mapGeoClientProvider;
 import 'perbug_game_models.dart';
+import 'puzzles/puzzle_framework.dart';
+import 'puzzles/sequence_forge_puzzle.dart';
 
 final perbugGameControllerProvider = StateNotifierProvider<PerbugGameController, PerbugGameState>((ref) {
   return PerbugGameController(ref);
@@ -14,6 +16,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
   PerbugGameController(this._ref) : super(PerbugGameState.initial());
 
   final Ref _ref;
+  static const SequenceForgeGenerator _sequenceForgeGenerator = SequenceForgeGenerator();
 
   static const MapViewport _fixedGameplayViewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
 
@@ -73,6 +76,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         'Jumped ${_formatDistance(move.node.distanceFromCurrentMeters ?? 0)} to ${move.node.label} (-$spend, +$gained energy)',
         ...state.history,
       ],
+      clearActiveSequenceForgeSession: true,
     );
     return true;
   }
@@ -81,6 +85,120 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     state = state.copyWith(
       energy: (state.energy + 3).clamp(0, state.maxEnergy),
       history: ['Recovered +3 energy from exploration streak', ...state.history],
+    );
+  }
+
+  void launchSequenceForgeForCurrentNode() {
+    final node = state.currentNode;
+    if (node == null) return;
+
+    final knobs = SequenceForgeDifficultyKnobs(
+      sequenceDepth: 6 + (state.visitedNodeIds.length % 3),
+      transformationLayers: state.visitedNodeIds.length >= 4 ? 2 : 1,
+      hiddenSteps: state.visitedNodeIds.length >= 3 ? 2 : 1,
+      operatorComplexity: state.visitedNodeIds.length >= 5 ? 4 : 2,
+      answerChoices: state.visitedNodeIds.length >= 6 ? 5 : 4,
+      misleadingSymmetry: state.visitedNodeIds.length >= 5 ? 2 : 0,
+    );
+
+    final input = PuzzleSeedInput(
+      nodeId: node.id,
+      latitude: node.latitude,
+      longitude: node.longitude,
+      difficultyBand: state.visitedNodeIds.length,
+    );
+
+    final instance = _sequenceForgeGenerator.generate(seedInput: input, knobs: knobs);
+    final session = PuzzleSession<SequenceForgePuzzleData>(
+      instance: instance,
+      status: PuzzleSessionStatus.generated,
+      selectedAnswers: const {},
+      startedAt: null,
+      retries: 0,
+    );
+
+    state = state.copyWith(
+      activeSequenceForgeSession: session,
+      puzzleEvents: ['generated:${instance.instanceId}', ...state.puzzleEvents],
+      history: ['Sequence Forge generated for ${node.label} (${instance.difficulty.tier.name})', ...state.history],
+    );
+  }
+
+  void startActivePuzzle() {
+    final session = state.activeSequenceForgeSession;
+    if (session == null) return;
+    if (session.status != PuzzleSessionStatus.generated) return;
+    state = state.copyWith(
+      activeSequenceForgeSession: session.copyWith(status: PuzzleSessionStatus.started, startedAt: DateTime.now()),
+      puzzleEvents: ['started:${session.instance.instanceId}', ...state.puzzleEvents],
+    );
+  }
+
+  void selectPuzzleAnswer({required int hiddenIndex, required String answer}) {
+    final session = state.activeSequenceForgeSession;
+    if (session == null) return;
+    final selected = {...session.selectedAnswers, hiddenIndex: answer};
+    state = state.copyWith(activeSequenceForgeSession: session.copyWith(selectedAnswers: selected));
+  }
+
+  PuzzleResult? submitActivePuzzle() {
+    final session = state.activeSequenceForgeSession;
+    final node = state.currentNode;
+    if (session == null || node == null) return null;
+
+    final success = validateSequenceForgeSubmission(data: session.instance.data, selectedAnswers: session.selectedAnswers);
+    final startedAt = session.startedAt ?? DateTime.now();
+    final result = PuzzleResult(
+      type: PuzzleType.perbugSequenceForge,
+      success: success,
+      nodeId: node.id,
+      duration: DateTime.now().difference(startedAt),
+      retries: session.retries,
+      difficulty: session.instance.difficulty,
+      telemetry: {
+        'family': session.instance.data.family.name,
+        'depth': session.instance.data.fullSequence.length,
+        'layers': session.instance.debugMetadata['transformationLayers'],
+        'hiddenSteps': session.instance.data.hiddenIndices.length,
+        'operatorComplexity': session.instance.debugMetadata['operatorComplexity'],
+        'answerChoices': session.instance.debugMetadata['answerChoices'],
+        'misleadingSymmetry': session.instance.data.misleadingSymmetryApplied,
+      },
+    );
+
+    final status = success ? PuzzleSessionStatus.succeeded : PuzzleSessionStatus.failed;
+    final retries = success ? session.retries : session.retries + 1;
+    final bonus = success ? 2 : 0;
+    state = state.copyWith(
+      energy: (state.energy + bonus).clamp(0, state.maxEnergy),
+      activeSequenceForgeSession: session.copyWith(status: status, retries: retries),
+      lastPuzzleResult: result,
+      puzzleEvents: ['submitted:${session.instance.instanceId}:$success', ...state.puzzleEvents],
+      history: [
+        '${success ? 'Solved' : 'Missed'} Sequence Forge at ${node.label}${success ? ' (+$bonus energy)' : ''}',
+        ...state.history,
+      ],
+    );
+    return result;
+  }
+
+  void abandonActivePuzzle() {
+    final session = state.activeSequenceForgeSession;
+    if (session == null) return;
+    state = state.copyWith(
+      activeSequenceForgeSession: session.copyWith(status: PuzzleSessionStatus.abandoned),
+      puzzleEvents: ['abandoned:${session.instance.instanceId}', ...state.puzzleEvents],
+      history: ['Abandoned Sequence Forge at ${state.currentNode?.label ?? 'node'}', ...state.history],
+    );
+  }
+
+  void resetActivePuzzleSelections() {
+    final session = state.activeSequenceForgeSession;
+    if (session == null) return;
+    state = state.copyWith(
+      activeSequenceForgeSession: session.copyWith(selectedAnswers: const {}, status: PuzzleSessionStatus.started),
+      puzzleEvents: ['reset:${session.instance.instanceId}', ...state.puzzleEvents],
+      clearLastPuzzleResult: true,
     );
   }
 

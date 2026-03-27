@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/widgets.dart';
 import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
+import 'puzzles/puzzle_framework.dart';
+import 'puzzles/sequence_forge_puzzle.dart';
 
 class PerbugGamePage extends ConsumerStatefulWidget {
   const PerbugGamePage({super.key});
@@ -112,24 +114,106 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 )
                 .toList(growable: false),
           ),
-          _Section(
-            title: 'Upcoming node challenge slots',
-            subtitle: 'Puzzle systems are not enabled yet, but node states and rewards are puzzle-ready.',
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: const [
-                  AppPill(label: 'available', icon: Icons.check_circle_outline),
-                  AppPill(label: 'completed', icon: Icons.task_alt),
-                  AppPill(label: 'locked', icon: Icons.lock_outline),
-                  AppPill(label: 'future-challenge-ready', icon: Icons.extension_outlined),
-                ],
-              ),
-            ],
-          ),
+          _SequenceForgeSection(state: state, controller: controller),
         ],
       ),
+    );
+  }
+}
+
+class _SequenceForgeSection extends StatelessWidget {
+  const _SequenceForgeSection({required this.state, required this.controller});
+
+  final PerbugGameState state;
+  final PerbugGameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final session = state.activeSequenceForgeSession;
+    if (session == null) {
+      return _Section(
+        title: 'Puzzle #6 · Perbug Sequence Forge',
+        subtitle: 'Deterministic sequence puzzle generated from current node latitude/longitude.',
+        children: [
+          PrimaryButton(
+            label: 'Generate Sequence Forge',
+            onPressed: controller.launchSequenceForgeForCurrentNode,
+          ),
+        ],
+      );
+    }
+
+    final data = session.instance.data;
+    return _Section(
+      title: 'Puzzle #6 · Perbug Sequence Forge',
+      subtitle: 'Difficulty ${session.instance.difficulty.tier.name.toUpperCase()} • score ${session.instance.difficulty.score}',
+      children: [
+        Text(data.ruleDescription),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [for (final term in data.visibleSequence) Chip(label: Text(term))],
+        ),
+        const SizedBox(height: 10),
+        if (session.status == PuzzleSessionStatus.generated)
+          PrimaryButton(label: 'Start puzzle', onPressed: controller.startActivePuzzle),
+        if (session.status != PuzzleSessionStatus.generated)
+          ...data.hiddenIndices.map((index) {
+            final options = data.choicesByHiddenIndex[index] ?? const <String>[];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Missing step ${index + 1}'),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final option in options)
+                        ChoiceChip(
+                          label: Text(option),
+                          selected: session.selectedAnswers[index] == option,
+                          onSelected: (_) => controller.selectPuzzleAnswer(hiddenIndex: index, answer: option),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        Row(
+          children: [
+            Expanded(
+              child: SecondaryButton(
+                label: 'Submit',
+                onPressed: session.status == PuzzleSessionStatus.generated
+                    ? null
+                    : () {
+                        final result = controller.submitActivePuzzle();
+                        final ok = result?.success == true;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(ok ? 'Sequence forged successfully!' : 'Incorrect sequence. Retry or regenerate.')),
+                        );
+                      },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: SecondaryButton(label: 'Reset', onPressed: controller.resetActivePuzzleSelections)),
+            const SizedBox(width: 8),
+            Expanded(child: SecondaryButton(label: 'Abandon', onPressed: controller.abandonActivePuzzle)),
+          ],
+        ),
+        if (state.lastPuzzleResult != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              'Last result: ${state.lastPuzzleResult!.success ? 'Success' : 'Fail'} · '
+              '${state.lastPuzzleResult!.duration.inSeconds}s · retries ${state.lastPuzzleResult!.retries}',
+            ),
+          ),
+      ],
     );
   }
 }

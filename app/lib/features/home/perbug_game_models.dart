@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'map_discovery_models.dart';
+import 'puzzles/puzzle_framework.dart';
+import 'puzzles/sequence_forge_puzzle.dart';
 
 enum PerbugNodeState { available, completed, locked, exhausted, special, futureChallengeReady }
 
@@ -66,6 +68,9 @@ class PerbugGameState {
     required this.loading,
     required this.visitedNodeIds,
     required this.history,
+    required this.puzzleEvents,
+    this.activeSequenceForgeSession,
+    this.lastPuzzleResult,
     this.error,
   });
 
@@ -78,6 +83,7 @@ class PerbugGameState {
         loading: false,
         visitedNodeIds: {},
         history: [],
+        puzzleEvents: [],
       );
 
   final List<PerbugNode> nodes;
@@ -88,6 +94,9 @@ class PerbugGameState {
   final bool loading;
   final Set<String> visitedNodeIds;
   final List<String> history;
+  final List<String> puzzleEvents;
+  final PuzzleSession<SequenceForgePuzzleData>? activeSequenceForgeSession;
+  final PuzzleResult? lastPuzzleResult;
   final String? error;
 
   PerbugNode? get currentNode {
@@ -109,6 +118,11 @@ class PerbugGameState {
     bool? loading,
     Set<String>? visitedNodeIds,
     List<String>? history,
+    List<String>? puzzleEvents,
+    PuzzleSession<SequenceForgePuzzleData>? activeSequenceForgeSession,
+    bool clearActiveSequenceForgeSession = false,
+    PuzzleResult? lastPuzzleResult,
+    bool clearLastPuzzleResult = false,
     String? error,
     bool clearError = false,
   }) {
@@ -121,6 +135,11 @@ class PerbugGameState {
       loading: loading ?? this.loading,
       visitedNodeIds: visitedNodeIds ?? this.visitedNodeIds,
       history: history ?? this.history,
+      puzzleEvents: puzzleEvents ?? this.puzzleEvents,
+      activeSequenceForgeSession: clearActiveSequenceForgeSession
+          ? null
+          : (activeSequenceForgeSession ?? this.activeSequenceForgeSession),
+      lastPuzzleResult: clearLastPuzzleResult ? null : (lastPuzzleResult ?? this.lastPuzzleResult),
       error: clearError ? null : (error ?? this.error),
     );
   }
