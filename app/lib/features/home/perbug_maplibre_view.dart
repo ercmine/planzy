@@ -66,7 +66,7 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
   bool _styleLoaded = false;
   bool _forceBuiltinStyle = false;
   bool _hasLoggedContainerSize = false;
-  bool _reportedWebMapLibMissing = false;
+  bool _reportedWebFallbackActive = false;
   VoidCallback? _cameraListener;
   Timer? _styleFallbackTimer;
   Timer? _styleLoadTimeoutTimer;
@@ -110,14 +110,14 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
   @override
   Widget build(BuildContext context) {
     if (kIsWeb) {
-      _reportWebMapUnavailableOnce();
-      return _WebMapUnavailablePlaceholder(
-        onTapRetry: () {
-          setState(() {
-            _reportedWebMapLibMissing = false;
-          });
-          _reportWebMapUnavailableOnce();
-        },
+      _reportWebFallbackReadyOnce();
+      return _WebStaticFallbackMap(
+        viewport: widget.viewport,
+        pins: widget.pins,
+        selectedPlaceId: widget.selectedPlaceId,
+        userLocation: widget.userLocation,
+        onViewportChanged: widget.onViewportChanged,
+        onPlaceSelected: widget.onPlaceSelected,
       );
     }
     if (widget.config.enableDiagnostics) {
@@ -206,14 +206,13 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
     );
   }
 
-  void _reportWebMapUnavailableOnce() {
-    if (_reportedWebMapLibMissing) return;
-    _reportedWebMapLibMissing = true;
+  void _reportWebFallbackReadyOnce() {
+    if (_reportedWebFallbackActive) return;
+    _reportedWebFallbackActive = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      widget.onMapLoadError(
-        'Map rendering is unavailable on web because the MapLibre JS runtime is not loaded (missing global `maplibregl`).',
-      );
+      widget.onMapLoadStarted();
+      widget.onMapReady();
     });
   }
 
@@ -733,46 +732,115 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
   }
 }
 
-class _WebMapUnavailablePlaceholder extends StatelessWidget {
-  const _WebMapUnavailablePlaceholder({required this.onTapRetry});
+class _WebStaticFallbackMap extends StatelessWidget {
+  const _WebStaticFallbackMap({
+    required this.viewport,
+    required this.pins,
+    required this.selectedPlaceId,
+    required this.userLocation,
+    required this.onViewportChanged,
+    required this.onPlaceSelected,
+  });
 
-  final VoidCallback onTapRetry;
+  final MapViewport viewport;
+  final List<MapPin> pins;
+  final String? selectedPlaceId;
+  final ({double lat, double lng})? userLocation;
+  final void Function(MapViewport viewport, {required bool hasGesture}) onViewportChanged;
+  final void Function(String placeId) onPlaceSelected;
+
+  String _fallbackStaticMapUrl() {
+    final lat = viewport.centerLat.toStringAsFixed(6);
+    final lng = viewport.centerLng.toStringAsFixed(6);
+    final zoom = viewport.zoom.round().clamp(2, 18);
+    final markerItems = <String>['$lat,$lng,red-pushpin'];
+    if (userLocation != null) {
+      markerItems.add(
+        '${userLocation!.lat.toStringAsFixed(6)},${userLocation!.lng.toStringAsFixed(6)},blue-pushpin',
+      );
+    }
+    final markerValue = markerItems.join('|');
+    return Uri.https('staticmap.openstreetmap.de', '/staticmap.php', {
+      'center': '$lat,$lng',
+      'zoom': '$zoom',
+      'size': '860x520',
+      'markers': markerValue,
+    }).toString();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final highlighted = pins.take(8).toList(growable: false);
     return ColoredBox(
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Using fallback web map',
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'MapLibre is unavailable in this web runtime. A lightweight OpenStreetMap fallback is active.',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(color: theme.colorScheme.surface),
+                  child: Image.network(
+                    _fallbackStaticMapUrl(),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Text(
+                        'Unable to load fallback map tiles right now.',
+                        style: theme.textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Icon(Icons.map_outlined, size: 42, color: theme.colorScheme.primary),
-                const SizedBox(height: 12),
-                Text(
-                  'Map unavailable on web',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'The MapLibre JavaScript runtime is missing in this build, so the live map cannot be rendered right now.',
-                  style: theme.textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 14),
-                OutlinedButton.icon(
-                  onPressed: onTapRetry,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
+                if (userLocation != null)
+                  OutlinedButton.icon(
+                    onPressed: () => onViewportChanged(
+                      MapViewport(centerLat: userLocation!.lat, centerLng: userLocation!.lng, zoom: viewport.zoom),
+                      hasGesture: true,
+                    ),
+                    icon: const Icon(Icons.my_location),
+                    label: const Text('Recenter to me'),
+                  ),
+                ...highlighted.map(
+                  (pin) => ActionChip(
+                    avatar: Icon(
+                      pin.canonicalPlaceId == selectedPlaceId ? Icons.place : Icons.location_on_outlined,
+                      size: 18,
+                    ),
+                    label: Text(pin.name, overflow: TextOverflow.ellipsis),
+                    onPressed: () {
+                      onPlaceSelected(pin.canonicalPlaceId);
+                      onViewportChanged(
+                        MapViewport(centerLat: pin.latitude, centerLng: pin.longitude, zoom: viewport.zoom),
+                        hasGesture: true,
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );
