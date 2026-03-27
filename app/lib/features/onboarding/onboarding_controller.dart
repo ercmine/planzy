@@ -39,7 +39,8 @@ class OnboardingController extends Notifier<OnboardingState> {
     if (!connector.isAvailable) {
       state = state.copyWith(
         status: OnboardingFlowStatus.onboardingFailed,
-        errorMessage: 'No in-app wallet connector detected. Use the mobile wallet app connect buttons, or paste your wallet manually.',
+        errorMessage:
+            'No wallet connector detected. Use a wallet app on phone or a browser extension on web, or paste your wallet manually.',
       );
       return;
     }

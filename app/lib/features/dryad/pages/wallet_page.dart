@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -58,26 +59,26 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
                   runSpacing: 8,
                   children: [
                     FilledButton(
-                    onPressed: _isConnecting ? null : () => _connectBrowserWallet(walletId: 'metamask'),
+                    onPressed: _isConnecting ? null : () => _connectWallet(walletId: 'metamask'),
                     child: Text(_isConnecting ? 'Connecting…' : 'Connect MetaMask'),
                   ),
                   OutlinedButton(
-                    onPressed: _isConnecting ? null : () => _connectBrowserWallet(walletId: 'phantom'),
+                    onPressed: _isConnecting ? null : () => _connectWallet(walletId: 'phantom'),
                     child: const Text('Connect Phantom (EVM)'),
                   ),
                   OutlinedButton(
-                    onPressed: _isConnecting ? null : () => _connectBrowserWallet(walletId: 'coinbase'),
+                    onPressed: _isConnecting ? null : () => _connectWallet(walletId: 'coinbase'),
                     child: const Text('Connect Coinbase Wallet'),
                   ),
                   OutlinedButton(
-                    onPressed: _isConnecting ? null : () => _connectBrowserWallet(),
+                    onPressed: _isConnecting ? null : () => _connectWallet(),
                     child: const Text('Connect detected wallet'),
                   ),
                 ],
               ),
               if (!connector.isAvailable) ...[
                 const SizedBox(height: 8),
-                const Text('No injected EVM provider detected. Install MetaMask, Phantom EVM, or Coinbase Wallet extension and refresh.'),
+                Text(_missingWalletMessage()),
               ],
               if (_connectionMessage != null) ...[
                 const SizedBox(height: 8),
@@ -114,18 +115,18 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
     );
   }
 
-  Future<void> _connectBrowserWallet({String? walletId}) async {
+  Future<void> _connectWallet({String? walletId}) async {
     final connector = ref.read(walletConnectorProvider);
     if (!connector.isAvailable) {
       setState(() {
-        _connectionMessage = 'Wallet connect is unavailable in this environment. Install a supported browser extension and retry.';
+        _connectionMessage = _missingWalletMessage();
       });
       return;
     }
 
     if (walletId != null && !connector.isWalletInstalled(walletId)) {
       setState(() {
-        _connectionMessage = '$walletId is not installed in this browser.';
+        _connectionMessage = _walletNotDetectedMessage(walletId);
       });
       return;
     }
@@ -201,5 +202,19 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
         });
       },
     );
+  }
+
+  String _missingWalletMessage() {
+    if (kIsWeb) {
+      return 'No wallet provider detected in this browser. Install MetaMask, Phantom EVM, or Coinbase Wallet extension and refresh.';
+    }
+    return 'No wallet app detected on this phone. Install/open MetaMask, Phantom, or Coinbase Wallet and retry.';
+  }
+
+  String _walletNotDetectedMessage(String walletId) {
+    if (kIsWeb) {
+      return '$walletId is not installed in this browser.';
+    }
+    return '$walletId app is not detected on this phone.';
   }
 }
