@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,8 +64,8 @@ class Env {
   const Env._();
 
   static const String _defaultApiBaseUrl = 'https://api.perbug.com';
-  static const String _defaultMapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty/style.json';
-  static const String _defaultMapStyleDarkUrl = 'https://tiles.openfreemap.org/styles/dark/style.json';
+  static const String _defaultMapStyleUrl = 'builtin://light';
+  static const String _defaultMapStyleDarkUrl = 'builtin://dark';
 
   static Future<EnvConfig> load(EnvFlavor flavor) async {
     final fileName = switch (flavor) {
@@ -171,8 +173,8 @@ class Env {
             : _defaultMapStyleDarkUrl);
 
     return MapStackConfig(
-      styleUrl: _normalizeMapStyleUrl(resolvedStyleUrl),
-      darkStyleUrl: _normalizeMapStyleUrl(resolvedDarkStyleUrl),
+      styleUrl: _normalizeMapStyleUrl(resolvedStyleUrl, isDark: false),
+      darkStyleUrl: _normalizeMapStyleUrl(resolvedDarkStyleUrl, isDark: true),
       tileSourceStrategy: strategyFromDefine.trim().isNotEmpty
           ? strategyFromDefine.trim()
           : (dotenv.maybeGet(EnvKeys.mapTileSourceStrategy)?.trim().isNotEmpty == true
@@ -201,16 +203,50 @@ class Env {
     return null;
   }
 
-  static String _normalizeMapStyleUrl(String raw) {
+  static String _normalizeMapStyleUrl(String raw, {required bool isDark}) {
+    final normalizedRaw = raw.trim();
+    if (normalizedRaw == 'builtin://light') {
+      return _builtinRasterStyleJson(isDark: false);
+    }
+    if (normalizedRaw == 'builtin://dark') {
+      return _builtinRasterStyleJson(isDark: true);
+    }
+
     final uri = Uri.tryParse(raw);
     if (uri == null) return raw;
     if (uri.host != 'tiles.openfreemap.org') return raw;
 
     final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList(growable: false);
     if (segments.length == 2 && segments.first == 'styles') {
-      return uri.replace(pathSegments: [...segments, 'style.json']).toString();
+      // OpenFreeMap styles have had intermittent outages; fallback to a local
+      // OSM-backed style so maps stay visible in app + web even when hosted
+      // style documents are unavailable.
+      return _builtinRasterStyleJson(isDark: isDark);
     }
-    return raw;
+    return uri.path.endsWith('/style.json') ? raw : _builtinRasterStyleJson(isDark: isDark);
+  }
+
+  static String _builtinRasterStyleJson({required bool isDark}) {
+    return jsonEncode({
+      'version': 8,
+      'name': isDark ? 'Perbug Built-in Dark' : 'Perbug Built-in Light',
+      'sources': {
+        'openstreetmap': {
+          'type': 'raster',
+          'tiles': ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          'tileSize': 256,
+          'attribution': '© OpenStreetMap contributors',
+          'maxzoom': 19,
+        },
+      },
+      'layers': [
+        {
+          'id': 'openstreetmap-raster',
+          'type': 'raster',
+          'source': 'openstreetmap',
+        },
+      ],
+    });
   }
 
 
