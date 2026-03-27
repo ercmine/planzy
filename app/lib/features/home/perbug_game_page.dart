@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/widgets.dart';
 import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
+import 'puzzles/logic_locks_puzzle.dart';
+import 'puzzles/puzzle_framework.dart';
 
 class PerbugGamePage extends ConsumerStatefulWidget {
   const PerbugGamePage({super.key});
@@ -26,6 +28,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     final state = ref.watch(perbugGameControllerProvider);
     final controller = ref.read(perbugGameControllerProvider.notifier);
     final moves = state.reachableMoves().take(8).toList(growable: false);
+    final puzzleSession = state.activePuzzleSession?.logicLocksSession;
 
     return RefreshIndicator(
       onRefresh: controller.initialize,
@@ -80,6 +83,46 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
           if (state.loading) const AppCard(child: LinearProgressIndicator()),
           if (state.error != null) AppCard(child: Text(state.error!)),
           _Section(
+            title: 'Node puzzle challenge',
+            subtitle: 'Perbug Logic Locks is deterministic from this node lat/lng and generated before play.',
+            children: [
+              if (puzzleSession == null)
+                FilledButton.icon(
+                  onPressed: controller.generateLogicLocksForCurrentNode,
+                  icon: const Icon(Icons.extension_outlined),
+                  label: const Text('Generate Logic Locks (#3)'),
+                )
+              else ...[
+                Text('Difficulty: ${puzzleSession.instance.difficulty.tier} (${(puzzleSession.instance.difficulty.score * 100).round()}%)'),
+                const SizedBox(height: 4),
+                Text('Knobs • vars ${puzzleSession.instance.data.entities.length} • clues ${puzzleSession.instance.data.clues.length} • depth ${puzzleSession.instance.data.deductionDepthEstimate.toStringAsFixed(2)}'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    FilledButton(
+                      onPressed: () async {
+                        controller.startActivePuzzle();
+                        controller.logCluePanelViewed();
+                        await showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          useSafeArea: true,
+                          builder: (_) => const _LogicLocksSheet(),
+                        );
+                      },
+                      child: const Text('Start puzzle'),
+                    ),
+                    OutlinedButton(
+                      onPressed: controller.generateLogicLocksForCurrentNode,
+                      child: const Text('Regenerate'),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+          _Section(
             title: 'Reachable jumps',
             subtitle: 'Movement is restricted by distance and energy. No unrestricted teleporting.',
             children: moves
@@ -113,22 +156,119 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 .toList(growable: false),
           ),
           _Section(
-            title: 'Upcoming node challenge slots',
-            subtitle: 'Puzzle systems are not enabled yet, but node states and rewards are puzzle-ready.',
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: const [
-                  AppPill(label: 'available', icon: Icons.check_circle_outline),
-                  AppPill(label: 'completed', icon: Icons.task_alt),
-                  AppPill(label: 'locked', icon: Icons.lock_outline),
-                  AppPill(label: 'future-challenge-ready', icon: Icons.extension_outlined),
-                ],
-              ),
-            ],
+            title: 'Puzzle lifecycle hooks',
+            subtitle: 'Events captured for balancing and future rewards/energy systems.',
+            children: state.puzzleHistory
+                .take(6)
+                .map((event) => Text('• ${event.name} @ ${event.timestamp.toIso8601String().substring(11, 19)}'))
+                .toList(growable: false),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LogicLocksSheet extends ConsumerWidget {
+  const _LogicLocksSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(perbugGameControllerProvider);
+    final controller = ref.read(perbugGameControllerProvider.notifier);
+    final session = state.activePuzzleSession?.logicLocksSession;
+    if (session == null) {
+      return const SizedBox(height: 220, child: Center(child: Text('No active puzzle.')));
+    }
+
+    final data = session.instance.data;
+    final player = session.playerState;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.lock_outline),
+                const SizedBox(width: 8),
+                Text('Perbug Logic Locks', style: Theme.of(context).textTheme.titleLarge),
+              ],
+            ),
+            Text('Difficulty ${session.instance.difficulty.tier} • seed ${session.instance.seed}'),
+            const SizedBox(height: 12),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Clues', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  ...data.clues.map((c) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text('• ${c.text}'),
+                      )),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Arrange entities into slots', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  for (var i = 0; i < data.slotLabels.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 70, child: Text(data.slotLabels[i])),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: DropdownButtonFormField<String?>(
+                              value: player.slotAssignments[i],
+                              items: [
+                                const DropdownMenuItem<String?>(value: null, child: Text('—')),
+                                ...data.solution.map((e) => DropdownMenuItem<String?>(value: e, child: Text(e))),
+                              ],
+                              onChanged: (v) => controller.assignPuzzleSlot(i, v),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton(
+                  onPressed: () {
+                    final result = controller.submitPuzzleAttempt();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(result.success ? 'Solved! +energy hook applied.' : 'Not correct yet.')),
+                    );
+                  },
+                  child: const Text('Submit'),
+                ),
+                OutlinedButton(onPressed: controller.undoPuzzleMove, child: const Text('Undo')),
+                OutlinedButton(onPressed: controller.resetPuzzle, child: const Text('Reset')),
+                TextButton(
+                  onPressed: () {
+                    controller.abandonActivePuzzle();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Abandon'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

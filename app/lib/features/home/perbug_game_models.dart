@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'map_discovery_models.dart';
+import 'puzzles/logic_locks_puzzle.dart';
+import 'puzzles/puzzle_framework.dart';
 
 enum PerbugNodeState { available, completed, locked, exhausted, special, futureChallengeReady }
 
@@ -42,6 +44,28 @@ class PerbugNode {
   }
 }
 
+
+
+class PerbugPuzzleSessionData {
+  const PerbugPuzzleSessionData({
+    required this.nodeId,
+    required this.logicLocksSession,
+  });
+
+  final String nodeId;
+  final PuzzleSession<LogicLocksPuzzleData, LogicLocksPlayerState> logicLocksSession;
+
+  PerbugPuzzleSessionData copyWith({
+    String? nodeId,
+    PuzzleSession<LogicLocksPuzzleData, LogicLocksPlayerState>? logicLocksSession,
+  }) {
+    return PerbugPuzzleSessionData(
+      nodeId: nodeId ?? this.nodeId,
+      logicLocksSession: logicLocksSession ?? this.logicLocksSession,
+    );
+  }
+}
+
 class PerbugMoveCandidate {
   const PerbugMoveCandidate({
     required this.node,
@@ -67,6 +91,8 @@ class PerbugGameState {
     required this.visitedNodeIds,
     required this.history,
     this.error,
+    this.activePuzzleSession,
+    this.puzzleHistory = const [],
   });
 
   factory PerbugGameState.initial() => const PerbugGameState(
@@ -89,6 +115,8 @@ class PerbugGameState {
   final Set<String> visitedNodeIds;
   final List<String> history;
   final String? error;
+  final PerbugPuzzleSessionData? activePuzzleSession;
+  final List<PuzzleAnalyticsEvent> puzzleHistory;
 
   PerbugNode? get currentNode {
     final id = currentNodeId;
@@ -111,6 +139,9 @@ class PerbugGameState {
     List<String>? history,
     String? error,
     bool clearError = false,
+    PerbugPuzzleSessionData? activePuzzleSession,
+    bool clearPuzzleSession = false,
+    List<PuzzleAnalyticsEvent>? puzzleHistory,
   }) {
     return PerbugGameState(
       nodes: nodes ?? this.nodes,
@@ -122,6 +153,8 @@ class PerbugGameState {
       visitedNodeIds: visitedNodeIds ?? this.visitedNodeIds,
       history: history ?? this.history,
       error: clearError ? null : (error ?? this.error),
+      activePuzzleSession: clearPuzzleSession ? null : (activePuzzleSession ?? this.activePuzzleSession),
+      puzzleHistory: puzzleHistory ?? this.puzzleHistory,
     );
   }
 
