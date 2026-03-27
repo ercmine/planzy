@@ -66,6 +66,7 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
   bool _styleLoaded = false;
   bool _forceBuiltinStyle = false;
   bool _hasLoggedContainerSize = false;
+  bool _reportedWebMapLibMissing = false;
   VoidCallback? _cameraListener;
   Timer? _styleFallbackTimer;
   Timer? _styleLoadTimeoutTimer;
@@ -108,6 +109,17 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      _reportWebMapUnavailableOnce();
+      return _WebMapUnavailablePlaceholder(
+        onTapRetry: () {
+          setState(() {
+            _reportedWebMapLibMissing = false;
+          });
+          _reportWebMapUnavailableOnce();
+        },
+      );
+    }
     if (widget.config.enableDiagnostics) {
       Log.d('map.lifecycle build style=$_stylePreview cycle=$_styleLoadCycle forceBuiltin=$_forceBuiltinStyle');
     }
@@ -192,6 +204,17 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
         );
       },
     );
+  }
+
+  void _reportWebMapUnavailableOnce() {
+    if (_reportedWebMapLibMissing) return;
+    _reportedWebMapLibMissing = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.onMapLoadError(
+        'Map rendering is unavailable on web because the MapLibre JS runtime is not loaded (missing global `maplibregl`).',
+      );
+    });
   }
 
   @override
@@ -707,6 +730,52 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
     } catch (error) {
       if (widget.config.enableDiagnostics) Log.warn('map.layer dryad-user layers skipped error=$error');
     }
+  }
+}
+
+class _WebMapUnavailablePlaceholder extends StatelessWidget {
+  const _WebMapUnavailablePlaceholder({required this.onTapRetry});
+
+  final VoidCallback onTapRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ColoredBox(
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.map_outlined, size: 42, color: theme.colorScheme.primary),
+                const SizedBox(height: 12),
+                Text(
+                  'Map unavailable on web',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'The MapLibre JavaScript runtime is missing in this build, so the live map cannot be rendered right now.',
+                  style: theme.textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: onTapRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
