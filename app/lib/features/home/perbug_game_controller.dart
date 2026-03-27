@@ -5,6 +5,8 @@ import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_tab.dart' show mapGeoClientProvider;
 import 'perbug_game_models.dart';
+import 'perbug_puzzles/puzzle_framework.dart';
+import 'perbug_puzzles/word_weave.dart';
 
 final perbugGameControllerProvider = StateNotifierProvider<PerbugGameController, PerbugGameState>((ref) {
   return PerbugGameController(ref);
@@ -82,6 +84,148 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       energy: (state.energy + 3).clamp(0, state.maxEnergy),
       history: ['Recovered +3 energy from exploration streak', ...state.history],
     );
+  }
+
+  void launchWordWeaveForNode(PerbugNode node, {WordWeaveDifficultyConfig? config}) {
+    final resolvedConfig = config ??
+        const WordWeaveDifficultyConfig(
+          letterPoolSize: 9,
+          targetWordLength: 5,
+          decoyDensity: 0.3,
+          branchingOptions: 3,
+          retryAllowance: 3,
+          dictionaryStrictness: WordWeaveDictionaryStrictness.standardDictionary,
+        );
+    final session = createWordWeaveSession(
+      seed: PuzzleSeedInput(nodeId: node.id, latitude: node.latitude, longitude: node.longitude),
+      config: resolvedConfig,
+    );
+    state = state.copyWith(
+      activePuzzleSession: session,
+      clearLastPuzzleSummary: true,
+      history: ['Generated Word Weave for ${node.label} (${session.instance.difficulty.tier})', ...state.history],
+    );
+  }
+
+  void startActivePuzzle() {
+    final session = state.activePuzzleSession;
+    if (session == null || session.status != PuzzleSessionStatus.generated) return;
+    state = state.copyWith(
+      activePuzzleSession: session.copyWith(
+        status: PuzzleSessionStatus.started,
+        startedAt: DateTime.now(),
+        lifecycleEvents: [
+          ...session.lifecycleEvents,
+          PuzzleLifecycleEvent(
+            name: 'puzzle_started',
+            at: DateTime.now(),
+            metadata: {'puzzleId': session.instance.id},
+          ),
+        ],
+      ),
+    );
+  }
+
+  void appendPuzzleLetter(String letter) {
+    final session = state.activePuzzleSession;
+    if (session == null || session.status == PuzzleSessionStatus.failed || session.status == PuzzleSessionStatus.succeeded) return;
+    if (session.currentInput.length >= session.instance.board.targetLength) return;
+    state = state.copyWith(activePuzzleSession: session.copyWith(currentInput: '${session.currentInput}$letter'));
+  }
+
+  void undoPuzzleLetter() {
+    final session = state.activePuzzleSession;
+    if (session == null || session.currentInput.isEmpty) return;
+    state = state.copyWith(activePuzzleSession: session.copyWith(currentInput: session.currentInput.substring(0, session.currentInput.length - 1)));
+  }
+
+  void clearPuzzleInput() {
+    final session = state.activePuzzleSession;
+    if (session == null) return;
+    state = state.copyWith(activePuzzleSession: session.copyWith(currentInput: ''));
+  }
+
+  PuzzleResult submitPuzzleInput() {
+    final session = state.activePuzzleSession;
+    if (session == null) {
+      return const PuzzleResult(success: false, reason: 'No active puzzle', metadata: {'kind': 'missing'});
+    }
+    final validator = WordWeaveValidator();
+    final result = validator.validateSubmission(
+      board: session.instance.board,
+      solution: session.instance.solution,
+      input: session.currentInput,
+      config: session.config,
+    );
+
+    final nextEvents = [
+      ...session.lifecycleEvents,
+      PuzzleLifecycleEvent(
+        name: 'submission_attempted',
+        at: DateTime.now(),
+        metadata: {
+          'input': session.currentInput,
+          'success': result.success,
+          'reason': result.reason,
+        },
+      ),
+    ];
+
+    if (result.success) {
+      final successSession = session.copyWith(
+        status: PuzzleSessionStatus.succeeded,
+        lifecycleEvents: [
+          ...nextEvents,
+          PuzzleLifecycleEvent(
+            name: 'puzzle_succeeded',
+            at: DateTime.now(),
+            metadata: {'attemptsUsed': session.attemptsUsed},
+          ),
+        ],
+      );
+      state = state.copyWith(
+        activePuzzleSession: successSession,
+        lastPuzzleSummary: 'Solved ${session.instance.solution.primaryTarget} in ${session.attemptsUsed + 1} attempt(s).',
+        history: ['Completed Word Weave at node ${state.currentNode?.label ?? 'Unknown'}', ...state.history],
+      );
+      return result;
+    }
+
+    final nextAttempts = session.attemptsUsed + 1;
+    final exhausted = nextAttempts >= session.maxRetries;
+    final failedSession = session.copyWith(
+      attemptsUsed: nextAttempts,
+      currentInput: '',
+      status: exhausted ? PuzzleSessionStatus.failed : session.status,
+      invalidSubmissions: [...session.invalidSubmissions, result.reason],
+      lifecycleEvents: [
+        ...nextEvents,
+        if (exhausted)
+          PuzzleLifecycleEvent(
+            name: 'puzzle_failed',
+            at: DateTime.now(),
+            metadata: {'attemptsUsed': nextAttempts},
+          ),
+      ],
+    );
+    state = state.copyWith(
+      activePuzzleSession: failedSession,
+      lastPuzzleSummary: exhausted ? 'Out of retries. Target was ${session.instance.solution.primaryTarget}.' : null,
+    );
+    return result;
+  }
+
+  void abandonPuzzle() {
+    final session = state.activePuzzleSession;
+    if (session == null) return;
+    final abandoned = session.copyWith(
+      status: PuzzleSessionStatus.abandoned,
+      lifecycleEvents: [
+        ...session.lifecycleEvents,
+        PuzzleLifecycleEvent(name: 'puzzle_abandoned', at: DateTime.now(), metadata: {'attemptsUsed': session.attemptsUsed}),
+      ],
+    );
+    state = state.copyWith(activePuzzleSession: abandoned, history: ['Abandoned active Word Weave', ...state.history]);
   }
 
   PerbugNode _mapPinToNode(MapPin pin) {

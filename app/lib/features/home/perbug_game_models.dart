@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'perbug_puzzles/word_weave.dart';
 import 'map_discovery_models.dart';
 
 enum PerbugNodeState { available, completed, locked, exhausted, special, futureChallengeReady }
@@ -66,6 +67,8 @@ class PerbugGameState {
     required this.loading,
     required this.visitedNodeIds,
     required this.history,
+    this.activePuzzleSession,
+    this.lastPuzzleSummary,
     this.error,
   });
 
@@ -78,6 +81,8 @@ class PerbugGameState {
         loading: false,
         visitedNodeIds: {},
         history: [],
+        activePuzzleSession: null,
+        lastPuzzleSummary: null,
       );
 
   final List<PerbugNode> nodes;
@@ -88,6 +93,8 @@ class PerbugGameState {
   final bool loading;
   final Set<String> visitedNodeIds;
   final List<String> history;
+  final WordWeaveSession? activePuzzleSession;
+  final String? lastPuzzleSummary;
   final String? error;
 
   PerbugNode? get currentNode {
@@ -109,6 +116,10 @@ class PerbugGameState {
     bool? loading,
     Set<String>? visitedNodeIds,
     List<String>? history,
+    WordWeaveSession? activePuzzleSession,
+    bool clearActivePuzzleSession = false,
+    String? lastPuzzleSummary,
+    bool clearLastPuzzleSummary = false,
     String? error,
     bool clearError = false,
   }) {
@@ -121,6 +132,8 @@ class PerbugGameState {
       loading: loading ?? this.loading,
       visitedNodeIds: visitedNodeIds ?? this.visitedNodeIds,
       history: history ?? this.history,
+      activePuzzleSession: clearActivePuzzleSession ? null : (activePuzzleSession ?? this.activePuzzleSession),
+      lastPuzzleSummary: clearLastPuzzleSummary ? null : (lastPuzzleSummary ?? this.lastPuzzleSummary),
       error: clearError ? null : (error ?? this.error),
     );
   }

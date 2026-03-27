@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/widgets.dart';
 import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
+import 'perbug_puzzles/puzzle_framework.dart';
+import 'perbug_puzzles/word_weave.dart';
 
 class PerbugGamePage extends ConsumerStatefulWidget {
   const PerbugGamePage({super.key});
@@ -113,21 +115,32 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 .toList(growable: false),
           ),
           _Section(
-            title: 'Upcoming node challenge slots',
-            subtitle: 'Puzzle systems are not enabled yet, but node states and rewards are puzzle-ready.',
+            title: 'Node challenge slots',
+            subtitle: 'Word Weave is now live as modular puzzle type #5 with deterministic node seeding.',
             children: [
-              Wrap(
+              const Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: const [
-                  AppPill(label: 'available', icon: Icons.check_circle_outline),
-                  AppPill(label: 'completed', icon: Icons.task_alt),
-                  AppPill(label: 'locked', icon: Icons.lock_outline),
-                  AppPill(label: 'future-challenge-ready', icon: Icons.extension_outlined),
+                children: [
+                  AppPill(label: 'grid-path', icon: Icons.grid_3x3),
+                  AppPill(label: 'pattern-recall', icon: Icons.memory),
+                  AppPill(label: 'logic-locks', icon: Icons.vpn_key_outlined),
+                  AppPill(label: 'symbol-match', icon: Icons.extension_outlined),
+                  AppPill(label: 'word-weave', icon: Icons.abc),
                 ],
               ),
+              const SizedBox(height: 10),
+              SecondaryButton(
+                label: 'Launch Word Weave for current node',
+                onPressed: state.currentNode == null ? null : () => controller.launchWordWeaveForNode(state.currentNode!),
+              ),
+              if (state.activePuzzleSession != null) ...[
+                const SizedBox(height: 12),
+                _WordWeavePanel(state: state, controller: controller),
+              ],
             ],
           ),
+          if (state.lastPuzzleSummary != null) AppCard(tone: AppCardTone.featured, child: Text(state.lastPuzzleSummary!)),
         ],
       ),
     );
@@ -217,6 +230,94 @@ class _Section extends StatelessWidget {
           Text(subtitle),
           const SizedBox(height: 8),
           ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _WordWeavePanel extends StatelessWidget {
+  const _WordWeavePanel({required this.state, required this.controller});
+
+  final PerbugGameState state;
+  final PerbugGameController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final session = state.activePuzzleSession!;
+    final board = session.instance.board;
+    final status = session.status;
+    final isPlayable = status == PuzzleSessionStatus.generated || status == PuzzleSessionStatus.started;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101527),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Perbug Word Weave', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text('Difficulty: ${session.instance.difficulty.tier} • score ${session.instance.difficulty.score.toStringAsFixed(2)}'),
+          const SizedBox(height: 6),
+          Text('Retries left: ${session.retriesRemaining} • strictness: ${session.config.dictionaryStrictness.name}'),
+          const SizedBox(height: 8),
+          Text(
+            session.currentInput.isEmpty ? 'Current input: —' : 'Current input: ${session.currentInput}',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: board.letterPool
+                .map(
+                  (letter) => ActionChip(
+                    label: Text(letter),
+                    onPressed: isPlayable ? () => controller.appendPuzzleLetter(letter) : null,
+                  ),
+                )
+                .toList(growable: false),
+          ),
+          const SizedBox(height: 10),
+          Text('Branch preview', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 4),
+          ...board.branchPreview.asMap().entries.map(
+                (entry) => Text('Step ${entry.key + 1}: ${entry.value.join(' / ')}'),
+              ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              SecondaryButton(
+                label: status == PuzzleSessionStatus.generated ? 'Start' : 'Undo',
+                onPressed: status == PuzzleSessionStatus.generated ? controller.startActivePuzzle : controller.undoPuzzleLetter,
+              ),
+              SecondaryButton(label: 'Clear', onPressed: isPlayable ? controller.clearPuzzleInput : null),
+              PrimaryButton(
+                label: 'Submit',
+                onPressed: isPlayable
+                    ? () {
+                        final result = controller.submitPuzzleInput();
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.reason)));
+                      }
+                    : null,
+              ),
+              SecondaryButton(label: 'Abandon', onPressed: controller.abandonPuzzle),
+            ],
+          ),
+          if (status == PuzzleSessionStatus.failed || status == PuzzleSessionStatus.succeeded) ...[
+            const SizedBox(height: 10),
+            Text(
+              status == PuzzleSessionStatus.succeeded
+                  ? 'Solved target: ${session.instance.solution.primaryTarget}'
+                  : 'Failed. Target: ${session.instance.solution.primaryTarget}',
+            ),
+          ],
         ],
       ),
     );
