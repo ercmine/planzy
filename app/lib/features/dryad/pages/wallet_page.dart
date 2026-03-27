@@ -16,9 +16,7 @@ class DryadWalletPage extends ConsumerStatefulWidget {
 class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
   bool _isConnecting = false;
   String? _connectionMessage;
-  static const String _metaMaskMobileUri = 'https://metamask.app.link/';
-  static const String _phantomMobileUri = 'https://phantom.app/ul/v1/connect';
-  static const String _coinbaseWalletMobileUri = 'https://go.cb-w.com/';
+  static const String _walletDappUrl = 'https://app.dryad.dev';
 
   @override
   Widget build(BuildContext context) {
@@ -47,15 +45,15 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
                 runSpacing: 8,
                 children: [
                   FilledButton(
-                    onPressed: _isConnecting ? null : () => _launchWallet(_metaMaskMobileUri),
+                    onPressed: _isConnecting ? null : () => _launchWallet(_WalletApp.metaMask),
                     child: Text(_isConnecting ? 'Connecting…' : 'Connect MetaMask app'),
                   ),
                   OutlinedButton(
-                    onPressed: () => _launchWallet(_phantomMobileUri),
+                    onPressed: () => _launchWallet(_WalletApp.phantom),
                     child: const Text('Connect Phantom app'),
                   ),
                   OutlinedButton(
-                    onPressed: () => _launchWallet(_coinbaseWalletMobileUri),
+                    onPressed: () => _launchWallet(_WalletApp.coinbase),
                     child: const Text('Connect Coinbase Wallet app'),
                   ),
                   OutlinedButton(
@@ -136,7 +134,27 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
     }
   }
 
-  Future<void> _launchWallet(String uri) async {
-    await launchUrl(Uri.parse(uri), mode: LaunchMode.externalApplication);
+  Future<void> _launchWallet(_WalletApp wallet) async {
+    final uri = _buildWalletConnectUri(wallet);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      setState(() {
+        _connectionMessage = 'Could not open wallet app. Install it and try again.';
+      });
+    }
+  }
+
+  Uri _buildWalletConnectUri(_WalletApp wallet) {
+    final encodedDappUrl = Uri.encodeComponent(_walletDappUrl);
+    switch (wallet) {
+      case _WalletApp.metaMask:
+        return Uri.parse('https://metamask.app.link/dapp/$encodedDappUrl');
+      case _WalletApp.phantom:
+        return Uri.parse('https://phantom.app/ul/browse/$encodedDappUrl');
+      case _WalletApp.coinbase:
+        return Uri.parse('https://go.cb-w.com/dapp?cb_url=$encodedDappUrl');
+    }
   }
 }
+
+enum _WalletApp { metaMask, phantom, coinbase }
