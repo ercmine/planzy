@@ -38,7 +38,7 @@ class OnboardingController extends Notifier<OnboardingState> {
     if (!connector.isAvailable) {
       state = state.copyWith(
         status: OnboardingFlowStatus.onboardingFailed,
-        errorMessage: 'No browser wallet detected. Install MetaMask (or compatible wallet) in Flutter Web, or paste your wallet manually.',
+        errorMessage: 'No in-app wallet connector detected. Use the mobile wallet app connect buttons, or paste your wallet manually.',
       );
       return;
     }
@@ -114,7 +114,7 @@ class OnboardingController extends Notifier<OnboardingState> {
         status: OnboardingFlowStatus.onboardingFailed,
         isBusy: false,
         errorMessage:
-            'On-chain transaction failed. Connect a browser wallet and approve the request, or provide a wallet-enabled RPC. Error: $error',
+            'On-chain transaction failed. Connect using a mobile wallet app (or in-app web wallet where available) and approve the request, or provide a wallet-enabled RPC. Error: $error',
       );
     }
   }

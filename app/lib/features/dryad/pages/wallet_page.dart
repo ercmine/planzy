@@ -16,6 +16,9 @@ class DryadWalletPage extends ConsumerStatefulWidget {
 class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
   bool _isConnecting = false;
   String? _connectionMessage;
+  static const String _metaMaskMobileUri = 'https://metamask.app.link/';
+  static const String _phantomMobileUri = 'https://phantom.app/ul/v1/connect';
+  static const String _coinbaseWalletMobileUri = 'https://go.cb-w.com/';
 
   @override
   Widget build(BuildContext context) {
@@ -44,17 +47,26 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
                 runSpacing: 8,
                 children: [
                   FilledButton(
-                    onPressed: _isConnecting ? null : _connectBrowserWallet,
-                    child: Text(_isConnecting ? 'Connecting…' : 'Connect wallet'),
+                    onPressed: _isConnecting ? null : () => _launchWallet(_metaMaskMobileUri),
+                    child: Text(_isConnecting ? 'Connecting…' : 'Connect MetaMask app'),
                   ),
-                  OutlinedButton(onPressed: () => _launchWallet('metamask://'), child: const Text('Open MetaMask')),
-                  OutlinedButton(onPressed: () => _launchWallet('phantom://'), child: const Text('Open Phantom')),
-                  OutlinedButton(onPressed: () => _launchWallet('https://go.cb-w.com/'), child: const Text('Open Coinbase Wallet')),
+                  OutlinedButton(
+                    onPressed: () => _launchWallet(_phantomMobileUri),
+                    child: const Text('Connect Phantom app'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _launchWallet(_coinbaseWalletMobileUri),
+                    child: const Text('Connect Coinbase Wallet app'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _isConnecting ? null : _connectBrowserWallet,
+                    child: const Text('Use in-app web wallet'),
+                  ),
                 ],
               ),
               if (!connector.isAvailable) ...[
                 const SizedBox(height: 8),
-                const Text('No browser wallet provider detected here. Install a wallet extension and use this page in a wallet-enabled browser, or connect from onboarding.'),
+                const Text('No in-app browser wallet provider detected. Use a mobile wallet app button above, or paste your wallet address in onboarding.'),
               ],
               if (_connectionMessage != null) ...[
                 const SizedBox(height: 8),
@@ -95,7 +107,7 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
     final connector = ref.read(walletConnectorProvider);
     if (!connector.isAvailable) {
       setState(() {
-        _connectionMessage = 'Wallet app links only open the wallet. To actually connect, use the Connect wallet button in a browser with MetaMask/Phantom extension enabled.';
+        _connectionMessage = 'In-app wallet connect is unavailable. Use one of the mobile wallet app connect buttons.';
       });
       return;
     }

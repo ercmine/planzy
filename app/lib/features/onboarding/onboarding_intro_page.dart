@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
@@ -21,6 +22,9 @@ class OnboardingIntroPage extends ConsumerStatefulWidget {
 
 class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
   final _walletController = TextEditingController();
+  static const String _metaMaskMobileUri = 'https://metamask.app.link/';
+  static const String _phantomMobileUri = 'https://phantom.app/ul/v1/connect';
+  static const String _coinbaseWalletMobileUri = 'https://go.cb-w.com/';
 
   @override
   void dispose() {
@@ -68,9 +72,21 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
             ),
             const SizedBox(height: AppSpacing.m),
             PrimaryButton(
-              label: 'Connect browser wallet',
-              onPressed: state.isBusy ? null : ref.read(onboardingControllerProvider.notifier).connectWallet,
+              label: 'Connect MetaMask app',
+              onPressed: state.isBusy ? null : () => _launchWallet(_metaMaskMobileUri),
               isLoading: state.isBusy,
+            ),
+            const SizedBox(height: AppSpacing.s),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                SecondaryButton(label: 'Connect Phantom app', onPressed: () => _launchWallet(_phantomMobileUri)),
+                SecondaryButton(
+                  label: 'Connect Coinbase Wallet app',
+                  onPressed: () => _launchWallet(_coinbaseWalletMobileUri),
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.s),
             const Text('or paste an address manually'),
@@ -129,6 +145,10 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _launchWallet(String uri) async {
+    await launchUrl(Uri.parse(uri), mode: LaunchMode.externalApplication);
   }
 }
 
