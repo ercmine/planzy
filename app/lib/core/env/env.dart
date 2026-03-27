@@ -64,8 +64,8 @@ class Env {
   const Env._();
 
   static const String _defaultApiBaseUrl = 'https://api.perbug.com';
-  static const String _defaultMapStyleUrl = 'builtin://light';
-  static const String _defaultMapStyleDarkUrl = 'builtin://dark';
+  static const String _defaultMapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';
+  static const String _defaultMapStyleDarkUrl = 'https://tiles.openfreemap.org/styles/liberty';
 
   static Future<EnvConfig> load(EnvFlavor flavor) async {
     final fileName = switch (flavor) {
