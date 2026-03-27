@@ -147,12 +147,32 @@ class Env {
     if (parsed.scheme != 'https' && parsed.scheme != 'http') {
       throw StateError('API base URL must use http or https: "$raw"');
     }
-    final allowHttp = parsed.scheme == 'http' &&
-        (parsed.host == 'localhost' || parsed.host == '127.0.0.1');
+    final allowHttp = parsed.scheme == 'http' && _isAllowedLocalHttpHost(parsed.host);
     if (parsed.scheme == 'http' && !allowHttp) {
-      throw StateError('HTTP API base URL is only allowed for localhost: "$raw"');
+      throw StateError('HTTP API base URL is only allowed for localhost or private LAN hosts: "$raw"');
     }
     return raw;
+  }
+
+  static bool _isAllowedLocalHttpHost(String host) {
+    if (host == 'localhost' || host == '127.0.0.1' || host == '::1') return true;
+    if (host.endsWith('.local')) return true;
+
+    final parts = host.split('.');
+    if (parts.length != 4) return false;
+    final octets = <int>[];
+    for (final part in parts) {
+      final parsed = int.tryParse(part);
+      if (parsed == null || parsed < 0 || parsed > 255) return false;
+      octets.add(parsed);
+    }
+
+    final a = octets[0];
+    final b = octets[1];
+    if (a == 10) return true;
+    if (a == 172 && b >= 16 && b <= 31) return true;
+    if (a == 192 && b == 168) return true;
+    return false;
   }
 
   static MapStackConfig _resolveMapStackConfig() {
