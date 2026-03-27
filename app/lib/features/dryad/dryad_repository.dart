@@ -29,7 +29,7 @@ class DryadRepository {
       final rows = (payload['trees'] as List?) ?? const [];
       return rows.whereType<Map<String, dynamic>>().map(DryadTree.fromJson).toList(growable: false);
     } on ApiError {
-      return DryadSeedData.trees.where((tree) => tree.saleStatus == TreeSaleStatus.listed).toList(growable: false);
+      return const [];
     }
   }
 

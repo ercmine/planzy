@@ -15,7 +15,6 @@ class PlacePreviewCard extends StatelessWidget {
     this.saved = false,
     this.onOpenDetails,
     this.onLeaveReview,
-    this.onAddVideoReview,
     this.onSave,
     this.onShare,
     this.onOpenMaps,
@@ -29,7 +28,6 @@ class PlacePreviewCard extends StatelessWidget {
   final bool saved;
   final VoidCallback? onOpenDetails;
   final VoidCallback? onLeaveReview;
-  final VoidCallback? onAddVideoReview;
   final VoidCallback? onSave;
   final VoidCallback? onShare;
   final VoidCallback? onOpenMaps;
@@ -106,10 +104,6 @@ class PlacePreviewCard extends StatelessWidget {
                               backgroundColor: theme.colorScheme.secondary.withOpacity(0.18),
                             ),
                           ],
-                          if (place.hasCreatorMedia) ...[
-                            if (proximityLabel != null || saved) const SizedBox(width: 8),
-                            const AppPill(label: 'Creator videos', icon: Icons.play_circle_outline),
-                          ],
                         ],
                       ),
                     ),
@@ -152,7 +146,7 @@ class PlacePreviewCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(place.descriptionSnippet ?? 'Open full place details for reviews, creator clips, and trust signals.', maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text(place.descriptionSnippet ?? 'Open full place details for reviews and trust signals.', maxLines: 2, overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
@@ -167,14 +161,6 @@ class PlacePreviewCard extends StatelessWidget {
                           onPressed: reviewCtaEnabled ? onLeaveReview : null,
                           icon: const Icon(Icons.rate_review_outlined),
                           label: reviewCtaEnabled ? 'Leave review' : 'Review locked',
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          onPressed: onAddVideoReview,
-                          icon: const Icon(Icons.videocam_rounded),
-                          label: const Text('Add video'),
                         ),
                       ),
                     ],
