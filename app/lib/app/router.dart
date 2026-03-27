@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/identity/identity_provider.dart';
-import '../features/dryad/pages/tree_page.dart';
 import '../features/home/home_page.dart';
 import '../features/onboarding/bootstrap_page.dart';
 import '../features/onboarding/onboarding_intro_page.dart';
@@ -46,20 +45,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/bootstrap', name: 'bootstrap', builder: (context, state) => const BootstrapPage()),
       GoRoute(path: '/onboarding', name: 'onboarding', builder: (context, state) => const OnboardingIntroPage()),
       GoRoute(path: '/', name: 'home', builder: (context, state) => const HomePage()),
-      GoRoute(path: '/map', name: 'map', builder: (context, state) => const HomePage(initialTab: HomeTab.map)),
-      GoRoute(path: '/tend', name: 'tend', builder: (context, state) => const HomePage(initialTab: HomeTab.tend)),
-      GoRoute(path: '/market', name: 'market', builder: (context, state) => const HomePage(initialTab: HomeTab.market)),
-      GoRoute(path: '/trees', name: 'trees', builder: (context, state) => const HomePage(initialTab: HomeTab.grove)),
-      GoRoute(path: '/wallet', name: 'wallet', builder: (context, state) => const HomePage(initialTab: HomeTab.creator)),
-      GoRoute(path: '/profile', name: 'profile', builder: (context, state) => const HomePage(initialTab: HomeTab.creator)),
-      GoRoute(
-        path: '/tree/:id',
-        name: 'tree',
-        builder: (context, state) {
-          final id = state.pathParameters['id'] ?? '';
-          return DryadTreePage(treeId: id);
-        },
-      ),
+      GoRoute(path: '/world', name: 'world', builder: (context, state) => const HomePage(initialTab: HomeTab.world)),
+      GoRoute(path: '/collection', name: 'collection', builder: (context, state) => const HomePage(initialTab: HomeTab.collection)),
+      GoRoute(path: '/profile', name: 'profile', builder: (context, state) => const HomePage(initialTab: HomeTab.profile)),
     ],
   );
 });
