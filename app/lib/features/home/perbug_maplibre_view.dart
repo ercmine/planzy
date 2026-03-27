@@ -216,58 +216,12 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
     final controller = _controller;
     if (controller == null) return;
     final mapTheme = _theme;
+    if (widget.config.enableDiagnostics) {
+      Log.d('map.style loading style=${mapTheme.styleUrl} 3d=${widget.config.enable3dBuildings}');
+    }
 
     if (widget.config.enable3dBuildings) {
-      try {
-        await controller.addLayer(
-          'composite',
-          'dryad-3d-buildings',
-          FillExtrusionLayerProperties(
-            fillExtrusionColor: mapTheme.building.wall,
-            fillExtrusionOpacity: mapTheme.isDark ? 0.74 : 0.62,
-            fillExtrusionHeight: [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              13.2,
-              0,
-              16.2,
-              ['coalesce', ['get', 'height'], 12],
-            ],
-            fillExtrusionBase: [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              13.2,
-              0,
-              16.2,
-              ['coalesce', ['get', 'min_height'], 0],
-            ],
-            fillExtrusionVerticalGradient: true,
-          ),
-          sourceLayer: 'building',
-          belowLayerId: 'waterway-label',
-        );
-      } catch (error) {
-        if (widget.config.enableDiagnostics) {
-          Log.warn('map.style building extrusion not applied: $error');
-        }
-      }
-
-      try {
-        await controller.addLayer(
-          'composite',
-          'dryad-3d-building-roofs',
-          FillLayerProperties(
-            fillColor: mapTheme.building.roof,
-            fillOpacity: mapTheme.isDark ? 0.34 : 0.26,
-            fillOutlineColor: mapTheme.building.edge,
-          ),
-          sourceLayer: 'building',
-          minzoom: 15.4,
-          belowLayerId: 'waterway-label',
-        );
-      } catch (_) {}
+      await _add3dBuildingLayers(mapTheme);
     }
 
     if (widget.config.enableTerrain && widget.config.terrainSourceUrl != null && widget.config.terrainSourceUrl!.isNotEmpty) {
@@ -277,6 +231,75 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
         'map.style terrain requested but disabled: maplibre_gl 0.21.0 has no Flutter terrain API',
       );
     }
+  }
+
+  Future<void> _add3dBuildingLayers(DryadMapTheme mapTheme) async {
+    final controller = _controller;
+    if (controller == null) return;
+
+    final attempts = <({String sourceId, String sourceLayer})>[
+      (sourceId: 'composite', sourceLayer: 'building'),
+      (sourceId: 'openmaptiles', sourceLayer: 'building'),
+      (sourceId: 'openfreemap', sourceLayer: 'building'),
+      (sourceId: 'basemap', sourceLayer: 'building'),
+    ];
+
+    for (final attempt in attempts) {
+      try {
+        await controller.addLayer(
+          attempt.sourceId,
+          'dryad-3d-buildings',
+          FillExtrusionLayerProperties(
+            fillExtrusionColor: mapTheme.building.wall,
+            fillExtrusionOpacity: mapTheme.isDark ? 0.74 : 0.62,
+            fillExtrusionHeight: [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              12.8,
+              0,
+              15.8,
+              ['coalesce', ['get', 'render_height'], ['get', 'height'], 14],
+            ],
+            fillExtrusionBase: [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              12.8,
+              0,
+              15.8,
+              ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+            ],
+            fillExtrusionVerticalGradient: true,
+          ),
+          sourceLayer: attempt.sourceLayer,
+          minzoom: 12.8,
+          belowLayerId: 'waterway-label',
+        );
+
+        await controller.addLayer(
+          attempt.sourceId,
+          'dryad-3d-building-roofs',
+          FillLayerProperties(
+            fillColor: mapTheme.building.roof,
+            fillOpacity: mapTheme.isDark ? 0.34 : 0.26,
+            fillOutlineColor: mapTheme.building.edge,
+          ),
+          sourceLayer: attempt.sourceLayer,
+          minzoom: 15.2,
+          belowLayerId: 'waterway-label',
+        );
+        if (widget.config.enableDiagnostics) {
+          Log.d('map.style 3d buildings source=${attempt.sourceId} sourceLayer=${attempt.sourceLayer}');
+        }
+        return;
+      } catch (error) {
+        if (widget.config.enableDiagnostics) {
+          Log.warn('map.style 3d source attempt failed source=${attempt.sourceId} layer=${attempt.sourceLayer} error=$error');
+        }
+      }
+    }
+    Log.warn('map.style unable to add 3d buildings for any known source id.');
   }
 
   Future<void> _syncMapData() async {

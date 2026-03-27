@@ -3,9 +3,22 @@ import 'wallet_connector_stub.dart' if (dart.library.html) 'wallet_connector_web
 abstract class WalletConnector {
   bool get isAvailable;
 
-  Future<String> connectWallet();
+  List<String> get supportedWalletIds;
 
-  Future<int> readChainId();
+  bool isWalletInstalled(String walletId);
+
+  Future<String> connectWallet({String? walletId});
+
+  Future<int> readChainId({String? walletId});
+
+  Future<bool> switchChain({
+    required int chainId,
+    String? rpcUrl,
+    String? chainName,
+    String? nativeCurrencySymbol,
+    String? explorerUrl,
+    String? walletId,
+  });
 
   Future<String> sendTransaction({
     required String from,
@@ -13,6 +26,14 @@ abstract class WalletConnector {
     required String data,
     String? valueHex,
   });
+
+  void attachSessionListeners({
+    void Function(String? account)? onAccountChanged,
+    void Function(int chainId)? onChainChanged,
+    void Function(String reason)? onDisconnected,
+  });
+
+  void detachSessionListeners();
 }
 
 WalletConnector createWalletConnector() => createWalletConnectorImpl();

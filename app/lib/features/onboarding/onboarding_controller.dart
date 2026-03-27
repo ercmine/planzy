@@ -71,11 +71,30 @@ class OnboardingController extends Notifier<OnboardingState> {
       final connector = ref.read(walletConnectorProvider);
       final activeWalletChain = connector.isAvailable ? await connector.readChainId() : snapshot.chainId;
       if (activeWalletChain != expectedChain) {
+        final config = ref.read(dryadContractConfigProvider);
+        final switched = connector.isAvailable
+            ? await connector.switchChain(
+                chainId: config.chainId,
+                rpcUrl: config.rpcUrl,
+                chainName: config.networkName,
+                nativeCurrencySymbol: config.nativeSymbol,
+                explorerUrl: config.explorerBaseUrl,
+              )
+            : false;
+        final resolvedChain = connector.isAvailable ? await connector.readChainId() : activeWalletChain;
+        if (switched && resolvedChain == expectedChain) {
+          state = state.copyWith(
+            status: snapshot.hasNft ? OnboardingFlowStatus.nftFound : OnboardingFlowStatus.nftNotMinted,
+            isBusy: false,
+            snapshot: snapshot,
+          );
+          return;
+        }
         state = state.copyWith(
           status: OnboardingFlowStatus.wrongNetwork,
           isBusy: false,
           snapshot: snapshot,
-          errorMessage: 'Wrong network. Expected chain ID $expectedChain but connected wallet is on $activeWalletChain.',
+          errorMessage: 'Wrong network. Expected chain ID $expectedChain but connected wallet is on $resolvedChain.',
         );
         return;
       }

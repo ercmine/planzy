@@ -218,9 +218,11 @@ class Env {
 
     final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList(growable: false);
     if (segments.length == 2 && segments.first == 'styles') {
-      // Preserve OpenFreeMap vector styles so map overlays that rely on vector
-      // sources (for example 3D building extrusion) remain available.
-      return raw;
+      // OpenFreeMap short style URLs (`/styles/<name>`) are not consistently
+      // accepted by all MapLibre clients. Resolve explicitly to style.json so
+      // style loading is deterministic across platforms.
+      final normalizedPath = '${uri.path.endsWith('/') ? uri.path : '${uri.path}/'}style.json';
+      return uri.replace(path: normalizedPath).toString();
     }
     return uri.path.endsWith('/style.json') ? raw : _builtinRasterStyleJson(isDark: isDark);
   }
