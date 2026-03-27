@@ -105,6 +105,20 @@ cp android/key.properties.example android/key.properties
 flutter test
 ```
 
+## Browser testing from phone on same LAN
+
+Use Flutter web-server mode and bind all interfaces:
+
+```bash
+flutter run -d web-server \
+  --web-hostname 0.0.0.0 \
+  --web-port 8080 \
+  -t lib/main_dev.dart \
+  --dart-define=API_BASE_URL=http://<your-computer-lan-ip>:8080
+```
+
+Then open `http://<your-computer-lan-ip>:8080` from your phone browser.
+
 ## Release checklist
 
 - [ ] Update app version in `pubspec.yaml`.

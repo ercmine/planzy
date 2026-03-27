@@ -61,6 +61,15 @@ Convenience scripts from repo root:
 ./scripts/web_build.sh
 ```
 
+For testing from another device on your LAN (for example, phone browser), run:
+
+```bash
+cd web
+pnpm dev --host 0.0.0.0 --port 5173
+```
+
+Then open `http://<your-computer-lan-ip>:5173` from the phone.
+
 ## Web environment variables
 
 Create `web/.env` based on `web/.env.example`.
@@ -128,6 +137,12 @@ Example local Flutter/web values:
 
 ```bash
 CORS_ALLOWED_ORIGINS=https://app.dryad.dev,http://localhost:3000,http://localhost:5173,http://localhost:8080
+```
+
+When accessing local services from a phone on the same Wi‑Fi, include your LAN origin too, e.g.:
+
+```bash
+CORS_ALLOWED_ORIGINS=http://192.168.1.20:5173,http://192.168.1.20:8080
 ```
 
 Quick verification:
