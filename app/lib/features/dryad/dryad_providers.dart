@@ -20,6 +20,13 @@ final marketplaceTreesProvider = FutureProvider<List<DryadTree>>((ref) async {
   return repo.fetchMarketplace();
 });
 
+final ownedTreesProvider = FutureProvider<List<DryadTree>>((ref) async {
+  final wallet = ref.watch(walletAddressProvider);
+  if (wallet == null || wallet.trim().isEmpty) return const <DryadTree>[];
+  final repo = await ref.watch(dryadRepositoryProvider.future);
+  return repo.fetchOwnedTrees(wallet: wallet);
+});
+
 final treeDetailProvider = FutureProvider.family<DryadTree?, String>((ref, treeId) async {
   final repo = await ref.watch(dryadRepositoryProvider.future);
   return repo.fetchTree(treeId);

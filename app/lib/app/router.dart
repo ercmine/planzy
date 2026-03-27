@@ -48,6 +48,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', name: 'home', builder: (context, state) => const HomePage()),
       GoRoute(path: '/map', name: 'map', builder: (context, state) => const HomePage(initialTab: HomeTab.smartMap)),
       GoRoute(path: '/market', name: 'market', builder: (context, state) => const HomePage(initialTab: HomeTab.market)),
+      GoRoute(path: '/tend', name: 'tend', builder: (context, state) => const HomePage(initialTab: HomeTab.tend)),
       GoRoute(path: '/trees', name: 'trees', builder: (context, state) => const HomePage(initialTab: HomeTab.grove)),
       GoRoute(path: '/wallet', name: 'wallet', builder: (context, state) => const HomePage(initialTab: HomeTab.wallet)),
       GoRoute(path: '/profile', name: 'profile', builder: (context, state) => const HomePage(initialTab: HomeTab.profile)),

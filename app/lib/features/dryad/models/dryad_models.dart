@@ -30,6 +30,9 @@ class DryadTree {
     this.priceDryad,
     this.treeImageUrl,
     this.digUpTxHash,
+    this.lastWateredAt,
+    this.nextWateringAvailableAt,
+    this.waterCooldownSeconds,
   });
 
   final String id;
@@ -53,9 +56,17 @@ class DryadTree {
   final double? priceDryad;
   final String? treeImageUrl;
   final String? digUpTxHash;
+  final DateTime? lastWateredAt;
+  final DateTime? nextWateringAvailableAt;
+  final int? waterCooldownSeconds;
 
   bool get isListed => saleStatus == TreeSaleStatus.listed;
   bool get readyToReplant => isPortable || lifecycleState == TreeLifecycleState.readyToReplant;
+  bool get canWaterNow {
+    final next = nextWateringAvailableAt;
+    if (next == null) return true;
+    return DateTime.now().isAfter(next) || DateTime.now().isAtSameMomentAs(next);
+  }
 
   String get statusLabel {
     switch (claimState) {
@@ -158,8 +169,17 @@ class DryadTree {
       priceDryad: (json['priceDryad'] as num?)?.toDouble(),
       treeImageUrl: json['treeImageUrl']?.toString(),
       digUpTxHash: json['digUpTxHash']?.toString(),
+      lastWateredAt: _parseDate(json['lastWateredAt']),
+      nextWateringAvailableAt: _parseDate(json['nextWateringAvailableAt']),
+      waterCooldownSeconds: (json['waterCooldownSeconds'] as num?)?.toInt(),
     );
   }
+}
+
+DateTime? _parseDate(dynamic value) {
+  final raw = value?.toString();
+  if (raw == null || raw.isEmpty) return null;
+  return DateTime.tryParse(raw);
 }
 
 @immutable
