@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -125,8 +124,11 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
     }
 
     if (walletId != null && !connector.isWalletInstalled(walletId)) {
+      if (connector.isMobileBrowser) {
+        await connector.launchWalletApp(walletId: walletId, dappUri: Uri.base);
+      }
       setState(() {
-        _connectionMessage = _walletNotDetectedMessage(walletId);
+        _connectionMessage = _walletNotDetectedMessage(walletId, connector.isMobileBrowser);
       });
       return;
     }
@@ -205,16 +207,17 @@ class _DryadWalletPageState extends ConsumerState<DryadWalletPage> {
   }
 
   String _missingWalletMessage() {
-    if (kIsWeb) {
-      return 'No wallet provider detected in this browser. Install MetaMask, Phantom EVM, or Coinbase Wallet extension and refresh.';
+    final connector = ref.read(walletConnectorProvider);
+    if (connector.isMobileBrowser) {
+      return 'No injected wallet was detected in this mobile browser. Open app.dryad.dev inside MetaMask, Phantom, or Coinbase Wallet in-app browser and reconnect.';
     }
-    return 'No wallet app detected on this phone. Install/open MetaMask, Phantom, or Coinbase Wallet and retry.';
+    return 'No wallet provider detected in this browser. Install MetaMask, Phantom EVM, or Coinbase Wallet extension and refresh.';
   }
 
-  String _walletNotDetectedMessage(String walletId) {
-    if (kIsWeb) {
-      return '$walletId is not installed in this browser.';
+  String _walletNotDetectedMessage(String walletId, bool isMobileBrowser) {
+    if (isMobileBrowser) {
+      return '$walletId is not injected in this mobile browser. If the app is installed, launch app.dryad.dev from that wallet app browser.';
     }
-    return '$walletId app is not detected on this phone.';
+    return '$walletId is not installed in this browser.';
   }
 }

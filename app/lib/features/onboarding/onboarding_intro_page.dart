@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -281,9 +280,12 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
     }
 
     if (!connector.isWalletInstalled(walletId)) {
+      if (connector.isMobileBrowser) {
+        await connector.launchWalletApp(walletId: walletId, dappUri: Uri.base);
+      }
       controller.state = controller.state.copyWith(
         status: OnboardingFlowStatus.onboardingFailed,
-        errorMessage: _walletNotDetectedMessage(walletId),
+        errorMessage: _walletNotDetectedMessage(walletId, connector.isMobileBrowser),
       );
       return;
     }
@@ -303,17 +305,18 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
   }
 
   String _missingWalletMessage() {
-    if (kIsWeb) {
-      return 'No wallet provider detected in this browser. Install MetaMask, Phantom EVM, or Coinbase Wallet extension.';
+    final connector = ref.read(walletConnectorProvider);
+    if (connector.isMobileBrowser) {
+      return 'No injected wallet was detected in this mobile browser. Open app.dryad.dev inside the MetaMask, Phantom, or Coinbase Wallet in-app browser, then try connect again.';
     }
-    return 'No wallet app detected on this phone. Install/open MetaMask, Phantom, or Coinbase Wallet and try again.';
+    return 'No wallet provider detected in this browser. Install MetaMask, Phantom EVM, or Coinbase Wallet extension.';
   }
 
-  String _walletNotDetectedMessage(String walletId) {
-    if (kIsWeb) {
-      return '$walletId is not installed in this browser.';
+  String _walletNotDetectedMessage(String walletId, bool isMobileBrowser) {
+    if (isMobileBrowser) {
+      return '$walletId is not injected in this mobile browser. If the app is installed, open app.dryad.dev from that wallet\'s in-app browser.';
     }
-    return '$walletId app is not detected on this phone.';
+    return '$walletId is not installed in this browser.';
   }
 }
 

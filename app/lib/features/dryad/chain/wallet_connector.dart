@@ -3,9 +3,16 @@ import 'wallet_connector_stub.dart' if (dart.library.html) 'wallet_connector_web
 abstract class WalletConnector {
   bool get isAvailable;
 
+  bool get isMobileBrowser;
+
   List<String> get supportedWalletIds;
 
   bool isWalletInstalled(String walletId);
+
+  Future<bool> launchWalletApp({
+    required String walletId,
+    required Uri dappUri,
+  });
 
   Future<String> connectWallet({String? walletId});
 
