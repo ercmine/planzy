@@ -12,6 +12,7 @@ import '../../core/links/link_types.dart';
 import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
 import '../../core/location/location_permission_service.dart';
+import '../../core/logging/log.dart';
 import '../../providers/app_providers.dart';
 import '../collections/collection_models.dart';
 import '../collections/collection_repository.dart';
@@ -270,6 +271,8 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
     if (!state.pendingViewportSearch && _lastSearchKey == queryKey && state.pins.isNotEmpty) return;
 
     final requestId = ++_searchRequestId;
+    Log.d('map.overlay tree data fetch started mode=$mode requestId=$requestId');
+    Log.d('map.lifecycle loading flag set true source=search_this_area');
     state = state.copyWith(loading: true, discoveryError: null, lastSearchMode: mode);
     try {
       final discoveryClient = await _ref.read(placeDiscoveryClientProvider.future);
@@ -316,6 +319,9 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
           .toList(growable: false);
       if (requestId != _searchRequestId) return;
       _lastSearchKey = queryKey;
+      Log.d('map.overlay tree data fetch succeeded mode=$mode requestId=$requestId pins=${enrichedPins.length}');
+      Log.d('map.overlay nft marker generation succeeded mode=$mode requestId=$requestId');
+      Log.d('map.lifecycle loading flag set false source=search_this_area_success');
       state = state.copyWith(
         loading: false,
         pins: enrichedPins,
@@ -327,6 +333,8 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
       );
     } on ApiError catch (error) {
       if (requestId != _searchRequestId) return;
+      Log.warn('map.overlay tree data fetch failed mode=$mode requestId=$requestId status=${error.statusCode} kind=${error.kind}');
+      Log.d('map.lifecycle loading flag set false source=search_this_area_api_error');
       final message = error.statusCode == 503
           ? 'Nearby service is unavailable right now.'
           : error.statusCode == 502
@@ -339,6 +347,8 @@ class MapDiscoveryController extends StateNotifier<MapViewportState> {
       state = state.copyWith(loading: false, pendingViewportSearch: false, discoveryError: message);
     } catch (_) {
       if (requestId != _searchRequestId) return;
+      Log.warn('map.overlay tree data fetch failed mode=$mode requestId=$requestId error=unknown');
+      Log.d('map.lifecycle loading flag set false source=search_this_area_error');
       state = state.copyWith(loading: false, pendingViewportSearch: false, discoveryError: 'Could not load nearby places. Retry to refresh this area.');
     }
   }
@@ -376,6 +386,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _savedPlaceIds = <String>{};
   bool _mapReady = false;
+  String? _mapLoadError;
   bool _didInitialize = false;
   bool _hasFollowedUserLocation = false;
   bool _isSyncingMapViewport = false;
@@ -387,6 +398,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   double? _lastMapZoom;
   Timer? _viewportDebounce;
   Timer? _threeDLoadFallbackTimer;
+  int _mapReloadNonce = 0;
   MapViewport? _lastAutoSearchViewport;
   late final ProviderSubscription<MapViewportState> _mapStateSubscription;
   late final ProviderSubscription<LocationControllerState> _locationSubscription;
@@ -472,7 +484,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                 children: [
                   Positioned.fill(
                     child: DryadMapLibreView(
-                      key: ValueKey<String>('map-mode-${_is3dMode ? '3d' : '2d'}'),
+                      key: ValueKey<String>('map-mode-${_is3dMode ? '3d' : '2d'}-reload-$_mapReloadNonce'),
                       viewport: state.viewport,
                       pins: visiblePlaces,
                       selectedPlaceId: selected?.canonicalPlaceId,
@@ -483,10 +495,31 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                       collectionPlaceIds: collectionPlaceIds,
                       is3dMode: _is3dMode,
                       config: ref.watch(envConfigProvider).mapStack,
+                      onMapLoadStarted: () {
+                        if (!mounted) return;
+                        Log.d('map.lifecycle loading flag set true source=map_created');
+                        setState(() {
+                          _mapReady = false;
+                          _mapLoadError = null;
+                        });
+                      },
                       onMapReady: () {
                         if (!mounted) return;
                         _threeDLoadFallbackTimer?.cancel();
-                        setState(() => _mapReady = true);
+                        Log.d('map.lifecycle loading flag set false source=style_loaded');
+                        setState(() {
+                          _mapReady = true;
+                          _mapLoadError = null;
+                        });
+                      },
+                      onMapLoadError: (message) {
+                        if (!mounted) return;
+                        _threeDLoadFallbackTimer?.cancel();
+                        Log.error('map.lifecycle style load failed error=$message');
+                        setState(() {
+                          _mapReady = false;
+                          _mapLoadError = message;
+                        });
                       },
                       onTapEmpty: () => controller.clearSelectedPlace(),
                       onLongPress: (lat, lng) {
@@ -596,14 +629,14 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                                               BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, 6)),
                                             ],
                                           ),
-                                          child: const Padding(
+                                          child: Padding(
                                             padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                                                 SizedBox(width: 10),
-                                                Text('Loading map'),
+                                                Text(_mapLoadError == null ? 'Loading map' : 'Map load failed'),
                                               ],
                                             ),
                                           ),
@@ -752,6 +785,21 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                         ],
                       ),
                     ),
+                  if (_mapLoadError != null)
+                    Positioned.fill(
+                      child: DiscoveryStateCard(
+                        icon: Icons.map_outlined,
+                        title: 'Map unavailable',
+                        body: _mapLoadError!,
+                        actions: [
+                          FilledButton.icon(
+                            onPressed: _retryMapLoad,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry map'),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -790,14 +838,25 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     setState(() {
       _is3dMode = enabled;
       _mapReady = false;
+      _mapLoadError = null;
     });
     if (!enabled) return;
     _threeDLoadFallbackTimer = Timer(const Duration(seconds: 10), () {
       if (!mounted || !_is3dMode || _mapReady) return;
+      Log.warn('map.lifecycle timeout triggered: 3d mode fallback to 2d');
       setState(() => _is3dMode = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('3D map timed out. Switched back to 2D map.')),
       );
+    });
+  }
+
+  void _retryMapLoad() {
+    Log.d('map.lifecycle retry requested by user');
+    setState(() {
+      _mapLoadError = null;
+      _mapReady = false;
+      _mapReloadNonce++;
     });
   }
 

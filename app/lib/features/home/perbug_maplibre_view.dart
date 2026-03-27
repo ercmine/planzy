@@ -25,7 +25,9 @@ class DryadMapLibreView extends StatefulWidget {
     required this.collectionPlaceIds,
     required this.is3dMode,
     required this.config,
+    required this.onMapLoadStarted,
     required this.onMapReady,
+    required this.onMapLoadError,
     required this.onViewportChanged,
     required this.onTapEmpty,
     required this.onLongPress,
@@ -42,7 +44,9 @@ class DryadMapLibreView extends StatefulWidget {
   final Set<String> collectionPlaceIds;
   final bool is3dMode;
   final MapStackConfig config;
+  final VoidCallback onMapLoadStarted;
   final VoidCallback onMapReady;
+  final void Function(String message) onMapLoadError;
   final void Function(MapViewport viewport, {required bool hasGesture}) onViewportChanged;
   final VoidCallback onTapEmpty;
   final void Function(double lat, double lng) onLongPress;
@@ -64,7 +68,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
   bool _hasLoggedContainerSize = false;
   VoidCallback? _cameraListener;
   Timer? _styleFallbackTimer;
+  Timer? _styleLoadTimeoutTimer;
   double? _manualTilt;
+  int _styleLoadCycle = 0;
 
   DryadMapTheme get _theme => DryadMapTheme.resolve(brightness: Theme.of(context).brightness, config: widget.config);
   String get _resolvedStyleString => _forceBuiltinStyle ? _builtinRasterStyleJson : _theme.styleUrl;
@@ -102,6 +108,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.config.enableDiagnostics) {
+      Log.d('map.lifecycle build style=$_stylePreview cycle=$_styleLoadCycle forceBuiltin=$_forceBuiltinStyle');
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         _logContainerSizeOnce(constraints);
@@ -122,8 +131,10 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
             tiltGesturesEnabled: widget.config.enableEnhancedPitch,
             myLocationEnabled: false,
             onMapCreated: (controller) {
+              final nextCycle = _styleLoadCycle + 1;
+              _styleLoadCycle = nextCycle;
               if (widget.config.enableDiagnostics) {
-                Log.d('map.lifecycle onMapCreated style=${_theme.styleUrl} fallbackActive=$_forceBuiltinStyle');
+                Log.d('map.lifecycle onMapCreated cycle=$nextCycle style=${_theme.styleUrl} fallbackActive=$_forceBuiltinStyle');
               }
               final previousListener = _cameraListener;
               if (previousListener != null) {
@@ -133,10 +144,13 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
               _cameraListener = () => _lastCamera = controller.cameraPosition;
               controller.addListener(_cameraListener!);
               _styleLoaded = false;
+              widget.onMapLoadStarted();
               _scheduleWebStyleFallback();
+              _startStyleLoadTimeout(cycle: nextCycle);
             },
             onStyleLoadedCallback: () async {
               _styleFallbackTimer?.cancel();
+              _styleLoadTimeoutTimer?.cancel();
               _styleLoaded = true;
               if (widget.config.enableDiagnostics) {
                 Log.d('map.style loaded style=$_stylePreview');
@@ -183,11 +197,22 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
   @override
   void dispose() {
     _styleFallbackTimer?.cancel();
+    _styleLoadTimeoutTimer?.cancel();
     final listener = _cameraListener;
     if (listener != null) {
       _controller?.removeListener(listener);
     }
     super.dispose();
+  }
+
+  void _startStyleLoadTimeout({required int cycle}) {
+    _styleLoadTimeoutTimer?.cancel();
+    _styleLoadTimeoutTimer = Timer(const Duration(seconds: 12), () {
+      if (!mounted || _styleLoaded || cycle != _styleLoadCycle) return;
+      final message = 'Map style load timed out after 12s (style=$_stylePreview, fallback=$_forceBuiltinStyle).';
+      Log.error('map.style timeout cycle=$cycle style=$_stylePreview fallback=$_forceBuiltinStyle');
+      widget.onMapLoadError(message);
+    });
   }
 
   CameraPosition _cameraPositionForState() {
@@ -317,6 +342,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
     }
 
     if (widget.config.enable3dBuildings) {
+      if (widget.config.enableDiagnostics) {
+        Log.d('map.style 3d building layer add started');
+      }
       await _add3dBuildingLayers(mapTheme);
     }
 
@@ -342,6 +370,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
 
     for (final attempt in attempts) {
       try {
+        if (widget.config.enableDiagnostics) {
+          Log.d('map.style 3d building source attempt started source=${attempt.sourceId} sourceLayer=${attempt.sourceLayer}');
+        }
         await controller.addLayer(
           attempt.sourceId,
           'dryad-3d-buildings',
@@ -386,12 +417,12 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
           belowLayerId: 'waterway-label',
         );
         if (widget.config.enableDiagnostics) {
-          Log.d('map.style 3d buildings source=${attempt.sourceId} sourceLayer=${attempt.sourceLayer}');
+          Log.d('map.style 3d building layer add succeeded source=${attempt.sourceId} sourceLayer=${attempt.sourceLayer}');
         }
         return;
       } catch (error) {
         if (widget.config.enableDiagnostics) {
-          Log.warn('map.style 3d source attempt failed source=${attempt.sourceId} layer=${attempt.sourceLayer} error=$error');
+          Log.warn('map.style 3d building layer add failed source=${attempt.sourceId} layer=${attempt.sourceLayer} error=$error');
         }
       }
     }
@@ -463,6 +494,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
     final payload = <String, dynamic>{'type': 'FeatureCollection', 'features': features};
     try {
       await controller.setGeoJsonSource(id, payload);
+      if (widget.config.enableDiagnostics) {
+        Log.d('map.source base source upsert succeeded id=$id features=${features.length}');
+      }
     } catch (setError) {
       if (widget.config.enableDiagnostics) {
         Log.warn('map.source set failed id=$id error=$setError; attempting addSource');
@@ -477,6 +511,9 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
             clusterMaxZoom: 13,
           ),
         );
+        if (widget.config.enableDiagnostics) {
+          Log.d('map.source base source add succeeded id=$id features=${features.length}');
+        }
       } catch (addError, stackTrace) {
         Log.error('map.source add failed id=$id', error: addError, stackTrace: stackTrace);
       }
