@@ -218,10 +218,9 @@ class Env {
 
     final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList(growable: false);
     if (segments.length == 2 && segments.first == 'styles') {
-      // OpenFreeMap styles have had intermittent outages; fallback to a local
-      // OSM-backed style so maps stay visible in app + web even when hosted
-      // style documents are unavailable.
-      return _builtinRasterStyleJson(isDark: isDark);
+      // Preserve OpenFreeMap vector styles so map overlays that rely on vector
+      // sources (for example 3D building extrusion) remain available.
+      return raw;
     }
     return uri.path.endsWith('/style.json') ? raw : _builtinRasterStyleJson(isDark: isDark);
   }
