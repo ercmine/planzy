@@ -99,8 +99,15 @@ class DryadTree {
   }
 
   factory DryadTree.fromJson(Map<String, dynamic> json) {
+    final id = _readString(json, const ['id', 'treeId']);
+    final name = _readString(json, const ['name', 'treeName', 'title']) ?? 'Untitled tree';
+    final placeName = _readString(json, const ['placeName', 'place', 'venueName']) ?? 'Unknown place';
+    final locationLabel = _readString(json, const ['locationLabel', 'location', 'cityLabel']) ?? placeName;
+    final ownerHandle = _readString(json, const ['ownerHandle', 'sellerHandle', 'owner', 'wallet']) ?? 'Unknown owner';
+    final founderHandle = _readString(json, const ['founderHandle', 'founder', 'creatorHandle']) ?? ownerHandle;
+
     TreeSaleStatus sale;
-    switch ((json['saleStatus'] ?? '').toString()) {
+    switch ((_readString(json, const ['saleStatus', 'sale_status', 'listingStatus']) ?? '').toLowerCase()) {
       case 'listed':
         sale = TreeSaleStatus.listed;
         break;
@@ -112,7 +119,7 @@ class DryadTree {
     }
 
     TreeClaimState claim;
-    switch ((json['claimState'] ?? '').toString()) {
+    switch ((_readString(json, const ['claimState', 'claim_state']) ?? '').toLowerCase()) {
       case 'claimed':
         claim = TreeClaimState.claimed;
         break;
@@ -127,7 +134,7 @@ class DryadTree {
     }
 
     TreeLifecycleState lifecycle;
-    switch ((json['lifecycleState'] ?? '').toString()) {
+    switch ((_readString(json, const ['lifecycleState', 'lifecycle_state']) ?? '').toLowerCase()) {
       case 'listed':
         lifecycle = TreeLifecycleState.listed;
         break;
@@ -148,32 +155,69 @@ class DryadTree {
     }
 
     return DryadTree(
-      id: (json['id'] ?? '').toString(),
-      name: (json['name'] ?? '').toString(),
-      placeName: (json['placeName'] ?? '').toString(),
-      locationLabel: (json['locationLabel'] ?? '').toString(),
-      latitude: (json['latitude'] as num?)?.toDouble() ?? 0,
-      longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
-      founderHandle: (json['founderHandle'] ?? '').toString(),
-      ownerHandle: (json['ownerHandle'] ?? '').toString(),
-      growthLevel: (json['growthLevel'] as num?)?.toInt() ?? 0,
-      contributionCount: (json['contributionCount'] as num?)?.toInt() ?? 0,
-      rarity: (json['rarity'] ?? '').toString(),
-      category: (json['category'] ?? '').toString(),
+      id: id ?? '',
+      name: name,
+      placeName: placeName,
+      locationLabel: locationLabel,
+      latitude: _readDouble(json, const ['latitude', 'lat']) ?? 0,
+      longitude: _readDouble(json, const ['longitude', 'lng']) ?? 0,
+      founderHandle: founderHandle,
+      ownerHandle: ownerHandle,
+      growthLevel: _readInt(json, const ['growthLevel', 'growth_level']) ?? 0,
+      contributionCount: _readInt(json, const ['contributionCount', 'contribution_count']) ?? 0,
+      rarity: _readString(json, const ['rarity']) ?? 'Unknown',
+      category: _readString(json, const ['category', 'type']) ?? 'Location',
       saleStatus: sale,
       claimState: claim,
       lifecycleState: lifecycle,
       isPortable: json['isPortable'] == true,
       currentSpotId: json['currentSpotId']?.toString(),
-      priceEth: (json['priceEth'] as num?)?.toDouble(),
+      priceEth: _readDouble(json, const ['priceEth', 'price_eth', 'listedPriceEth']),
       priceDryad: (json['priceDryad'] as num?)?.toDouble(),
-      treeImageUrl: json['treeImageUrl']?.toString(),
+      treeImageUrl: _readString(json, const ['treeImageUrl', 'imageUrl', 'image']),
       digUpTxHash: json['digUpTxHash']?.toString(),
       lastWateredAt: _parseDate(json['lastWateredAt']),
       nextWateringAvailableAt: _parseDate(json['nextWateringAvailableAt']),
       waterCooldownSeconds: (json['waterCooldownSeconds'] as num?)?.toInt(),
     );
   }
+}
+
+String? _readString(Map<String, dynamic> json, List<String> keys) {
+  for (final key in keys) {
+    final value = json[key];
+    if (value == null) continue;
+    final text = value.toString().trim();
+    if (text.isNotEmpty) return text;
+  }
+  return null;
+}
+
+double? _readDouble(Map<String, dynamic> json, List<String> keys) {
+  for (final key in keys) {
+    final value = json[key];
+    if (value == null) continue;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      final parsed = double.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+  }
+  return null;
+}
+
+int? _readInt(Map<String, dynamic> json, List<String> keys) {
+  for (final key in keys) {
+    final value = json[key];
+    if (value == null) continue;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+  }
+  return null;
 }
 
 DateTime? _parseDate(dynamic value) {

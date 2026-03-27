@@ -19,7 +19,7 @@ class DryadRepository {
 
   Future<List<DryadTree>> fetchMarketplace() async {
     final payload = await apiClient.getJson('/v1/dryad/market/listings');
-    final rows = (payload['trees'] as List?) ?? const [];
+    final rows = (payload['trees'] as List?) ?? (payload['listings'] as List?) ?? const [];
     return rows.whereType<Map<String, dynamic>>().map(DryadTree.fromJson).toList(growable: false);
   }
 
