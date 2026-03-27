@@ -16,6 +16,7 @@ import '../../providers/app_providers.dart';
 import '../collections/collection_models.dart';
 import '../collections/collection_repository.dart';
 import '../economy/economy_models.dart';
+import '../video_platform/video_models.dart';
 import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_widgets.dart';
