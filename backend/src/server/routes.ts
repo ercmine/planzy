@@ -313,9 +313,52 @@ export function createRoutes(
         await dryadMarketplaceHandlers.listUnclaimedSpots(req, res);
         return;
       }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/world" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.worldSnapshot(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/map/pulse" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.mapPulse(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/market/pulse" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.marketPulse(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/creators/trees" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.creatorTreeProfiles(req, res);
+        return;
+      }
       if (req.method === "GET" && normalizedPath === "/v1/dryad/trees/replantable" && dryadMarketplaceHandlers) {
         const wallet = String(url.searchParams.get("wallet") ?? "") as `0x${string}`;
         await dryadMarketplaceHandlers.listReplantableTrees(req, res, wallet);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/tend" && dryadMarketplaceHandlers) {
+        const wallet = String(url.searchParams.get("wallet") ?? "") as `0x${string}`;
+        await dryadMarketplaceHandlers.tendQueue(req, res, wallet);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/progression" && dryadMarketplaceHandlers) {
+        const wallet = String(url.searchParams.get("wallet") ?? "") as `0x${string}`;
+        await dryadMarketplaceHandlers.progression(req, res, wallet);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/return-triggers" && dryadMarketplaceHandlers) {
+        const wallet = String(url.searchParams.get("wallet") ?? "") as `0x${string}`;
+        await dryadMarketplaceHandlers.returnTriggers(req, res, wallet);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/dryad/watch" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.watchTree(req, res);
+        return;
+      }
+      if (req.method === "DELETE" && normalizedPath === "/v1/dryad/watch" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.unwatchTree(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/dryad/metrics/loops" && dryadMarketplaceHandlers) {
+        await dryadMarketplaceHandlers.loopMetrics(req, res);
         return;
       }
       const dryadTreeMatch = matchPath("/v1/dryad/trees/:treeId", normalizedPath);
