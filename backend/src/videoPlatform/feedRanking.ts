@@ -68,10 +68,12 @@ export interface FeedRankingOutput {
 export function rankPlaceLinkedVideoFeed(input: FeedRankingInput): FeedRankingOutput {
   const profile = FEED_SCOPE_PROFILES[input.scope];
   const filtered = filterByScope(input.allVideos, input.scope, input.context, profile.minCandidateCount);
+  const candidates = filtered.filter((video) => Boolean(video.canonicalPlaceId));
 
-  const scored: FeedRankCandidate[] = filtered
+  const scored: FeedRankCandidate[] = candidates
     .map((video) => {
-      const place = input.placeSignalsFor(video.canonicalPlaceId);
+      const placeId = video.canonicalPlaceId ?? "creator";
+      const place = input.placeSignalsFor(placeId);
       const creator = input.creatorSignalsFor(video.authorUserId);
       const localityScore = computeLocalityScore({ scope: input.scope, context: input.context, place });
       const freshnessScore = computeFreshnessScore(video.lifecycle.publishedAt ?? video.lifecycle.createdAt);
@@ -109,9 +111,9 @@ export function rankPlaceLinkedVideoFeed(input: FeedRankingInput): FeedRankingOu
     nextCursor: nextOffset < diversified.length ? encodeCursor({ offset: nextOffset, scope: input.scope }) : undefined,
     observability: {
       scope: input.scope,
-      candidateCount: filtered.length,
+      candidateCount: candidates.length,
       rankedCount: diversified.length,
-      fallbackApplied: filtered.length < profile.minCandidateCount,
+      fallbackApplied: candidates.length < profile.minCandidateCount,
       zeroResult: sliced.length === 0,
       diversitySuppressions: diversified.filter((row) => row.scoreComponents.diversityPenalty < 0).length,
       averageComponentScores: averageComponents(sliced.map((row) => row.scoreComponents))
@@ -165,12 +167,13 @@ function diversify(scored: FeedRankCandidate[], diversityWeight: number): FeedRa
   const ranked = [...scored];
   for (const item of ranked) {
     const creatorPenalty = Math.min((creatorSeen.get(item.video.authorUserId) ?? 0) * 0.08, 0.32);
-    const placePenalty = Math.min((placeSeen.get(item.video.canonicalPlaceId) ?? 0) * 0.1, 0.4);
+    const placeId = item.video.canonicalPlaceId ?? "creator";
+    const placePenalty = Math.min((placeSeen.get(placeId) ?? 0) * 0.1, 0.4);
     const penalty = (creatorPenalty + placePenalty) * diversityWeight;
     item.scoreComponents.diversityPenalty = -penalty;
     item.rawScore -= penalty;
     creatorSeen.set(item.video.authorUserId, (creatorSeen.get(item.video.authorUserId) ?? 0) + 1);
-    placeSeen.set(item.video.canonicalPlaceId, (placeSeen.get(item.video.canonicalPlaceId) ?? 0) + 1);
+    placeSeen.set(placeId, (placeSeen.get(placeId) ?? 0) + 1);
   }
   return ranked.sort((a, b) => b.rawScore - a.rawScore);
 }
@@ -185,12 +188,12 @@ function toFeedItem(candidate: FeedRankCandidate, scope: FeedScope): VideoFeedIt
   };
   return {
     videoId: video.id,
-    placeId: video.canonicalPlaceId,
+    placeId: video.canonicalPlaceId ?? place.canonicalPlaceId,
     placeName: place.name,
     placeCategory: place.category,
     regionLabel: [place.city, place.region].filter(Boolean).join(", ") || "Unknown",
     placeSummary: {
-      canonicalPlaceId: video.canonicalPlaceId,
+      canonicalPlaceId: video.canonicalPlaceId ?? place.canonicalPlaceId,
       name: place.name,
       category: place.category,
       city: place.city,
