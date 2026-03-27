@@ -5,6 +5,8 @@ import 'map_discovery_clients.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_tab.dart' show mapGeoClientProvider;
 import 'perbug_game_models.dart';
+import 'puzzles/perbug_puzzle_framework.dart';
+import 'puzzles/perbug_symbol_match.dart';
 
 final perbugGameControllerProvider = StateNotifierProvider<PerbugGameController, PerbugGameState>((ref) {
   return PerbugGameController(ref);
@@ -14,6 +16,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
   PerbugGameController(this._ref) : super(PerbugGameState.initial());
 
   final Ref _ref;
+  final SymbolMatchGenerator _symbolMatchGenerator = const SymbolMatchGenerator();
 
   static const MapViewport _fixedGameplayViewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
 
@@ -75,6 +78,66 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       ],
     );
     return true;
+  }
+
+  SymbolMatchPuzzleInstance buildSymbolMatchPuzzleForNode(
+    PerbugNode node, {
+    SymbolMatchDifficultyKnobs? knobs,
+    int salt = 0,
+  }) {
+    final generatedKnobs = knobs ?? defaultSymbolMatchKnobsForNode(node);
+    final seed = PuzzleSeedInput(
+      nodeId: node.id,
+      latitude: node.latitude,
+      longitude: node.longitude,
+      salt: salt,
+    );
+
+    final puzzle = _symbolMatchGenerator.generate(seedInput: seed, knobs: generatedKnobs);
+    final session = PuzzleSession(
+      puzzleId: puzzle.id,
+      puzzleType: puzzle.type,
+      nodeId: node.id,
+      startedAt: DateTime.now(),
+      currentRound: 0,
+      mistakes: 0,
+      retries: 0,
+    );
+
+    state = state.copyWith(activePuzzleSession: session);
+    return puzzle;
+  }
+
+  void recordPuzzleEvent({
+    required String type,
+    required String nodeId,
+    required Map<String, Object?> payload,
+  }) {
+    state = state.copyWith(
+      puzzleEvents: [
+        PerbugPuzzleEvent(type: type, timestamp: DateTime.now(), nodeId: nodeId, payload: payload),
+        ...state.puzzleEvents,
+      ],
+    );
+  }
+
+  void finalizePuzzleResult({
+    required PerbugNode node,
+    required PuzzleResult result,
+  }) {
+    recordPuzzleEvent(
+      type: result.success ? 'puzzle_succeeded' : 'puzzle_failed',
+      nodeId: node.id,
+      payload: {
+        'durationMs': result.duration.inMilliseconds,
+        'mistakes': result.mistakes,
+        'completedRounds': result.completedRounds,
+        'totalRounds': result.totalRounds,
+        'failureReason': result.failureReason,
+      },
+    );
+
+    state = state.copyWith(clearActivePuzzleSession: true);
   }
 
   void claimPassiveEnergy() {

@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/widgets.dart';
 import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
+import 'puzzles/perbug_puzzle_framework.dart';
+import 'puzzles/perbug_symbol_match_screen.dart';
 
 class PerbugGamePage extends ConsumerStatefulWidget {
   const PerbugGamePage({super.key});
@@ -15,6 +17,40 @@ class PerbugGamePage extends ConsumerStatefulWidget {
 }
 
 class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
+  Future<void> _openMovePuzzle({
+    required BuildContext context,
+    required PerbugMoveCandidate move,
+    required PerbugGameController controller,
+  }) async {
+    final puzzle = controller.buildSymbolMatchPuzzleForNode(move.node);
+    final result = await showModalBottomSheet<PuzzleResult>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => SymbolMatchPuzzleSheet(
+        node: move.node,
+        puzzle: puzzle,
+        onEvent: (event, data) => controller.recordPuzzleEvent(type: event, nodeId: move.node.id, payload: data),
+      ),
+    );
+
+    if (!mounted || result == null) return;
+    controller.finalizePuzzleResult(node: move.node, result: result);
+    if (result.success) {
+      final ok = await controller.jumpTo(move);
+      if (!mounted) return;
+      if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Puzzle cleared. Jumped to ${move.node.label}.')),
+        );
+      }
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.failureReason ?? 'Puzzle failed. Jump cancelled.')),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -97,16 +133,10 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                     trailing: TextButton(
                       onPressed: move.isReachable
                           ? () async {
-                              final ok = await controller.jumpTo(move);
-                              if (!context.mounted) return;
-                              if (ok) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Jumped to ${move.node.label}')),
-                                );
-                              }
+                              await _openMovePuzzle(context: context, move: move, controller: controller);
                             }
                           : null,
-                      child: Text('Jump (${move.energyCost})'),
+                      child: Text('Challenge (${move.energyCost})'),
                     ),
                   ),
                 )
@@ -127,6 +157,18 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 ],
               ),
             ],
+          ),
+          _Section(
+            title: 'Puzzle telemetry (debug)',
+            subtitle: 'Lifecycle hooks and balancing data emitted from Symbol Match sessions.',
+            children: state.puzzleEvents.take(6).map((event) {
+              return ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text('${event.type} • ${event.nodeId}'),
+                subtitle: Text(event.timestamp.toIso8601String()),
+              );
+            }).toList(growable: false),
           ),
         ],
       ),

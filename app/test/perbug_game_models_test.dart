@@ -16,6 +16,7 @@ void main() {
       loading: false,
       visitedNodeIds: {'a'},
       history: [],
+      puzzleEvents: [],
     );
 
     final moves = state.reachableMoves();

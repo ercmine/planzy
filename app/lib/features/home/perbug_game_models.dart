@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'map_discovery_models.dart';
+import 'puzzles/perbug_puzzle_framework.dart';
+import 'puzzles/perbug_symbol_match.dart';
 
 enum PerbugNodeState { available, completed, locked, exhausted, special, futureChallengeReady }
 
@@ -66,6 +68,8 @@ class PerbugGameState {
     required this.loading,
     required this.visitedNodeIds,
     required this.history,
+    required this.puzzleEvents,
+    this.activePuzzleSession,
     this.error,
   });
 
@@ -78,6 +82,7 @@ class PerbugGameState {
         loading: false,
         visitedNodeIds: {},
         history: [],
+        puzzleEvents: [],
       );
 
   final List<PerbugNode> nodes;
@@ -88,6 +93,8 @@ class PerbugGameState {
   final bool loading;
   final Set<String> visitedNodeIds;
   final List<String> history;
+  final List<PerbugPuzzleEvent> puzzleEvents;
+  final PuzzleSession? activePuzzleSession;
   final String? error;
 
   PerbugNode? get currentNode {
@@ -109,6 +116,9 @@ class PerbugGameState {
     bool? loading,
     Set<String>? visitedNodeIds,
     List<String>? history,
+    List<PerbugPuzzleEvent>? puzzleEvents,
+    PuzzleSession? activePuzzleSession,
+    bool clearActivePuzzleSession = false,
     String? error,
     bool clearError = false,
   }) {
@@ -121,6 +131,8 @@ class PerbugGameState {
       loading: loading ?? this.loading,
       visitedNodeIds: visitedNodeIds ?? this.visitedNodeIds,
       history: history ?? this.history,
+      puzzleEvents: puzzleEvents ?? this.puzzleEvents,
+      activePuzzleSession: clearActivePuzzleSession ? null : (activePuzzleSession ?? this.activePuzzleSession),
       error: clearError ? null : (error ?? this.error),
     );
   }
@@ -177,4 +189,33 @@ PerbugNodeState deriveNodeStateFromPin(MapPin pin) {
   if (pin.hasCreatorMedia && pin.hasReviews) return PerbugNodeState.special;
   if (pin.hasReviews) return PerbugNodeState.futureChallengeReady;
   return PerbugNodeState.available;
+}
+
+class PerbugPuzzleEvent {
+  const PerbugPuzzleEvent({
+    required this.type,
+    required this.timestamp,
+    required this.nodeId,
+    required this.payload,
+  });
+
+  final String type;
+  final DateTime timestamp;
+  final String nodeId;
+  final Map<String, Object?> payload;
+}
+
+SymbolMatchDifficultyKnobs defaultSymbolMatchKnobsForNode(PerbugNode node) {
+  final absLat = node.latitude.abs();
+  final absLng = node.longitude.abs();
+  final densityRoll = ((absLat * 10 + absLng * 3).round()) % 4;
+  final timer = ((absLat + absLng).round()) % 5;
+  return SymbolMatchDifficultyKnobs(
+    symbolPoolSize: 12 + densityRoll * 2,
+    ruleComplexity: 2 + (densityRoll % 3),
+    decoyCount: 3 + (densityRoll % 2),
+    rounds: 3 + (timer % 2),
+    overlapSimilarity: 0.45 + (densityRoll * 0.12).clamp(0.0, 0.4),
+    timerPressure: timer,
+  );
 }
