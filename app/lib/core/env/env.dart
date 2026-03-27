@@ -62,8 +62,8 @@ class Env {
   const Env._();
 
   static const String _defaultApiBaseUrl = 'https://api.perbug.com';
-  static const String _defaultMapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';
-  static const String _defaultMapStyleDarkUrl = 'https://tiles.openfreemap.org/styles/dark';
+  static const String _defaultMapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty/style.json';
+  static const String _defaultMapStyleDarkUrl = 'https://tiles.openfreemap.org/styles/dark/style.json';
 
   static Future<EnvConfig> load(EnvFlavor flavor) async {
     final fileName = switch (flavor) {
@@ -159,17 +159,20 @@ class Env {
     const strategyFromDefine = String.fromEnvironment(EnvKeys.mapTileSourceStrategy);
     const terrainFromDefine = String.fromEnvironment(EnvKeys.mapTerrainSourceUrl);
 
+    final resolvedStyleUrl = styleFromDefine.trim().isNotEmpty
+        ? styleFromDefine.trim()
+        : (dotenv.maybeGet(EnvKeys.mapStyleUrl)?.trim().isNotEmpty == true
+            ? dotenv.maybeGet(EnvKeys.mapStyleUrl)!.trim()
+            : _defaultMapStyleUrl);
+    final resolvedDarkStyleUrl = darkFromDefine.trim().isNotEmpty
+        ? darkFromDefine.trim()
+        : (dotenv.maybeGet(EnvKeys.mapStyleDarkUrl)?.trim().isNotEmpty == true
+            ? dotenv.maybeGet(EnvKeys.mapStyleDarkUrl)!.trim()
+            : _defaultMapStyleDarkUrl);
+
     return MapStackConfig(
-      styleUrl: styleFromDefine.trim().isNotEmpty
-          ? styleFromDefine.trim()
-          : (dotenv.maybeGet(EnvKeys.mapStyleUrl)?.trim().isNotEmpty == true
-              ? dotenv.maybeGet(EnvKeys.mapStyleUrl)!.trim()
-              : _defaultMapStyleUrl),
-      darkStyleUrl: darkFromDefine.trim().isNotEmpty
-          ? darkFromDefine.trim()
-          : (dotenv.maybeGet(EnvKeys.mapStyleDarkUrl)?.trim().isNotEmpty == true
-              ? dotenv.maybeGet(EnvKeys.mapStyleDarkUrl)!.trim()
-              : _defaultMapStyleDarkUrl),
+      styleUrl: _normalizeMapStyleUrl(resolvedStyleUrl),
+      darkStyleUrl: _normalizeMapStyleUrl(resolvedDarkStyleUrl),
       tileSourceStrategy: strategyFromDefine.trim().isNotEmpty
           ? strategyFromDefine.trim()
           : (dotenv.maybeGet(EnvKeys.mapTileSourceStrategy)?.trim().isNotEmpty == true
@@ -196,6 +199,18 @@ class Env {
       return fromDotEnv;
     }
     return null;
+  }
+
+  static String _normalizeMapStyleUrl(String raw) {
+    final uri = Uri.tryParse(raw);
+    if (uri == null) return raw;
+    if (uri.host != 'tiles.openfreemap.org') return raw;
+
+    final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList(growable: false);
+    if (segments.length == 2 && segments.first == 'styles') {
+      return uri.replace(pathSegments: [...segments, 'style.json']).toString();
+    }
+    return raw;
   }
 
 
