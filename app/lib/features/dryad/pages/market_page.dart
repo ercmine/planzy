@@ -54,6 +54,13 @@ class _TreeListingCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final displayLocation = [tree.placeName, tree.locationLabel]
+        .where((segment) => segment.trim().isNotEmpty)
+        .toSet()
+        .join(' • ');
+    final displayPrice = tree.priceEth == null ? 'Price unavailable' : '${tree.priceEth!.toStringAsFixed(2)} ETH';
+    final sellerLabel = tree.ownerHandle.trim().isEmpty ? 'Seller unavailable' : 'Seller ${tree.ownerHandle}';
+
     Future<void> buy() async {
       if (wallet == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connect wallet to buy listed trees.')));
@@ -80,14 +87,14 @@ class _TreeListingCard extends ConsumerWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(tree.name),
-              subtitle: Text('${tree.placeName} • ${tree.locationLabel}'),
-              trailing: Text('${tree.priceEth?.toStringAsFixed(2)} ETH'),
+              subtitle: Text(displayLocation.isEmpty ? 'Unknown location' : displayLocation),
+              trailing: Text(displayPrice),
             ),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                AppPill(label: 'Seller ${tree.ownerHandle}', icon: Icons.sell_outlined),
+                AppPill(label: sellerLabel, icon: Icons.sell_outlined),
                 AppPill(label: tree.lifecycleLabel, icon: Icons.forest_outlined),
                 AppPill(label: tree.rarity, icon: Icons.auto_awesome),
               ],
