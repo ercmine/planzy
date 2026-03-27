@@ -68,10 +68,6 @@ export interface VideoModerationProvider {
   scan(input: { video: VideoAsset }): Promise<{ summary: VideoModerationSummary; evidence: VideoModerationFrameEvidence[] }>;
 }
 
-export interface PlaceLookup {
-  exists(placeId: string): boolean;
-}
-
 export interface UploadObjectVerifier {
   verifyObjectExists(input: { bucket: string; key: string; minBytes?: number; contentType?: string }): Promise<boolean>;
 }
@@ -92,9 +88,9 @@ const defaultProcessingExecutor: VideoProcessingExecutor = {
       durationMs: input.video.durationMs,
       width: input.video.width,
       height: input.video.height,
-      processedAssetKey: `processed/place-review-videos/${input.video.id}/playback.mp4`,
-      thumbnailAssetKey: `processed/place-review-videos/${input.video.id}/thumb.jpg`,
-      coverAssetKey: `processed/place-review-videos/${input.video.id}/cover.jpg`
+      processedAssetKey: `processed/creator-videos/${input.video.id}/playback.mp4`,
+      thumbnailAssetKey: `processed/creator-videos/${input.video.id}/thumb.jpg`,
+      coverAssetKey: `processed/creator-videos/${input.video.id}/cover.jpg`
     };
   }
 };
@@ -124,7 +120,6 @@ const defaultModerationProvider: VideoModerationProvider = {
 export class VideoPlatformService {
   constructor(
     private readonly store: VideoPlatformStore,
-    private readonly placeLookup: PlaceLookup,
     private readonly cfg: VideoStorageConfig,
     private readonly uploadVerifier: UploadObjectVerifier = permissiveObjectVerifier,
     private readonly processingExecutor: VideoProcessingExecutor = defaultProcessingExecutor,
@@ -134,23 +129,26 @@ export class VideoPlatformService {
     private readonly moderationProvider: VideoModerationProvider = defaultModerationProvider
   ) {}
 
-  async createDraft(input: { userId: string; canonicalPlaceId: string; title?: string; caption?: string; rating?: number }): Promise<VideoAsset> {
-    if (!this.placeLookup.exists(input.canonicalPlaceId)) throw new Error("canonical_place_not_found");
+  async createDraft(input: { userId: string; creatorId?: string; creatorWallet?: string; primaryTreeId?: string; title?: string; caption?: string; tags?: string[]; rating?: number }): Promise<VideoAsset> {
     const now = new Date().toISOString();
     const id = `vid_${randomUUID()}`;
     return this.store.createVideo({
       id,
-      canonicalPlaceId: input.canonicalPlaceId,
       authorUserId: input.userId,
+      creatorId: input.creatorId ?? input.userId,
+      creatorWallet: input.creatorWallet,
+      primaryTreeId: input.primaryTreeId,
       status: "draft",
       moderationStatus: "pending",
       visibility: "private",
       title: input.title,
       caption: input.caption,
       rating: input.rating,
+      tags: input.tags ?? [],
       lifecycle: { createdAt: now, updatedAt: now },
       retryCount: 0,
-      engagement: { views: 0, likes: 0, saves: 0, shares: 0, completionRate: 0 }
+      engagement: { views: 0, likes: 0, saves: 0, shares: 0, completionRate: 0 },
+      tipStats: { waterTipsCount: 0, waterTipsWei: "0", directTipsCount: 0, directTipsWei: "0" }
     });
   }
 
@@ -163,12 +161,12 @@ export class VideoPlatformService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.cfg.uploadTtlSeconds * 1000).toISOString();
     const uploadMode = input.sizeBytes >= this.cfg.multipartThresholdBytes ? "multipart" : "single";
-    const key = `raw/place-review-videos/${input.userId}/${video.id}/original-${Date.now()}.mp4`;
+    const key = `raw/creator-videos/${input.userId}/${video.id}/original-${Date.now()}.mp4`;
     const session: UploadSession = {
       id: `ups_${randomUUID()}`,
       userId: input.userId,
       videoId: video.id,
-      purpose: "place_review_video",
+      purpose: "creator_video",
       status: "uploading",
       bucket: this.cfg.rawBucket,
       key,
@@ -290,7 +288,7 @@ export class VideoPlatformService {
       video.lifecycle.processingCompletedAt = job.completedAt;
 
       await this.transition(video, "processed");
-      await this.notificationService?.notify({ type: "video.processing.finished", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId });
+      await this.notificationService?.notify({ type: "video.processing.finished", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId ?? "creator" });
       await this.runModerationScan(video);
       if (video.moderationStatus === "pending" || video.moderationStatus === "review") {
         await this.transition(video, "moderation_pending", { allowNoop: true });
@@ -308,7 +306,7 @@ export class VideoPlatformService {
       job.completedAt = new Date().toISOString();
       await this.store.updateProcessingJob(job);
       await this.failProcessing(video, job.lastError);
-      await this.notificationService?.notify({ type: "video.processing.failed", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId, reason: video.failureReason });
+      await this.notificationService?.notify({ type: "video.processing.failed", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId ?? "creator", reason: video.failureReason });
       return job;
     }
   }
@@ -333,13 +331,14 @@ export class VideoPlatformService {
     return video;
   }
 
-  async updateDraft(input: { userId: string; videoId: string; title?: string; caption?: string; rating?: number; canonicalPlaceId?: string; visibility?: "public" | "private" | "unlisted" }): Promise<VideoAsset> {
+  async updateDraft(input: { userId: string; videoId: string; title?: string; caption?: string; rating?: number; creatorWallet?: string; primaryTreeId?: string; tags?: string[]; visibility?: "public" | "private" | "unlisted" }): Promise<VideoAsset> {
     const video = await this.requireOwnerVideo(input.userId, input.videoId);
-    if (input.canonicalPlaceId && !this.placeLookup.exists(input.canonicalPlaceId)) throw new Error("canonical_place_not_found");
-    if (input.canonicalPlaceId) video.canonicalPlaceId = input.canonicalPlaceId;
     if (input.title !== undefined) video.title = input.title;
     if (input.caption !== undefined) video.caption = input.caption;
     if (input.rating !== undefined) video.rating = input.rating;
+    if (input.creatorWallet !== undefined) video.creatorWallet = input.creatorWallet;
+    if (input.primaryTreeId !== undefined) video.primaryTreeId = input.primaryTreeId;
+    if (input.tags !== undefined) video.tags = input.tags.slice(0, 20);
     if (input.visibility !== undefined) video.visibility = input.visibility;
     video.lifecycle.updatedAt = new Date().toISOString();
     await this.store.updateVideo(video);
@@ -384,15 +383,16 @@ export class VideoPlatformService {
       .sort((a, b) => b.lifecycle.updatedAt.localeCompare(a.lifecycle.updatedAt))
       .map((video) => {
         const readiness = this.computePublishReadiness(video);
-        const moderationTarget = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId, subjectUserId: video.authorUserId };
+        const moderationTarget = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId ?? "creator", subjectUserId: video.authorUserId };
         const moderationAggregate = this.moderationService?.getAggregate(moderationTarget);
         return {
           videoId: video.id,
-          placeId: video.canonicalPlaceId,
+          placeId: video.canonicalPlaceId ?? "creator",
           title: video.title,
           caption: video.caption,
           status: video.status,
           moderationStatus: video.moderationStatus,
+      supportSummary: video.tipStats,
           moderationState: moderationAggregate?.state,
           moderationReason: video.moderationSummary?.decision == "block" ? "Blocked due to safety policy" : moderationAggregate?.state === "pending_review" || video.moderationStatus === "review" ? "Under safety review" : moderationAggregate?.state,
           statusLabel: this.statusLabel(video.status),
@@ -508,7 +508,7 @@ export class VideoPlatformService {
         videoId: video.id,
         userId: input.userId,
         creatorUserId: video.authorUserId,
-        canonicalPlaceId: video.canonicalPlaceId,
+        canonicalPlaceId: video.canonicalPlaceId ?? "creator",
         watchedAt: new Date().toISOString(),
         progressMs: Math.max(0, input.progressMs ?? 0),
         completed: input.event === "video_completed"
@@ -616,7 +616,7 @@ export class VideoPlatformService {
   async reportVideo(input: { userId: string; videoId: string; reasonCode: "sexual_explicit" | "graphic_violent" | "harassment_bullying" | "hate_abusive_language" | "spam" | "other"; note?: string }): Promise<{ accepted: true; aggregate?: ReturnType<ModerationService["getAggregate"]> }> {
     const video = await this.store.getVideo(input.videoId);
     if (!video) throw new Error("video_not_found");
-    const target = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId, subjectUserId: video.authorUserId };
+    const target = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId ?? "creator", subjectUserId: video.authorUserId };
     const result = await this.moderationService?.submitReport({ target, reporterUserId: input.userId, reasonCode: input.reasonCode, note: input.note });
     return { accepted: true, aggregate: result?.aggregate };
   }
@@ -644,7 +644,7 @@ export class VideoPlatformService {
     const result = await this.moderationProvider.scan({ video });
     video.moderationSummary = result.summary;
     video.moderationEvidence = result.evidence;
-    const target = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId, subjectUserId: video.authorUserId };
+    const target = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId ?? "creator", subjectUserId: video.authorUserId };
     await this.moderationService?.ingestSignals({
       target,
       actorUserId: video.authorUserId,
@@ -660,10 +660,10 @@ export class VideoPlatformService {
       video.moderationStatus = "approved";
     } else if (result.summary.decision === "review") {
       video.moderationStatus = "review";
-      await this.notificationService?.notify({ type: "video.moderation.changed", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId, moderationState: "pending" });
+      await this.notificationService?.notify({ type: "video.moderation.changed", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId ?? "creator", moderationState: "pending" });
     } else {
       video.moderationStatus = "rejected";
-      await this.notificationService?.notify({ type: "video.moderation.changed", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId, moderationState: "rejected" });
+      await this.notificationService?.notify({ type: "video.moderation.changed", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId ?? "creator", moderationState: "rejected" });
     }
     video.lifecycle.moderatedAt = new Date().toISOString();
     await this.store.updateVideo(video);
@@ -697,13 +697,12 @@ export class VideoPlatformService {
     video.lifecycle.publishedAt = video.lifecycle.publishedAt ?? new Date().toISOString();
     video.lifecycle.updatedAt = new Date().toISOString();
     await this.store.updateVideo(video);
-    await this.notificationService?.notify({ type: "video.published", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId });
+    await this.notificationService?.notify({ type: "video.published", recipientUserId: video.authorUserId, videoId: video.id, placeId: video.canonicalPlaceId ?? "creator" });
     return video;
   }
 
   private computePublishReadiness(video: VideoAsset): { ready: boolean; missing: string[] } {
     const missing: string[] = [];
-    if (!video.canonicalPlaceId) missing.push("canonical_place_id");
     if (!video.rawAssetKey) missing.push("raw_asset");
     if (!video.processedAssetKey) missing.push("processed_asset");
     if (!video.thumbnailAssetKey && !video.coverAssetKey) missing.push("thumbnail_or_cover");
@@ -735,11 +734,11 @@ export class VideoPlatformService {
   }
 
   private toFeedItem(video: VideoAsset): VideoFeedItem {
-    const target = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId, subjectUserId: video.authorUserId };
+    const target = { targetType: "place_review_video" as const, targetId: video.id, placeId: video.canonicalPlaceId ?? "creator", subjectUserId: video.authorUserId };
     const trust = this.trustSafetyService?.getContentSummary(target, 0.6);
     return {
       videoId: video.id,
-      placeId: video.canonicalPlaceId,
+      placeId: video.canonicalPlaceId ?? "creator",
       title: video.title,
       caption: video.caption,
       creatorUserId: video.authorUserId,
@@ -748,6 +747,7 @@ export class VideoPlatformService {
       coverUrl: this.playbackUrl(video.coverAssetKey),
       status: video.status,
       moderationStatus: video.moderationStatus,
+      supportSummary: video.tipStats,
       trust: trust ? { trustScore: trust.trustScore, trustTier: trust.trustTier, badges: trust.badges } : undefined,
       publishedAt: video.lifecycle.publishedAt
     };
@@ -783,7 +783,7 @@ export class VideoPlatformService {
     return {
       canonicalPlaceId: placeId,
       name: `Place ${placeId}`,
-      category: "place_review",
+      category: "creator_video",
       city,
       region,
       qualityScore: Math.min(1, (avgRating / 5) * 0.65 + trusted * 0.25 + (placeTrust?.trustScore ?? 0.5) * 0.1),
@@ -813,7 +813,7 @@ export class VideoPlatformService {
   private isVisibleVideo(video: VideoAsset): boolean {
     if (!["published", "moderation_pending", "publish_pending"].includes(video.status)) return false;
     if (!this.moderationService) return true;
-    return this.moderationService.isPubliclyVisible({ targetType: "place_review_video", targetId: video.id, placeId: video.canonicalPlaceId, subjectUserId: video.authorUserId });
+    return this.moderationService.isPubliclyVisible({ targetType: "creator_video", targetId: video.id, placeId: video.canonicalPlaceId ?? "creator", subjectUserId: video.authorUserId });
   }
 
   private playbackUrl(key?: string): string | undefined {

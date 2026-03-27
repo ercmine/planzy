@@ -3,12 +3,15 @@ export type DryadTipStatus = "created" | "awaiting_signature" | "submitted" | "c
 export interface DryadVideoTipIntent {
   id: string;
   videoId: string;
+  treeId?: string;
   placeId?: string;
   senderUserId: string;
-  senderWalletPublicKey: string;
+  senderWalletAddress: string;
   recipientUserId: string;
   recipientCreatorProfileId?: string;
-  recipientWalletPublicKey: string;
+  recipientWalletAddress: string;
+  tipKind: "water_tree" | "direct_eth";
+  network: "ethereum";
   grossAmountAtomic: bigint;
   platformFeeAtomic: bigint;
   recipientNetAtomic: bigint;
@@ -55,5 +58,5 @@ export interface DryadTipTransferResult {
 }
 
 export interface DryadTipsAdapter {
-  submitTransfer(input: { fromWallet: string; toWallet: string; amountAtomic: bigint; memo: string; idempotencyKey: string }): Promise<DryadTipTransferResult>;
+  submitTransfer(input: { fromWallet: string; toWallet: string; amountWei: bigint; memo: string; idempotencyKey: string }): Promise<DryadTipTransferResult>;
 }

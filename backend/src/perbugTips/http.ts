@@ -13,9 +13,17 @@ function requireUserId(req: IncomingMessage): string {
 export function createDryadTipsHttpHandlers(service: DryadTipsService) {
   return {
     createIntent: async (req: IncomingMessage, res: ServerResponse, videoId: string) => {
-      const body = await parseJsonBody(req) as { senderWalletPublicKey?: string; amountAtomic?: string; note?: string };
-      if (!body.senderWalletPublicKey || !body.amountAtomic) throw new ValidationError(["senderWalletPublicKey and amountAtomic required"]);
-      const tip = await service.createVideoTipIntent({ videoId, senderUserId: requireUserId(req), senderWalletPublicKey: body.senderWalletPublicKey, amountAtomic: BigInt(body.amountAtomic), note: body.note, allowSelfTip: String(process.env.DRYAD_ALLOW_SELF_TIP ?? "false") === "true" });
+      const body = await parseJsonBody(req) as { senderWalletAddress?: string; amountWei?: string; note?: string; tipKind?: "water_tree" | "direct_eth" };
+      if (!body.senderWalletAddress || !body.amountWei) throw new ValidationError(["senderWalletAddress and amountWei required"]);
+      const tip = await service.createVideoTipIntent({
+        videoId,
+        senderUserId: requireUserId(req),
+        senderWalletAddress: body.senderWalletAddress,
+        amountWei: BigInt(body.amountWei),
+        note: body.note,
+        tipKind: body.tipKind ?? "water_tree",
+        allowSelfTip: String(process.env.DRYAD_ALLOW_SELF_TIP ?? "false") === "true"
+      });
       sendJson(res, 201, { tipIntent: tip });
     },
     submit: async (req: IncomingMessage, res: ServerResponse, tipIntentId: string) => sendJson(res, 200, { tipIntent: await service.submitTip({ tipIntentId, senderUserId: requireUserId(req) }) }),

@@ -8,7 +8,6 @@ import { VideoPlatformService } from '../../videoPlatform/service.js';
 function videoService() {
   return new VideoPlatformService(
     new MemoryVideoPlatformStore(),
-    { exists: () => true },
     {
       awsRegion: 'us-east-1',
       rawBucket: 'raw',

@@ -223,7 +223,6 @@ export function createServer(options?: CreateServerOptions) {
   });
   videoPlatformService = new VideoPlatformService(
     new MemoryVideoPlatformStore(),
-    { exists: (placeId) => Boolean(placeService.getCanonicalPlace(placeId)) },
     {
       awsRegion: process.env.AWS_REGION ?? "us-east-1",
       rawBucket: process.env.AWS_S3_VIDEO_RAW_BUCKET ?? "dryad-media-raw-dev",
