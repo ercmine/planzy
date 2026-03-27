@@ -8,7 +8,7 @@ import '../dryad/pages/tend_page.dart';
 import '../dryad/pages/wallet_page.dart';
 import 'map_discovery_tab.dart';
 
-enum HomeTab { smartMap, market, tend, grove, wallet, profile }
+enum HomeTab { smartMap, market, tend, grove, wallet }
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, this.initialTab = HomeTab.smartMap});
@@ -20,7 +20,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const List<HomeTab> _tabs = [HomeTab.smartMap, HomeTab.market, HomeTab.tend, HomeTab.grove, HomeTab.wallet, HomeTab.profile];
+  static const List<HomeTab> _tabs = [HomeTab.smartMap, HomeTab.market, HomeTab.tend, HomeTab.grove, HomeTab.wallet];
   late int _navIndex;
 
   @override
@@ -38,7 +38,6 @@ class _HomePageState extends State<HomePage> {
       DryadTendPage(onOpenTree: _openTree),
       DryadGrovePage(onOpenTree: _openTree),
       const DryadWalletPage(),
-      const _DryadProfilePage(),
     ];
 
     return AppScaffold(
@@ -54,7 +53,6 @@ class _HomePageState extends State<HomePage> {
           NavigationDestination(icon: Icon(Icons.water_drop_outlined), selectedIcon: Icon(Icons.water_drop), label: 'Tend'),
           NavigationDestination(icon: Icon(Icons.forest_outlined), selectedIcon: Icon(Icons.forest), label: 'My Trees'),
           NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );
@@ -62,23 +60,5 @@ class _HomePageState extends State<HomePage> {
 
   void _openTree(String treeId) {
     context.push('/tree/$treeId');
-  }
-}
-
-class _DryadProfilePage extends StatelessWidget {
-  const _DryadProfilePage();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: const [
-        PremiumHeader(
-          title: 'Steward Profile',
-          subtitle: 'Identity across ownership history, planting activity, and listing performance.',
-          badge: AppPill(label: 'Dryad', icon: Icons.emoji_nature_outlined),
-        ),
-      ],
-    );
   }
 }

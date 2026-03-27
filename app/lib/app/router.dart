@@ -51,7 +51,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/tend', name: 'tend', builder: (context, state) => const HomePage(initialTab: HomeTab.tend)),
       GoRoute(path: '/trees', name: 'trees', builder: (context, state) => const HomePage(initialTab: HomeTab.grove)),
       GoRoute(path: '/wallet', name: 'wallet', builder: (context, state) => const HomePage(initialTab: HomeTab.wallet)),
-      GoRoute(path: '/profile', name: 'profile', builder: (context, state) => const HomePage(initialTab: HomeTab.profile)),
+      GoRoute(path: '/profile', name: 'profile', redirect: (context, state) => '/wallet'),
       GoRoute(
         path: '/tree/:id',
         name: 'tree',
