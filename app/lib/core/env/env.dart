@@ -64,8 +64,8 @@ class Env {
   const Env._();
 
   static const String _defaultApiBaseUrl = 'https://api.perbug.com';
-  static const String _defaultMapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';
-  static const String _defaultMapStyleDarkUrl = 'https://tiles.openfreemap.org/styles/liberty';
+  static const String _defaultMapStyleUrl = 'builtin://light';
+  static const String _defaultMapStyleDarkUrl = 'builtin://dark';
 
   static Future<EnvConfig> load(EnvFlavor flavor) async {
     final fileName = switch (flavor) {
@@ -232,6 +232,10 @@ class Env {
       return _builtinRasterStyleJson(isDark: true);
     }
 
+    if (normalizedRaw.startsWith('{') && normalizedRaw.endsWith('}')) {
+      return normalizedRaw;
+    }
+
     final uri = Uri.tryParse(raw);
     if (uri == null) return raw;
     if (uri.host != 'tiles.openfreemap.org') return raw;
@@ -244,7 +248,10 @@ class Env {
       final normalizedPath = '${uri.path.endsWith('/') ? uri.path : '${uri.path}/'}style.json';
       return uri.replace(path: normalizedPath).toString();
     }
-    return uri.path.endsWith('/style.json') ? raw : _builtinRasterStyleJson(isDark: isDark);
+    if (uri.path.endsWith('/style.json')) return raw;
+
+    Log.warn('map.env invalid style URL "$normalizedRaw"; using built-in raster style instead.');
+    return _builtinRasterStyleJson(isDark: isDark);
   }
 
   static String _builtinRasterStyleJson({required bool isDark}) {
