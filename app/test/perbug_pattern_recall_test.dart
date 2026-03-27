@@ -31,8 +31,9 @@ void main() {
     const generator = PatternRecallGenerator();
     const seed = PuzzleSeedInput(nodeId: 'node-a', latitude: 30.2672, longitude: -97.7431);
 
-    final first = generator.generate(node: nodeA, seedInput: seed, tuning: const {});
-    final second = generator.generate(node: nodeA, seedInput: seed, tuning: const {});
+    const context = PuzzleNodeContext(nodeId: 'node-a', latitude: 30.2672, longitude: -97.7431, region: 'Downtown');
+    final first = generator.generate(node: context, seedInput: seed, tuning: const {});
+    final second = generator.generate(node: context, seedInput: seed, tuning: const {});
 
     expect(first.generatedSequence, second.generatedSequence);
     expect(first.expectedAnswer, second.expectedAnswer);
@@ -45,18 +46,21 @@ void main() {
     const seedA = PuzzleSeedInput(nodeId: 'node-a', latitude: 30.2672, longitude: -97.7431);
     const seedB = PuzzleSeedInput(nodeId: 'node-b', latitude: 30.271, longitude: -97.75);
 
-    final first = generator.generate(node: nodeA, seedInput: seedA, tuning: const {});
-    final second = generator.generate(node: nodeB, seedInput: seedB, tuning: const {});
+    const contextA = PuzzleNodeContext(nodeId: 'node-a', latitude: 30.2672, longitude: -97.7431, region: 'Downtown');
+    const contextB = PuzzleNodeContext(nodeId: 'node-b', latitude: 30.271, longitude: -97.75, region: 'North');
+    final first = generator.generate(node: contextA, seedInput: seedA, tuning: const {});
+    final second = generator.generate(node: contextB, seedInput: seedB, tuning: const {});
 
-    expect(first.generatedSequence, isNot(second.generatedSequence));
+    expect(first.generatedSequence.join(','), isNot(second.generatedSequence.join(',')));
   });
 
   test('difficulty responds to tuning knobs/progression boosts', () {
     const generator = PatternRecallGenerator();
     const seed = PuzzleSeedInput(nodeId: 'node-a', latitude: 30.2672, longitude: -97.7431);
 
-    final easy = generator.generate(node: nodeA, seedInput: seed, tuning: const {'progressionStage': 0.0, 'rarityBoost': 0.0});
-    final hard = generator.generate(node: nodeA, seedInput: seed, tuning: const {'progressionStage': 1.6, 'rarityBoost': 0.8});
+    const context = PuzzleNodeContext(nodeId: 'node-a', latitude: 30.2672, longitude: -97.7431, region: 'Downtown');
+    final easy = generator.generate(node: context, seedInput: seed, tuning: const {'progressionStage': 0.0, 'rarityBoost': 0.0});
+    final hard = generator.generate(node: context, seedInput: seed, tuning: const {'progressionStage': 1.6, 'rarityBoost': 0.8});
 
     expect(hard.difficulty.score, greaterThan(easy.difficulty.score));
     expect(hard.knobs.sequenceLength, greaterThanOrEqualTo(easy.knobs.sequenceLength));

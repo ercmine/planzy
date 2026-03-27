@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import '../../perbug_game_models.dart';
 import '../perbug_puzzle_framework.dart';
 import 'pattern_recall_models.dart';
 
@@ -11,7 +10,7 @@ class PatternRecallGenerator implements PuzzleGenerator<PatternRecallInstance> {
 
   @override
   PatternRecallInstance generate({
-    required PerbugNode node,
+    required PuzzleNodeContext node,
     required PuzzleSeedInput seedInput,
     required Map<String, Object> tuning,
   }) {
@@ -57,7 +56,7 @@ class PatternRecallGenerator implements PuzzleGenerator<PatternRecallInstance> {
   }
 
   PatternRecallDifficultyKnobs _knobsFor({
-    required PerbugNode node,
+    required PuzzleNodeContext node,
     required Map<String, Object> tuning,
     required math.Random rng,
   }) {

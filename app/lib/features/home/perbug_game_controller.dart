@@ -94,7 +94,16 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     final node = state.currentNode;
     if (node == null) return null;
     final seedInput = PuzzleSeedInput(nodeId: node.id, latitude: node.latitude, longitude: node.longitude);
-    final instance = _patternGenerator.generate(node: node, seedInput: seedInput, tuning: tuning);
+    final instance = _patternGenerator.generate(
+      node: PuzzleNodeContext(
+        nodeId: node.id,
+        latitude: node.latitude,
+        longitude: node.longitude,
+        region: node.region,
+      ),
+      seedInput: seedInput,
+      tuning: tuning,
+    );
     final now = DateTime.now().toUtc();
     final session = PatternRecallSession(
       instance: instance,

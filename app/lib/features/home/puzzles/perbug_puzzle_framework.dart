@@ -1,7 +1,5 @@
 import 'dart:math' as math;
 
-import '../perbug_game_models.dart';
-
 enum PuzzleType { gridPath, patternRecall }
 
 class PuzzleSeedInput {
@@ -101,10 +99,24 @@ abstract class PuzzleInstance {
 
 abstract class PuzzleGenerator<T extends PuzzleInstance> {
   T generate({
-    required PerbugNode node,
+    required PuzzleNodeContext node,
     required PuzzleSeedInput seedInput,
     required Map<String, Object> tuning,
   });
+}
+
+class PuzzleNodeContext {
+  const PuzzleNodeContext({
+    required this.nodeId,
+    required this.latitude,
+    required this.longitude,
+    required this.region,
+  });
+
+  final String nodeId;
+  final double latitude;
+  final double longitude;
+  final String region;
 }
 
 abstract class PuzzleValidator<T extends PuzzleInstance> {
