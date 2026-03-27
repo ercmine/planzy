@@ -306,36 +306,16 @@ void main() {
   });
 
 
-  testWidgets('Profile tab renders profile details and settings entry points', (tester) async {
-    await tester.pumpWidget(
-      buildApp(
-        baseOverrides(
-          studioItems: const [
-            StudioVideo(
-              videoId: 'published_1',
-              placeId: 'p3',
-              placeName: 'Taco Terrace',
-              title: 'Taco Terrace review',
-              status: StudioVideoStatus.published,
-              section: StudioSection.published,
-              updatedAt: '2026-01-01T00:00:00Z',
-              publishedAt: '2026-01-02T00:00:00Z',
-            ),
-          ],
-        ),
-      ),
-    );
+  testWidgets('Wallet tab opens wallet dashboard actions', (tester) async {
+    await tester.pumpWidget(buildApp(baseOverrides()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Profile'));
+    await tester.tap(find.text('Wallet'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Edit profile'), findsOneWidget);
-    expect(find.text('Posts & reviews'), findsOneWidget);
-    expect(find.text('Drafted reviews & videos'), findsOneWidget);
-    expect(find.text('Saved places & collections'), findsOneWidget);
-    expect(find.text('Profile tools'), findsOneWidget);
-    expect(find.text('Log out'), findsOneWidget);
+    expect(find.text('Wallet'), findsOneWidget);
+    expect(find.textContaining('Target network:'), findsOneWidget);
+    expect(find.text('Connect MetaMask'), findsOneWidget);
   });
 
   testWidgets('Place detail page shows place-linked video section', (tester) async {
