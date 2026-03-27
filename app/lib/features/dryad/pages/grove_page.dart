@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../app/theme/widgets.dart';
 import '../chain/dryad_chain_providers.dart';
@@ -15,6 +16,7 @@ class DryadGrovePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final treesAsync = ref.watch(ownedTreesProvider);
     final wallet = ref.watch(walletAddressProvider);
+    final snapshotAsync = ref.watch(groveNftSnapshotProvider);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -37,7 +39,48 @@ class DryadGrovePage extends ConsumerWidget {
               if (wallet == null || wallet.trim().isEmpty) {
                 return const AppCard(child: Text('Connect your wallet to load your real owned trees.'));
               }
-              if (trees.isEmpty) return const AppCard(child: Text('No owned trees yet. Claim and plant from the Planting tab.'));
+              if (trees.isEmpty) {
+                return snapshotAsync.when(
+                  data: (snapshot) {
+                    if (snapshot == null || snapshot.tokens.isEmpty) {
+                      return const AppCard(child: Text('No owned trees yet. Claim and plant from the Planting tab.'));
+                    }
+                    return AppCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Detected ${snapshot.tokens.length} on-chain tree NFT(s) for this wallet.'),
+                          const SizedBox(height: 8),
+                          const Text('These trees are not yet synced into the Dryad trees API inventory.'),
+                          const SizedBox(height: 12),
+                          ...snapshot.tokens.map(
+                            (token) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (token.artwork?.svgMarkup case final svg?)
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: SizedBox(
+                                        width: 80,
+                                        height: 80,
+                                        child: SvgPicture.string(svg),
+                                      ),
+                                    ),
+                                  Expanded(child: Text('Token #${token.tokenId}')),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  error: (_, __) => const AppCard(child: Text('No owned trees yet. Claim and plant from the Planting tab.')),
+                  loading: () => const AppCard(child: LinearProgressIndicator()),
+                );
+              }
               return Column(
                 children: trees
                     .map((tree) => Padding(

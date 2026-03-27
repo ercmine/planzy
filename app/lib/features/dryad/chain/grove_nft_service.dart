@@ -11,19 +11,29 @@ class GroveNftSnapshot {
     required this.chainId,
     required this.wallet,
     required this.ownedBalance,
-    required this.tokenId,
-    required this.tokenUri,
-    required this.artwork,
+    required this.tokens,
   });
 
   final int chainId;
   final String wallet;
   final BigInt ownedBalance;
-  final BigInt? tokenId;
-  final String? tokenUri;
-  final NftArtwork? artwork;
+  final List<GroveNftTokenSnapshot> tokens;
 
-  bool get hasNft => ownedBalance > BigInt.zero && tokenId != null;
+  BigInt? get tokenId => tokens.isEmpty ? null : tokens.first.tokenId;
+  String? get tokenUri => tokens.isEmpty ? null : tokens.first.tokenUri;
+  NftArtwork? get artwork => tokens.isEmpty ? null : tokens.first.artwork;
+
+  bool get hasMultipleNfts => tokens.length > 1;
+
+  bool get hasNft => ownedBalance > BigInt.zero && tokens.isNotEmpty;
+}
+
+class GroveNftTokenSnapshot {
+  const GroveNftTokenSnapshot({required this.tokenId, required this.tokenUri, required this.artwork});
+
+  final BigInt tokenId;
+  final String tokenUri;
+  final NftArtwork? artwork;
 }
 
 class GroveNftService {
@@ -51,33 +61,34 @@ class GroveNftService {
         chainId: chainId,
         wallet: walletAddress,
         ownedBalance: balance,
-        tokenId: null,
-        tokenUri: null,
-        artwork: null,
+        tokens: const <GroveNftTokenSnapshot>[],
       );
     }
 
-    final tokenIdRaw = await _ethCall(
-      to: config.groveNftAddress,
-      data: encodeAddressUintCall('tokenOfOwnerByIndex(address,uint256)', walletAddress, BigInt.zero),
-    );
-    final tokenId = decodeUint256(tokenIdRaw);
+    final nftCount = balance.toInt();
+    final tokens = <GroveNftTokenSnapshot>[];
+    for (var index = 0; index < nftCount; index += 1) {
+      final tokenIdRaw = await _ethCall(
+        to: config.groveNftAddress,
+        data: encodeAddressUintCall('tokenOfOwnerByIndex(address,uint256)', walletAddress, BigInt.from(index)),
+      );
+      final tokenId = decodeUint256(tokenIdRaw);
 
-    final tokenUriRaw = await _ethCall(
-      to: config.groveNftAddress,
-      data: encodeUintCall('tokenURI(uint256)', tokenId),
-    );
+      final tokenUriRaw = await _ethCall(
+        to: config.groveNftAddress,
+        data: encodeUintCall('tokenURI(uint256)', tokenId),
+      );
 
-    final tokenUri = decodeString(tokenUriRaw);
-    final artwork = parseNftArtworkFromTokenUri(tokenUri);
+      final tokenUri = decodeString(tokenUriRaw);
+      final artwork = parseNftArtworkFromTokenUri(tokenUri);
+      tokens.add(GroveNftTokenSnapshot(tokenId: tokenId, tokenUri: tokenUri, artwork: artwork));
+    }
 
     return GroveNftSnapshot(
       chainId: chainId,
       wallet: walletAddress,
       ownedBalance: balance,
-      tokenId: tokenId,
-      tokenUri: tokenUri,
-      artwork: artwork,
+      tokens: tokens,
     );
   }
 
