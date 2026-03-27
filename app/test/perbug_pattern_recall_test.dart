@@ -129,4 +129,25 @@ void main() {
     expect(notifier.state.puzzleEvents.where((e) => e['name'] == 'preview_completed').isNotEmpty, isTrue);
     expect(notifier.state.puzzleEvents.where((e) => e['name'] == 'puzzle_succeeded').isNotEmpty, isTrue);
   });
+
+  test('controller reuses active in-progress pattern session', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(perbugGameControllerProvider.notifier);
+    notifier.state = const PerbugGameState(
+      nodes: [nodeA],
+      currentNodeId: 'node-a',
+      energy: 10,
+      maxEnergy: 20,
+      maxJumpMeters: 2000,
+      loading: false,
+      visitedNodeIds: {'node-a'},
+      history: [],
+      puzzleEvents: [],
+    );
+
+    final first = notifier.launchPatternRecallForCurrentNode();
+    final second = notifier.launchPatternRecallForCurrentNode();
+    expect(identical(first, second), isTrue);
+  });
 }

@@ -32,7 +32,12 @@ class _PatternRecallPuzzleSheetState extends State<PatternRecallPuzzleSheet> {
   void _runPreview(PatternRecallSession session) {
     _previewTimer?.cancel();
     widget.controller.startPatternPreview();
-    var step = 0;
+    if (session.instance.generatedSequence.isEmpty) {
+      widget.controller.completePatternPreview();
+      return;
+    }
+    widget.controller.setPatternPreviewStep(0);
+    var step = 1;
     final total = session.instance.generatedSequence.length;
     _previewTimer = Timer.periodic(session.instance.previewStepDuration, (timer) {
       widget.controller.setPatternPreviewStep(step);

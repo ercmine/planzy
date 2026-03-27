@@ -91,6 +91,13 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
   }
 
   PatternRecallSession? launchPatternRecallForCurrentNode({Map<String, Object> tuning = const {}}) {
+    final active = state.activePatternRecall;
+    if (active != null &&
+        active.phase != PatternRecallPhase.success &&
+        active.phase != PatternRecallPhase.failure &&
+        active.phase != PatternRecallPhase.abandoned) {
+      return active;
+    }
     final node = state.currentNode;
     if (node == null) return null;
     final seedInput = PuzzleSeedInput(nodeId: node.id, latitude: node.latitude, longitude: node.longitude);
