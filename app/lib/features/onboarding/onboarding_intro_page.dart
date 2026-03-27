@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -188,7 +189,7 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
     if (!connector.isAvailable) {
       controller.state = controller.state.copyWith(
         status: OnboardingFlowStatus.onboardingFailed,
-        errorMessage: 'No injected EVM wallet detected. Install MetaMask, Phantom EVM, or Coinbase Wallet extension.',
+        errorMessage: _missingWalletMessage(),
       );
       return;
     }
@@ -196,7 +197,7 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
     if (!connector.isWalletInstalled(walletId)) {
       controller.state = controller.state.copyWith(
         status: OnboardingFlowStatus.onboardingFailed,
-        errorMessage: '$walletId is not installed in this browser.',
+        errorMessage: _walletNotDetectedMessage(walletId),
       );
       return;
     }
@@ -213,6 +214,20 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
         errorMessage: 'Wallet connection failed: $error',
       );
     }
+  }
+
+  String _missingWalletMessage() {
+    if (kIsWeb) {
+      return 'No wallet provider detected in this browser. Install MetaMask, Phantom EVM, or Coinbase Wallet extension.';
+    }
+    return 'No wallet app detected on this phone. Install/open MetaMask, Phantom, or Coinbase Wallet and try again.';
+  }
+
+  String _walletNotDetectedMessage(String walletId) {
+    if (kIsWeb) {
+      return '$walletId is not installed in this browser.';
+    }
+    return '$walletId app is not detected on this phone.';
   }
 }
 
