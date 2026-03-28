@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/theme/tokens.dart';
 import '../../app/theme/widgets.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';
 import 'perbug_economy_models.dart';
@@ -36,9 +37,9 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
         padding: const EdgeInsets.all(16),
         children: [
           PremiumHeader(
-            title: 'Perbug Strategy Map',
-            subtitle: 'Move node-to-node, resolve encounters, and push outward from ${state.areaLabel ?? 'your anchor region'}.',
-            badge: const AppPill(label: 'Fixed zoom 2D', icon: Icons.map_outlined),
+            title: 'Perbug Tactical Atlas',
+            subtitle: 'Traverse the fixed-zoom world board, deploy your squad, and expand from ${state.areaLabel ?? 'your anchor region'}.',
+            badge: const AppPill(label: 'Map-native strategy RPG', icon: Icons.explore),
           ),
           const SizedBox(height: 12),
           AppCard(
@@ -54,8 +55,8 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Level ${state.progression.level} • XP ${state.progression.xp} • Perbug ${state.economy.wallet.balance}'),
-                Text('Upgrade Currency ${state.progression.upgradeCurrency} • Squad power ${state.squad.equippedPower} • Slots ${state.squad.maxSlots}'),
+                Text('Commander L${state.progression.level} • XP ${state.progression.xp} • Perbug ${state.economy.wallet.balance}'),
+                Text('Arcane Marks ${state.progression.upgradeCurrency} • Squad power ${state.squad.equippedPower} • Active slots ${state.squad.maxSlots}'),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -78,7 +79,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('World board (zoom locked @ ${state.fixedZoom.toStringAsFixed(0)})', style: Theme.of(context).textTheme.titleMedium),
+                Text('World board: fixed tactical zoom ${state.fixedZoom.toStringAsFixed(0)}', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 240,
@@ -94,21 +95,34 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text('Current node: ${state.currentNode?.label ?? '—'} • Jump range ${(state.maxJumpMeters / 1000).toStringAsFixed(1)}km'),
+                Text('Current node: ${state.currentNode?.label ?? '—'} • March range ${(state.maxJumpMeters / 1000).toStringAsFixed(1)}km'),
                 if (state.currentNode != null)
                   Text(
                     '${state.currentNode!.neighborhood}, ${state.currentNode!.city}, ${state.currentNode!.region}, ${state.currentNode!.country}',
                   ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final nodeType in PerbugNodeType.values)
+                      AppPill(
+                        label: nodeType.name,
+                        icon: _iconForNodeType(nodeType),
+                        backgroundColor: _colorForNodeType(nodeType).withOpacity(0.16),
+                        foregroundColor: _colorForNodeType(nodeType),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
           if (state.loading) const AppCard(child: LinearProgressIndicator()),
           if (state.error != null) AppCard(child: Text(state.error!)),
 
-
           _Section(
-            title: 'Returning commander brief',
-            subtitle: 'Daily objectives, rare windows, frontier, and next goals.',
+            title: 'Commander return loop',
+            subtitle: 'War table objectives, rare windows, frontier, and next goals.',
             children: [
               Text('World tier ${state.progressionLayer.world.worldTier} • Regions unlocked ${state.progressionLayer.world.unlockedRegions.length}'),
               Text('Rare window resets in ${state.progressionLayer.rareSpawns.nextRollAt.difference(DateTime.now().toUtc()).inMinutes.clamp(0, 999)} min'),
@@ -119,7 +133,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             ],
           ),
           _Section(
-            title: 'Daily objectives',
+            title: 'War table objectives',
             subtitle: 'Resets daily and drives return momentum.',
             children: [
               Text('Daily set ${state.progressionLayer.daily.dayKey} • refresh ${state.progressionLayer.daily.refreshAt.toLocal()}'),
@@ -127,8 +141,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 (objective) => ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(objective.title),
-                  subtitle: Text('${objective.description}
-${objective.progress.current}/${objective.progress.target}'),
+                  subtitle: Text('${objective.description}\n${objective.progress.current}/${objective.progress.target}'),
                   trailing: FilledButton.tonal(
                     onPressed: objective.progress.isComplete && !objective.progress.claimed
                         ? () => controller.claimDailyObjective(objective.id)
@@ -140,7 +153,7 @@ ${objective.progress.current}/${objective.progress.target}'),
             ],
           ),
           _Section(
-            title: 'Collections + milestones',
+            title: 'Collections // relic codex',
             subtitle: 'Track ownership, map mastery, and long-term unlock pacing.',
             children: [
               ...state.progressionLayer.collections.map(
@@ -166,7 +179,7 @@ ${objective.progress.current}/${objective.progress.target}'),
             ],
           ),
           _Section(
-            title: 'Unlockables + frontier status',
+            title: 'Frontier gates + unlock track',
             subtitle: 'Explicit unlock rules tied to world expansion and milestones.',
             children: [
               ...state.progressionLayer.unlockables.map(
@@ -193,7 +206,7 @@ ${objective.progress.current}/${objective.progress.target}'),
             ],
           ),
           _Section(
-            title: 'Squad command: active loadout',
+            title: 'Squad loadout // active formation',
             subtitle: 'Manage active units used in node encounters. Roster is larger than active slots.',
             children: [
               ...List.generate(state.squad.activeSquad.maxSlots, (slotIndex) {
@@ -233,7 +246,7 @@ ${objective.progress.current}/${objective.progress.target}'),
             ],
           ),
           _Section(
-            title: 'Roster vault',
+            title: 'Roster vault // collectible units',
             subtitle: 'Collectible unit identity with rarity, role, class, and progression.',
             children: [
               ...state.squad.roster
@@ -254,7 +267,7 @@ ${objective.progress.current}/${objective.progress.target}'),
             ],
           ),
           _Section(
-            title: 'Collectibles + provenance inventory',
+            title: 'Relics, ownership, and provenance',
             subtitle: 'Chain-backed assets are optional and coexist with normal progression assets.',
             children: [
               if (state.economy.ownedAssets.entries.isEmpty)
@@ -281,9 +294,8 @@ ${objective.progress.current}/${objective.progress.target}'),
                 ),
             ],
           ),
-
           _Section(
-            title: 'Loop step 1-2: Move on nearby nodes',
+            title: 'Expedition phase 1: march + positioning',
             subtitle: 'No free teleporting. Reachability is based on real distance and energy.',
             children: moves
                 .map(
@@ -312,7 +324,7 @@ ${objective.progress.current}/${objective.progress.target}'),
                 .toList(growable: false),
           ),
           _Section(
-            title: 'Loop step 3-4: Resolve encounter and reward',
+            title: 'Expedition phase 2: encounter + payoff',
             subtitle: 'Encounters are scaffolded for puzzle, tactical, timed, harvest, and boss modules.',
             children: [
               if (state.activeEncounter != null)
@@ -371,7 +383,7 @@ ${objective.progress.current}/${objective.progress.target}'),
             ],
           ),
           _Section(
-            title: 'Loop step 5: Progress squad + resources',
+            title: 'Expedition phase 3: progression + upgrades',
             subtitle: 'Rewards feed progression, inventory, and unit upgrades.',
             children: [
               Text('Inventory: ${state.progression.inventory.entries.map((e) => '${e.key}:${e.value}').join(' • ')}'),
@@ -396,7 +408,7 @@ ${objective.progress.current}/${objective.progress.target}'),
             ],
           ),
           _Section(
-            title: 'Loop step 6: Crafting and strategic Perbug spend',
+            title: 'Expedition phase 4: crafting + economy',
             subtitle: 'Crafting consumes resources + Perbug and outputs progression items or consumables.',
             children: [
               ...perbugCraftingRecipes.map(
@@ -441,8 +453,8 @@ ${objective.progress.current}/${objective.progress.target}'),
             ],
           ),
           _Section(
-            title: 'Perbug wallet ledger',
-            subtitle: 'Gameplay-first accounting with anti-duplicate action IDs and source/sink attribution.',
+            title: 'Economy ledger // marketplace-ready',
+            subtitle: 'Rewards, sinks, and provenance accounting built for resource economy and trading surfaces.',
             children: state.economy.wallet.transactions.take(10).map((tx) {
               final direction = tx.type == PerbugTransactionType.reward ? '+' : '-';
               final reason = tx.source?.name ?? tx.sink?.name ?? 'system';
@@ -578,16 +590,7 @@ IconData _iconForNodeType(PerbugNodeType type) {
 }
 
 Color _colorForNodeType(PerbugNodeType type) {
-  return switch (type) {
-    PerbugNodeType.encounter => const Color(0xFF4E7DFF),
-    PerbugNodeType.resource => const Color(0xFF2EC27E),
-    PerbugNodeType.mission => const Color(0xFFFF9F1C),
-    PerbugNodeType.shop => const Color(0xFFB07CF7),
-    PerbugNodeType.rare => const Color(0xFFE76F51),
-    PerbugNodeType.boss => const Color(0xFFEF476F),
-    PerbugNodeType.rest => const Color(0xFF118AB2),
-    PerbugNodeType.event => const Color(0xFFF15BB5),
-  };
+  return AppSemanticColors.mapNode[type.name] ?? const Color(0xFF5E8BFF);
 }
 
 class _Section extends StatelessWidget {
@@ -600,12 +603,13 @@ class _Section extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
+      tone: AppCardTone.collection,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
-          Text(subtitle),
+          Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 8),
           ...children,
         ],
