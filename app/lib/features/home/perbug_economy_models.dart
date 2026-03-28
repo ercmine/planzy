@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'perbug_asset_models.dart';
+
 enum ResourceCategory {
   basicMaterial,
   refinedComponent,
@@ -340,6 +342,8 @@ class PerbugEconomyState {
     required this.sourceLedger,
     required this.wallet,
     required this.config,
+    this.ownedAssets = AssetInventory.empty,
+    this.walletLink = WalletLinkState.disconnected,
   });
 
   factory PerbugEconomyState.initial() => const PerbugEconomyState(
@@ -349,6 +353,8 @@ class PerbugEconomyState {
         sourceLedger: [],
         wallet: PerbugWalletState.initial(),
         config: PerbugEconomyConfig.defaults(),
+        ownedAssets: AssetInventory.empty,
+        walletLink: WalletLinkState.disconnected,
       );
 
   final Inventory inventory;
@@ -357,6 +363,8 @@ class PerbugEconomyState {
   final List<Map<String, Object>> sourceLedger;
   final PerbugWalletState wallet;
   final PerbugEconomyConfig config;
+  final AssetInventory ownedAssets;
+  final WalletLinkState walletLink;
 
   PerbugEconomyState copyWith({
     Inventory? inventory,
@@ -365,6 +373,8 @@ class PerbugEconomyState {
     List<Map<String, Object>>? sourceLedger,
     PerbugWalletState? wallet,
     PerbugEconomyConfig? config,
+    AssetInventory? ownedAssets,
+    WalletLinkState? walletLink,
   }) {
     return PerbugEconomyState(
       inventory: inventory ?? this.inventory,
@@ -373,6 +383,8 @@ class PerbugEconomyState {
       sourceLedger: sourceLedger ?? this.sourceLedger,
       wallet: wallet ?? this.wallet,
       config: config ?? this.config,
+      ownedAssets: ownedAssets ?? this.ownedAssets,
+      walletLink: walletLink ?? this.walletLink,
     );
   }
 
@@ -407,6 +419,12 @@ class PerbugEconomyState {
               )
               .toList(growable: false),
         },
+        'ownedAssets': ownedAssets.toJson(),
+        'walletLink': {
+          'isConnected': walletLink.isConnected,
+          'walletAddress': walletLink.walletAddress,
+          'lastSyncStatus': walletLink.lastSyncStatus.name,
+        },
       };
 
   factory PerbugEconomyState.fromEncoded(String raw) {
@@ -416,6 +434,7 @@ class PerbugEconomyState {
     final ledgerRaw = (json['sourceLedger'] as List?) ?? const [];
     final walletRaw = (json['wallet'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
     final walletTransactions = (walletRaw['transactions'] as List?) ?? const [];
+    final walletLinkRaw = (json['walletLink'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
     return PerbugEconomyState(
       inventory: Inventory.fromJson((json['inventory'] as Map?)?.cast<String, dynamic>() ?? const {}),
       unlockedRecipeIds: unlockedRaw.map((entry) => entry.toString()).toSet(),
@@ -455,6 +474,15 @@ class PerbugEconomyState {
             .toList(growable: false),
       ),
       config: PerbugEconomyConfig.defaults(),
+      ownedAssets: AssetInventory.fromJson((json['ownedAssets'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{}),
+      walletLink: WalletLinkState(
+        isConnected: walletLinkRaw['isConnected'] == true,
+        walletAddress: walletLinkRaw['walletAddress']?.toString(),
+        lastSyncStatus: AssetLinkStatus.values.firstWhere(
+          (value) => value.name == walletLinkRaw['lastSyncStatus']?.toString(),
+          orElse: () => AssetLinkStatus.notLinked,
+        ),
+      ),
     );
   }
 }
