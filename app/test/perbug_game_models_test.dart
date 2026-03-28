@@ -72,8 +72,8 @@ void main() {
       areaLabel: null,
       visitedNodeIds: {'a'},
       history: [],
-      progression: ProgressionState(level: 1, xp: 0, perbug: 0, inventory: {}),
-      squad: SquadState(units: [], maxSlots: 3),
+      progression: ProgressionState(level: 1, xp: 0, perbug: 0, inventory: {}, upgradeCurrency: 0),
+      squad: SquadState(roster: [], activeSquad: SquadLoadout(maxSlots: 3, unitIdsBySlot: [null, null, null])),
       activeEncounter: null,
       puzzleProgressByNode: {},
       puzzleSession: null,
@@ -91,6 +91,37 @@ void main() {
     final c = moves.firstWhere((m) => m.node.id == 'c');
     expect(b.isReachable, isTrue);
     expect(c.isReachable, isFalse);
+  });
+
+  test('starter squad has encounter-ready loadout and role diversity', () {
+    final starter = SquadState.starter();
+    expect(starter.roster.length, greaterThanOrEqualTo(4));
+    expect(starter.activeUnits.length, 3);
+    expect(starter.isEncounterReady, isTrue);
+    final summary = starter.summarizePower();
+    expect(summary.totalPower, greaterThan(0));
+    expect(summary.roleCoverage.length, greaterThanOrEqualTo(2));
+  });
+
+  test('duplicate unit assignment is rejected by loadout validator', () {
+    final starter = SquadState.starter();
+    final duplicated = SquadLoadout(
+      maxSlots: starter.maxSlots,
+      unitIdsBySlot: [starter.roster.first.id, starter.roster.first.id, null],
+    );
+    expect(starter.validateLoadout(duplicated), isNotNull);
+  });
+
+  test('unit progression and rarity modifiers increase effective power', () {
+    final starter = SquadState.starter();
+    final scout = starter.roster.first;
+    final basePower = scout.power;
+    final leveled = scout.copyWith(progression: scout.progression.applyXp(1000));
+    expect(leveled.progression.level, greaterThan(scout.progression.level));
+    expect(leveled.power, greaterThan(basePower));
+
+    final rareUnit = starter.roster.firstWhere((u) => u.rarity == UnitRarity.rare);
+    expect(rareUnit.power, greaterThan(starter.roster.first.power - 2));
   });
 
   test('future puzzle-ready node state enum exists', () {

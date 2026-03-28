@@ -109,6 +109,11 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     return true;
   }
 
+
+  void debugSetActiveEncounter(NodeEncounter encounter) {
+    state = state.copyWith(activeEncounter: encounter);
+  }
+
   NodeEncounter launchEncounter() {
     final current = state.currentNode;
     final encounter = state.activeEncounter;
@@ -134,14 +139,18 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     final resolvedStatus = succeeded ? EncounterStatus.resolved : EncounterStatus.failed;
     final payout = succeeded ? encounter.rewardBundle : const RewardBundle();
     final progression = state.progression.applyRewards(payout);
+    final nextSquad = succeeded
+        ? state.squad.applyUnitXpToActive(payout.unitXp).unlockUnits(payout.unitUnlocks)
+        : state.squad;
 
     state = state.copyWith(
       activeEncounter: encounter.copyWith(status: resolvedStatus),
       progression: progression,
+      squad: nextSquad,
       energy: (state.energy + payout.energy).clamp(0, state.maxEnergy),
       history: [
         succeeded
-            ? 'Resolved ${encounter.type.name} (+${payout.xp} XP, +${payout.perbug} Perbug)'
+            ? 'Resolved ${encounter.type.name} (+${payout.xp} XP, +${payout.perbug} Perbug, +${payout.unitXp} squad XP)'
             : 'Encounter failed. Regroup and try another node.',
         ...state.history,
       ],
@@ -156,23 +165,66 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
   }
 
   void upgradePrimaryUnit() {
-    final units = [...state.squad.units];
-    if (units.isEmpty) return;
-    if (state.progression.perbug < 5) {
-      state = state.copyWith(history: ['Need 5 Perbug to upgrade squad power.', ...state.history]);
+    final primary = state.squad.activeUnits.isEmpty ? null : state.squad.activeUnits.first;
+    if (primary == null) return;
+    final upgrade = primary.upgradePath.firstWhere(
+      (node) => !primary.progression.unlockedUpgradeIds.contains(node.id),
+      orElse: () => const UnitUpgradeNode(
+        id: '__none__',
+        title: 'No upgrades',
+        description: 'No upgrades remain',
+        statBonus: UnitStats(attack: 0, defense: 0, speed: 0, utility: 0, energyEfficiency: 0, resilience: 0, initiative: 0),
+        levelRequirement: 999,
+        currencyCost: 999,
+      ),
+    );
+
+    if (upgrade.id == '__none__') {
+      state = state.copyWith(history: ['${primary.name} has completed its current upgrade path.', ...state.history]);
       return;
     }
 
-    units[0] = units[0].copyWith(power: units[0].power + 2);
+    if (state.progression.upgradeCurrency < upgrade.currencyCost) {
+      state = state.copyWith(history: ['Need ${upgrade.currencyCost} upgrade currency for ${upgrade.title}.', ...state.history]);
+      return;
+    }
+
+    if (primary.progression.level < upgrade.levelRequirement) {
+      state = state.copyWith(history: ['${primary.name} must reach level ${upgrade.levelRequirement} first.', ...state.history]);
+      return;
+    }
+
+    final nextSquad = state.squad.unlockUnitUpgrade(
+      unitId: primary.id,
+      upgradeId: upgrade.id,
+      currencyAvailable: state.progression.upgradeCurrency,
+    );
+
     state = state.copyWith(
-      squad: SquadState(units: units, maxSlots: state.squad.maxSlots),
+      squad: nextSquad,
       progression: ProgressionState(
         level: state.progression.level,
         xp: state.progression.xp,
-        perbug: state.progression.perbug - 5,
+        perbug: state.progression.perbug,
         inventory: state.progression.inventory,
+        upgradeCurrency: state.progression.upgradeCurrency - upgrade.currencyCost,
       ),
-      history: ['Upgraded ${units[0].name} to power ${units[0].power}.', ...state.history],
+      history: ['Unlocked ${upgrade.title} on ${primary.name}.', ...state.history],
+    );
+  }
+
+
+  void assignUnitToSlot({required String unitId, required int slotIndex}) {
+    state = state.copyWith(
+      squad: state.squad.assignUnitToSlot(unitId: unitId, slotIndex: slotIndex),
+      history: ['Assigned $unitId to squad slot ${slotIndex + 1}.', ...state.history],
+    );
+  }
+
+  void clearSquadSlot(int slotIndex) {
+    state = state.copyWith(
+      squad: state.squad.removeUnitFromSlot(slotIndex),
+      history: ['Cleared squad slot ${slotIndex + 1}.', ...state.history],
     );
   }
 
@@ -483,6 +535,9 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
           if (node.nodeType != PerbugNodeType.resource) 'signal_shard': 1 + (node.difficulty ~/ 2),
         },
         energy: node.nodeType == PerbugNodeType.rest ? 4 : 1,
+        unitXp: 18 + (node.difficulty * 5),
+        upgradeCurrency: node.nodeType == PerbugNodeType.boss ? 8 : 3,
+        unitUnlocks: node.nodeType == PerbugNodeType.rare ? ['rare-recruit-${node.id}'] : const [],
       ),
     );
   }
