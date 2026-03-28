@@ -1,0 +1,18 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import MarketplaceExperience from '@/components/marketplace/MarketplaceExperience';
+import { createSeo } from '@/lib/seo';
+
+const seo = createSeo({
+  title: 'Perbug Marketplace',
+  description: 'Trade hall for special characters, relics, rare items, and map-linked assets in Perbug\'s world economy.',
+  path: '/marketplace/'
+});
+---
+
+<BaseLayout {...seo}>
+  <Container class="py-14">
+    <MarketplaceExperience client:load />
+  </Container>
+</BaseLayout>

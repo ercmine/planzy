@@ -72,6 +72,7 @@ import { MemoryDryadEconomyStore, DryadEconomyService } from "../perbugEconomy/i
 import { MemoryViewerEngagementStore, ViewerEngagementRewardsService } from "../viewerEngagementRewards/index.js";
 import { DryadMarketplaceService } from "../dryad/service.js";
 import { createPerbugWorldHttpHandlers, MemoryPerbugWorldStore, PerbugWorldService } from "../perbugWorld/index.js";
+import { PerbugMarketplaceService, seedMarketplaceListings } from "../perbugMarketplace/index.js";
 import type { DryadTree } from "../dryad/domain.js";
 import { createHttpServer } from "./httpServer.js";
 
@@ -316,6 +317,7 @@ export function createServer(options?: CreateServerOptions) {
 
   const dryadEconomyService = new DryadEconomyService(new MemoryDryadEconomyStore());
   const perbugWorldService = new PerbugWorldService(new MemoryPerbugWorldStore());
+  const perbugMarketplaceService = new PerbugMarketplaceService(seedMarketplaceListings());
   const perbugWorldHandlers = createPerbugWorldHttpHandlers(perbugWorldService);
   const viewerEngagementRewardsService = new ViewerEngagementRewardsService(new MemoryViewerEngagementStore(), {
     getVideoContext: (videoId) => ({ creatorId: `creator_${videoId}`, placeId: `place_${videoId}` }),
@@ -393,7 +395,8 @@ export function createServer(options?: CreateServerOptions) {
     dryadEconomyService,
     viewerEngagementRewardsService,
     dryadMarketplaceService,
-    perbugWorldHandlers
+    perbugWorldHandlers,
+    perbugMarketplaceService
   });
 }
 

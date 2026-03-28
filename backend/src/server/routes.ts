@@ -106,6 +106,8 @@ import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/
 import { createDryadMarketplaceHttpHandlers } from "../dryad/http.js";
 import type { DryadMarketplaceService } from "../dryad/service.js";
 import type { createPerbugWorldHttpHandlers } from "../perbugWorld/http.js";
+import { createPerbugMarketplaceHttpHandlers } from "../perbugMarketplace/http.js";
+import type { PerbugMarketplaceService } from "../perbugMarketplace/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -209,6 +211,7 @@ export function createRoutes(
     dryadMarketplaceService?: DryadMarketplaceService;
     reviewEligibilityService?: ReviewEligibilityService;
     perbugWorldHandlers?: ReturnType<typeof createPerbugWorldHttpHandlers>;
+    perbugMarketplaceService?: PerbugMarketplaceService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -260,6 +263,7 @@ export function createRoutes(
   const viewerRewardsHandlers = deps?.viewerEngagementRewardsService ? createViewerEngagementRewardsHttpHandlers(deps.viewerEngagementRewardsService) : null;
   const dryadMarketplaceHandlers = deps?.dryadMarketplaceService ? createDryadMarketplaceHttpHandlers(deps.dryadMarketplaceService) : null;
   const perbugWorldHandlers = deps?.perbugWorldHandlers ?? null;
+  const perbugMarketplaceHandlers = deps?.perbugMarketplaceService ? createPerbugMarketplaceHttpHandlers(deps.perbugMarketplaceService) : null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -295,6 +299,49 @@ export function createRoutes(
 
 
 
+
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/listings" && perbugMarketplaceHandlers) {
+        await perbugMarketplaceHandlers.listListings(req, res);
+        return;
+      }
+
+      const perbugListingDetailMatch = matchPath("/v1/perbug/marketplace/listings/:listingId", normalizedPath);
+      if (req.method === "GET" && perbugListingDetailMatch && perbugMarketplaceHandlers) {
+        await perbugMarketplaceHandlers.getListingDetail(req, res, perbugListingDetailMatch.listingId);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/featured" && perbugMarketplaceHandlers) {
+        await perbugMarketplaceHandlers.featuredListings(req, res);
+        return;
+      }
+
+      const perbugCategoryMatch = matchPath("/v1/perbug/marketplace/categories/:category", normalizedPath);
+      if (req.method === "GET" && perbugCategoryMatch && perbugMarketplaceHandlers) {
+        await perbugMarketplaceHandlers.listByCategory(req, res, perbugCategoryMatch.category as never);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/search" && perbugMarketplaceHandlers) {
+        await perbugMarketplaceHandlers.search(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/categories" && perbugMarketplaceHandlers) {
+        await perbugMarketplaceHandlers.categories(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/analytics" && perbugMarketplaceHandlers) {
+        await perbugMarketplaceHandlers.analytics(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/capabilities" && perbugMarketplaceHandlers) {
+        await perbugMarketplaceHandlers.capabilities(req, res);
+        return;
+      }
 
       if (req.method === "GET" && normalizedPath === "/v1/perbug/world/bootstrap" && perbugWorldHandlers) {
         await perbugWorldHandlers.bootstrap(req, res);
