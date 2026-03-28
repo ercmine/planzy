@@ -306,6 +306,36 @@ export function createRoutes(
         return;
       }
 
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/world/encounter/preview" && perbugWorldHandlers) {
+        await perbugWorldHandlers.previewEncounter(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/launch" && perbugWorldHandlers) {
+        await perbugWorldHandlers.launchEncounter(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/action" && perbugWorldHandlers) {
+        await perbugWorldHandlers.submitEncounterAction(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/finalize" && perbugWorldHandlers) {
+        await perbugWorldHandlers.finalizeEncounter(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/abandon" && perbugWorldHandlers) {
+        await perbugWorldHandlers.abandonEncounter(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/retry" && perbugWorldHandlers) {
+        await perbugWorldHandlers.retryEncounter(req, res);
+        return;
+      }
+
       if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/resolve" && perbugWorldHandlers) {
         await perbugWorldHandlers.resolveEncounter(req, res);
         return;
