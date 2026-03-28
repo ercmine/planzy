@@ -48,6 +48,7 @@ import type { DryadEconomyService } from "../perbugEconomy/service.js";
 import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
 import type { DryadMarketplaceService } from "../dryad/service.js";
 import type { createPerbugWorldHttpHandlers } from "../perbugWorld/http.js";
+import type { PerbugMarketplaceService } from "../perbugMarketplace/service.js";
 import { createRoutes } from "./routes.js";
 
 export function matchPath(pattern: string, pathname: string): Record<string, string> | null {
@@ -129,6 +130,7 @@ export function createHttpServer(
     viewerEngagementRewardsService?: ViewerEngagementRewardsService;
     dryadMarketplaceService?: DryadMarketplaceService;
     perbugWorldHandlers?: ReturnType<typeof createPerbugWorldHttpHandlers>;
+    perbugMarketplaceService?: PerbugMarketplaceService;
   }
 ): Server {
   const route = createRoutes(service, merchantService, deps);
