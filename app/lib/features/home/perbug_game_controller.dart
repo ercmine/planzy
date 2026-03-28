@@ -8,6 +8,7 @@ import '../puzzles/puzzle_framework.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_tab.dart' show mapGeoClientProvider;
 import 'perbug_game_models.dart';
+import 'perbug_node_world_engine.dart';
 
 final perbugGameControllerProvider = StateNotifierProvider<PerbugGameController, PerbugGameState>((ref) {
   return PerbugGameController(ref);
@@ -16,10 +17,12 @@ final perbugGameControllerProvider = StateNotifierProvider<PerbugGameController,
 class PerbugGameController extends StateNotifier<PerbugGameState> {
   PerbugGameController(this._ref)
       : _gridPathGenerator = const GridPathGenerator(),
+        _worldEngine = const PerbugNodeWorldEngine(),
         super(PerbugGameState.initial());
 
   final Ref _ref;
   final GridPathGenerator _gridPathGenerator;
+  final PerbugNodeWorldEngine _worldEngine;
   Timer? _puzzleTimer;
 
   static const MapViewport _fixedGameplayViewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
@@ -40,7 +43,19 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         return;
       }
 
-      final nodes = pins.take(20).map(_mapPinToNode).toList(growable: false);
+      final worldSnapshot = _worldEngine.build(
+        pins: pins,
+        context: PerbugNodeGenerationContext(
+          anchorLat: viewport.centerLat,
+          anchorLng: viewport.centerLng,
+          playerLevel: state.progression.level,
+          maxNodes: 24,
+          minNodeSpacingMeters: 220,
+          maxLinkDistanceMeters: state.maxJumpMeters * 1.3,
+        ),
+        anchorArea: area,
+      );
+      final nodes = worldSnapshot.nodes;
       final start = state.currentNodeId == null ? nodes.first : nodes.firstWhere((n) => n.id == state.currentNodeId, orElse: () => nodes.first);
       state = state.copyWith(
         nodes: nodes,
@@ -48,6 +63,8 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         visitedNodeIds: {...state.visitedNodeIds, start.id},
         areaLabel: [area?.city, area?.region].whereType<String>().where((e) => e.isNotEmpty).join(', '),
         history: state.history.isEmpty ? ['Landed at ${start.label}'] : state.history,
+        connections: worldSnapshot.connections,
+        worldDebug: worldSnapshot.debug,
         loading: false,
       );
     } catch (error) {
@@ -59,6 +76,8 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     if (!move.isReachable) return false;
     final current = state.currentNode;
     if (current == null) return false;
+    final linked = state.connections[current.id]?.contains(move.node.id) == true;
+    if (!linked) return false;
 
     final spend = move.energyCost;
     final isFirstVisit = !state.visitedNodeIds.contains(move.node.id);
@@ -440,27 +459,6 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         timerSeconds: timerEnabled ? 45 : null,
       ),
     );
-  }
-
-  PerbugNode _mapPinToNode(MapPin pin) {
-    final nodeType = deriveNodeTypeFromPin(pin);
-    return PerbugNode(
-      id: pin.canonicalPlaceId,
-      label: pin.name,
-      latitude: pin.latitude,
-      longitude: pin.longitude,
-      region: pin.neighborhoodLabel,
-      nodeType: nodeType,
-      difficulty: _difficultyFor(pin),
-      state: deriveNodeStateFromPin(pin),
-      energyReward: pin.hasReviews ? 4 : 2,
-    );
-  }
-
-  int _difficultyFor(MapPin pin) {
-    final base = ((pin.rating * 2).round()).clamp(1, 5);
-    if (pin.hasCreatorMedia) return (base + 1).clamp(1, 6);
-    return base;
   }
 
   NodeEncounter _createEncounter(PerbugNode node) {

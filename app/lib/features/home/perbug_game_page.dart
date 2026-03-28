@@ -80,6 +80,10 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 ),
                 const SizedBox(height: 8),
                 Text('Current node: ${state.currentNode?.label ?? '—'} • Jump range ${(state.maxJumpMeters / 1000).toStringAsFixed(1)}km'),
+                if (state.currentNode != null)
+                  Text(
+                    '${state.currentNode!.neighborhood}, ${state.currentNode!.city}, ${state.currentNode!.region}, ${state.currentNode!.country}',
+                  ),
               ],
             ),
           ),
@@ -93,8 +97,8 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   (move) => ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(
-                      move.isReachable ? Icons.radio_button_checked : Icons.block,
-                      color: move.isReachable ? Colors.greenAccent : Colors.orangeAccent,
+                      _iconForNodeType(move.node.nodeType),
+                      color: move.isReachable ? _colorForNodeType(move.node.nodeType) : Colors.blueGrey,
                     ),
                     title: Text('${move.node.label} • ${move.node.nodeType.name}'),
                     subtitle: Text(
@@ -270,13 +274,45 @@ class _BoardPainter extends CustomPainter {
       final p = toPoint(node);
       final isCurrent = node.id == state.currentNodeId;
       final isVisited = state.visitedNodeIds.contains(node.id);
-      final fill = Paint()..color = isCurrent ? const Color(0xFFFFD166) : (isVisited ? const Color(0xFF4ECDC4) : const Color(0xFF8D99AE));
+      final isReachable = state.reachableMoves().any((move) => move.node.id == node.id && move.isReachable);
+      final fill = Paint()
+        ..color = isCurrent
+            ? const Color(0xFFFFD166)
+            : isReachable
+                ? _colorForNodeType(node.nodeType)
+                : (isVisited ? const Color(0xFF4ECDC4) : const Color(0xFF8D99AE));
       canvas.drawCircle(p, isCurrent ? 7 : 5, fill);
     }
   }
 
   @override
   bool shouldRepaint(covariant _BoardPainter oldDelegate) => oldDelegate.state != state;
+}
+
+IconData _iconForNodeType(PerbugNodeType type) {
+  return switch (type) {
+    PerbugNodeType.encounter => Icons.flash_on_rounded,
+    PerbugNodeType.resource => Icons.forest_rounded,
+    PerbugNodeType.mission => Icons.flag_circle_rounded,
+    PerbugNodeType.shop => Icons.storefront_rounded,
+    PerbugNodeType.rare => Icons.auto_awesome_rounded,
+    PerbugNodeType.boss => Icons.health_and_safety_rounded,
+    PerbugNodeType.rest => Icons.nightlight_round,
+    PerbugNodeType.event => Icons.celebration_rounded,
+  };
+}
+
+Color _colorForNodeType(PerbugNodeType type) {
+  return switch (type) {
+    PerbugNodeType.encounter => const Color(0xFF4E7DFF),
+    PerbugNodeType.resource => const Color(0xFF2EC27E),
+    PerbugNodeType.mission => const Color(0xFFFF9F1C),
+    PerbugNodeType.shop => const Color(0xFFB07CF7),
+    PerbugNodeType.rare => const Color(0xFFE76F51),
+    PerbugNodeType.boss => const Color(0xFFEF476F),
+    PerbugNodeType.rest => const Color(0xFF118AB2),
+    PerbugNodeType.event => const Color(0xFFF15BB5),
+  };
 }
 
 class _Section extends StatelessWidget {

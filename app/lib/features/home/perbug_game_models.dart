@@ -6,7 +6,7 @@ import 'map_discovery_models.dart';
 
 enum PerbugNodeState { available, completed, locked, exhausted, special, futureChallengeReady }
 
-enum PerbugNodeType { encounter, resource, mission, rest, rare, boss, event, support }
+enum PerbugNodeType { encounter, resource, mission, shop, rare, boss, rest, event }
 
 enum EncounterType { puzzle, tacticalSkirmish, timedEvent, resourceHarvest, bossBattle, missionChain }
 
@@ -135,43 +135,68 @@ class ProgressionState {
 class PerbugNode {
   const PerbugNode({
     required this.id,
+    required this.placeId,
     required this.label,
     required this.latitude,
     required this.longitude,
     required this.region,
+    required this.city,
+    required this.neighborhood,
+    required this.country,
     required this.nodeType,
     required this.difficulty,
     required this.state,
     required this.energyReward,
+    required this.movementCost,
+    required this.rarityScore,
+    required this.tags,
+    required this.metadata,
     this.distanceFromCurrentMeters,
   });
 
   final String id;
+  final String placeId;
   final String label;
   final double latitude;
   final double longitude;
   final String region;
+  final String city;
+  final String neighborhood;
+  final String country;
   final PerbugNodeType nodeType;
   final int difficulty;
   final PerbugNodeState state;
   final int energyReward;
+  final int movementCost;
+  final double rarityScore;
+  final Set<String> tags;
+  final Map<String, Object> metadata;
   final double? distanceFromCurrentMeters;
 
   PerbugNode copyWith({
     PerbugNodeState? state,
     double? distanceFromCurrentMeters,
     PerbugNodeType? nodeType,
+    int? movementCost,
   }) {
     return PerbugNode(
       id: id,
+      placeId: placeId,
       label: label,
       latitude: latitude,
       longitude: longitude,
       region: region,
+      city: city,
+      neighborhood: neighborhood,
+      country: country,
       nodeType: nodeType ?? this.nodeType,
       difficulty: difficulty,
       state: state ?? this.state,
       energyReward: energyReward,
+      movementCost: movementCost ?? this.movementCost,
+      rarityScore: rarityScore,
+      tags: tags,
+      metadata: metadata,
       distanceFromCurrentMeters: distanceFromCurrentMeters ?? this.distanceFromCurrentMeters,
     );
   }
@@ -289,6 +314,8 @@ class PerbugGameState {
     required this.puzzleProgressByNode,
     required this.puzzleSession,
     required this.puzzleTelemetry,
+    required this.connections,
+    required this.worldDebug,
     this.error,
   });
 
@@ -315,6 +342,8 @@ class PerbugGameState {
         puzzleProgressByNode: const {},
         puzzleSession: null,
         puzzleTelemetry: const [],
+        connections: const {},
+        worldDebug: const {},
       );
 
   final List<PerbugNode> nodes;
@@ -333,6 +362,8 @@ class PerbugGameState {
   final Map<String, PuzzleNodeProgress> puzzleProgressByNode;
   final GridPathPuzzleSessionState? puzzleSession;
   final List<Map<String, Object>> puzzleTelemetry;
+  final Map<String, Set<String>> connections;
+  final Map<String, Object> worldDebug;
   final String? error;
 
   PerbugNode? get currentNode {
@@ -366,6 +397,8 @@ class PerbugGameState {
     List<Map<String, Object>>? puzzleTelemetry,
     String? error,
     bool clearError = false,
+    Map<String, Set<String>>? connections,
+    Map<String, Object>? worldDebug,
   }) {
     return PerbugGameState(
       nodes: nodes ?? this.nodes,
@@ -384,6 +417,8 @@ class PerbugGameState {
       puzzleProgressByNode: puzzleProgressByNode ?? this.puzzleProgressByNode,
       puzzleSession: clearPuzzleSession ? null : (puzzleSession ?? this.puzzleSession),
       puzzleTelemetry: puzzleTelemetry ?? this.puzzleTelemetry,
+      connections: connections ?? this.connections,
+      worldDebug: worldDebug ?? this.worldDebug,
       error: clearError ? null : (error ?? this.error),
     );
   }
@@ -395,15 +430,18 @@ class PerbugGameState {
     final results = <PerbugMoveCandidate>[];
     for (final node in nodes) {
       if (node.id == current.id) continue;
+      final linked = connections[current.id]?.contains(node.id) == true;
       final distance = haversineMeters(current.latitude, current.longitude, node.latitude, node.longitude);
-      final energyCost = math.max(2, (distance / 450).round());
-      final inRange = distance <= maxJumpMeters;
+      final energyCost = math.max(node.movementCost, math.max(2, (distance / 450).round()));
+      final inRange = linked && distance <= maxJumpMeters;
       final hasEnergy = energy >= energyCost;
       final reachable = inRange && hasEnergy;
       final reason = reachable
           ? 'Reachable'
-          : !inRange
-              ? 'Out of range'
+          : !linked
+              ? 'No travel link'
+              : !inRange
+                  ? 'Out of range'
               : 'Not enough energy';
       results.add(
         PerbugMoveCandidate(
@@ -445,8 +483,10 @@ PerbugNodeState deriveNodeStateFromPin(MapPin pin) {
 PerbugNodeType deriveNodeTypeFromPin(MapPin pin) {
   final category = pin.category.toLowerCase();
   if (category.contains('park') || category.contains('trail')) return PerbugNodeType.resource;
-  if (category.contains('shop') || category.contains('store') || category.contains('market')) return PerbugNodeType.support;
+  if (category.contains('shop') || category.contains('store') || category.contains('market')) return PerbugNodeType.shop;
   if (pin.hasCreatorMedia) return PerbugNodeType.rare;
+  if (category.contains('hotel') || category.contains('hostel') || category.contains('lodging')) return PerbugNodeType.rest;
+  if (category.contains('event') || category.contains('festival')) return PerbugNodeType.event;
   if (pin.hasReviews) return PerbugNodeType.encounter;
   return PerbugNodeType.mission;
 }
