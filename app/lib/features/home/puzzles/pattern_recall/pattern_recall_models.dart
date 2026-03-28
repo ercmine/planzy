@@ -116,12 +116,7 @@ class PatternRecallSession {
   }
 }
 
-class PatternRecallStateView {
-  const PatternRecallStateView({
-    required this.activeStep,
-    required this.showDistraction,
-  });
-
-  final int? activeStep;
-  final int? showDistraction;
+extension PatternRecallPhaseX on PatternRecallPhase {
+  bool get isTerminal =>
+      this == PatternRecallPhase.success || this == PatternRecallPhase.failure || this == PatternRecallPhase.abandoned;
 }

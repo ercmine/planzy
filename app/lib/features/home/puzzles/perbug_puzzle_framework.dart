@@ -62,31 +62,6 @@ class PuzzleLifecycleEvent {
   final Map<String, Object> payload;
 }
 
-class PuzzleSession {
-  const PuzzleSession({
-    required this.type,
-    required this.nodeId,
-    required this.seed,
-    required this.startedAt,
-    required this.retries,
-    required this.events,
-    this.completedAt,
-  });
-
-  final PuzzleType type;
-  final String nodeId;
-  final String seed;
-  final DateTime startedAt;
-  final int retries;
-  final DateTime? completedAt;
-  final List<PuzzleLifecycleEvent> events;
-
-  Duration get elapsed {
-    final end = completedAt ?? DateTime.now().toUtc();
-    return end.difference(startedAt);
-  }
-}
-
 abstract class PuzzleInstance {
   PuzzleType get type;
 
