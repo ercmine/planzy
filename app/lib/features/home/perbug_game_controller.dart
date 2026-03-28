@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/location/location_controller.dart';
+import '../../providers/app_providers.dart';
 import '../puzzles/grid_path_puzzle.dart';
 import '../puzzles/puzzle_framework.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_tab.dart' show mapGeoClientProvider;
+import 'perbug_economy_models.dart';
 import 'perbug_game_models.dart';
+import 'perbug_economy_store.dart';
 import 'perbug_node_world_engine.dart';
 
 final perbugGameControllerProvider = StateNotifierProvider<PerbugGameController, PerbugGameState>((ref) {
@@ -24,12 +27,15 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
   final GridPathGenerator _gridPathGenerator;
   final PerbugNodeWorldEngine _worldEngine;
   Timer? _puzzleTimer;
+  PerbugEconomyStore? _economyStore;
+  bool _economyHydrated = false;
 
   static const MapViewport _fixedGameplayViewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
 
   Future<void> initialize() async {
     state = state.copyWith(loading: true, clearError: true);
     try {
+      await _hydrateEconomyState();
       final geoClient = await _ref.read(mapGeoClientProvider.future);
       final location = _ref.read(locationControllerProvider).effectiveLocation;
       final viewport = location == null
@@ -67,6 +73,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         worldDebug: worldSnapshot.debug,
         loading: false,
       );
+      await _persistEconomyState();
     } catch (error) {
       state = state.copyWith(loading: false, error: 'Unable to load Perbug world nodes: $error');
     }
@@ -114,6 +121,23 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     state = state.copyWith(activeEncounter: encounter);
   }
 
+  void debugSeedEconomy({
+    required Inventory inventory,
+    int? perbug,
+    int? level,
+  }) {
+    state = state.copyWith(
+      economy: state.economy.copyWith(inventory: inventory),
+      progression: ProgressionState(
+        level: level ?? state.progression.level,
+        xp: state.progression.xp,
+        perbug: perbug ?? state.progression.perbug,
+        inventory: state.progression.inventory,
+        upgradeCurrency: state.progression.upgradeCurrency,
+      ),
+    );
+  }
+
   NodeEncounter launchEncounter() {
     final current = state.currentNode;
     final encounter = state.activeEncounter;
@@ -139,6 +163,14 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     final resolvedStatus = succeeded ? EncounterStatus.resolved : EncounterStatus.failed;
     final payout = succeeded ? encounter.rewardBundle : const RewardBundle();
     final progression = state.progression.applyRewards(payout);
+    final nextEconomy = succeeded
+        ? _applyResourceGrant(
+            base: state.economy,
+            grant: payout.resources,
+            source: ResourceSource.nodeEncounter,
+            metadata: {'encounter_type': encounter.type.name, 'node_id': encounter.nodeId},
+          )
+        : state.economy;
     final nextSquad = succeeded
         ? state.squad.applyUnitXpToActive(payout.unitXp).unlockUnits(payout.unitUnlocks)
         : state.squad;
@@ -147,7 +179,19 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       activeEncounter: encounter.copyWith(status: resolvedStatus),
       progression: progression,
       squad: nextSquad,
+      economy: nextEconomy,
       energy: (state.energy + payout.energy).clamp(0, state.maxEnergy),
+      economyTelemetry: [
+        if (succeeded)
+          {
+            'event': 'reward_applied',
+            'source': ResourceSource.nodeEncounter.name,
+            'perbug_earned': payout.perbug,
+            'resource_count': payout.resources.values.fold<int>(0, (sum, value) => sum + value),
+            'at': DateTime.now().toIso8601String(),
+          },
+        ...state.economyTelemetry,
+      ],
       history: [
         succeeded
             ? 'Resolved ${encounter.type.name} (+${payout.xp} XP, +${payout.perbug} Perbug, +${payout.unitXp} squad XP)'
@@ -155,6 +199,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         ...state.history,
       ],
     );
+    unawaited(_persistEconomyState());
   }
 
   void claimPassiveEnergy() {
@@ -184,8 +229,11 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       return;
     }
 
-    if (state.progression.upgradeCurrency < upgrade.currencyCost) {
-      state = state.copyWith(history: ['Need ${upgrade.currencyCost} upgrade currency for ${upgrade.title}.', ...state.history]);
+    final modules = state.economy.inventory.quantityOf('upgrade_module');
+    if (state.progression.upgradeCurrency < upgrade.currencyCost || modules < 1) {
+      state = state.copyWith(
+        history: ['Need ${upgrade.currencyCost} upgrade currency and 1 upgrade module for ${upgrade.title}.', ...state.history],
+      );
       return;
     }
 
@@ -209,8 +257,105 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         inventory: state.progression.inventory,
         upgradeCurrency: state.progression.upgradeCurrency - upgrade.currencyCost,
       ),
+      economy: state.economy.copyWith(inventory: state.economy.inventory.remove(const ResourceStack(resourceId: 'upgrade_module', amount: 1))),
       history: ['Unlocked ${upgrade.title} on ${primary.name}.', ...state.history],
     );
+    unawaited(_persistEconomyState());
+  }
+
+  void craftRecipe(String recipeId) {
+    CraftingRecipe? recipe;
+    for (final entry in perbugCraftingRecipes) {
+      if (entry.id == recipeId) {
+        recipe = entry;
+        break;
+      }
+    }
+    if (recipe == null) return;
+    if (state.progression.level < recipe.unlockLevel) {
+      _appendCraftFailure(recipeId, 'Recipe unlock level ${recipe.unlockLevel} not reached');
+      return;
+    }
+    if (state.progression.perbug < recipe.perbugCost) {
+      _appendCraftFailure(recipeId, 'Not enough Perbug');
+      return;
+    }
+    if (state.energy < recipe.energyCost) {
+      _appendCraftFailure(recipeId, 'Not enough energy');
+      return;
+    }
+    final costs = recipe.inputs.map((input) => input.toStack()).toList(growable: false);
+    if (!state.economy.inventory.canAfford(costs)) {
+      _appendCraftFailure(recipeId, 'Missing ingredients');
+      return;
+    }
+
+    var nextInventory = state.economy.inventory;
+    for (final input in recipe.inputs) {
+      nextInventory = nextInventory.remove(input.toStack());
+    }
+    for (final output in recipe.outputs) {
+      nextInventory = nextInventory.add(output.toStack());
+    }
+    final nextEconomy = state.economy.copyWith(
+      inventory: nextInventory,
+      sessions: [
+        CraftingSession(recipeId: recipe.id, createdAt: DateTime.now().toUtc(), succeeded: true, error: null),
+        ...state.economy.sessions,
+      ],
+    );
+    state = state.copyWith(
+      economy: nextEconomy,
+      progression: ProgressionState(
+        level: state.progression.level,
+        xp: state.progression.xp,
+        perbug: state.progression.perbug - recipe.perbugCost,
+        inventory: state.progression.inventory,
+        upgradeCurrency: state.progression.upgradeCurrency,
+      ),
+      energy: (state.energy - recipe.energyCost).clamp(0, state.maxEnergy),
+      economyTelemetry: [
+        {
+          'event': 'craft_success',
+          'recipe_id': recipe.id,
+          'perbug_spend': recipe.perbugCost,
+          'energy_spend': recipe.energyCost,
+          'at': DateTime.now().toIso8601String(),
+        },
+        ...state.economyTelemetry,
+      ],
+      history: ['Crafted ${recipe.label} (-${recipe.perbugCost} Perbug).', ...state.history],
+    );
+    unawaited(_persistEconomyState());
+  }
+
+  void useCraftedItem(String resourceId) {
+    final current = state.economy.inventory.quantityOf(resourceId);
+    if (current < 1) return;
+    if (resourceId == 'field_kit') {
+      state = state.copyWith(
+        economy: state.economy.copyWith(
+          inventory: state.economy.inventory.remove(const ResourceStack(resourceId: 'field_kit', amount: 1)),
+        ),
+        energy: (state.energy + 6).clamp(0, state.maxEnergy),
+        history: ['Used Field Kit (+6 energy).', ...state.history],
+      );
+    } else if (resourceId == 'upgrade_module') {
+      state = state.copyWith(
+        economy: state.economy.copyWith(
+          inventory: state.economy.inventory.remove(const ResourceStack(resourceId: 'upgrade_module', amount: 1)),
+        ),
+        progression: ProgressionState(
+          level: state.progression.level,
+          xp: state.progression.xp,
+          perbug: state.progression.perbug,
+          inventory: state.progression.inventory,
+          upgradeCurrency: state.progression.upgradeCurrency + 4,
+        ),
+        history: ['Applied Upgrade Module (+4 upgrade currency).', ...state.history],
+      );
+    }
+    unawaited(_persistEconomyState());
   }
 
 
@@ -529,11 +674,12 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       difficultyTier: 'Tier ${node.difficulty}',
       rewardBundle: RewardBundle(
         xp: 12 + (node.difficulty * 3),
-        perbug: node.nodeType == PerbugNodeType.rare ? 3 : 1,
-        resources: {
-          if (node.nodeType == PerbugNodeType.resource) 'bio_dust': 2 + node.difficulty,
-          if (node.nodeType != PerbugNodeType.resource) 'signal_shard': 1 + (node.difficulty ~/ 2),
+        perbug: switch (node.nodeType) {
+          PerbugNodeType.rare => 4,
+          PerbugNodeType.boss => 5,
+          _ => 1,
         },
+        resources: _resourceRewardsForNode(node),
         energy: node.nodeType == PerbugNodeType.rest ? 4 : 1,
         unitXp: 18 + (node.difficulty * 5),
         upgradeCurrency: node.nodeType == PerbugNodeType.boss ? 8 : 3,
@@ -551,5 +697,80 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
   void dispose() {
     _puzzleTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _hydrateEconomyState() async {
+    if (_economyHydrated) return;
+    final prefs = await _ref.read(sharedPreferencesProvider.future);
+    _economyStore ??= PerbugEconomyStore(prefs);
+    final loaded = _economyStore!.load();
+    state = state.copyWith(economy: loaded);
+    _economyHydrated = true;
+  }
+
+  Future<void> _persistEconomyState() async {
+    final store = _economyStore;
+    if (store == null) return;
+    await store.save(state.economy);
+  }
+
+  PerbugEconomyState _applyResourceGrant({
+    required PerbugEconomyState base,
+    required Map<String, int> grant,
+    required ResourceSource source,
+    required Map<String, Object> metadata,
+  }) {
+    var nextInventory = base.inventory;
+    for (final entry in grant.entries) {
+      if (entry.value <= 0) continue;
+      nextInventory = nextInventory.add(ResourceStack(resourceId: entry.key, amount: entry.value));
+    }
+    return base.copyWith(
+      inventory: nextInventory,
+      sourceLedger: [
+        {'source': source.name, 'grant': grant, 'at': DateTime.now().toIso8601String(), ...metadata},
+        ...base.sourceLedger,
+      ],
+    );
+  }
+
+  void _appendCraftFailure(String recipeId, String reason) {
+    state = state.copyWith(
+      economy: state.economy.copyWith(
+        sessions: [
+          CraftingSession(recipeId: recipeId, createdAt: DateTime.now().toUtc(), succeeded: false, error: reason),
+          ...state.economy.sessions,
+        ],
+      ),
+      history: ['Craft failed for $recipeId: $reason', ...state.history],
+    );
+  }
+
+  Map<String, int> _resourceRewardsForNode(PerbugNode node) {
+    return switch (node.nodeType) {
+      PerbugNodeType.resource => {
+          'ore': 2 + node.difficulty,
+          'scrap': 1 + (node.difficulty ~/ 2),
+          'bio_matter': 1,
+        },
+      PerbugNodeType.boss => {
+          'relic_shard': 2,
+          'crystal': 2 + node.difficulty,
+          'fuel_cell': 1,
+        },
+      PerbugNodeType.rare => {
+          'crystal': 2 + node.difficulty,
+          'circuit': 1 + (node.difficulty ~/ 2),
+        },
+      PerbugNodeType.mission => {
+          'ore': 1 + node.difficulty,
+          'circuit': 1,
+          'signal_shard': 1,
+        },
+      _ => {
+          'signal_shard': 1 + (node.difficulty ~/ 2),
+          'scrap': 1,
+        },
+    };
   }
 }

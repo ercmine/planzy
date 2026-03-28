@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/widgets.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';
+import 'perbug_economy_models.dart';
 import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
 
@@ -55,6 +56,15 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 const SizedBox(height: 8),
                 Text('Level ${state.progression.level} • XP ${state.progression.xp} • Perbug ${state.progression.perbug}'),
                 Text('Upgrade Currency ${state.progression.upgradeCurrency} • Squad power ${state.squad.equippedPower} • Slots ${state.squad.maxSlots}'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final strategic in ['ore', 'scrap', 'circuit', 'relic_shard', 'field_kit', 'upgrade_module'])
+                      AppPill(label: '${perbugResourceDefinitions[strategic]?.label ?? strategic}: ${state.economy.inventory.quantityOf(strategic)}'),
+                  ],
+                ),
               ],
             ),
           ),
@@ -230,6 +240,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             subtitle: 'Rewards feed progression, inventory, and unit upgrades.',
             children: [
               Text('Inventory: ${state.progression.inventory.entries.map((e) => '${e.key}:${e.value}').join(' • ')}'),
+              Text('Economy Inventory: ${state.economy.inventory.stacks.entries.map((e) => '${e.key}:${e.value}').join(' • ')}'),
               Text('Encounter ready: ${state.squad.isEncounterReady ? 'yes' : 'no'} • Role coverage ${state.squad.summarizePower().roleCoverage.entries.map((e) => '${e.key.name}:${e.value}').join(', ')}'),
               const SizedBox(height: 8),
               Wrap(
@@ -239,6 +250,51 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                     onPressed: controller.upgradePrimaryUnit,
                     icon: const Icon(Icons.upgrade),
                     label: const Text('Unlock next primary upgrade'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          _Section(
+            title: 'Loop step 6: Crafting and strategic Perbug spend',
+            subtitle: 'Crafting consumes resources + Perbug and outputs progression items or consumables.',
+            children: [
+              ...perbugCraftingRecipes.map(
+                (recipe) {
+                  final hasUnlock = state.progression.level >= recipe.unlockLevel;
+                  final canAffordIngredients = state.economy.inventory.canAfford(recipe.inputs.map((e) => e.toStack()).toList(growable: false));
+                  final canAfford = hasUnlock && canAffordIngredients && state.progression.perbug >= recipe.perbugCost && state.energy >= recipe.energyCost;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${recipe.label} (${recipe.category.name})'),
+                    subtitle: Text(
+                      'Inputs: ${recipe.inputs.map((i) => '${i.resourceId}x${i.amount}').join(', ')} • '
+                      'Perbug ${recipe.perbugCost} • Energy ${recipe.energyCost} • '
+                      '${hasUnlock ? 'Unlocked' : 'Unlocks at L${recipe.unlockLevel}'}',
+                    ),
+                    trailing: FilledButton(
+                      onPressed: canAfford ? () => controller.craftRecipe(recipe.id) : null,
+                      child: const Text('Craft'),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.tonalIcon(
+                    onPressed: state.economy.inventory.quantityOf('field_kit') > 0 ? () => controller.useCraftedItem('field_kit') : null,
+                    icon: const Icon(Icons.battery_charging_full),
+                    label: const Text('Use Field Kit'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: state.economy.inventory.quantityOf('upgrade_module') > 0
+                        ? () => controller.useCraftedItem('upgrade_module')
+                        : null,
+                    icon: const Icon(Icons.precision_manufacturing),
+                    label: const Text('Apply Upgrade Module'),
                   ),
                 ],
               ),

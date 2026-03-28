@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../puzzles/grid_path_puzzle.dart';
 import '../puzzles/puzzle_framework.dart';
 import 'map_discovery_models.dart';
+import 'perbug_economy_models.dart';
 
 enum PerbugNodeState { available, completed, locked, exhausted, special, futureChallengeReady }
 
@@ -815,6 +816,8 @@ class PerbugGameState {
     required this.puzzleTelemetry,
     required this.connections,
     required this.worldDebug,
+    required this.economy,
+    required this.economyTelemetry,
     this.error,
   });
 
@@ -837,6 +840,8 @@ class PerbugGameState {
         puzzleTelemetry: const [],
         connections: const {},
         worldDebug: const {},
+        economy: PerbugEconomyState.initial(),
+        economyTelemetry: const [],
       );
 
   final List<PerbugNode> nodes;
@@ -857,6 +862,8 @@ class PerbugGameState {
   final List<Map<String, Object>> puzzleTelemetry;
   final Map<String, Set<String>> connections;
   final Map<String, Object> worldDebug;
+  final PerbugEconomyState economy;
+  final List<Map<String, Object>> economyTelemetry;
   final String? error;
 
   PerbugNode? get currentNode {
@@ -892,6 +899,8 @@ class PerbugGameState {
     bool clearError = false,
     Map<String, Set<String>>? connections,
     Map<String, Object>? worldDebug,
+    PerbugEconomyState? economy,
+    List<Map<String, Object>>? economyTelemetry,
   }) {
     return PerbugGameState(
       nodes: nodes ?? this.nodes,
@@ -912,6 +921,8 @@ class PerbugGameState {
       puzzleTelemetry: puzzleTelemetry ?? this.puzzleTelemetry,
       connections: connections ?? this.connections,
       worldDebug: worldDebug ?? this.worldDebug,
+      economy: economy ?? this.economy,
+      economyTelemetry: economyTelemetry ?? this.economyTelemetry,
       error: clearError ? null : (error ?? this.error),
     );
   }
