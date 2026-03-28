@@ -55,7 +55,7 @@ class _DryadAppState extends ConsumerState<DryadApp> {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Dryad',
+      title: 'Perbug',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

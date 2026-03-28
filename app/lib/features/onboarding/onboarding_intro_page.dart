@@ -50,7 +50,7 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
         Text('Welcome to Perbug', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
         const SizedBox(height: AppSpacing.s),
         const Text(
-          'Perbug is a real-world exploration game. You hop between real location nodes, spend energy, and progress across regions.',
+          'Perbug is a map-native strategy RPG. You move between nearby real-world nodes, resolve encounters, earn rewards, and push outward.',
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.m),
@@ -68,8 +68,8 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
         const SizedBox(height: AppSpacing.s),
         const PermissionInfoCard(
           icon: Icons.extension,
-          title: 'Puzzle-ready nodes',
-          description: 'Challenges and puzzles plug into node states later without changing your progression map.',
+          title: 'Encounter-ready nodes',
+          description: 'Every node can launch encounters (puzzle, battle, harvest, missions) without changing the world-map loop.',
         ),
         const SizedBox(height: AppSpacing.m),
         PrimaryButton(label: 'Start expedition', onPressed: () => setState(() => _step = _OnboardingStep.location)),
@@ -107,7 +107,7 @@ class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
         ],
         const SizedBox(height: AppSpacing.m),
         PrimaryButton(
-          label: 'Enter Perbug world',
+          label: 'Start first mission',
           isLoading: busy,
           onPressed: busy ? null : () => ref.read(onboardingControllerProvider.notifier).completeOnboarding(),
         ),

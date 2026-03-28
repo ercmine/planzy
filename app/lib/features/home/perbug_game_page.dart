@@ -27,7 +27,6 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     final state = ref.watch(perbugGameControllerProvider);
     final controller = ref.read(perbugGameControllerProvider.notifier);
     final moves = state.reachableMoves().take(8).toList(growable: false);
-    final currentProgress = state.currentNode == null ? null : state.puzzleProgressByNode[state.currentNode!.id];
 
     return RefreshIndicator(
       onRefresh: controller.initialize,
@@ -35,21 +34,27 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
-          const PremiumHeader(
-            title: 'Perbug World Board',
-            subtitle: 'Jump between real-world nodes, spend energy, and solve node puzzles.',
-            badge: AppPill(label: 'Grid Path live', icon: Icons.extension_rounded),
+          PremiumHeader(
+            title: 'Perbug Strategy Map',
+            subtitle: 'Move node-to-node, resolve encounters, and push outward from ${state.areaLabel ?? 'your anchor region'}.',
+            badge: const AppPill(label: 'Fixed zoom 2D', icon: Icons.map_outlined),
           ),
           const SizedBox(height: 12),
           AppCard(
             tone: AppCardTone.featured,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _EnergyMeter(current: state.energy, max: state.maxEnergy),
+                Row(
+                  children: [
+                    Expanded(child: _EnergyMeter(current: state.energy, max: state.maxEnergy)),
+                    const SizedBox(width: 8),
+                    SecondaryButton(label: '+Energy', onPressed: controller.claimPassiveEnergy),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                SecondaryButton(label: '+Energy', onPressed: controller.claimPassiveEnergy),
+                const SizedBox(height: 8),
+                Text('Level ${state.progression.level} • XP ${state.progression.xp} • Perbug ${state.progression.perbug}'),
+                Text('Squad power ${state.squad.equippedPower} • Slots ${state.squad.maxSlots}'),
               ],
             ),
           ),
@@ -58,7 +63,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('World board (fixed zoom)', style: Theme.of(context).textTheme.titleMedium),
+                Text('World board (zoom locked @ ${state.fixedZoom.toStringAsFixed(0)})', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 240,
@@ -78,36 +83,11 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
           if (state.loading) const AppCard(child: LinearProgressIndicator()),
           if (state.error != null) AppCard(child: Text(state.error!)),
           _Section(
-            title: 'Node puzzle: Perbug Grid Path',
-            subtitle: 'Deterministic from node latitude/longitude with tunable difficulty knobs.',
-            children: [
-              if (state.currentNode != null)
-                Text('Current node seed: ${state.currentNode!.latitude.toStringAsFixed(4)}, ${state.currentNode!.longitude.toStringAsFixed(4)}'),
-              if (currentProgress != null)
-                Text(
-                  'Progress • completed: ${currentProgress.completed} • attempts: ${currentProgress.attemptCount} '
-                  '• best: ${currentProgress.bestDuration?.inSeconds ?? '-'}s',
-                ),
-              const SizedBox(height: 8),
-              FilledButton.icon(
-                onPressed: state.currentNode == null
-                    ? null
-                    : () {
-                        controller.launchPuzzleForCurrentNode();
-                        _openPuzzleSheet(context);
-                      },
-                icon: const Icon(Icons.grid_4x4_rounded),
-                label: const Text('Open Grid Path puzzle'),
-              ),
-            ],
-          ),
-          _Section(
-            title: 'Reachable jumps',
-            subtitle: 'Movement is restricted by distance and energy. No unrestricted teleporting.',
+            title: 'Loop step 1-2: Move on nearby nodes',
+            subtitle: 'No free teleporting. Reachability is based on real distance and energy.',
             children: moves
                 .map(
                   (move) => ListTile(
@@ -116,7 +96,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                       move.isReachable ? Icons.radio_button_checked : Icons.block,
                       color: move.isReachable ? Colors.greenAccent : Colors.orangeAccent,
                     ),
-                    title: Text(move.node.label),
+                    title: Text('${move.node.label} • ${move.node.nodeType.name}'),
                     subtitle: Text(
                       '${move.node.region} • ${((move.node.distanceFromCurrentMeters ?? 0) / 1000).toStringAsFixed(2)}km • ${move.reason}',
                     ),
@@ -124,19 +104,77 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                       onPressed: move.isReachable
                           ? () async {
                               final ok = await controller.jumpTo(move);
-                              if (!context.mounted) return;
-                              if (ok) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Jumped to ${move.node.label}')),
-                                );
-                              }
+                              if (!context.mounted || !ok) return;
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Moved to ${move.node.label}')));
                             }
                           : null,
-                      child: Text('Jump (${move.energyCost})'),
+                      child: Text('Move (${move.energyCost})'),
                     ),
                   ),
                 )
                 .toList(growable: false),
+          ),
+          _Section(
+            title: 'Loop step 3-4: Resolve encounter and reward',
+            subtitle: 'Encounters are scaffolded for puzzle, tactical, timed, harvest, and boss modules.',
+            children: [
+              if (state.activeEncounter != null)
+                Text('Active encounter: ${state.activeEncounter!.type.name} • ${state.activeEncounter!.difficultyTier}'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.icon(
+                    onPressed: state.currentNode == null
+                        ? null
+                        : () {
+                            controller.launchEncounter();
+                            controller.resolveEncounter(succeeded: true);
+                          },
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Resolve success'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: state.currentNode == null
+                        ? null
+                        : () {
+                            controller.launchEncounter();
+                            controller.resolveEncounter(succeeded: false);
+                          },
+                    icon: const Icon(Icons.replay_circle_filled_outlined),
+                    label: const Text('Resolve fail'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: state.currentNode == null
+                        ? null
+                        : () {
+                            controller.launchPuzzleForCurrentNode();
+                            _openPuzzleSheet(context);
+                          },
+                    icon: const Icon(Icons.grid_4x4_rounded),
+                    label: const Text('Puzzle encounter'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          _Section(
+            title: 'Loop step 5: Progress squad + resources',
+            subtitle: 'Rewards feed progression, inventory, and unit upgrades.',
+            children: [
+              Text('Inventory: ${state.progression.inventory.entries.map((e) => '${e.key}:${e.value}').join(' • ')}'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  FilledButton.icon(
+                    onPressed: controller.upgradePrimaryUnit,
+                    icon: const Icon(Icons.upgrade),
+                    label: const Text('Upgrade primary unit (-5 Perbug)'),
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),
@@ -223,8 +261,8 @@ class _BoardPainter extends CustomPainter {
       final linePaint = Paint()
         ..color = const Color(0xFF4E7DFF).withOpacity(0.38)
         ..strokeWidth = 1.4;
-      for (final move in state.reachableMoves().where((m) => m.isReachable).take(10)) {
-        canvas.drawLine(currentPoint, toPoint(move.node), linePaint);
+      for (final move in state.reachableMoves().take(14)) {
+        canvas.drawLine(currentPoint, toPoint(move.node), linePaint..color = move.isReachable ? const Color(0xFF4E7DFF).withOpacity(0.38) : const Color(0xFF8D99AE).withOpacity(0.2));
       }
     }
 

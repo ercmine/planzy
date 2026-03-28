@@ -105,6 +105,7 @@ import { createViewerEngagementRewardsHttpHandlers } from "../viewerEngagementRe
 import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
 import { createDryadMarketplaceHttpHandlers } from "../dryad/http.js";
 import type { DryadMarketplaceService } from "../dryad/service.js";
+import type { createPerbugWorldHttpHandlers } from "../perbugWorld/http.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -207,6 +208,7 @@ export function createRoutes(
     viewerEngagementRewardsService?: ViewerEngagementRewardsService;
     dryadMarketplaceService?: DryadMarketplaceService;
     reviewEligibilityService?: ReviewEligibilityService;
+    perbugWorldHandlers?: ReturnType<typeof createPerbugWorldHttpHandlers>;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -257,6 +259,7 @@ export function createRoutes(
   const economyHandlers = deps?.dryadEconomyService ? createDryadEconomyHttpHandlers(deps.dryadEconomyService) : null;
   const viewerRewardsHandlers = deps?.viewerEngagementRewardsService ? createViewerEngagementRewardsHttpHandlers(deps.viewerEngagementRewardsService) : null;
   const dryadMarketplaceHandlers = deps?.dryadMarketplaceService ? createDryadMarketplaceHttpHandlers(deps.dryadMarketplaceService) : null;
+  const perbugWorldHandlers = deps?.perbugWorldHandlers ?? null;
   const placeAutocompleteCache = new Map<string, { expiresAt: number; payload: Record<string, unknown> }>();
 
   const adminHandlers = deps?.accountsService && deps?.moderationService
@@ -291,6 +294,22 @@ export function createRoutes(
 
 
 
+
+
+      if (req.method === "GET" && normalizedPath === "/v1/perbug/world/bootstrap" && perbugWorldHandlers) {
+        await perbugWorldHandlers.bootstrap(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/perbug/world/move" && perbugWorldHandlers) {
+        await perbugWorldHandlers.move(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/resolve" && perbugWorldHandlers) {
+        await perbugWorldHandlers.resolveEncounter(req, res);
+        return;
+      }
 
       if (req.method === "GET" && normalizedPath === "/v1/competition/home" && competitionHandlers) {
         await competitionHandlers.home(req, res);
