@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../puzzles/grid_path_puzzle.dart';
 import '../puzzles/puzzle_framework.dart';
 import 'map_discovery_models.dart';
+import 'perbug_asset_models.dart';
 import 'perbug_economy_models.dart';
 
 enum PerbugNodeState { available, completed, locked, exhausted, special, futureChallengeReady }
@@ -19,7 +20,23 @@ enum UnitClass { mech, bio, arcane, rogue, drone, sentinel, tactician }
 
 enum UnitRarity { common, uncommon, rare, epic, legendary }
 
-enum UnitOwnershipSource { starter, earned, crafted, rewarded, event, nftBacked, promoted }
+enum UnitOwnershipSource { starter, earned, crafted, rewarded, event, premium, nftBacked, importedNft, chainMinted, marketplaceAcquired, promoted }
+
+extension UnitOwnershipSourceX on UnitOwnershipSource {
+  OwnershipSource toOwnershipSource() => switch (this) {
+        UnitOwnershipSource.starter => OwnershipSource.starter,
+        UnitOwnershipSource.earned => OwnershipSource.earned,
+        UnitOwnershipSource.crafted => OwnershipSource.crafted,
+        UnitOwnershipSource.rewarded => OwnershipSource.rewarded,
+        UnitOwnershipSource.event => OwnershipSource.event,
+        UnitOwnershipSource.premium => OwnershipSource.premium,
+        UnitOwnershipSource.importedNft => OwnershipSource.importedNft,
+        UnitOwnershipSource.chainMinted => OwnershipSource.chainMinted,
+        UnitOwnershipSource.marketplaceAcquired => OwnershipSource.marketplaceAcquired,
+        UnitOwnershipSource.nftBacked => OwnershipSource.chainMinted,
+        UnitOwnershipSource.promoted => OwnershipSource.earned,
+      };
+}
 
 class NodeEncounter {
   const NodeEncounter({
@@ -250,6 +267,8 @@ class PerbugUnit {
     required this.upgradePath,
     this.cosmetics = const UnitCosmetics(),
     this.nftLink,
+    this.assetIdentity,
+    this.assetProvenance,
   });
 
   final String id;
@@ -265,6 +284,30 @@ class PerbugUnit {
   final List<UnitUpgradeNode> upgradePath;
   final UnitCosmetics cosmetics;
   final UnitNftLink? nftLink;
+  final AssetIdentity? assetIdentity;
+  final AssetProvenance? assetProvenance;
+
+  AssetIdentity get resolvedAssetIdentity => assetIdentity ?? AssetIdentity(
+        assetClass: AssetClass.character,
+        templateId: templateId,
+        instanceId: id,
+        variantId: cosmetics.variant,
+        stackBehavior: StackBehavior.uniquePerInstance,
+      );
+
+  AssetProvenance get resolvedProvenance => assetProvenance ?? AssetProvenance(
+        source: ownershipSource.toOwnershipSource(),
+        note: nftLink?.provenance,
+        externalReference: nftLink == null
+            ? null
+            : ExternalAssetReference(
+                chain: nftLink!.chain,
+                contractAddress: nftLink!.contract,
+                tokenId: nftLink!.tokenId,
+              ),
+      );
+
+  bool get isChainBacked => resolvedProvenance.isChainBacked;
 
   double get _rarityModifier => switch (rarity) {
         UnitRarity.common => 1.0,
@@ -295,7 +338,16 @@ class PerbugUnit {
 
   int get power => effectiveStats.powerScore.round();
 
-  PerbugUnit copyWith({UnitProgression? progression, UnitCosmetics? cosmetics, UnitNftLink? nftLink, bool clearNftLink = false}) {
+  PerbugUnit copyWith({
+    UnitProgression? progression,
+    UnitCosmetics? cosmetics,
+    UnitNftLink? nftLink,
+    AssetIdentity? assetIdentity,
+    AssetProvenance? assetProvenance,
+    bool clearNftLink = false,
+    bool clearAssetIdentity = false,
+    bool clearAssetProvenance = false,
+  }) {
     return PerbugUnit(
       id: id,
       templateId: templateId,
@@ -310,6 +362,8 @@ class PerbugUnit {
       upgradePath: upgradePath,
       cosmetics: cosmetics ?? this.cosmetics,
       nftLink: clearNftLink ? null : (nftLink ?? this.nftLink),
+      assetIdentity: clearAssetIdentity ? null : (assetIdentity ?? this.assetIdentity),
+      assetProvenance: clearAssetProvenance ? null : (assetProvenance ?? this.assetProvenance),
     );
   }
 }

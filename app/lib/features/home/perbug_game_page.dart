@@ -63,6 +63,11 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   children: [
                     for (final strategic in ['ore', 'scrap', 'circuit', 'relic_shard', 'field_kit', 'upgrade_module'])
                       AppPill(label: '${perbugResourceDefinitions[strategic]?.label ?? strategic}: ${state.economy.inventory.quantityOf(strategic)}'),
+                    AppPill(label: 'Owned assets: ${state.economy.ownedAssets.entries.length}', icon: Icons.inventory_2_outlined),
+                    AppPill(
+                      label: state.economy.walletLink.isConnected ? 'Wallet linked' : 'Wallet optional',
+                      icon: state.economy.walletLink.isConnected ? Icons.link : Icons.link_off,
+                    ),
                   ],
                 ),
               ],
@@ -151,14 +156,42 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                       leading: CircleAvatar(child: Text(unit.rarity.name.substring(0, 1).toUpperCase())),
                       title: Text('${unit.name} • ${unit.role.name}/${unit.unitClass.name}'),
                       subtitle: Text(
-                        'Lv ${unit.progression.level} • ${unit.rarity.name} • ${unit.ownershipSource.name} • Power ${unit.power}',
+                        'Lv ${unit.progression.level} • ${unit.rarity.name} • ${unit.resolvedProvenance.source.name} • Power ${unit.power}',
                       ),
-                      trailing: unit.nftLink == null
-                          ? const Text('Off-chain')
-                          : const Icon(Icons.verified, color: Colors.amber),
+                      trailing: unit.isChainBacked
+                          ? const Icon(Icons.verified, color: Colors.amber)
+                          : const Text('Core'),
                     ),
                   )
                   .toList(growable: false),
+            ],
+          ),
+          _Section(
+            title: 'Collectibles + provenance inventory',
+            subtitle: 'Chain-backed assets are optional and coexist with normal progression assets.',
+            children: [
+              if (state.economy.ownedAssets.entries.isEmpty)
+                const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('No optional collectible assets yet'),
+                  subtitle: Text('Core inventory, squad progression, and encounters remain fully playable without wallet linkage.'),
+                ),
+              ...state.economy.ownedAssets.entries.map(
+                (asset) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(child: Text(asset.identity.assetClass.name.substring(0, 1).toUpperCase())),
+                  title: Text('${asset.name} • ${asset.identity.assetClass.name}'),
+                  subtitle: Text(
+                    '${asset.provenance.source.name} • Qty ${asset.quantity} • ${asset.isNftBacked ? 'Chain-backed' : 'Game-native'}',
+                  ),
+                  trailing: asset.isNftBacked ? const Icon(Icons.token_outlined) : const Icon(Icons.videogame_asset_outlined),
+                ),
+              ),
+              if (!state.economy.walletLink.isConnected)
+                const AppCard(
+                  tone: AppCardTone.muted,
+                  child: Text('Wallet is not connected. NFT import/sync remains optional and does not block gameplay loops.'),
+                ),
             ],
           ),
 
