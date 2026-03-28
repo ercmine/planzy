@@ -54,7 +54,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 ),
                 const SizedBox(height: 8),
                 Text('Level ${state.progression.level} • XP ${state.progression.xp} • Perbug ${state.progression.perbug}'),
-                Text('Squad power ${state.squad.equippedPower} • Slots ${state.squad.maxSlots}'),
+                Text('Upgrade Currency ${state.progression.upgradeCurrency} • Squad power ${state.squad.equippedPower} • Slots ${state.squad.maxSlots}'),
               ],
             ),
           ),
@@ -89,6 +89,69 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
           ),
           if (state.loading) const AppCard(child: LinearProgressIndicator()),
           if (state.error != null) AppCard(child: Text(state.error!)),
+
+          _Section(
+            title: 'Squad command: active loadout',
+            subtitle: 'Manage active units used in node encounters. Roster is larger than active slots.',
+            children: [
+              ...List.generate(state.squad.activeSquad.maxSlots, (slotIndex) {
+                final assignedId = state.squad.activeSquad.unitIdsBySlot[slotIndex];
+                final assigned = assignedId == null
+                    ? null
+                    : state.squad.roster.firstWhere((u) => u.id == assignedId, orElse: () => state.squad.roster.first);
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Slot ${slotIndex + 1}'),
+                        if (assigned != null)
+                          Text('${assigned.name} • ${assigned.role.name}/${assigned.unitClass.name} • L${assigned.progression.level}')
+                        else
+                          const Text('Unassigned'),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            for (final unit in state.squad.roster)
+                              ChoiceChip(
+                                label: Text(unit.name),
+                                selected: assignedId == unit.id,
+                                onSelected: (_) => controller.assignUnitToSlot(unitId: unit.id, slotIndex: slotIndex),
+                              ),
+                            TextButton(onPressed: () => controller.clearSquadSlot(slotIndex), child: const Text('Clear')),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+          _Section(
+            title: 'Roster vault',
+            subtitle: 'Collectible unit identity with rarity, role, class, and progression.',
+            children: [
+              ...state.squad.roster
+                  .map(
+                    (unit) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(child: Text(unit.rarity.name.substring(0, 1).toUpperCase())),
+                      title: Text('${unit.name} • ${unit.role.name}/${unit.unitClass.name}'),
+                      subtitle: Text(
+                        'Lv ${unit.progression.level} • ${unit.rarity.name} • ${unit.ownershipSource.name} • Power ${unit.power}',
+                      ),
+                      trailing: unit.nftLink == null
+                          ? const Text('Off-chain')
+                          : const Icon(Icons.verified, color: Colors.amber),
+                    ),
+                  )
+                  .toList(growable: false),
+            ],
+          ),
+
           _Section(
             title: 'Loop step 1-2: Move on nearby nodes',
             subtitle: 'No free teleporting. Reachability is based on real distance and energy.',
@@ -167,6 +230,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             subtitle: 'Rewards feed progression, inventory, and unit upgrades.',
             children: [
               Text('Inventory: ${state.progression.inventory.entries.map((e) => '${e.key}:${e.value}').join(' • ')}'),
+              Text('Encounter ready: ${state.squad.isEncounterReady ? 'yes' : 'no'} • Role coverage ${state.squad.summarizePower().roleCoverage.entries.map((e) => '${e.key.name}:${e.value}').join(', ')}'),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -174,7 +238,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   FilledButton.icon(
                     onPressed: controller.upgradePrimaryUnit,
                     icon: const Icon(Icons.upgrade),
-                    label: const Text('Upgrade primary unit (-5 Perbug)'),
+                    label: const Text('Unlock next primary upgrade'),
                   ),
                 ],
               ),
