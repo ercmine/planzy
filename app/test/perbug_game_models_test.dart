@@ -1,3 +1,4 @@
+import 'package:dryad/features/home/perbug_economy_models.dart';
 import 'package:dryad/features/home/perbug_game_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -84,6 +85,8 @@ void main() {
         'c': {},
       },
       worldDebug: {},
+      economy: PerbugEconomyState.initial(),
+      economyTelemetry: [],
     );
 
     final moves = state.reachableMoves();
