@@ -54,7 +54,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Level ${state.progression.level} • XP ${state.progression.xp} • Perbug ${state.progression.perbug}'),
+                Text('Level ${state.progression.level} • XP ${state.progression.xp} • Perbug ${state.economy.wallet.balance}'),
                 Text('Upgrade Currency ${state.progression.upgradeCurrency} • Squad power ${state.squad.equippedPower} • Slots ${state.squad.maxSlots}'),
                 const SizedBox(height: 8),
                 Wrap(
@@ -185,7 +185,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Moved to ${move.node.label}')));
                             }
                           : null,
-                      child: Text('Move (${move.energyCost})'),
+                      child: Text('Move (${move.energyCost}⚡ + ${move.totalPerbugCost}Ⓟ)'),
                     ),
                   ),
                 )
@@ -201,6 +201,21 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  FilledButton.tonalIcon(
+                    onPressed: state.activeEncounter == null ? null : controller.rerollCurrentEncounter,
+                    icon: const Icon(Icons.casino_outlined),
+                    label: Text('Reroll (${state.economy.config.actionCosts[PerbugActionType.reroll]?.baseCost ?? 0}Ⓟ)'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: state.currentNode == null ? null : controller.scoutCurrentNode,
+                    icon: const Icon(Icons.travel_explore),
+                    label: Text('Scout (${state.economy.config.actionCosts[PerbugActionType.scouting]?.baseCost ?? 0}Ⓟ)'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: state.currentNode == null ? null : controller.enterEventNode,
+                    icon: const Icon(Icons.event_available),
+                    label: Text('Event entry (${state.economy.config.actionCosts[PerbugActionType.eventEntry]?.baseCost ?? 0}Ⓟ)'),
+                  ),
                   FilledButton.icon(
                     onPressed: state.currentNode == null
                         ? null
@@ -251,6 +266,11 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                     icon: const Icon(Icons.upgrade),
                     label: const Text('Unlock next primary upgrade'),
                   ),
+                  FilledButton.tonalIcon(
+                    onPressed: controller.unlockPremiumMissionTrack,
+                    icon: const Icon(Icons.workspace_premium_outlined),
+                    label: Text('Premium track (${state.economy.config.actionCosts[PerbugActionType.premiumProgression]?.baseCost ?? 0}Ⓟ)'),
+                  ),
                 ],
               ),
             ],
@@ -263,7 +283,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 (recipe) {
                   final hasUnlock = state.progression.level >= recipe.unlockLevel;
                   final canAffordIngredients = state.economy.inventory.canAfford(recipe.inputs.map((e) => e.toStack()).toList(growable: false));
-                  final canAfford = hasUnlock && canAffordIngredients && state.progression.perbug >= recipe.perbugCost && state.energy >= recipe.energyCost;
+                  final canAfford = hasUnlock && canAffordIngredients && state.economy.wallet.balance >= recipe.perbugCost && state.energy >= recipe.energyCost;
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text('${recipe.label} (${recipe.category.name})'),
@@ -299,6 +319,21 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 ],
               ),
             ],
+          ),
+          _Section(
+            title: 'Perbug wallet ledger',
+            subtitle: 'Gameplay-first accounting with anti-duplicate action IDs and source/sink attribution.',
+            children: state.economy.wallet.transactions.take(10).map((tx) {
+              final direction = tx.type == PerbugTransactionType.reward ? '+' : '-';
+              final reason = tx.source?.name ?? tx.sink?.name ?? 'system';
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text('$direction${tx.amount} Ⓟ • $reason'),
+                subtitle: Text(tx.actionId ?? tx.id),
+                trailing: Text('Bal ${tx.balanceAfter}'),
+              );
+            }).toList(growable: false),
           ),
         ],
       ),

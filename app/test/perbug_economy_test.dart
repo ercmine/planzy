@@ -29,6 +29,7 @@ void main() {
     expect(after.economy.inventory.quantityOf('field_kit'), 1);
     expect(after.economy.inventory.quantityOf('bio_matter'), 1);
     expect(after.progression.perbug, 8);
+    expect(after.economy.wallet.transactions.first.sink?.name, 'crafting');
   });
 
   test('encounter reward flows into economy inventory', () {
@@ -53,4 +54,5 @@ void main() {
     expect(after.economy.sourceLedger, isNotEmpty);
     expect(after.progression.perbug, greaterThanOrEqualTo(2));
   });
+
 }

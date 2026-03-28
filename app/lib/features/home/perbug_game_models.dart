@@ -707,12 +707,17 @@ class PerbugMoveCandidate {
     required this.node,
     required this.isReachable,
     required this.energyCost,
+    required this.perbugMovementCost,
+    required this.perbugNodeAccessCost,
     required this.reason,
   });
 
   final PerbugNode node;
   final bool isReachable;
   final int energyCost;
+  final int perbugMovementCost;
+  final int perbugNodeAccessCost;
+  int get totalPerbugCost => perbugMovementCost + perbugNodeAccessCost;
   final String reason;
 }
 
@@ -937,21 +942,34 @@ class PerbugGameState {
       final linked = connections[current.id]?.contains(node.id) == true;
       final distance = haversineMeters(current.latitude, current.longitude, node.latitude, node.longitude);
       final energyCost = math.max(node.movementCost, math.max(2, (distance / 450).round()));
+      final movementCostRule = economy.config.actionCosts[PerbugActionType.movement];
+      final nodeAccessRule = economy.config.actionCosts[PerbugActionType.nodeAccess];
+      final perbugMovementCost = movementCostRule == null || movementCostRule.distanceDivisorMeters <= 0
+          ? 0
+          : movementCostRule.baseCost + (distance ~/ movementCostRule.distanceDivisorMeters);
+      final perbugNodeAccessCost = nodeAccessRule == null
+          ? 0
+          : nodeAccessRule.baseCost + (node.rarityScore * nodeAccessRule.rarityMultiplier).round();
       final inRange = linked && distance <= maxJumpMeters;
       final hasEnergy = energy >= energyCost;
-      final reachable = inRange && hasEnergy;
+      final hasPerbug = economy.wallet.balance >= (perbugMovementCost + perbugNodeAccessCost);
+      final reachable = inRange && hasEnergy && hasPerbug;
       final reason = reachable
           ? 'Reachable'
           : !linked
               ? 'No travel link'
               : !inRange
                   ? 'Out of range'
-                  : 'Not enough energy';
+                  : !hasEnergy
+                      ? 'Not enough energy'
+                      : 'Not enough Perbug';
       results.add(
         PerbugMoveCandidate(
           node: node.copyWith(distanceFromCurrentMeters: distance),
           isReachable: reachable,
           energyCost: energyCost,
+          perbugMovementCost: perbugMovementCost,
+          perbugNodeAccessCost: perbugNodeAccessCost,
           reason: reason,
         ),
       );

@@ -90,6 +90,16 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     final isFirstVisit = !state.visitedNodeIds.contains(move.node.id);
     final gained = isFirstVisit ? move.node.energyReward : 1;
     final nextEnergy = (state.energy - spend + gained).clamp(0, state.maxEnergy);
+    final spendEconomy = _trySpendPerbug(
+      amount: move.totalPerbugCost,
+      sink: PerbugSink.movement,
+      actionId: 'move:${state.currentNodeId}:${move.node.id}',
+      metadata: {
+        'movement_cost': move.perbugMovementCost,
+        'node_access_cost': move.perbugNodeAccessCost,
+      },
+    );
+    if (spendEconomy == null) return false;
 
     final updatedNodes = state.nodes
         .map(
@@ -105,10 +115,27 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       nodes: updatedNodes,
       currentNodeId: move.node.id,
       energy: nextEnergy,
+      economy: spendEconomy,
+      progression: ProgressionState(
+        level: state.progression.level,
+        xp: state.progression.xp,
+        perbug: spendEconomy.wallet.balance,
+        inventory: state.progression.inventory,
+        upgradeCurrency: state.progression.upgradeCurrency,
+      ),
       visitedNodeIds: {...state.visitedNodeIds, move.node.id},
       activeEncounter: encounter,
+      economyTelemetry: [
+        {
+          'event': 'perbug_spend',
+          'sink': PerbugSink.movement.name,
+          'amount': move.totalPerbugCost,
+          'at': DateTime.now().toIso8601String(),
+        },
+        ...state.economyTelemetry,
+      ],
       history: [
-        'Moved ${_formatDistance(move.node.distanceFromCurrentMeters ?? 0)} to ${move.node.label} (-$spend, +$gained energy)',
+        'Moved ${_formatDistance(move.node.distanceFromCurrentMeters ?? 0)} to ${move.node.label} (-$spend energy, -${move.totalPerbugCost} Perbug, +$gained energy)',
         'Encounter ready: ${encounter.type.name} • ${encounter.difficultyTier}',
         ...state.history,
       ],
@@ -126,12 +153,16 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     int? perbug,
     int? level,
   }) {
+    final nextPerbug = perbug ?? state.progression.perbug;
     state = state.copyWith(
-      economy: state.economy.copyWith(inventory: inventory),
+      economy: state.economy.copyWith(
+        inventory: inventory,
+        wallet: state.economy.wallet.copyWith(balance: nextPerbug),
+      ),
       progression: ProgressionState(
         level: level ?? state.progression.level,
         xp: state.progression.xp,
-        perbug: perbug ?? state.progression.perbug,
+        perbug: nextPerbug,
         inventory: state.progression.inventory,
         upgradeCurrency: state.progression.upgradeCurrency,
       ),
@@ -162,39 +193,70 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     if (encounter == null) return;
     final resolvedStatus = succeeded ? EncounterStatus.resolved : EncounterStatus.failed;
     final payout = succeeded ? encounter.rewardBundle : const RewardBundle();
-    final progression = state.progression.applyRewards(payout);
+    final cappedPerbug = succeeded
+        ? _cappedEmission(
+            desired: payout.perbug,
+            source: PerbugSource.encounter,
+            nodeDifficulty: int.tryParse(encounter.difficultyTier.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1,
+          )
+        : 0;
+    final adjustedPayout = RewardBundle(
+      xp: payout.xp,
+      perbug: cappedPerbug,
+      resources: payout.resources,
+      energy: payout.energy,
+      unitXp: payout.unitXp,
+      unitUnlocks: payout.unitUnlocks,
+      upgradeCurrency: payout.upgradeCurrency,
+    );
+    final progression = state.progression.applyRewards(adjustedPayout);
     final nextEconomy = succeeded
         ? _applyResourceGrant(
             base: state.economy,
-            grant: payout.resources,
+            grant: adjustedPayout.resources,
             source: ResourceSource.nodeEncounter,
             metadata: {'encounter_type': encounter.type.name, 'node_id': encounter.nodeId},
           )
         : state.economy;
+    final walletApplied = succeeded && adjustedPayout.perbug > 0
+        ? _applyPerbugReward(
+            base: nextEconomy,
+            amount: adjustedPayout.perbug,
+            source: PerbugSource.encounter,
+            actionId: 'encounter:${encounter.id}',
+            metadata: {'node_id': encounter.nodeId, 'difficulty': encounter.difficultyTier},
+          )
+        : nextEconomy;
     final nextSquad = succeeded
-        ? state.squad.applyUnitXpToActive(payout.unitXp).unlockUnits(payout.unitUnlocks)
+        ? state.squad.applyUnitXpToActive(adjustedPayout.unitXp).unlockUnits(adjustedPayout.unitUnlocks)
         : state.squad;
 
     state = state.copyWith(
       activeEncounter: encounter.copyWith(status: resolvedStatus),
-      progression: progression,
+      progression: ProgressionState(
+        level: progression.level,
+        xp: progression.xp,
+        perbug: walletApplied.wallet.balance,
+        inventory: progression.inventory,
+        upgradeCurrency: progression.upgradeCurrency,
+      ),
       squad: nextSquad,
-      economy: nextEconomy,
-      energy: (state.energy + payout.energy).clamp(0, state.maxEnergy),
+      economy: walletApplied,
+      energy: (state.energy + adjustedPayout.energy).clamp(0, state.maxEnergy),
       economyTelemetry: [
         if (succeeded)
           {
             'event': 'reward_applied',
             'source': ResourceSource.nodeEncounter.name,
-            'perbug_earned': payout.perbug,
-            'resource_count': payout.resources.values.fold<int>(0, (sum, value) => sum + value),
+            'perbug_earned': adjustedPayout.perbug,
+            'resource_count': adjustedPayout.resources.values.fold<int>(0, (sum, value) => sum + value),
             'at': DateTime.now().toIso8601String(),
           },
         ...state.economyTelemetry,
       ],
       history: [
         succeeded
-            ? 'Resolved ${encounter.type.name} (+${payout.xp} XP, +${payout.perbug} Perbug, +${payout.unitXp} squad XP)'
+            ? 'Resolved ${encounter.type.name} (+${adjustedPayout.xp} XP, +${adjustedPayout.perbug} Perbug, +${adjustedPayout.unitXp} squad XP)'
             : 'Encounter failed. Regroup and try another node.',
         ...state.history,
       ],
@@ -241,6 +303,18 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       state = state.copyWith(history: ['${primary.name} must reach level ${upgrade.levelRequirement} first.', ...state.history]);
       return;
     }
+    final perbugUpgradeCost = state.economy.config.actionCosts[PerbugActionType.upgrade]?.baseCost ?? 0;
+    if (state.economy.wallet.balance < perbugUpgradeCost) {
+      state = state.copyWith(history: ['Need $perbugUpgradeCost Perbug for ${upgrade.title}.', ...state.history]);
+      return;
+    }
+    final spendEconomy = _trySpendPerbug(
+      amount: perbugUpgradeCost,
+      sink: PerbugSink.upgrade,
+      actionId: 'upgrade:${primary.id}:${upgrade.id}',
+      metadata: {'unit_id': primary.id, 'upgrade_id': upgrade.id},
+    );
+    if (spendEconomy == null) return;
 
     final nextSquad = state.squad.unlockUnitUpgrade(
       unitId: primary.id,
@@ -253,12 +327,12 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       progression: ProgressionState(
         level: state.progression.level,
         xp: state.progression.xp,
-        perbug: state.progression.perbug,
+        perbug: spendEconomy.wallet.balance,
         inventory: state.progression.inventory,
         upgradeCurrency: state.progression.upgradeCurrency - upgrade.currencyCost,
       ),
-      economy: state.economy.copyWith(inventory: state.economy.inventory.remove(const ResourceStack(resourceId: 'upgrade_module', amount: 1))),
-      history: ['Unlocked ${upgrade.title} on ${primary.name}.', ...state.history],
+      economy: spendEconomy.copyWith(inventory: spendEconomy.inventory.remove(const ResourceStack(resourceId: 'upgrade_module', amount: 1))),
+      history: ['Unlocked ${upgrade.title} on ${primary.name} (-$perbugUpgradeCost Perbug).', ...state.history],
     );
     unawaited(_persistEconomyState());
   }
@@ -276,7 +350,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       _appendCraftFailure(recipeId, 'Recipe unlock level ${recipe.unlockLevel} not reached');
       return;
     }
-    if (state.progression.perbug < recipe.perbugCost) {
+    if (state.economy.wallet.balance < recipe.perbugCost) {
       _appendCraftFailure(recipeId, 'Not enough Perbug');
       return;
     }
@@ -290,6 +364,17 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       return;
     }
 
+    final spendEconomy = _trySpendPerbug(
+      amount: recipe.perbugCost,
+      sink: PerbugSink.crafting,
+      actionId: 'craft:${recipe.id}:${DateTime.now().millisecondsSinceEpoch}',
+      metadata: {'recipe_id': recipe.id},
+    );
+    if (spendEconomy == null) {
+      _appendCraftFailure(recipeId, 'Perbug spend declined');
+      return;
+    }
+
     var nextInventory = state.economy.inventory;
     for (final input in recipe.inputs) {
       nextInventory = nextInventory.remove(input.toStack());
@@ -297,11 +382,11 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     for (final output in recipe.outputs) {
       nextInventory = nextInventory.add(output.toStack());
     }
-    final nextEconomy = state.economy.copyWith(
+    final nextEconomy = spendEconomy.copyWith(
       inventory: nextInventory,
       sessions: [
         CraftingSession(recipeId: recipe.id, createdAt: DateTime.now().toUtc(), succeeded: true, error: null),
-        ...state.economy.sessions,
+        ...spendEconomy.sessions,
       ],
     );
     state = state.copyWith(
@@ -309,7 +394,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       progression: ProgressionState(
         level: state.progression.level,
         xp: state.progression.xp,
-        perbug: state.progression.perbug - recipe.perbugCost,
+        perbug: nextEconomy.wallet.balance,
         inventory: state.progression.inventory,
         upgradeCurrency: state.progression.upgradeCurrency,
       ),
@@ -348,13 +433,114 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         progression: ProgressionState(
           level: state.progression.level,
           xp: state.progression.xp,
-          perbug: state.progression.perbug,
+          perbug: state.economy.wallet.balance,
           inventory: state.progression.inventory,
           upgradeCurrency: state.progression.upgradeCurrency + 4,
         ),
         history: ['Applied Upgrade Module (+4 upgrade currency).', ...state.history],
       );
     }
+    unawaited(_persistEconomyState());
+  }
+
+  void rerollCurrentEncounter() {
+    final encounter = state.activeEncounter;
+    final node = state.currentNode;
+    if (encounter == null || node == null) return;
+    final cost = state.economy.config.actionCosts[PerbugActionType.reroll]?.baseCost ?? 0;
+    final spendEconomy = _trySpendPerbug(
+      amount: cost,
+      sink: PerbugSink.reroll,
+      actionId: 'reroll:${encounter.id}',
+      metadata: {'node_id': node.id},
+    );
+    if (spendEconomy == null) return;
+    final rerolled = _createEncounter(node);
+    state = state.copyWith(
+      activeEncounter: rerolled,
+      economy: spendEconomy,
+      progression: ProgressionState(
+        level: state.progression.level,
+        xp: state.progression.xp,
+        perbug: spendEconomy.wallet.balance,
+        inventory: state.progression.inventory,
+        upgradeCurrency: state.progression.upgradeCurrency,
+      ),
+      history: ['Rerolled encounter rewards for ${node.label} (-$cost Perbug).', ...state.history],
+    );
+    unawaited(_persistEconomyState());
+  }
+
+  void scoutCurrentNode() {
+    final node = state.currentNode;
+    if (node == null) return;
+    final cost = state.economy.config.actionCosts[PerbugActionType.scouting]?.baseCost ?? 0;
+    final spendEconomy = _trySpendPerbug(
+      amount: cost,
+      sink: PerbugSink.scouting,
+      actionId: 'scout:${node.id}',
+      metadata: {'node_id': node.id},
+    );
+    if (spendEconomy == null) return;
+    state = state.copyWith(
+      economy: spendEconomy,
+      progression: ProgressionState(
+        level: state.progression.level,
+        xp: state.progression.xp,
+        perbug: spendEconomy.wallet.balance,
+        inventory: state.progression.inventory,
+        upgradeCurrency: state.progression.upgradeCurrency,
+      ),
+      history: ['Scouted ${node.label}. Rare metadata refreshed (-$cost Perbug).', ...state.history],
+    );
+    unawaited(_persistEconomyState());
+  }
+
+  void enterEventNode() {
+    final node = state.currentNode;
+    if (node == null) return;
+    final cost = state.economy.config.actionCosts[PerbugActionType.eventEntry]?.baseCost ?? 0;
+    final spendEconomy = _trySpendPerbug(
+      amount: cost,
+      sink: PerbugSink.eventEntry,
+      actionId: 'event_entry:${node.id}',
+      metadata: {'node_type': node.nodeType.name},
+    );
+    if (spendEconomy == null) return;
+    state = state.copyWith(
+      economy: spendEconomy,
+      progression: ProgressionState(
+        level: state.progression.level,
+        xp: state.progression.xp,
+        perbug: spendEconomy.wallet.balance,
+        inventory: state.progression.inventory,
+        upgradeCurrency: state.progression.upgradeCurrency,
+      ),
+      history: ['Entered event ops at ${node.label} (-$cost Perbug).', ...state.history],
+    );
+    unawaited(_persistEconomyState());
+  }
+
+  void unlockPremiumMissionTrack() {
+    final cost = state.economy.config.actionCosts[PerbugActionType.premiumProgression]?.baseCost ?? 0;
+    final spendEconomy = _trySpendPerbug(
+      amount: cost,
+      sink: PerbugSink.premiumProgression,
+      actionId: 'premium_track:l${state.progression.level}',
+      metadata: {'level': state.progression.level},
+    );
+    if (spendEconomy == null) return;
+    state = state.copyWith(
+      economy: spendEconomy,
+      progression: ProgressionState(
+        level: state.progression.level,
+        xp: state.progression.xp,
+        perbug: spendEconomy.wallet.balance,
+        inventory: state.progression.inventory,
+        upgradeCurrency: state.progression.upgradeCurrency + 6,
+      ),
+      history: ['Unlocked premium mission track (+6 upgrade currency, -$cost Perbug).', ...state.history],
+    );
     unawaited(_persistEconomyState());
   }
 
@@ -704,7 +890,16 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     final prefs = await _ref.read(sharedPreferencesProvider.future);
     _economyStore ??= PerbugEconomyStore(prefs);
     final loaded = _economyStore!.load();
-    state = state.copyWith(economy: loaded);
+    state = state.copyWith(
+      economy: loaded,
+      progression: ProgressionState(
+        level: state.progression.level,
+        xp: state.progression.xp,
+        perbug: loaded.wallet.balance,
+        inventory: state.progression.inventory,
+        upgradeCurrency: state.progression.upgradeCurrency,
+      ),
+    );
     _economyHydrated = true;
   }
 
@@ -732,6 +927,105 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         ...base.sourceLedger,
       ],
     );
+  }
+
+  PerbugEconomyState? _trySpendPerbug({
+    required int amount,
+    required PerbugSink sink,
+    required String actionId,
+    Map<String, Object> metadata = const <String, Object>{},
+  }) {
+    if (amount <= 0) return state.economy;
+    final wallet = state.economy.wallet;
+    if (wallet.balance < amount) return null;
+    if (state.economy.config.antiAbusePolicy.requireUniqueActionId && wallet.appliedActionIds.contains(actionId)) {
+      return null;
+    }
+    final cap = state.economy.config.antiAbusePolicy.dailySpendActionCap[sink];
+    if (cap != null) {
+      final spentToday = wallet.transactions
+          .where((tx) => tx.sink == sink && _isSameDayUtc(tx.createdAt, DateTime.now().toUtc()))
+          .fold<int>(0, (sum, tx) => sum + tx.amount);
+      if (spentToday + amount > cap) return null;
+    }
+    final nextBalance = wallet.balance - amount;
+    final tx = PerbugTransaction(
+      id: 'spend-${DateTime.now().microsecondsSinceEpoch}',
+      type: PerbugTransactionType.spend,
+      amount: amount,
+      sink: sink,
+      actionId: actionId,
+      createdAt: DateTime.now().toUtc(),
+      balanceAfter: nextBalance,
+      metadata: metadata,
+    );
+    return state.economy.copyWith(
+      wallet: wallet.copyWith(
+        balance: nextBalance,
+        transactions: [tx, ...wallet.transactions].take(120).toList(growable: false),
+        appliedActionIds: {...wallet.appliedActionIds, actionId},
+      ),
+      sourceLedger: [
+        {'type': 'sink', 'sink': sink.name, 'amount': amount, 'action_id': actionId, 'at': DateTime.now().toIso8601String(), ...metadata},
+        ...state.economy.sourceLedger,
+      ],
+    );
+  }
+
+  PerbugEconomyState _applyPerbugReward({
+    required PerbugEconomyState base,
+    required int amount,
+    required PerbugSource source,
+    required String actionId,
+    Map<String, Object> metadata = const <String, Object>{},
+  }) {
+    if (amount <= 0) return base;
+    if (base.wallet.appliedActionIds.contains(actionId)) return base;
+    final nextBalance = base.wallet.balance + amount;
+    final tx = PerbugTransaction(
+      id: 'reward-${DateTime.now().microsecondsSinceEpoch}',
+      type: PerbugTransactionType.reward,
+      amount: amount,
+      source: source,
+      actionId: actionId,
+      createdAt: DateTime.now().toUtc(),
+      balanceAfter: nextBalance,
+      metadata: metadata,
+    );
+    return base.copyWith(
+      wallet: base.wallet.copyWith(
+        balance: nextBalance,
+        transactions: [tx, ...base.wallet.transactions].take(120).toList(growable: false),
+        appliedActionIds: {...base.wallet.appliedActionIds, actionId},
+      ),
+      sourceLedger: [
+        {'type': 'source', 'source': source.name, 'amount': amount, 'action_id': actionId, 'at': DateTime.now().toIso8601String(), ...metadata},
+        ...base.sourceLedger,
+      ],
+    );
+  }
+
+  int _cappedEmission({
+    required int desired,
+    required PerbugSource source,
+    required int nodeDifficulty,
+  }) {
+    if (desired <= 0) return 0;
+    if (nodeDifficulty < state.economy.config.emissionPolicy.minNodeDifficultyForReward) {
+      return state.economy.config.emissionPolicy.trivialActionReward;
+    }
+    final cap = state.economy.config.emissionPolicy.dailySourceCap[source] ?? desired;
+    final rewardedToday = state.economy.wallet.transactions
+        .where((tx) => tx.source == source && _isSameDayUtc(tx.createdAt, DateTime.now().toUtc()))
+        .fold<int>(0, (sum, tx) => sum + tx.amount);
+    final remaining = (cap - rewardedToday).clamp(0, cap);
+    return desired > remaining ? remaining : desired;
+  }
+
+  bool _isSameDayUtc(DateTime a, DateTime b) {
+    final x = a.toUtc();
+    final y = b.toUtc();
+    return x.year == y.year && x.month == y.month && x.day == y.day;
   }
 
   void _appendCraftFailure(String recipeId, String reason) {
