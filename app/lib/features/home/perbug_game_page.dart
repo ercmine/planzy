@@ -105,6 +105,93 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
           if (state.loading) const AppCard(child: LinearProgressIndicator()),
           if (state.error != null) AppCard(child: Text(state.error!)),
 
+
+          _Section(
+            title: 'Returning commander brief',
+            subtitle: 'Daily objectives, rare windows, frontier, and next goals.',
+            children: [
+              Text('World tier ${state.progressionLayer.world.worldTier} • Regions unlocked ${state.progressionLayer.world.unlockedRegions.length}'),
+              Text('Rare window resets in ${state.progressionLayer.rareSpawns.nextRollAt.difference(DateTime.now().toUtc()).inMinutes.clamp(0, 999)} min'),
+              if (state.progressionLayer.returnLoop.recommendedActions.isEmpty)
+                const Text('No recommended actions yet. Explore your first node chain.')
+              else
+                ...state.progressionLayer.returnLoop.recommendedActions.take(4).map((tip) => ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: const Icon(Icons.chevron_right), title: Text(tip))),
+            ],
+          ),
+          _Section(
+            title: 'Daily objectives',
+            subtitle: 'Resets daily and drives return momentum.',
+            children: [
+              Text('Daily set ${state.progressionLayer.daily.dayKey} • refresh ${state.progressionLayer.daily.refreshAt.toLocal()}'),
+              ...state.progressionLayer.daily.objectives.map(
+                (objective) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(objective.title),
+                  subtitle: Text('${objective.description}
+${objective.progress.current}/${objective.progress.target}'),
+                  trailing: FilledButton.tonal(
+                    onPressed: objective.progress.isComplete && !objective.progress.claimed
+                        ? () => controller.claimDailyObjective(objective.id)
+                        : null,
+                    child: Text(objective.progress.claimed ? 'Claimed' : 'Claim'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          _Section(
+            title: 'Collections + milestones',
+            subtitle: 'Track ownership, map mastery, and long-term unlock pacing.',
+            children: [
+              ...state.progressionLayer.collections.map(
+                (collection) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(collection.label),
+                  subtitle: LinearProgressIndicator(value: collection.percent.clamp(0, 1)),
+                  trailing: Text('${collection.discovered}/${collection.total}'),
+                ),
+              ),
+              const Divider(),
+              ...state.progressionLayer.milestones.map(
+                (milestone) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(milestone.title),
+                  subtitle: Text('${milestone.current}/${milestone.target}'),
+                  trailing: FilledButton(
+                    onPressed: milestone.isComplete && !milestone.claimed ? () => controller.claimMilestoneReward(milestone.id) : null,
+                    child: Text(milestone.claimed ? 'Claimed' : 'Claim'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          _Section(
+            title: 'Unlockables + frontier status',
+            subtitle: 'Explicit unlock rules tied to world expansion and milestones.',
+            children: [
+              ...state.progressionLayer.unlockables.map(
+                (unlock) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(unlock.unlocked ? Icons.lock_open : Icons.lock_outline),
+                  title: Text(unlock.label),
+                  subtitle: Text(unlock.unlocked ? unlock.description : 'Locked: ${unlock.requirement}'),
+                ),
+              ),
+              const Divider(),
+              ...state.progressionLayer.world.regionNodeTotals.entries.map((entry) {
+                final cleared = state.progressionLayer.world.regionNodeCompleted[entry.key] ?? 0;
+                final ratio = entry.value == 0 ? 0 : cleared / entry.value;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(entry.key),
+                  subtitle: LinearProgressIndicator(value: ratio.clamp(0, 1)),
+                  trailing: Text('$cleared/${entry.value}'),
+                );
+              }),
+              if (state.progressionLayer.rareSpawns.activeNodeIds.isNotEmpty)
+                Text('Active rare nodes: ${state.progressionLayer.rareSpawns.activeNodeIds.take(3).join(', ')}'),
+            ],
+          ),
           _Section(
             title: 'Squad command: active loadout',
             subtitle: 'Manage active units used in node encounters. Roster is larger than active slots.',
