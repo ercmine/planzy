@@ -94,6 +94,62 @@ void main() {
     final c = moves.firstWhere((m) => m.node.id == 'c');
     expect(b.isReachable, isTrue);
     expect(c.isReachable, isFalse);
+    expect(b.totalPerbugCost, greaterThan(0));
+  });
+
+  test('reachable move generation blocks when perbug balance is too low', () {
+    final base = PerbugGameState.initial();
+    final state = base.copyWith(
+      nodes: const [
+        PerbugNode(
+          id: 'a',
+          placeId: 'place_a',
+          label: 'A',
+          latitude: 30.2672,
+          longitude: -97.7431,
+          region: 'R',
+          city: 'Austin',
+          neighborhood: 'Downtown',
+          country: 'USA',
+          nodeType: PerbugNodeType.encounter,
+          difficulty: 2,
+          state: PerbugNodeState.available,
+          energyReward: 2,
+          movementCost: 2,
+          rarityScore: 0.2,
+          tags: {'cafe'},
+          metadata: {},
+        ),
+        PerbugNode(
+          id: 'b',
+          placeId: 'place_b',
+          label: 'B',
+          latitude: 30.2685,
+          longitude: -97.7440,
+          region: 'R',
+          city: 'Austin',
+          neighborhood: 'Downtown',
+          country: 'USA',
+          nodeType: PerbugNodeType.rare,
+          difficulty: 5,
+          state: PerbugNodeState.available,
+          energyReward: 2,
+          movementCost: 2,
+          rarityScore: 0.95,
+          tags: {'rare'},
+          metadata: {},
+        ),
+      ],
+      currentNodeId: 'a',
+      connections: const {
+        'a': {'b'},
+        'b': {'a'},
+      },
+      economy: base.economy.copyWith(wallet: base.economy.wallet.copyWith(balance: 0)),
+    );
+    final move = state.reachableMoves().firstWhere((m) => m.node.id == 'b');
+    expect(move.isReachable, isFalse);
+    expect(move.reason, 'Not enough Perbug');
   });
 
   test('starter squad has encounter-ready loadout and role diversity', () {

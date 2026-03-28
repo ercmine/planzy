@@ -1,4 +1,5 @@
 import 'package:dryad/features/home/perbug_game_controller.dart';
+import 'package:dryad/features/home/perbug_economy_models.dart';
 import 'package:dryad/features/home/perbug_game_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,5 +44,19 @@ void main() {
     expect(after.progression.xp, greaterThan(before.progression.xp));
     expect(after.progression.upgradeCurrency, greaterThan(before.progression.upgradeCurrency));
     expect(after.squad.activeUnits.first.progression.level, greaterThanOrEqualTo(before.squad.activeUnits.first.progression.level));
+  });
+
+  test('premium progression spend reduces perbug and grants upgrade currency', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final controller = container.read(perbugGameControllerProvider.notifier);
+
+    controller.debugSeedEconomy(inventory: const Inventory(stacks: {'upgrade_module': 1}), perbug: 20);
+    final before = container.read(perbugGameControllerProvider);
+    controller.unlockPremiumMissionTrack();
+    final after = container.read(perbugGameControllerProvider);
+
+    expect(after.progression.perbug, lessThan(before.progression.perbug));
+    expect(after.progression.upgradeCurrency, greaterThan(before.progression.upgradeCurrency));
   });
 }
