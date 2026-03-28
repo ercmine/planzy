@@ -12,6 +12,7 @@ import 'perbug_economy_models.dart';
 import 'perbug_game_models.dart';
 import 'perbug_economy_store.dart';
 import 'perbug_node_world_engine.dart';
+import 'perbug_progression_models.dart';
 
 final perbugGameControllerProvider = StateNotifierProvider<PerbugGameController, PerbugGameState>((ref) {
   return PerbugGameController(ref);
@@ -21,11 +22,13 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
   PerbugGameController(this._ref)
       : _gridPathGenerator = const GridPathGenerator(),
         _worldEngine = const PerbugNodeWorldEngine(),
+        _progressionEngine = const PerbugProgressionEngine(),
         super(PerbugGameState.initial());
 
   final Ref _ref;
   final GridPathGenerator _gridPathGenerator;
   final PerbugNodeWorldEngine _worldEngine;
+  final PerbugProgressionEngine _progressionEngine;
   Timer? _puzzleTimer;
   PerbugEconomyStore? _economyStore;
   bool _economyHydrated = false;
@@ -73,6 +76,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         worldDebug: worldSnapshot.debug,
         loading: false,
       );
+      _syncProgression(reason: 'initialize');
       await _persistEconomyState();
     } catch (error) {
       state = state.copyWith(loading: false, error: 'Unable to load Perbug world nodes: $error');
@@ -140,6 +144,11 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         ...state.history,
       ],
     );
+    _trackObjective(ObjectiveType.clearNodes, 1);
+    if (isFirstVisit) {
+      _trackObjective(ObjectiveType.discoverNodes, 1);
+    }
+    _syncProgression(reason: 'jump_to_node');
     return true;
   }
 
@@ -261,6 +270,13 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         ...state.history,
       ],
     );
+    if (succeeded && encounter.type == EncounterType.resourceHarvest) {
+      _trackObjective(ObjectiveType.collectResource, 1);
+    }
+    if (succeeded && state.currentNode?.nodeType == PerbugNodeType.rare) {
+      _trackObjective(ObjectiveType.completeRareNode, 1);
+    }
+    _syncProgression(reason: 'encounter_resolved');
     unawaited(_persistEconomyState());
   }
 
@@ -334,6 +350,8 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       economy: spendEconomy.copyWith(inventory: spendEconomy.inventory.remove(const ResourceStack(resourceId: 'upgrade_module', amount: 1))),
       history: ['Unlocked ${upgrade.title} on ${primary.name} (-$perbugUpgradeCost Perbug).', ...state.history],
     );
+    _trackObjective(ObjectiveType.upgradeUnit, 1);
+    _syncProgression(reason: 'upgrade_unit');
     unawaited(_persistEconomyState());
   }
 
@@ -411,6 +429,8 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       ],
       history: ['Crafted ${recipe.label} (-${recipe.perbugCost} Perbug).', ...state.history],
     );
+    _trackObjective(ObjectiveType.craftItems, 1);
+    _syncProgression(reason: 'craft_item');
     unawaited(_persistEconomyState());
   }
 
@@ -544,6 +564,16 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     unawaited(_persistEconomyState());
   }
 
+
+  void claimDailyObjective(String objectiveId) {
+    final result = _progressionEngine.claimObjective(current: state.progressionLayer, objectiveId: objectiveId);
+    _applyProgressionResult(result, source: 'daily_objective');
+  }
+
+  void claimMilestoneReward(String milestoneId) {
+    final result = _progressionEngine.claimMilestone(current: state.progressionLayer, milestoneId: milestoneId);
+    _applyProgressionResult(result, source: 'milestone');
+  }
 
   void assignUnitToSlot({required String unitId, required int slotIndex}) {
     state = state.copyWith(
@@ -927,6 +957,61 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         ...base.sourceLedger,
       ],
     );
+  }
+
+  void _trackObjective(ObjectiveType type, int amount) {
+    final result = _progressionEngine.onAction(
+      current: state.progressionLayer,
+      type: type,
+      amount: amount,
+      now: DateTime.now().toUtc(),
+    );
+    state = state.copyWith(progressionLayer: result.progression);
+  }
+
+  void _syncProgression({required String reason}) {
+    final sync = _progressionEngine.syncWorld(
+      current: state.progressionLayer,
+      nodes: state.nodes,
+      visitedNodeIds: state.visitedNodeIds,
+      squad: state.squad,
+      inventory: state.economy.inventory,
+      now: DateTime.now().toUtc(),
+    );
+    state = state.copyWith(
+      progressionLayer: sync.progression,
+      history: ['Progression sync: $reason', ...state.history],
+    );
+  }
+
+  void _applyProgressionResult(ProgressionUpdateResult result, {required String source}) {
+    var nextEconomy = state.economy;
+    if (result.reward.perbug > 0) {
+      nextEconomy = _applyPerbugReward(
+        base: nextEconomy,
+        amount: result.reward.perbug,
+        source: PerbugSource.progressionStep,
+        actionId: '$source:${DateTime.now().millisecondsSinceEpoch}',
+        metadata: {'source': source},
+      );
+    }
+    if (result.reward.resources.isNotEmpty) {
+      nextEconomy = _applyResourceGrant(base: nextEconomy, grant: result.reward.resources, source: ResourceSource.systemGrant, metadata: {'source': source});
+    }
+    final progression = state.progression.applyRewards(result.reward);
+    state = state.copyWith(
+      progressionLayer: result.progression,
+      economy: nextEconomy,
+      progression: ProgressionState(
+        level: progression.level,
+        xp: progression.xp,
+        perbug: nextEconomy.wallet.balance,
+        inventory: progression.inventory,
+        upgradeCurrency: progression.upgradeCurrency,
+      ),
+      history: [result.log, ...state.history],
+    );
+    unawaited(_persistEconomyState());
   }
 
   PerbugEconomyState? _trySpendPerbug({

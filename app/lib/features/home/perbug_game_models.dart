@@ -5,6 +5,7 @@ import '../puzzles/puzzle_framework.dart';
 import 'map_discovery_models.dart';
 import 'perbug_asset_models.dart';
 import 'perbug_economy_models.dart';
+import 'perbug_progression_models.dart';
 
 enum PerbugNodeState { available, completed, locked, exhausted, special, futureChallengeReady }
 
@@ -877,6 +878,7 @@ class PerbugGameState {
     required this.worldDebug,
     required this.economy,
     required this.economyTelemetry,
+    required this.progressionLayer,
     this.error,
   });
 
@@ -901,6 +903,7 @@ class PerbugGameState {
         worldDebug: const {},
         economy: PerbugEconomyState.initial(),
         economyTelemetry: const [],
+        progressionLayer: PerbugProgressionState.initial(),
       );
 
   final List<PerbugNode> nodes;
@@ -923,6 +926,7 @@ class PerbugGameState {
   final Map<String, Object> worldDebug;
   final PerbugEconomyState economy;
   final List<Map<String, Object>> economyTelemetry;
+  final PerbugProgressionState progressionLayer;
   final String? error;
 
   PerbugNode? get currentNode {
@@ -960,6 +964,7 @@ class PerbugGameState {
     Map<String, Object>? worldDebug,
     PerbugEconomyState? economy,
     List<Map<String, Object>>? economyTelemetry,
+    PerbugProgressionState? progressionLayer,
   }) {
     return PerbugGameState(
       nodes: nodes ?? this.nodes,
@@ -982,6 +987,7 @@ class PerbugGameState {
       worldDebug: worldDebug ?? this.worldDebug,
       economy: economy ?? this.economy,
       economyTelemetry: economyTelemetry ?? this.economyTelemetry,
+      progressionLayer: progressionLayer ?? this.progressionLayer,
       error: clearError ? null : (error ?? this.error),
     );
   }

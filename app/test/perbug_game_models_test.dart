@@ -1,10 +1,11 @@
 import 'package:dryad/features/home/perbug_economy_models.dart';
 import 'package:dryad/features/home/perbug_game_models.dart';
+import 'package:dryad/features/home/perbug_progression_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('reachable move generation respects movement range and energy', () {
-    const state = PerbugGameState(
+    final state = PerbugGameState(
       nodes: [
         PerbugNode(
           id: 'a',
@@ -87,6 +88,7 @@ void main() {
       worldDebug: {},
       economy: PerbugEconomyState.initial(),
       economyTelemetry: [],
+      progressionLayer: PerbugProgressionState.initial(),
     );
 
     final moves = state.reachableMoves();
