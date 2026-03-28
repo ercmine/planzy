@@ -50,9 +50,16 @@ class PrimaryButton extends StatelessWidget {
 
 BoxDecoration _appScaffoldDecoration(ColorScheme scheme) {
   return BoxDecoration(
-    color: scheme.surface,
+    gradient: LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        scheme.surface,
+        scheme.surfaceContainerLowest.withOpacity(0.98),
+      ],
+    ),
     border: Border(
-      top: BorderSide(color: scheme.outlineVariant.withOpacity(0.18)),
+      top: BorderSide(color: scheme.outlineVariant.withOpacity(0.28)),
     ),
   );
 }
@@ -170,6 +177,7 @@ enum AppCardTone {
   collection,
   sponsored,
   kpi,
+  muted,
 }
 
 Gradient? _gradientForTone(ColorScheme scheme, AppCardTone tone) {
@@ -188,7 +196,7 @@ Gradient? _gradientForTone(ColorScheme scheme, AppCardTone tone) {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          AppColors.vividOrange.withOpacity(0.22),
+          AppColors.ember.withOpacity(0.22),
           scheme.primary.withOpacity(0.24),
           scheme.surfaceContainerHigh.withOpacity(0.94),
         ],
@@ -221,6 +229,15 @@ Gradient? _gradientForTone(ColorScheme scheme, AppCardTone tone) {
           scheme.surfaceContainerLow.withOpacity(0.9),
         ],
       );
+    case AppCardTone.muted:
+      return LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          scheme.surfaceContainerLowest.withOpacity(0.82),
+          scheme.surfaceContainerHigh.withOpacity(0.8),
+        ],
+      );
     case AppCardTone.standard:
       return null;
   }
@@ -237,6 +254,8 @@ Color _borderForTone(ColorScheme scheme, AppCardTone tone) {
       return scheme.tertiary.withOpacity(0.30);
     case AppCardTone.kpi:
       return scheme.outlineVariant.withOpacity(0.66);
+    case AppCardTone.muted:
+      return scheme.outlineVariant.withOpacity(0.55);
     case AppCardTone.standard:
       return scheme.outlineVariant.withOpacity(0.44);
   }
@@ -505,7 +524,7 @@ class PremiumHeader extends StatelessWidget {
                   badge!,
                   const SizedBox(height: AppSpacing.s),
                 ],
-                Text(title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+                Text(title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.25)),
                 const SizedBox(height: AppSpacing.xs),
                 Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
               ],

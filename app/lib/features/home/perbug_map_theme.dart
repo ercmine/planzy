@@ -52,11 +52,11 @@ class DryadMapTheme {
       styleUrl: isDark ? config.darkStyleUrl : config.styleUrl,
       base: isDark
           ? const DryadBasePalette(
-              land: '#111625',
-              landAccent: '#171D31',
-              water: '#0B2D50',
-              park: '#1A2E2C',
-              boundary: '#2F3B59',
+              land: '#090F20',
+              landAccent: '#131D36',
+              water: '#132F58',
+              park: '#17362F',
+              boundary: '#33456A',
             )
           : const DryadBasePalette(
               land: '#F4F6FA',
@@ -83,14 +83,14 @@ class DryadMapTheme {
           : const DryadLabelPalette(primary: '#1A2742', secondary: '#5C6C8E', halo: '#FFFFFF'),
       marker: isDark
           ? const DryadMarkerPalette(
-              normal: '#63A6FF',
-              selected: '#4F6CFF',
-              sponsored: '#FFB768',
-              reward: '#FF8B6B',
-              quest: '#3ED8B4',
-              collection: '#B59CFF',
-              cluster: '#3F5BFF',
-              user: '#6EC3FF',
+              normal: '#5E8BFF',
+              selected: '#92A6FF',
+              sponsored: '#FFCA74',
+              reward: '#FF8A5B',
+              quest: '#55D3A9',
+              collection: '#B182FF',
+              cluster: '#405EE0',
+              user: '#6DE2FF',
               text: '#F7F9FF',
               outline: '#091124',
             )
@@ -108,10 +108,10 @@ class DryadMapTheme {
             ),
       overlay: isDark
           ? const DryadOverlayPalette(
-              district: '#6C82FF',
-              districtEdge: '#9CB0FF',
+              district: '#617BFF',
+              districtEdge: '#95ACFF',
               selectionHalo: '#6A7AFF',
-              focusRing: '#FF9E67',
+              focusRing: '#FFD36E',
             )
           : const DryadOverlayPalette(
               district: '#4C66FF',

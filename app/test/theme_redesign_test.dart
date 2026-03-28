@@ -12,13 +12,19 @@ void main() {
     expect(AppMotion.extraSlow, const Duration(milliseconds: 680));
   });
 
-  test('redesigned theme uses taller premium navigation bar', () {
+  test('navigation chrome remains compact for mobile readability', () {
     final theme = AppTheme.dark();
-    expect(theme.navigationBarTheme.height, 76);
+    expect(theme.navigationBarTheme.height, 78);
   });
 
-  test('brand palette uses restrained accent colors', () {
-    expect(AppColors.darkColorScheme.primary, const Color(0xFF8EA8BA));
-    expect(AppColors.darkColorScheme.secondary, const Color(0xFFA2AAB1));
+  test('brand palette targets tactical fantasy contrast', () {
+    expect(AppColors.darkColorScheme.surface, const Color(0xFF080D1C));
+    expect(AppColors.darkColorScheme.primary, const Color(0xFF92A6FF));
+    expect(AppColors.darkColorScheme.secondary, const Color(0xFF8BC8FF));
+  });
+
+  test('rarity semantic colors are explicit and reusable', () {
+    expect(AppSemanticColors.rarity['legendary'], const Color(0xFFFFC56B));
+    expect(AppSemanticColors.mapNode['boss'], const Color(0xFFFF506D));
   });
 }

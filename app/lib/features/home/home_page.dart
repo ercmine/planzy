@@ -37,15 +37,25 @@ class _HomePageState extends State<HomePage> {
 
     return AppScaffold(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-      appBar: AppBar(title: const Text('Perbug')),
+      appBar: AppBar(
+        title: const Text('Perbug // World Command'),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: Center(
+              child: AppPill(label: 'Tactical RPG HUD', icon: Icons.auto_awesome),
+            ),
+          ),
+        ],
+      ),
       body: IndexedStack(index: _navIndex, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
         onDestinationSelected: (value) => setState(() => _navIndex = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.public_outlined), selectedIcon: Icon(Icons.public), label: 'World'),
-          NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view), label: 'Collection'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
+          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Frontier'),
+          NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Vault'),
+          NavigationDestination(icon: Icon(Icons.hub_outlined), selectedIcon: Icon(Icons.hub), label: 'Command'),
         ],
       ),
     );

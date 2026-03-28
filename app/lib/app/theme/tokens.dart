@@ -10,8 +10,10 @@ class AppRadius {
   static const double medium = AppSpacing.radiusM;
   static const double large = AppSpacing.radiusL;
   static const double extraLarge = AppSpacing.radiusXL;
-  static const double sheet = 32;
+  static const double sheet = 28;
   static const double pill = 999;
+  static const double tacticalPanel = 20;
+  static const double collectibleCard = 18;
 }
 
 class AppIconSize {
@@ -40,27 +42,66 @@ class AppElevation {
   const AppElevation._();
 
   static const double flat = 0;
-  static const double low = 2;
 
-  static List<BoxShadow> card(Color shadowColor, {bool glow = false}) {
+  static List<BoxShadow> card(Color shadowColor, {Color? rim, bool glow = false}) {
     return <BoxShadow>[
       BoxShadow(
-        color: shadowColor.withOpacity(0.16),
-        blurRadius: 28,
+        color: shadowColor.withOpacity(0.35),
+        blurRadius: 26,
         offset: const Offset(0, 16),
       ),
       if (glow)
         BoxShadow(
-          color: AppColors.electricBlue.withOpacity(0.05),
-          blurRadius: 24,
-          spreadRadius: -2,
-          offset: const Offset(0, 8),
+          color: (rim ?? AppColors.arcane).withOpacity(0.22),
+          blurRadius: 22,
+          spreadRadius: -1,
+          offset: const Offset(0, 0),
         ),
       BoxShadow(
-        color: shadowColor.withOpacity(0.08),
-        blurRadius: 10,
-        offset: const Offset(0, 3),
+        color: shadowColor.withOpacity(0.18),
+        blurRadius: 8,
+        offset: const Offset(0, 2),
       ),
     ];
   }
+}
+
+class AppSemanticColors {
+  const AppSemanticColors._();
+
+  static const Map<String, Color> rarity = {
+    'common': Color(0xFF9FA9C9),
+    'uncommon': Color(0xFF55D3A9),
+    'rare': Color(0xFF5EA1FF),
+    'epic': Color(0xFFB182FF),
+    'legendary': Color(0xFFFFC56B),
+    'mythic': Color(0xFFFF6D9D),
+  };
+
+  static const Map<String, Color> unitRoles = {
+    'vanguard': Color(0xFF5EA1FF),
+    'striker': Color(0xFFFF7F72),
+    'support': Color(0xFF55D3A9),
+    'controller': Color(0xFFAA87FF),
+    'scout': Color(0xFFF2D06E),
+    'engineer': Color(0xFF6DE2FF),
+  };
+
+  static const Map<String, Color> mapNode = {
+    'encounter': Color(0xFF5E8BFF),
+    'resource': Color(0xFF46DDA4),
+    'mission': Color(0xFFFFBC61),
+    'shop': Color(0xFFB184FF),
+    'rare': Color(0xFFFF7E9B),
+    'boss': Color(0xFFFF506D),
+    'rest': Color(0xFF5BD7FF),
+    'event': Color(0xFFF39BF8),
+  };
+
+  static const Color currencyPerbug = Color(0xFFFFD36E);
+  static const Color currencyShards = Color(0xFF6CD9FF);
+  static const Color success = Color(0xFF5AD8A5);
+  static const Color warning = Color(0xFFFFB870);
+  static const Color error = Color(0xFFFF7B83);
+  static const Color info = Color(0xFF81AFFF);
 }
