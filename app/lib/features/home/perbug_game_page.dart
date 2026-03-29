@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/theme/rpg_bar.dart';
 import '../../app/theme/widgets.dart';
 import '../../app/app_routes.dart';
 import '../../core/navigation/navigation_utils.dart';
@@ -54,14 +55,41 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [
-                FilledButton.icon(onPressed: () => context.go(AppRoutes.nodeDetails), icon: const Icon(Icons.place_outlined), label: const Text('Node details')),
-                FilledButton.icon(onPressed: () => context.go(AppRoutes.encounter), icon: const Icon(Icons.sports_martial_arts), label: const Text('Encounter')),
-                FilledButton.icon(onPressed: () => context.go(AppRoutes.squad), icon: const Icon(Icons.groups_2_outlined), label: const Text('Squad')),
-                FilledButton.icon(onPressed: () => context.go(AppRoutes.inventory), icon: const Icon(Icons.inventory_2_outlined), label: const Text('Inventory')),
-                FilledButton.icon(onPressed: () => context.go(AppRoutes.marketplace), icon: const Icon(Icons.storefront_outlined), label: const Text('Marketplace')),
-                FilledButton.icon(onPressed: () => context.go(AppRoutes.progression), icon: const Icon(Icons.flag_outlined), label: const Text('Objectives')),
-                OutlinedButton.icon(onPressed: () => context.go(AppRoutes.wallet), icon: const Icon(Icons.account_balance_wallet_outlined), label: const Text('Wallet/Login')),
+                children: [
+                SizedBox(
+                  width: 176,
+                  child: RpgBarButton(label: 'Node details', onPressed: () => context.go(AppRoutes.nodeDetails), icon: const Icon(Icons.place_outlined), height: 50),
+                ),
+                SizedBox(
+                  width: 176,
+                  child: RpgBarButton(label: 'Enter Encounter', onPressed: () => context.go(AppRoutes.encounter), icon: const Icon(Icons.sports_martial_arts), height: 50),
+                ),
+                SizedBox(
+                  width: 176,
+                  child: RpgBarButton(label: 'View Squad', onPressed: () => context.go(AppRoutes.squad), icon: const Icon(Icons.groups_2_outlined), height: 50),
+                ),
+                SizedBox(
+                  width: 176,
+                  child: RpgBarButton(label: 'Inventory', onPressed: () => context.go(AppRoutes.inventory), icon: const Icon(Icons.inventory_2_outlined), height: 50),
+                ),
+                SizedBox(
+                  width: 176,
+                  child: RpgBarButton(label: 'Open Marketplace', onPressed: () => context.go(AppRoutes.marketplace), icon: const Icon(Icons.storefront_outlined), height: 50),
+                ),
+                SizedBox(
+                  width: 176,
+                  child: RpgBarButton(label: 'Objectives', onPressed: () => context.go(AppRoutes.progression), icon: const Icon(Icons.flag_outlined), height: 50),
+                ),
+                SizedBox(
+                  width: 176,
+                  child: RpgBarButton(
+                    label: 'Wallet/Login',
+                    onPressed: () => context.go(AppRoutes.wallet),
+                    icon: const Icon(Icons.account_balance_wallet_outlined),
+                    variant: RpgButtonVariant.secondary,
+                    height: 50,
+                  ),
+                ),
               ],
             ),
           ),
@@ -176,11 +204,12 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   contentPadding: EdgeInsets.zero,
                   title: Text(objective.title),
                   subtitle: Text('${objective.description}\n${objective.progress.current}/${objective.progress.target}'),
-                  trailing: FilledButton.tonal(
+                  trailing: RpgBarButton(
+                    height: 42,
                     onPressed: objective.progress.isComplete && !objective.progress.claimed
                         ? () => controller.claimDailyObjective(objective.id)
                         : null,
-                    child: Text(objective.progress.claimed ? 'Claimed' : 'Claim'),
+                    label: objective.progress.claimed ? 'Claimed' : 'Claim Reward',
                   ),
                 ),
               ),
@@ -204,9 +233,10 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   contentPadding: EdgeInsets.zero,
                   title: Text(milestone.title),
                   subtitle: Text('${milestone.current}/${milestone.target}'),
-                  trailing: FilledButton(
+                  trailing: RpgBarButton(
+                    height: 42,
                     onPressed: milestone.isComplete && !milestone.claimed ? () => controller.claimMilestoneReward(milestone.id) : null,
-                    child: Text(milestone.claimed ? 'Claimed' : 'Claim'),
+                    label: milestone.claimed ? 'Claimed' : 'Claim Reward',
                   ),
                 ),
               ),
@@ -347,7 +377,8 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                         '${move.node.region} • ${((move.node.distanceFromCurrentMeters ?? 0) / 1000).toStringAsFixed(2)}km • ${move.reason}\n'
                         'Icon ${visual.iconRef.id} • Tile ${visual.tileRef.id}',
                       ),
-                      trailing: TextButton(
+                      trailing: RpgBarButton(
+                        height: 42,
                         onPressed: move.isReachable
                             ? () => runGuardedUiAction(
                                 context,
@@ -363,7 +394,8 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                                 },
                               )
                             : null,
-                        child: Text('Move (${move.energyCost}⚡ + ${move.totalPerbugCost}Ⓟ)'),
+                        label: 'Move (${move.energyCost}⚡ + ${move.totalPerbugCost}Ⓟ)',
+                        variant: RpgButtonVariant.secondary,
                       ),
                     );
                   },
@@ -596,10 +628,10 @@ class _OnboardingCoachCard extends StatelessWidget {
             runSpacing: 8,
             children: [
               if (canContinue)
-                FilledButton.icon(
+                RpgBarButton(
                   onPressed: onContinue,
                   icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Continue'),
+                  label: 'Continue',
                 ),
               TextButton(onPressed: onSkip, child: const Text('Skip tutorial')),
             ],
@@ -700,7 +732,14 @@ class _Section extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          RpgBarSurface(
+            height: 54,
+            tint: const Color(0x2A000000),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+            ),
+          ),
           const SizedBox(height: 4),
           Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 8),
