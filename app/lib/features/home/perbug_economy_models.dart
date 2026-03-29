@@ -18,6 +18,7 @@ enum ResourceSource {
   nodeEncounter,
   resourceNode,
   missionNode,
+  systemGrant,
   bossNode,
   crafting,
   consumableUse,
@@ -346,7 +347,7 @@ class PerbugEconomyState {
     this.walletLink = WalletLinkState.disconnected,
   });
 
-  factory PerbugEconomyState.initial() => const PerbugEconomyState(
+  factory PerbugEconomyState.initial() => PerbugEconomyState(
         inventory: Inventory(stacks: {'ore': 0, 'scrap': 0, 'signal_shard': 0}),
         unlockedRecipeIds: {'field_kit', 'upgrade_module'},
         sessions: [],

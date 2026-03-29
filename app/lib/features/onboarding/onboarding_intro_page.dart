@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
-import '../../core/location/location_controller.dart';
+import '../../providers/app_providers.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_widgets.dart';
 
@@ -53,7 +53,7 @@ class OnboardingIntroPage extends ConsumerWidget {
               onPressed: onboarding.isBusy
                   ? null
                   : () async {
-                      await ref.read(locationControllerProvider.notifier).requestPermissionAndRefresh();
+                      await ref.read(locationControllerProvider.notifier).requestPermissionAndLoad();
                       await ref.read(onboardingControllerProvider.notifier).startOnboardingExpedition();
                       if (context.mounted) {
                         context.go('/');

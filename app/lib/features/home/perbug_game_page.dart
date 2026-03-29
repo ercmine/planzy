@@ -212,7 +212,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(entry.key),
-                  subtitle: LinearProgressIndicator(value: ratio.clamp(0, 1)),
+                  subtitle: LinearProgressIndicator(value: ratio.clamp(0, 1).toDouble()),
                   trailing: Text('$cleared/${entry.value}'),
                 );
               }),

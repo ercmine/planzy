@@ -114,9 +114,9 @@ class GridPathDifficulty {
         'obstacle_density': config.obstacleDensity,
         'branch_complexity': config.branchComplexity,
         'false_path_count': config.falsePathCount,
-        'move_limit': config.rules.moveLimit,
+        'move_limit': config.rules.moveLimit ?? -1,
         'no_revisit': config.rules.disallowRevisit,
-        'timer_seconds': config.rules.timerSeconds,
+        'timer_seconds': config.rules.timerSeconds ?? -1,
       },
     );
   }
