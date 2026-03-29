@@ -2,8 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/theme/widgets.dart';
+import '../../app/app_routes.dart';
+import '../../core/navigation/navigation_utils.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_state.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';
@@ -46,6 +49,22 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             badge: const AppPill(label: 'Map-native strategy RPG', icon: Icons.explore),
           ),
           const SizedBox(height: 12),
+          AppCard(
+            tone: AppCardTone.kpi,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(onPressed: () => context.go(AppRoutes.nodeDetails), icon: const Icon(Icons.place_outlined), label: const Text('Node details')),
+                FilledButton.icon(onPressed: () => context.go(AppRoutes.encounter), icon: const Icon(Icons.sports_martial_arts), label: const Text('Encounter')),
+                FilledButton.icon(onPressed: () => context.go(AppRoutes.squad), icon: const Icon(Icons.groups_2_outlined), label: const Text('Squad')),
+                FilledButton.icon(onPressed: () => context.go(AppRoutes.inventory), icon: const Icon(Icons.inventory_2_outlined), label: const Text('Inventory')),
+                FilledButton.icon(onPressed: () => context.go(AppRoutes.marketplace), icon: const Icon(Icons.storefront_outlined), label: const Text('Marketplace')),
+                FilledButton.icon(onPressed: () => context.go(AppRoutes.progression), icon: const Icon(Icons.flag_outlined), label: const Text('Objectives')),
+                OutlinedButton.icon(onPressed: () => context.go(AppRoutes.wallet), icon: const Icon(Icons.account_balance_wallet_outlined), label: const Text('Wallet/Login')),
+              ],
+            ),
+          ),
           if (!onboarding.hasCompleted && onboarding.step != OnboardingStep.identityIntro) ...[
             _OnboardingCoachCard(
               state: onboarding,
@@ -330,15 +349,19 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                       ),
                       trailing: TextButton(
                         onPressed: move.isReachable
-                            ? () async {
-                                final ok = await controller.jumpTo(move);
+                            ? () => runGuardedUiAction(
+                                context,
+                                actionLabel: 'Move to node',
+                                action: () async {
+                                  final ok = await controller.jumpTo(move);
                                 if (!context.mounted || !ok) return;
                                 await onboardingController.recordFirstMove();
                                 if (onboarding.step == OnboardingStep.firstMove) {
                                   await onboardingController.advanceTo(OnboardingStep.firstEncounter);
                                 }
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Moved to ${move.node.label}')));
-                              }
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Moved to ${move.node.label}')));
+                                },
+                              )
                             : null,
                         child: Text('Move (${move.energyCost}⚡ + ${move.totalPerbugCost}Ⓟ)'),
                       ),

@@ -201,12 +201,13 @@ class AdInlineCard extends StatelessWidget {
 }
 
 class EmptyStateCard extends StatelessWidget {
-  const EmptyStateCard({required this.icon, required this.title, required this.description, required this.cta, super.key});
+  const EmptyStateCard({required this.icon, required this.title, required this.description, required this.cta, this.onPressed, super.key});
 
   final IconData icon;
   final String title;
   final String description;
   final String cta;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +220,7 @@ class EmptyStateCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           Text(description, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: AppSpacing.s),
-          FilledButton.tonal(onPressed: () {}, child: Text(cta)),
+          FilledButton.tonal(onPressed: onPressed, child: Text(cta)),
         ],
       ),
     );

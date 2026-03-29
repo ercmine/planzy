@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/app_routes.dart';
 import '../../app/theme/widgets.dart';
 import '../collections/collections_page.dart';
 import '../settings/settings_page.dart';
@@ -18,17 +20,10 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   static const List<HomeTab> _tabs = [HomeTab.world, HomeTab.collection, HomeTab.profile];
-  late int _navIndex;
-
-  @override
-  void initState() {
-    super.initState();
-    _navIndex = _tabs.indexOf(widget.initialTab);
-    if (_navIndex < 0) _navIndex = 0;
-  }
 
   @override
   Widget build(BuildContext context) {
+    final selectedIndex = _tabs.indexOf(widget.initialTab).clamp(0, _tabs.length - 1);
     final pages = const [
       PerbugGamePage(),
       CollectionsPage(collections: []),
@@ -48,10 +43,22 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: IndexedStack(index: _navIndex, children: pages),
+      body: IndexedStack(index: selectedIndex, children: pages),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _navIndex,
-        onDestinationSelected: (value) => setState(() => _navIndex = value),
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (value) {
+          switch (value) {
+            case 0:
+              context.go(AppRoutes.liveMap);
+              break;
+            case 1:
+              context.go(AppRoutes.collection);
+              break;
+            case 2:
+              context.go(AppRoutes.profile);
+              break;
+          }
+        },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Frontier'),
           NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Vault'),

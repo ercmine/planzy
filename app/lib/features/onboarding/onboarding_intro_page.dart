@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../app/app_routes.dart';
 import '../../providers/app_providers.dart';
+import '../../core/navigation/navigation_utils.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_widgets.dart';
 
@@ -52,20 +54,26 @@ class OnboardingIntroPage extends ConsumerWidget {
               isLoading: onboarding.isBusy,
               onPressed: onboarding.isBusy
                   ? null
-                  : () async {
-                      await ref.read(locationControllerProvider.notifier).requestPermissionAndLoad();
-                      await ref.read(onboardingControllerProvider.notifier).startOnboardingExpedition();
-                      if (context.mounted) {
-                        context.go('/');
-                      }
-                    },
+                  : () => runGuardedUiAction(
+                      context,
+                      actionLabel: 'Deploy to live map',
+                      action: () async {
+                        await ref.read(locationControllerProvider.notifier).requestPermissionAndLoad();
+                        await ref.read(onboardingControllerProvider.notifier).startOnboardingExpedition();
+                        if (context.mounted) context.go(AppRoutes.liveMap);
+                      },
+                    ),
             ),
             const SizedBox(height: AppSpacing.s),
             TextButton(
-              onPressed: () async {
-                await ref.read(onboardingControllerProvider.notifier).skipOnboarding();
-                if (context.mounted) context.go('/');
-              },
+              onPressed: () => runGuardedUiAction(
+                context,
+                actionLabel: 'Skip tutorial',
+                action: () async {
+                  await ref.read(onboardingControllerProvider.notifier).skipOnboarding();
+                  if (context.mounted) context.go(AppRoutes.liveMap);
+                },
+              ),
               child: const Text('Skip tutorial and enter command map'),
             ),
             if (location.errorMessage != null)

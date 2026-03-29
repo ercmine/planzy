@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../app/app_routes.dart';
 import '../../providers/app_providers.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_widgets.dart';
@@ -68,7 +69,7 @@ class _OnboardingLocationPageState extends ConsumerState<OnboardingLocationPage>
             ),
           ],
           const Spacer(),
-          PrimaryButton(label: 'Continue', onPressed: () => context.go('/onboarding/interests'), icon: const Icon(Icons.arrow_forward_rounded)),
+          PrimaryButton(label: 'Continue', onPressed: () => context.go(AppRoutes.onboardingInterests), icon: const Icon(Icons.arrow_forward_rounded)),
         ],
       ),
     );

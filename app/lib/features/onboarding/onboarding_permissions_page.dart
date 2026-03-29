@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/brand/logo.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../app/app_routes.dart';
 import '../../providers/app_providers.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_widgets.dart';
@@ -18,7 +19,7 @@ class OnboardingPermissionsPage extends ConsumerWidget {
       await ref.read(locationControllerProvider.notifier).requestPermissionAndLoad();
       await ref.read(onboardingControllerProvider.notifier).finish();
       if (context.mounted) {
-        context.go('/');
+        context.go(AppRoutes.liveMap);
       }
     }
 
