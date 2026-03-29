@@ -1,0 +1,50 @@
+import type { ContentEngagementRecord, CreatorVideoRecord, FirstPartyPlaceMetrics, GuideItemRecord, GuideRecord, PlaceSaveRecord, ReviewRecord } from "./types.js";
+export interface PlaceContentStore {
+    createReview(input: Omit<ReviewRecord, "id" | "createdAt" | "updatedAt" | "helpfulCount" | "reportCount">): Promise<ReviewRecord>;
+    listReviewsByPlace(canonicalPlaceId: string): Promise<ReviewRecord[]>;
+    createVideo(input: Omit<CreatorVideoRecord, "id" | "createdAt" | "updatedAt" | "viewCount" | "likeCount">): Promise<CreatorVideoRecord>;
+    listVideosByPlace(canonicalPlaceId: string): Promise<CreatorVideoRecord[]>;
+    upsertSave(input: Omit<PlaceSaveRecord, "id" | "createdAt">): Promise<PlaceSaveRecord>;
+    deleteSave(userId: string, canonicalPlaceId: string): Promise<void>;
+    listSavesByPlace(canonicalPlaceId: string): Promise<PlaceSaveRecord[]>;
+    createGuide(input: Omit<GuideRecord, "id" | "createdAt" | "updatedAt">): Promise<GuideRecord>;
+    getGuide(guideId: string): Promise<GuideRecord | undefined>;
+    addGuideItem(input: Omit<GuideItemRecord, "position" | "addedAt">): Promise<GuideItemRecord>;
+    listGuideItems(guideId: string): Promise<GuideItemRecord[]>;
+    listGuidesByPlace(canonicalPlaceId: string): Promise<GuideRecord[]>;
+    appendEngagement(input: Omit<ContentEngagementRecord, "id">): Promise<ContentEngagementRecord>;
+    listEngagementByPlace(canonicalPlaceId: string): Promise<ContentEngagementRecord[]>;
+    listAllReviews(): Promise<ReviewRecord[]>;
+    listAllVideos(): Promise<CreatorVideoRecord[]>;
+    listAllGuides(): Promise<GuideRecord[]>;
+    upsertPlaceMetrics(metrics: FirstPartyPlaceMetrics): Promise<FirstPartyPlaceMetrics>;
+    getPlaceMetrics(canonicalPlaceId: string): Promise<FirstPartyPlaceMetrics | undefined>;
+}
+export declare class MemoryPlaceContentStore implements PlaceContentStore {
+    private readonly reviews;
+    private readonly videos;
+    private readonly saves;
+    private readonly guides;
+    private readonly guideItems;
+    private readonly engagement;
+    private readonly metrics;
+    createReview(input: Omit<ReviewRecord, "id" | "createdAt" | "updatedAt" | "helpfulCount" | "reportCount">): Promise<ReviewRecord>;
+    listReviewsByPlace(canonicalPlaceId: string): Promise<ReviewRecord[]>;
+    createVideo(input: Omit<CreatorVideoRecord, "id" | "createdAt" | "updatedAt" | "viewCount" | "likeCount">): Promise<CreatorVideoRecord>;
+    listVideosByPlace(canonicalPlaceId: string): Promise<CreatorVideoRecord[]>;
+    upsertSave(input: Omit<PlaceSaveRecord, "id" | "createdAt">): Promise<PlaceSaveRecord>;
+    deleteSave(userId: string, canonicalPlaceId: string): Promise<void>;
+    listSavesByPlace(canonicalPlaceId: string): Promise<PlaceSaveRecord[]>;
+    createGuide(input: Omit<GuideRecord, "id" | "createdAt" | "updatedAt">): Promise<GuideRecord>;
+    getGuide(guideId: string): Promise<GuideRecord | undefined>;
+    addGuideItem(input: Omit<GuideItemRecord, "position" | "addedAt">): Promise<GuideItemRecord>;
+    listGuideItems(guideId: string): Promise<GuideItemRecord[]>;
+    listGuidesByPlace(canonicalPlaceId: string): Promise<GuideRecord[]>;
+    appendEngagement(input: Omit<ContentEngagementRecord, "id">): Promise<ContentEngagementRecord>;
+    listEngagementByPlace(canonicalPlaceId: string): Promise<ContentEngagementRecord[]>;
+    listAllReviews(): Promise<ReviewRecord[]>;
+    listAllVideos(): Promise<CreatorVideoRecord[]>;
+    listAllGuides(): Promise<GuideRecord[]>;
+    upsertPlaceMetrics(metrics: FirstPartyPlaceMetrics): Promise<FirstPartyPlaceMetrics>;
+    getPlaceMetrics(canonicalPlaceId: string): Promise<FirstPartyPlaceMetrics | undefined>;
+}

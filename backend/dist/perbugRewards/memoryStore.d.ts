@@ -1,0 +1,37 @@
+import type { AdminAuditLogRecord, DryadRewardsStore, DryadRewardTier, PlaceRecord, PlaceRewardState, RewardClaimRecord, RewardEligibilityRecord, RewardReviewRecord, WalletNonce, WalletRecord } from "./types.js";
+export declare class MemoryDryadRewardsStore implements DryadRewardsStore {
+    private readonly tiers;
+    private readonly places;
+    private readonly placeRewardStates;
+    private readonly reviews;
+    private readonly eligibility;
+    private readonly claims;
+    private readonly claimsByIdempotency;
+    private readonly wallets;
+    private readonly walletNonces;
+    private readonly auditLogs;
+    listRewardTiers(): DryadRewardTier[];
+    saveRewardTier(tier: DryadRewardTier): void;
+    listPlaces(): PlaceRecord[];
+    getPlace(placeId: string): PlaceRecord | null;
+    savePlace(place: PlaceRecord): void;
+    getPlaceRewardState(placeId: string): PlaceRewardState | null;
+    savePlaceRewardState(state: PlaceRewardState): void;
+    listReviewsForPlace(placeId: string): RewardReviewRecord[];
+    listReviewsForUser(userId: string): RewardReviewRecord[];
+    getReview(reviewId: string): RewardReviewRecord | null;
+    saveReview(review: RewardReviewRecord): void;
+    getEligibility(reviewId: string): RewardEligibilityRecord | null;
+    saveEligibility(record: RewardEligibilityRecord): void;
+    listClaimsForUser(userId: string): RewardClaimRecord[];
+    getClaimByReview(reviewId: string): RewardClaimRecord | null;
+    getClaimByIdempotencyKey(idempotencyKey: string): RewardClaimRecord | null;
+    saveClaim(record: RewardClaimRecord): void;
+    listWalletsForUser(userId: string): WalletRecord[];
+    getWalletByPublicKey(publicKey: string): WalletRecord | null;
+    saveWallet(wallet: WalletRecord): void;
+    listWalletNonces(publicKey: string): WalletNonce[];
+    saveWalletNonce(record: WalletNonce): void;
+    listAuditLogs(): AdminAuditLogRecord[];
+    addAuditLog(log: AdminAuditLogRecord): void;
+}

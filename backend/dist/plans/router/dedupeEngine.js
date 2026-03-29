@@ -1,0 +1,199 @@
+import { haversineMeters } from "./geo.js";
+import { mergePlans } from "./merge.js";
+import { addressSimilarity, nameSimilarity } from "./similarity.js";
+const DEFAULT_OPTIONS = {
+    geoThresholdMeters: 120,
+    nameSimilarityMin: 0.72,
+    addressSimilarityMin: 0.6,
+    requireAddressForMerge: false,
+    maxGroupSize: 6
+};
+function bucketValue(value) {
+    return Math.round(value * 1000);
+}
+function bucketKey(lat, lng) {
+    return `${bucketValue(lat)}:${bucketValue(lng)}`;
+}
+function neighboringBuckets(lat, lng) {
+    const latBucket = bucketValue(lat);
+    const lngBucket = bucketValue(lng);
+    const keys = [];
+    for (let dx = -1; dx <= 1; dx += 1) {
+        for (let dy = -1; dy <= 1; dy += 1) {
+            keys.push(`${latBucket + dx}:${lngBucket + dy}`);
+        }
+    }
+    return keys;
+}
+function isMovieVenueMismatch(a, b) {
+    const aKind = typeof a.metadata?.kind === "string" ? a.metadata.kind : undefined;
+    const bKind = typeof b.metadata?.kind === "string" ? b.metadata.kind : undefined;
+    if (a.category !== "movies" && b.category !== "movies") {
+        return false;
+    }
+    const oneIsTmdb = a.source === "tmdb" || b.source === "tmdb";
+    if (!oneIsTmdb) {
+        return false;
+    }
+    const aIsTheater = aKind === "theater";
+    const bIsTheater = bKind === "theater";
+    return !(aIsTheater && bIsTheater);
+}
+function tokenSetFromTitle(value) {
+    return new Set(value
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]+/g, " ")
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0 && token !== "the" && token !== "a" && token !== "an"));
+}
+function fallbackNameSimilarity(a, b) {
+    const aTokens = tokenSetFromTitle(a);
+    const bTokens = tokenSetFromTitle(b);
+    if (aTokens.size === 0 || bTokens.size === 0) {
+        return 0;
+    }
+    let intersection = 0;
+    for (const token of aTokens) {
+        if (bTokens.has(token)) {
+            intersection += 1;
+        }
+    }
+    const union = aTokens.size + bTokens.size - intersection;
+    return union > 0 ? intersection / union : 0;
+}
+function chooseFallback(candidates) {
+    const scored = candidates.map((candidate, index) => {
+        const score = (candidate.rating ?? 0) * 1000 +
+            (candidate.reviewCount ?? 0) * 10 +
+            (candidate.photos?.length ?? 0) * 2 +
+            (candidate.description ? 1 : 0) +
+            (candidate.deepLinks?.websiteLink ? 1 : 0);
+        return { candidate, index, score };
+    });
+    scored.sort((a, b) => b.score - a.score || a.index - b.index || a.candidate.id.localeCompare(b.candidate.id));
+    return scored[0]?.candidate ?? candidates[0];
+}
+function canMerge(anchor, other, opts) {
+    if (isMovieVenueMismatch(anchor, other)) {
+        return { ok: false, reason: "movie/venue mismatch" };
+    }
+    const geoDistance = haversineMeters(anchor.location, other.location);
+    if (geoDistance > opts.geoThresholdMeters) {
+        return { ok: false, reason: `geo>${opts.geoThresholdMeters}` };
+    }
+    const baseNameScore = nameSimilarity(anchor.title, other.title);
+    const nameScore = baseNameScore > 0 ? baseNameScore : fallbackNameSimilarity(anchor.title, other.title);
+    if (nameScore < opts.nameSimilarityMin) {
+        return { ok: false, reason: `name<${opts.nameSimilarityMin}` };
+    }
+    const aAddress = anchor.location.address;
+    const bAddress = other.location.address;
+    if (opts.requireAddressForMerge && (!aAddress || !bAddress)) {
+        return { ok: false, reason: "address required" };
+    }
+    const addrScore = addressSimilarity(aAddress, bAddress);
+    if (aAddress && bAddress) {
+        if (addrScore < opts.addressSimilarityMin) {
+            return { ok: false, reason: `address<${opts.addressSimilarityMin}` };
+        }
+    }
+    else if (nameScore < 0.85) {
+        return { ok: false, reason: "missing address and weak name" };
+    }
+    return { ok: true, reason: `geo=${geoDistance.toFixed(1)},name=${nameScore.toFixed(2)},addr=${addrScore.toFixed(2)}` };
+}
+export function dedupeAndMergePlans(plans, opts) {
+    const resolvedOpts = {
+        ...DEFAULT_OPTIONS,
+        ...opts
+    };
+    const uniqueById = new Map();
+    for (const plan of plans) {
+        if (!uniqueById.has(plan.id)) {
+            uniqueById.set(plan.id, plan);
+        }
+    }
+    const uniquePlans = [...uniqueById.values()];
+    const indexed = uniquePlans.map((plan, index) => ({
+        index,
+        plan,
+        bucketKey: bucketKey(plan.location.lat, plan.location.lng)
+    }));
+    const bucketMap = new Map();
+    for (const item of indexed) {
+        const bucketItems = bucketMap.get(item.bucketKey) ?? [];
+        bucketItems.push(item);
+        bucketMap.set(item.bucketKey, bucketItems);
+    }
+    for (const [key, values] of bucketMap.entries()) {
+        values.sort((a, b) => a.index - b.index || a.plan.id.localeCompare(b.plan.id));
+        bucketMap.set(key, values);
+    }
+    const grouped = new Set();
+    const output = [];
+    const groups = [];
+    for (const item of indexed) {
+        if (grouped.has(item.index)) {
+            continue;
+        }
+        const group = [item];
+        const reasons = [];
+        const nearbyKeys = neighboringBuckets(item.plan.location.lat, item.plan.location.lng);
+        const compared = nearbyKeys
+            .flatMap((key) => bucketMap.get(key) ?? [])
+            .filter((candidate) => candidate.index > item.index && !grouped.has(candidate.index))
+            .sort((a, b) => a.index - b.index || a.plan.id.localeCompare(b.plan.id));
+        for (const candidate of compared) {
+            if (group.length >= resolvedOpts.maxGroupSize) {
+                reasons.push("maxGroupSize reached");
+                break;
+            }
+            const decision = canMerge(item.plan, candidate.plan, resolvedOpts);
+            if (!decision.ok) {
+                continue;
+            }
+            group.push(candidate);
+            reasons.push(`${candidate.plan.id}:${decision.reason}`);
+        }
+        if (group.length === 1) {
+            grouped.add(item.index);
+            output.push(item.plan);
+            continue;
+        }
+        const candidates = group.map((entry) => entry.plan);
+        try {
+            const merged = mergePlans(candidates);
+            grouped.add(item.index);
+            for (const member of group.slice(1)) {
+                grouped.add(member.index);
+            }
+            output.push(merged.plan);
+            groups.push({
+                keptId: merged.plan.id,
+                mergedIds: merged.mergedFrom,
+                reason: reasons.join("; ") || "merged"
+            });
+        }
+        catch {
+            const fallback = chooseFallback(candidates);
+            grouped.add(item.index);
+            for (const member of group.slice(1)) {
+                grouped.add(member.index);
+            }
+            output.push(fallback);
+            groups.push({
+                keptId: fallback.id,
+                mergedIds: candidates.map((candidate) => candidate.id),
+                reason: "merge validation failed; fallback to best single"
+            });
+        }
+    }
+    return {
+        plans: output,
+        debug: {
+            merged: groups.length,
+            groups
+        }
+    };
+}

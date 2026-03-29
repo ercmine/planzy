@@ -1,0 +1,34 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Logger } from "../../logging/loggerTypes.js";
+import type { VenueClaimsService } from "./claimsService.js";
+export declare function parseJsonBody(req: IncomingMessage): Promise<unknown>;
+export declare function sendJson(res: ServerResponse, status: number, body: unknown): void;
+export declare function readHeader(req: IncomingMessage, name: string): string | undefined;
+export declare function createVenueClaimsHttpHandlers(service: VenueClaimsService, deps?: {
+    logger?: Logger;
+}): {
+    handleCreate: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    handleList: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    handlePatchStatus: (req: IncomingMessage, res: ServerResponse, claimId: string) => Promise<void>;
+    handleCreateBusinessClaimDraft: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    handleSubmitClaim: (req: IncomingMessage, res: ServerResponse, claimId: string) => Promise<void>;
+    handleGetClaim: (req: IncomingMessage, res: ServerResponse, claimId: string) => Promise<void>;
+    handleAddEvidence: (req: IncomingMessage, res: ServerResponse, claimId: string) => Promise<void>;
+    handleListEvidence: (req: IncomingMessage, res: ServerResponse, claimId: string) => Promise<void>;
+    handleReviewClaim: (req: IncomingMessage, res: ServerResponse, claimId: string) => Promise<void>;
+    handleRevokeOwnership: (req: IncomingMessage, res: ServerResponse, ownershipId: string) => Promise<void>;
+    handleUpsertOfficialContent: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handlePlaceManagementState: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handleUpdateOfficialDescription: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handleSubmitCategorySuggestion: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handleUpdateManagedHours: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handleUpsertBusinessLink: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handleUpsertMenuServices: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handleUpsertBusinessImage: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handleUpsertBusinessContactMethod: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handleListBusinessContactMethods: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handleVerifyBusinessContactMethod: (req: IncomingMessage, res: ServerResponse, placeId: string, contactMethodId: string) => Promise<void>;
+    handleBusinessTrustStatus: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handlePublicBusinessTrust: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+    handleAdminBusinessTrust: (req: IncomingMessage, res: ServerResponse, placeId: string) => Promise<void>;
+};

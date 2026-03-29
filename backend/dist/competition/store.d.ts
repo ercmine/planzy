@@ -1,0 +1,33 @@
+import type { CompetitionAuditLog, CompetitionLeaderboard, CompetitionLeaderboardEntry, CompetitionLikeEvent, CompetitionMission, CompetitionMissionProgress, CompetitionReward, CompetitionReviewEvent, CompetitionSeason, CompetitionTipEvent, CompetitionUserProfile, CompetitionVideoQualitySnapshot } from "./types.js";
+export interface CompetitionStore {
+    getSeason(id: string): CompetitionSeason | null;
+    listSeasons(): CompetitionSeason[];
+    saveSeason(season: CompetitionSeason): void;
+    listMissions(): CompetitionMission[];
+    getMission(id: string): CompetitionMission | null;
+    saveMission(mission: CompetitionMission): void;
+    listMissionProgress(): CompetitionMissionProgress[];
+    getMissionProgress(missionId: string, userId: string): CompetitionMissionProgress | null;
+    saveMissionProgress(progress: CompetitionMissionProgress): void;
+    listLeaderboards(): CompetitionLeaderboard[];
+    getLeaderboard(id: string): CompetitionLeaderboard | null;
+    saveLeaderboard(leaderboard: CompetitionLeaderboard): void;
+    listLeaderboardEntries(leaderboardId: string): CompetitionLeaderboardEntry[];
+    saveLeaderboardEntries(leaderboardId: string, entries: CompetitionLeaderboardEntry[]): void;
+    getQualitySnapshot(videoId: string): CompetitionVideoQualitySnapshot | null;
+    listQualitySnapshots(): CompetitionVideoQualitySnapshot[];
+    saveQualitySnapshot(snapshot: CompetitionVideoQualitySnapshot): void;
+    listLikeEvents(videoId: string): CompetitionLikeEvent[];
+    saveLikeEvent(event: CompetitionLikeEvent): void;
+    listTipEvents(userId?: string): CompetitionTipEvent[];
+    saveTipEvent(event: CompetitionTipEvent): void;
+    listReviewEvents(userId?: string): CompetitionReviewEvent[];
+    saveReviewEvent(event: CompetitionReviewEvent): void;
+    getUserProfile(userId: string): CompetitionUserProfile | null;
+    saveUserProfile(profile: CompetitionUserProfile): void;
+    listRewards(userId?: string): CompetitionReward[];
+    getReward(id: string): CompetitionReward | null;
+    saveReward(reward: CompetitionReward): void;
+    listAuditLogs(): CompetitionAuditLog[];
+    addAuditLog(log: CompetitionAuditLog): void;
+}

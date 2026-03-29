@@ -1,0 +1,22 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { DryadEconomyService } from "./service.js";
+export declare function createDryadEconomyHttpHandlers(service: DryadEconomyService): {
+    creditUser: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    createQuest: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    completeQuest: (req: IncomingMessage, res: ServerResponse, questId: string) => Promise<void>;
+    checkIn: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    upsertCollection: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    progressCollection: (req: IncomingMessage, res: ServerResponse, collectionId: string) => Promise<void>;
+    recordCreatorReward: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    claimCreatorReward: (req: IncomingMessage, res: ServerResponse, rewardId: string) => Promise<void>;
+    createGuide: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    guideAnalytics: (req: IncomingMessage, res: ServerResponse, guideId: string) => Promise<void>;
+    purchaseMembership: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    createOffer: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    redeemOffer: (req: IncomingMessage, res: ServerResponse, offerId: string) => Promise<void>;
+    updateSplit: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    adminDashboard: (_req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    consumerDashboard: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    creatorDashboard: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    businessDashboard: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+};

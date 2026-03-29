@@ -1,0 +1,115 @@
+import { ProviderError, ValidationError } from "./errors.js";
+import { planId } from "./plan.js";
+import { validatePlanArray } from "./planValidation.js";
+import { validateSearchPlansInput } from "./validation.js";
+const STUB_DATA = [
+    { sourceId: "1", title: "Sunrise Cafe", category: "coffee", location: { lat: 37.775, lng: -122.418, address: "101 Market St" }, priceLevel: 1, hours: { openNow: true } },
+    { sourceId: "2", title: "Golden Slice", category: "food", location: { lat: 37.776, lng: -122.419, address: "22 Mission St" }, priceLevel: 2, hours: { openNow: true } },
+    { sourceId: "3", title: "Moonlight Bar", category: "drinks", location: { lat: 37.778, lng: -122.421, address: "8 Howard St" }, priceLevel: 3, hours: { openNow: false } },
+    { sourceId: "4", title: "Park Trail Loop", category: "outdoors", location: { lat: 37.769, lng: -122.486, address: "Golden Gate Park" }, priceLevel: 0, hours: { openNow: true } },
+    { sourceId: "5", title: "Indie Cinema", category: "movies", location: { lat: 37.764, lng: -122.463, address: "450 Funston Ave" }, priceLevel: 2, hours: { openNow: false } },
+    { sourceId: "6", title: "Jazz Corner", category: "music", location: { lat: 37.782, lng: -122.410, address: "44 2nd St" }, priceLevel: 2, hours: { openNow: true } },
+    { sourceId: "7", title: "Urban Outfit Plaza", category: "shopping", location: { lat: 37.784, lng: -122.407, address: "200 Powell St" }, priceLevel: 3, hours: { openNow: true } },
+    { sourceId: "8", title: "Calm Wellness", category: "wellness", location: { lat: 37.770, lng: -122.430, address: "98 Hayes St" }, priceLevel: 2, hours: { openNow: false } },
+    { sourceId: "9", title: "City Sports Hub", category: "sports", location: { lat: 37.768, lng: -122.392, address: "1 King St" }, priceLevel: 1, hours: { openNow: true } },
+    { sourceId: "10", title: "Neighborhood Surprise", category: "other", location: { lat: 37.760, lng: -122.447, address: "77 Castro St" }, priceLevel: 0, hours: { openNow: true } },
+    { sourceId: "11", title: "Pier Coffee Roasters", category: "coffee", location: { lat: 37.808, lng: -122.409, address: "39 Pier" }, priceLevel: 2, hours: { openNow: true } },
+    { sourceId: "12", title: "Bistro Vista", category: "food", location: { lat: 37.800, lng: -122.437, address: "300 Lombard St" }, priceLevel: 4, hours: { openNow: false } }
+];
+function encodeCursor(offset) {
+    return Buffer.from(String(offset), "utf8").toString("base64");
+}
+function decodeCursor(cursor) {
+    if (!cursor) {
+        return 0;
+    }
+    const decoded = Buffer.from(cursor, "base64").toString("utf8");
+    const parsed = Number.parseInt(decoded, 10);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+        throw new ValidationError(["cursor is invalid"]);
+    }
+    return parsed;
+}
+function haversineMeters(aLat, aLng, bLat, bLng) {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const earthRadius = 6_371_000;
+    const dLat = toRad(bLat - aLat);
+    const dLng = toRad(bLng - aLng);
+    const sinLat = Math.sin(dLat / 2);
+    const sinLng = Math.sin(dLng / 2);
+    const aa = sinLat * sinLat + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * sinLng * sinLng;
+    const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+    return earthRadius * c;
+}
+export class StubProvider {
+    name = "stub";
+    async searchPlans(input, ctx) {
+        const started = Date.now();
+        if (ctx?.signal?.aborted) {
+            throw new ProviderError({
+                provider: this.name,
+                code: "ABORTED",
+                message: "Provider request was aborted",
+                retryable: true,
+                cause: ctx.signal.reason
+            });
+        }
+        const normalized = validateSearchPlansInput(input);
+        const offset = decodeCursor(normalized.cursor);
+        const filtered = [];
+        for (const record of STUB_DATA) {
+            if (ctx?.signal?.aborted) {
+                throw new ProviderError({
+                    provider: this.name,
+                    code: "ABORTED",
+                    message: "Provider request was aborted",
+                    retryable: true,
+                    cause: ctx.signal.reason
+                });
+            }
+            const distanceMeters = haversineMeters(normalized.location.lat, normalized.location.lng, record.location.lat, record.location.lng);
+            if (distanceMeters > normalized.radiusMeters) {
+                continue;
+            }
+            if (normalized.categories && normalized.categories.length > 0 && !normalized.categories.includes(record.category)) {
+                continue;
+            }
+            if (normalized.priceLevelMax !== undefined) {
+                const price = record.priceLevel ?? 0;
+                if (price > normalized.priceLevelMax) {
+                    continue;
+                }
+            }
+            if (normalized.openNow !== undefined && record.hours?.openNow !== normalized.openNow) {
+                continue;
+            }
+            filtered.push({ record, distanceMeters });
+        }
+        filtered.sort((a, b) => a.distanceMeters - b.distanceMeters);
+        const paged = filtered.slice(offset, offset + normalized.limit);
+        const nextOffset = offset + paged.length;
+        const nextCursor = nextOffset < filtered.length ? encodeCursor(nextOffset) : null;
+        const plans = paged.map(({ record, distanceMeters }) => ({
+            id: planId(this.name, record.sourceId),
+            source: this.name,
+            sourceId: record.sourceId,
+            title: record.title,
+            category: record.category,
+            description: record.description,
+            location: record.location,
+            distanceMeters: Math.round(distanceMeters),
+            priceLevel: record.priceLevel,
+            hours: record.hours
+        }));
+        const validatedPlans = validatePlanArray(plans);
+        return {
+            plans: validatedPlans,
+            nextCursor,
+            source: this.name,
+            debug: {
+                tookMs: Date.now() - started,
+                returned: validatedPlans.length
+            }
+        };
+    }
+}

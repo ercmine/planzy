@@ -1,0 +1,23 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { SponsoredLocationsService } from "./service.js";
+export declare function createSponsoredLocationsHttpHandlers(service: SponsoredLocationsService): {
+    requestPlaceAccess: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    approvePlaceAccess: (req: IncomingMessage, res: ServerResponse, accessId: string) => Promise<void>;
+    createCampaign: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    fundCampaign: (req: IncomingMessage, res: ServerResponse, campaignId: string) => Promise<void>;
+    listBusinessCampaigns: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    placements: (_req: IncomingMessage, res: ServerResponse, url: URL) => Promise<void>;
+    startVisit: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    heartbeatVisit: (req: IncomingMessage, res: ServerResponse, visitSessionId: string) => Promise<void>;
+    verifyVisit: (req: IncomingMessage, res: ServerResponse, visitSessionId: string) => Promise<void>;
+    claimReward: (req: IncomingMessage, res: ServerResponse, visitSessionId: string) => Promise<void>;
+    userRewards: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    pauseCampaign: (req: IncomingMessage, res: ServerResponse, campaignId: string) => Promise<void>;
+    resumeCampaign: (req: IncomingMessage, res: ServerResponse, campaignId: string) => Promise<void>;
+    endCampaign: (req: IncomingMessage, res: ServerResponse, campaignId: string) => Promise<void>;
+    adminFraudFlags: (_req: IncomingMessage, res: ServerResponse) => Promise<void>;
+    adminReviewClaim: (req: IncomingMessage, res: ServerResponse, claimId: string) => Promise<void>;
+    adminRefundCampaign: (req: IncomingMessage, res: ServerResponse, campaignId: string) => Promise<void>;
+    adminSetCampaignStatus: (req: IncomingMessage, res: ServerResponse, campaignId: string) => Promise<void>;
+    campaignLedger: (_req: IncomingMessage, res: ServerResponse, campaignId: string) => Promise<void>;
+};

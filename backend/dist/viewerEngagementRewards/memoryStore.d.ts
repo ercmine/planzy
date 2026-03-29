@@ -1,0 +1,37 @@
+import type { SponsoredVideoRewardPool, UserViewerRewardSummary, ViewerEngagementEvent, ViewerEngagementRiskFlag, ViewerEngagementStore, ViewerRewardAction, ViewerRewardEligibilityDecision, ViewerRewardLedgerEntry, ViewerRewardRule, WatchSession } from "./types.js";
+export declare class MemoryViewerEngagementStore implements ViewerEngagementStore {
+    private sessions;
+    private userSessions;
+    private eventsByUser;
+    private rules;
+    private decisionsByUser;
+    private ledger;
+    private ledgerById;
+    private riskFlags;
+    private summaryByUser;
+    private poolsById;
+    private videoCampaign;
+    createWatchSession(session: WatchSession): void;
+    updateWatchSession(session: WatchSession): void;
+    getWatchSession(sessionId: string): WatchSession | null;
+    listUserWatchSessions(userId: string, limit?: number): WatchSession[];
+    saveEvent(event: ViewerEngagementEvent): void;
+    listUserEvents(userId: string, action?: ViewerRewardAction): ViewerEngagementEvent[];
+    upsertRewardRule(rule: ViewerRewardRule): void;
+    listRewardRules(): ViewerRewardRule[];
+    getRewardRule(action: ViewerRewardAction): ViewerRewardRule | null;
+    saveEligibilityDecision(decision: ViewerRewardEligibilityDecision): void;
+    listEligibilityDecisions(userId: string, videoId?: string): ViewerRewardEligibilityDecision[];
+    saveLedgerEntry(entry: ViewerRewardLedgerEntry): void;
+    listLedgerEntries(userId?: string): ViewerRewardLedgerEntry[];
+    getLedgerEntry(entryId: string): ViewerRewardLedgerEntry | null;
+    saveRiskFlag(flag: ViewerEngagementRiskFlag): void;
+    listRiskFlags(userId?: string): ViewerEngagementRiskFlag[];
+    saveRewardSummary(summary: UserViewerRewardSummary): void;
+    getRewardSummary(userId: string): UserViewerRewardSummary | null;
+    saveSponsoredPool(pool: SponsoredVideoRewardPool): void;
+    getSponsoredPool(poolId: string): SponsoredVideoRewardPool | null;
+    findSponsoredPoolForVideo(videoId: string, atIso: string): SponsoredVideoRewardPool | null;
+    setVideoCampaign(videoId: string, poolId: string): void;
+    listSponsoredPools(): SponsoredVideoRewardPool[];
+}

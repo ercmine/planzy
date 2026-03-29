@@ -1,0 +1,38 @@
+import type { ProfileTrophyShowcase, ProgressionActionInput, ProgressionAdminSnapshot, ProgressionConfig, ProgressionEventResult, ProgressionProfile, RewardFeedbackEnvelope, RewardSurfaceContext, XpLedgerEvent } from "./types.js";
+export declare class ProgressionService {
+    private readonly config;
+    private readonly profiles;
+    private readonly ledgerByUser;
+    private readonly dedupe;
+    private readonly perActionDailyXp;
+    private readonly lastEventByKey;
+    private readonly rewardedEntityKeys;
+    private readonly suppressionCounts;
+    private readonly rewardSurfaceCounters;
+    private readonly lastCelebrationByUser;
+    constructor(config?: Partial<ProgressionConfig>);
+    recordAction(input: ProgressionActionInput): ProgressionEventResult;
+    getProgressionProfile(userId: string): ProgressionProfile;
+    getRewardFeedback(userId: string, context?: RewardSurfaceContext): RewardFeedbackEnvelope;
+    getProfileTrophyShowcase(userId: string): ProfileTrophyShowcase;
+    markTrophyShelfViewed(): void;
+    getRecentXpHistory(userId: string, limit?: number): XpLedgerEvent[];
+    getAdminSnapshot(): ProgressionAdminSnapshot;
+    private buildRewardFeedback;
+    private filterCelebrationQueue;
+    private buildModules;
+    private nextGoalForContext;
+    private unlockStatesForContext;
+    private buildProfileShowcase;
+    private toXpRewardEvent;
+    private updateStreaks;
+    private bumpStreak;
+    private updateMilestones;
+    private metricValue;
+    private getOrCreateProfile;
+    private snapshotProfile;
+    private toLevelProgress;
+    private appendLedger;
+    private dayKey;
+    private daysBetween;
+}

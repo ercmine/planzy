@@ -1,0 +1,34 @@
+import type { AccountsService } from "../accounts/service.js";
+import { type ActorContextResolved } from "../accounts/types.js";
+import type { BusinessAnalyticsService } from "../businessAnalytics/service.js";
+import type { BusinessPremiumService } from "../businessPremium/service.js";
+import { type FeatureQuotaEngine } from "../subscriptions/accessEngine.js";
+import type { SubscriptionService } from "../subscriptions/service.js";
+import type { VenueClaimsService } from "../venues/claims/claimsService.js";
+import type { NotificationService } from "../notifications/service.js";
+import type { CollaborationStore } from "./store.js";
+import type { CampaignContentLink, CampaignStatus, CreatorBusinessCampaign, CreatorBusinessInvite, FeaturedCreatorContentPlacement } from "./types.js";
+export declare class CollaborationService {
+    private readonly store;
+    private readonly accounts;
+    private readonly claims;
+    private readonly subscriptions?;
+    private readonly accessEngine?;
+    private readonly businessAnalytics?;
+    private readonly businessPremium?;
+    private readonly notifications?;
+    private readonly now;
+    constructor(store: CollaborationStore, accounts: AccountsService, claims: VenueClaimsService, subscriptions?: SubscriptionService | undefined, accessEngine?: FeatureQuotaEngine | undefined, businessAnalytics?: BusinessAnalyticsService | undefined, businessPremium?: BusinessPremiumService | undefined, notifications?: NotificationService | undefined, now?: () => Date);
+    private assertBusinessManager;
+    private assertBusinessCanManagePlaces;
+    private ensureCreatorContext;
+    createInvite(actor: ActorContextResolved, input: Omit<CreatorBusinessInvite, "id" | "createdAt" | "updatedAt" | "status" | "createdByUserId">): Promise<CreatorBusinessInvite>;
+    listBusinessInvites(actor: ActorContextResolved, businessProfileId: string): Promise<CreatorBusinessInvite[]>;
+    listCreatorInvites(actor: ActorContextResolved, creatorProfileId: string): Promise<CreatorBusinessInvite[]>;
+    respondToInvite(actor: ActorContextResolved, inviteId: string, decision: "accept" | "decline", note?: string): Promise<CreatorBusinessInvite>;
+    createCampaign(actor: ActorContextResolved, input: Omit<CreatorBusinessCampaign, "id" | "createdAt" | "updatedAt" | "createdByUserId">, placeIds: string[]): Promise<CreatorBusinessCampaign>;
+    transitionCampaignStatus(actor: ActorContextResolved, campaignId: string, nextStatus: CampaignStatus): Promise<CreatorBusinessCampaign>;
+    linkContentToCampaign(actor: ActorContextResolved, input: Omit<CampaignContentLink, "id" | "createdAt" | "updatedAt" | "moderationStatus">): Promise<CampaignContentLink>;
+    addFeaturedPlacement(actor: ActorContextResolved, input: Omit<FeaturedCreatorContentPlacement, "id" | "createdAt" | "updatedAt" | "isActive">): Promise<FeaturedCreatorContentPlacement>;
+    listFeaturedForPlace(placeId: string): Promise<FeaturedCreatorContentPlacement[]>;
+}

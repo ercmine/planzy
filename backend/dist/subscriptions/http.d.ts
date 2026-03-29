@@ -1,0 +1,25 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { EntitlementPolicyService } from "./policy.js";
+import type { SubscriptionService } from "./service.js";
+export declare function createSubscriptionHttpHandlers(service: SubscriptionService, policy: EntitlementPolicyService): {
+    getCurrentSubscription(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    getBillingState(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    getCurrentEntitlements(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    getAvailablePlans(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    checkTrialEligibility(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    previewUpgrade(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    previewDowngrade(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    startSubscriptionChange(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    startTrial(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    markPastDue(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    enterGracePeriod(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    cancelSubscription(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    resumeSubscription(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    getUsageSummary(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    adminOverrideEntitlement(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    adminGrantTrial(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    adminCompPlan(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    adminGetState(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    authorizeAction(req: IncomingMessage, res: ServerResponse): Promise<void>;
+    recordReviewUsage(accountId: string): Promise<void>;
+};

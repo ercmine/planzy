@@ -1,0 +1,171 @@
+export declare enum UserStatus {
+    ACTIVE = "ACTIVE",
+    SUSPENDED = "SUSPENDED"
+}
+export declare enum UserRole {
+    USER = "USER",
+    CREATOR = "CREATOR",
+    BUSINESS_OWNER = "BUSINESS_OWNER",
+    BUSINESS_MANAGER = "BUSINESS_MANAGER",
+    ADMIN = "ADMIN",
+    MODERATOR = "MODERATOR"
+}
+export declare enum ProfileType {
+    PERSONAL = "PERSONAL",
+    CREATOR = "CREATOR",
+    BUSINESS = "BUSINESS"
+}
+export declare enum VerificationStatus {
+    UNVERIFIED = "UNVERIFIED",
+    PENDING = "PENDING",
+    VERIFIED = "VERIFIED"
+}
+export declare enum CreatorProfileStatus {
+    ACTIVE = "ACTIVE",
+    PENDING = "PENDING",
+    HIDDEN = "HIDDEN",
+    SUSPENDED = "SUSPENDED"
+}
+export type CreatorSocialPlatform = "website" | "instagram" | "tiktok" | "x" | "youtube" | "linkedin";
+export interface CreatorSocialLink {
+    id: string;
+    platform: CreatorSocialPlatform;
+    url: string;
+    label?: string;
+    displayOrder: number;
+    createdAt: string;
+    updatedAt: string;
+}
+export declare enum ProfileVisibility {
+    PRIVATE = "PRIVATE",
+    PUBLIC = "PUBLIC"
+}
+export declare enum BusinessMembershipRole {
+    OWNER = "OWNER",
+    MANAGER = "MANAGER",
+    EDITOR = "EDITOR",
+    VIEWER = "VIEWER"
+}
+export declare enum MembershipStatus {
+    ACTIVE = "ACTIVE",
+    INVITED = "INVITED",
+    DISABLED = "DISABLED"
+}
+export interface UserIdentity {
+    id: string;
+    email?: string;
+    phone?: string;
+    authProvider?: string;
+    authProviderUserId?: string;
+    status: UserStatus;
+    moderationFlags: string[];
+    activeProfileType: ProfileType;
+    activeProfileId: string;
+    createdAt: string;
+    updatedAt: string;
+}
+export interface UserRoleAssignment {
+    userId: string;
+    role: UserRole;
+    assignedAt: string;
+}
+export interface PersonalProfile {
+    id: string;
+    userId: string;
+    displayName: string;
+    username?: string;
+    bio?: string;
+    avatarUrl?: string;
+    location?: string;
+    visibility: ProfileVisibility;
+    createdAt: string;
+    updatedAt: string;
+}
+export interface CreatorProfile {
+    id: string;
+    userId: string;
+    creatorName: string;
+    displayName: string;
+    slug: string;
+    handle?: string;
+    bio?: string;
+    avatarUrl?: string;
+    coverUrl?: string;
+    websiteUrl?: string;
+    category?: string;
+    tags: string[];
+    socialLinks: CreatorSocialLink[];
+    followerCount: number;
+    followingCount: number;
+    publicReviewsCount: number;
+    publicGuidesCount: number;
+    badges: string[];
+    status: CreatorProfileStatus;
+    isPublic: boolean;
+    bannerUrl?: string;
+    verificationStatus: VerificationStatus;
+    visibility: ProfileVisibility;
+    createdAt: string;
+    updatedAt: string;
+}
+export interface BusinessProfile {
+    id: string;
+    slug: string;
+    businessName: string;
+    description?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    avatarUrl?: string;
+    bannerUrl?: string;
+    address?: string;
+    verificationStatus: VerificationStatus;
+    visibility: ProfileVisibility;
+    createdByUserId: string;
+    updatedByUserId: string;
+    createdAt: string;
+    updatedAt: string;
+}
+export interface BusinessMembership {
+    id: string;
+    businessProfileId: string;
+    userId: string;
+    role: BusinessMembershipRole;
+    status: MembershipStatus;
+    invitedByUserId?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+export interface ActingContext {
+    profileType: ProfileType;
+    profileId: string;
+}
+export interface ActorContextResolved {
+    userId: string;
+    profileType: ProfileType;
+    profileId: string;
+    roles: UserRole[];
+    businessMembershipRole?: BusinessMembershipRole;
+}
+export declare enum PermissionAction {
+    CREATE_CREATOR_PROFILE = "CREATE_CREATOR_PROFILE",
+    ACT_AS_PROFILE = "ACT_AS_PROFILE",
+    EDIT_CREATOR_PROFILE = "EDIT_CREATOR_PROFILE",
+    MANAGE_BUSINESS_MEMBERS = "MANAGE_BUSINESS_MEMBERS",
+    BUSINESS_REPLY = "BUSINESS_REPLY",
+    PUBLISH_CREATOR_CONTENT = "PUBLISH_CREATOR_CONTENT",
+    ACCESS_BUSINESS_ANALYTICS = "ACCESS_BUSINESS_ANALYTICS"
+}
+export interface AuthorizationDecision {
+    allowed: boolean;
+    reasonCode: string;
+    message: string;
+    actingProfileType?: ProfileType;
+    requiredRole?: UserRole | BusinessMembershipRole;
+}
+export interface IdentitySummary {
+    user: UserIdentity;
+    roles: UserRole[];
+    personalProfile: PersonalProfile;
+    creatorProfile?: CreatorProfile;
+    businessProfiles: BusinessProfile[];
+}

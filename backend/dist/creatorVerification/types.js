@@ -1,0 +1,1 @@
+export const DEFAULT_CREATOR_VERIFICATION_CONFIG = { minAccountAgeDays: 0, minPublicContentCount: 0, rejectionCooldownDays: 14, blockOnModerationFlags: ["severe_recent_violation", "creator_suspended"] };
