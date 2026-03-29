@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../app/app_routes.dart';
 import 'onboarding_widgets.dart';
 
 class OnboardingSignInPage extends StatelessWidget {

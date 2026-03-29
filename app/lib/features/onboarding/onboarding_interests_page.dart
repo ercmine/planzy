@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../app/app_routes.dart';
 import '../../models/category_labels.dart';
 import '../../models/session_filters.dart';
 import 'onboarding_controller.dart';
@@ -49,13 +50,13 @@ class OnboardingInterestsPage extends ConsumerWidget {
           const Spacer(),
           PrimaryButton(
             label: 'Continue',
-            onPressed: () => context.go('/onboarding/discovery'),
+            onPressed: () => context.go(AppRoutes.onboardingDiscovery),
             icon: const Icon(Icons.arrow_forward_rounded),
           ),
           const SizedBox(height: AppSpacing.s),
           SecondaryButton(
             label: 'Skip for now',
-            onPressed: () => context.go('/onboarding/discovery'),
+            onPressed: () => context.go(AppRoutes.onboardingDiscovery),
           ),
         ],
       ),

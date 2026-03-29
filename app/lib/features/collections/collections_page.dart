@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../app/app_routes.dart';
 import 'collection_models.dart';
 
 class CollectionsPage extends StatelessWidget {
@@ -28,6 +30,11 @@ class CollectionsPage extends StatelessWidget {
                   'Saved places, quests, and progress stacks will appear here once you start exploring.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: AppSpacing.s),
+                FilledButton.tonal(
+                  onPressed: () => context.go(AppRoutes.liveMap),
+                  child: const Text('Start exploring'),
                 ),
               ],
             ),

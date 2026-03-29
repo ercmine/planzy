@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/brand/logo.dart';
+import '../../app/app_routes.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import '../../core/diagnostics/diagnostics.dart';
@@ -195,7 +196,7 @@ class SettingsPage extends ConsumerWidget {
                 const Text('Track claimable DRYAD, review reward status, and open the claim dashboard.'),
                 const SizedBox(height: AppSpacing.s),
                 FilledButton.tonal(
-                  onPressed: () => context.go('/creator/rewards'),
+                  onPressed: () => context.go(AppRoutes.marketplace),
                   child: const Text('Open creator earnings dashboard'),
                 ),
               ],

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
+import '../../app/app_routes.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_models.dart';
 import 'onboarding_widgets.dart';
@@ -21,7 +22,7 @@ class OnboardingDiscoveryPage extends ConsumerWidget {
         return;
       }
       if (result.isSuccess) {
-        context.go('/');
+        context.go(AppRoutes.liveMap);
       } else if (result.message != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result.message!)),
