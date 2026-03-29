@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_error.dart';
 import '../core/connectivity/offline_banner.dart';
 import '../core/debug_flags.dart';
+import '../core/identity/identity_provider.dart';
 import '../core/telemetry/telemetry_dispatcher.dart';
 import '../providers/app_providers.dart';
 import 'router.dart';
