@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/app_routes.dart';
+import '../../app/theme/rpg_bar.dart';
 import '../../app/theme/widgets.dart';
 import 'perbug_economy_models.dart';
 import 'perbug_game_controller.dart';
@@ -30,13 +31,13 @@ class PerbugNodeDetailsPage extends ConsumerWidget {
                 Text('Node type: ${node.nodeType.name}'),
                 Text('State: ${node.state.name}'),
                 const SizedBox(height: 12),
-                FilledButton.icon(
+                RpgBarButton(
                   onPressed: () {
                     controller.launchEncounter();
                     context.go(AppRoutes.encounter);
                   },
                   icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Launch Encounter'),
+                  label: 'Enter Encounter',
                 ),
               ],
             ),
@@ -65,19 +66,20 @@ class PerbugEncounterPage extends ConsumerWidget {
                 Wrap(
                   spacing: 8,
                   children: [
-                    FilledButton(
+                    RpgBarButton(
                       onPressed: () {
                         controller.resolveEncounter(succeeded: true);
                         context.go(AppRoutes.progression);
                       },
-                      child: const Text('Resolve Success'),
+                      label: 'Claim Reward',
                     ),
-                    OutlinedButton(
+                    RpgBarButton(
                       onPressed: () {
                         controller.resolveEncounter(succeeded: false);
                         context.go(AppRoutes.liveMap);
                       },
-                      child: const Text('Resolve Fail'),
+                      label: 'Retreat',
+                      variant: RpgButtonVariant.secondary,
                     ),
                   ],
                 ),
@@ -118,9 +120,10 @@ class PerbugInventoryPage extends ConsumerWidget {
         children: [
           ...state.economy.inventory.stacks.entries.map((entry) => ListTile(title: Text(entry.key), trailing: Text('${entry.value}'))),
           const SizedBox(height: 8),
-          FilledButton.tonal(
+          RpgBarButton(
             onPressed: () => context.go(AppRoutes.crafting),
-            child: const Text('Craft now'),
+            label: 'Craft now',
+            variant: RpgButtonVariant.secondary,
           ),
         ],
       ),
@@ -144,9 +147,10 @@ class PerbugCraftingPage extends ConsumerWidget {
               (recipe) => ListTile(
                 title: Text(recipe.label),
                 subtitle: Text('Cost ${recipe.perbugCost}Ⓟ + ${recipe.energyCost}⚡'),
-                trailing: FilledButton(
+                trailing: RpgBarButton(
+                  height: 42,
                   onPressed: state.progression.level >= recipe.unlockLevel ? () => controller.craftRecipe(recipe.id) : null,
-                  child: const Text('Craft'),
+                  label: 'Craft',
                 ),
               ),
             )

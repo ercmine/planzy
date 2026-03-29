@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'color_scheme.dart';
+import 'rpg_bar.dart';
 import 'spacing.dart';
 import 'tokens.dart';
 
@@ -22,27 +23,13 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return _PressScale(
-      child: FilledButton.icon(
-        onPressed: isLoading ? null : onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: scheme.primary,
-          shadowColor: scheme.shadow,
-          foregroundColor: scheme.onPrimary,
-          elevation: 0,
-          minimumSize: const Size.fromHeight(56),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
-        ).copyWith(
-          overlayColor: WidgetStatePropertyAll(scheme.onPrimary.withOpacity(0.08)),
-        ),
-        icon: isLoading
-            ? SizedBox.square(
-                dimension: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: scheme.onPrimary),
-              )
-            : icon ?? const SizedBox.shrink(),
-        label: Text(label),
+      child: RpgBarButton(
+        label: label,
+        onPressed: onPressed,
+        icon: icon,
+        isLoading: isLoading,
+        variant: RpgButtonVariant.primary,
       ),
     );
   }
@@ -109,24 +96,13 @@ class SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return _PressScale(
-      child: OutlinedButton.icon(
-        onPressed: isLoading ? null : onPressed,
-        style: OutlinedButton.styleFrom(
-          backgroundColor: scheme.surfaceContainerHigh.withOpacity(0.38),
-          side: BorderSide(color: scheme.outlineVariant.withOpacity(0.8)),
-          foregroundColor: scheme.onSurface,
-          minimumSize: const Size.fromHeight(54),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
-        ),
-        icon: isLoading
-            ? SizedBox.square(
-                dimension: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: scheme.primary),
-              )
-            : icon ?? const SizedBox.shrink(),
-        label: Text(label),
+      child: RpgBarButton(
+        label: label,
+        onPressed: onPressed,
+        icon: icon,
+        isLoading: isLoading,
+        variant: RpgButtonVariant.secondary,
       ),
     );
   }
@@ -524,8 +500,16 @@ class PremiumHeader extends StatelessWidget {
                   badge!,
                   const SizedBox(height: AppSpacing.s),
                 ],
-                Text(title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.25)),
-                const SizedBox(height: AppSpacing.xs),
+                RpgBarSurface(
+                  height: 64,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
+                  tint: const Color(0x33000000),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.2, color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s),
                 Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
               ],
             ),
