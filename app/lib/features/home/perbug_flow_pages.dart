@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/app_routes.dart';
 import '../../app/theme/widgets.dart';
+import 'perbug_economy_models.dart';
 import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
 
