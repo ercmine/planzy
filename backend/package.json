@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "test:launch": "vitest run src/**/__tests__/*launch*.test.ts src/subscriptions/__tests__/premiumExperience.test.ts"
+    "test:launch": "vitest run src/**/__tests__/*launch*.test.ts src/subscriptions/__tests__/premiumExperience.test.ts",
+    "prebuild": "node ./scripts/verify-wallet-auth-deps.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.9",
