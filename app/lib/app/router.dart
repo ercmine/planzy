@@ -10,6 +10,11 @@ import '../features/onboarding/onboarding_intro_page.dart';
 final onboardingGateProvider = Provider<ChangeNotifier>((ref) {
   final gate = ValueNotifier<int>(0);
   ref.listen<AsyncValue<bool>>(
+    onboardingIntroRequiredProvider,
+    (_, __) => gate.value++,
+    fireImmediately: true,
+  );
+  ref.listen<AsyncValue<bool>>(
     onboardingCompletedProvider,
     (_, __) => gate.value++,
     fireImmediately: true,
@@ -28,17 +33,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       final path = state.uri.path;
       final isOnboardingRoute = path == '/onboarding' || path.startsWith('/onboarding/');
       final isBootstrapRoute = path == '/bootstrap';
-      final onboardingState = ref.read(onboardingCompletedProvider);
+      final introGateState = ref.read(onboardingIntroRequiredProvider);
 
-      if (onboardingState.isLoading || onboardingState.hasError) {
+      if (introGateState.isLoading || introGateState.hasError) {
         return isBootstrapRoute ? null : '/bootstrap';
       }
 
-      final hasCompleted = onboardingState.valueOrNull ?? false;
-
-      if (!hasCompleted && !isOnboardingRoute) return '/onboarding';
-      if (hasCompleted && (path == '/onboarding' || isBootstrapRoute)) return '/';
-      if (!hasCompleted && isBootstrapRoute) return '/onboarding';
+      final requiresIntro = introGateState.valueOrNull ?? false;
+      if (requiresIntro && !isOnboardingRoute) return '/onboarding';
+      if (!requiresIntro && (isOnboardingRoute || isBootstrapRoute)) return '/';
       return null;
     },
     routes: [

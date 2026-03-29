@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/tokens.dart';
 import '../../app/theme/widgets.dart';
+import '../onboarding/onboarding_controller.dart';
+import '../onboarding/onboarding_state.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';
 import 'perbug_economy_models.dart';
 import 'perbug_game_controller.dart';
@@ -28,6 +30,8 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
   Widget build(BuildContext context) {
     final state = ref.watch(perbugGameControllerProvider);
     final controller = ref.read(perbugGameControllerProvider.notifier);
+    final onboarding = ref.watch(onboardingControllerProvider);
+    final onboardingController = ref.read(onboardingControllerProvider.notifier);
     final moves = state.reachableMoves().take(8).toList(growable: false);
 
     return RefreshIndicator(
@@ -42,6 +46,14 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             badge: const AppPill(label: 'Map-native strategy RPG', icon: Icons.explore),
           ),
           const SizedBox(height: 12),
+          if (!onboarding.hasCompleted && onboarding.step != OnboardingStep.identityIntro) ...[
+            _OnboardingCoachCard(
+              state: onboarding,
+              onContinue: onboardingController.advanceStep,
+              onSkip: onboardingController.skipOnboarding,
+            ),
+            const SizedBox(height: 12),
+          ],
           AppCard(
             tone: AppCardTone.featured,
             child: Column(
@@ -314,6 +326,10 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                           ? () async {
                               final ok = await controller.jumpTo(move);
                               if (!context.mounted || !ok) return;
+                              await onboardingController.recordFirstMove();
+                              if (onboarding.step == OnboardingStep.firstMove) {
+                                await onboardingController.advanceTo(OnboardingStep.firstEncounter);
+                              }
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Moved to ${move.node.label}')));
                             }
                           : null,
@@ -351,9 +367,13 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   FilledButton.icon(
                     onPressed: state.currentNode == null
                         ? null
-                        : () {
+                        : () async {
                             controller.launchEncounter();
                             controller.resolveEncounter(succeeded: true);
+                            await onboardingController.recordFirstReward();
+                            if (onboarding.step == OnboardingStep.firstEncounter) {
+                              await onboardingController.advanceTo(OnboardingStep.firstReward);
+                            }
                           },
                     icon: const Icon(Icons.check_circle_outline),
                     label: const Text('Resolve success'),
@@ -501,6 +521,65 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
           },
         );
       },
+    );
+  }
+}
+
+class _OnboardingCoachCard extends StatelessWidget {
+  const _OnboardingCoachCard({
+    required this.state,
+    required this.onContinue,
+    required this.onSkip,
+  });
+
+  final OnboardingState state;
+  final Future<void> Function() onContinue;
+  final Future<void> Function() onSkip;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = switch (state.step) {
+      OnboardingStep.mapNodes => 'These are real nearby places turned into nodes. Blue links are reachable jumps from your current position.',
+      OnboardingStep.squadIntro => 'Starter squad is live now: Scout, Engineer, and Tank are active. Squad roles drive encounter outcomes.',
+      OnboardingStep.firstMove => 'Tap a reachable node and press Move. Actions spend Energy + Perbug and push your frontier outward.',
+      OnboardingStep.firstEncounter => 'You arrived. Resolve this node encounter to complete the first loop: move → resolve → reward.',
+      OnboardingStep.firstReward => 'Rewards fuel progression: XP levels command, Perbug powers actions, and materials upgrade your squad.',
+      OnboardingStep.progressionCue => 'Next objective: clear 2 connected nodes and apply one squad upgrade to keep expanding.',
+      OnboardingStep.liveLoop => 'You are in the live loop. Keep expanding across real geography and strengthening your squad.',
+      _ => 'Mission briefing active.',
+    };
+
+    final canContinue = state.step != OnboardingStep.firstMove && state.step != OnboardingStep.firstEncounter;
+
+    return AppCard(
+      tone: AppCardTone.featured,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Onboarding // ${state.step.name}', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text(message),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (canContinue)
+                FilledButton.icon(
+                  onPressed: onContinue,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Continue'),
+                ),
+              TextButton(onPressed: onSkip, child: const Text('Skip tutorial')),
+            ],
+          ),
+          if (state.timeToFirstMoveMs != null || state.timeToFirstRewardMs != null)
+            Text(
+              'Telemetry: first move ${state.timeToFirstMoveMs ?? '-'}ms • first reward ${state.timeToFirstRewardMs ?? '-'}ms',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+        ],
+      ),
     );
   }
 }

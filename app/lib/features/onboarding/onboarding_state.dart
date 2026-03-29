@@ -1,63 +1,81 @@
-import '../dryad/chain/grove_nft_service.dart';
-
-enum OnboardingFlowStatus {
-  initial,
-  walletDisconnected,
-  walletConnected,
-  wrongNetwork,
-  readyToFetchNft,
-  nftFound,
-  nftNotMinted,
-  mintInProgress,
-  mintSucceeded,
-  onboardingCompleted,
-  onboardingFailed,
+enum OnboardingStep {
+  identityIntro,
+  mapNodes,
+  squadIntro,
+  firstMove,
+  firstEncounter,
+  firstReward,
+  progressionCue,
+  liveLoop,
+  completed,
 }
 
 class OnboardingState {
   const OnboardingState({
-    required this.status,
-    required this.walletAddress,
+    required this.step,
     required this.isBusy,
     required this.hasCompleted,
-    this.snapshot,
+    required this.startedAt,
+    required this.firstMoveAt,
+    required this.firstRewardAt,
+    required this.skipped,
     this.errorMessage,
-    this.txHash,
   });
 
   factory OnboardingState.initial() => const OnboardingState(
-        status: OnboardingFlowStatus.initial,
-        walletAddress: '',
+        step: OnboardingStep.identityIntro,
         isBusy: false,
         hasCompleted: false,
+        startedAt: null,
+        firstMoveAt: null,
+        firstRewardAt: null,
+        skipped: false,
       );
 
-  final OnboardingFlowStatus status;
-  final String walletAddress;
+  final OnboardingStep step;
   final bool isBusy;
   final bool hasCompleted;
-  final GroveNftSnapshot? snapshot;
+  final DateTime? startedAt;
+  final DateTime? firstMoveAt;
+  final DateTime? firstRewardAt;
+  final bool skipped;
   final String? errorMessage;
-  final String? txHash;
+
+  bool get shouldGateIntro => !hasCompleted && step == OnboardingStep.identityIntro;
+
+  int? get timeToFirstMoveMs {
+    if (startedAt == null || firstMoveAt == null) return null;
+    return firstMoveAt!.difference(startedAt!).inMilliseconds;
+  }
+
+  int? get timeToFirstRewardMs {
+    if (startedAt == null || firstRewardAt == null) return null;
+    return firstRewardAt!.difference(startedAt!).inMilliseconds;
+  }
 
   OnboardingState copyWith({
-    OnboardingFlowStatus? status,
-    String? walletAddress,
+    OnboardingStep? step,
     bool? isBusy,
     bool? hasCompleted,
-    GroveNftSnapshot? snapshot,
+    DateTime? startedAt,
+    bool clearStartedAt = false,
+    DateTime? firstMoveAt,
+    bool clearFirstMoveAt = false,
+    DateTime? firstRewardAt,
+    bool clearFirstRewardAt = false,
+    bool? skipped,
     String? errorMessage,
-    String? txHash,
     bool clearError = false,
   }) {
     return OnboardingState(
-      status: status ?? this.status,
-      walletAddress: walletAddress ?? this.walletAddress,
+      step: step ?? this.step,
       isBusy: isBusy ?? this.isBusy,
       hasCompleted: hasCompleted ?? this.hasCompleted,
-      snapshot: snapshot ?? this.snapshot,
+      startedAt: clearStartedAt ? null : (startedAt ?? this.startedAt),
+      firstMoveAt: clearFirstMoveAt ? null : (firstMoveAt ?? this.firstMoveAt),
+      firstRewardAt: clearFirstRewardAt ? null : (firstRewardAt ?? this.firstRewardAt),
+      skipped: skipped ?? this.skipped,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
-      txHash: txHash ?? this.txHash,
     );
   }
 }
