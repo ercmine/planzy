@@ -16,11 +16,7 @@ KEEP_AREA_MIN="${KEEP_AREA_MIN:-180}"
 KEEP_AREA_RATIO="${KEEP_AREA_RATIO:-0.012}"
 KEEP_MARGIN="${KEEP_MARGIN:-48}"
 KEEP_NEAR_DISTANCE="${KEEP_NEAR_DISTANCE:-40}"
-
-# Strict removal thresholds
-REMOVE_MAX_AREA="${REMOVE_MAX_AREA:-120}"
-REMOVE_MAX_AREA_RATIO="${REMOVE_MAX_AREA_RATIO:-0.0035}"
-REMOVE_MIN_DISTANCE="${REMOVE_MIN_DISTANCE:-80}"
+KEEP_CENTER_DISTANCE="${KEEP_CENTER_DISTANCE:-170}"
 
 REPORT_BASE="${REPORT_BASE:-}"
 PREVIEW_SHEET="${PREVIEW_SHEET:-}"
@@ -46,9 +42,7 @@ cmd=(python3 "${PYTHON_SCRIPT}"
   --keep-area-ratio "${KEEP_AREA_RATIO}"
   --keep-margin "${KEEP_MARGIN}"
   --keep-near-distance "${KEEP_NEAR_DISTANCE}"
-  --remove-max-area "${REMOVE_MAX_AREA}"
-  --remove-max-area-ratio "${REMOVE_MAX_AREA_RATIO}"
-  --remove-min-distance "${REMOVE_MIN_DISTANCE}")
+  --keep-center-distance "${KEEP_CENTER_DISTANCE}")
 
 if [[ "${DRY_RUN}" == "1" ]]; then
   cmd+=(--dry-run)
@@ -80,8 +74,6 @@ printf '  KEEP_AREA_MIN=%s\n' "${KEEP_AREA_MIN}"
 printf '  KEEP_AREA_RATIO=%s\n' "${KEEP_AREA_RATIO}"
 printf '  KEEP_MARGIN=%s\n' "${KEEP_MARGIN}"
 printf '  KEEP_NEAR_DISTANCE=%s\n' "${KEEP_NEAR_DISTANCE}"
-printf '  REMOVE_MAX_AREA=%s\n' "${REMOVE_MAX_AREA}"
-printf '  REMOVE_MAX_AREA_RATIO=%s\n' "${REMOVE_MAX_AREA_RATIO}"
-printf '  REMOVE_MIN_DISTANCE=%s\n' "${REMOVE_MIN_DISTANCE}"
+printf '  KEEP_CENTER_DISTANCE=%s\n' "${KEEP_CENTER_DISTANCE}"
 
 "${cmd[@]}"

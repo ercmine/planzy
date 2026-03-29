@@ -41,6 +41,77 @@ class Component:
     def bbox(self) -> Tuple[int, int, int, int]:
         return (self.min_x, self.min_y, self.max_x, self.max_y)
 
+    @property
+    def center(self) -> Tuple[float, float]:
+        return ((self.min_x + self.max_x) / 2.0, (self.min_y + self.max_y) / 2.0)
+
+
+@dataclass(frozen=True)
+class ThresholdProfile:
+    name: str
+    keep_area_min: int
+    keep_area_ratio: float
+    keep_gap_max: float
+    keep_near_touch: int
+    keep_center_distance: float
+
+
+DEFAULT_PROFILE = ThresholdProfile(
+    name="default",
+    keep_area_min=180,
+    keep_area_ratio=0.012,
+    keep_gap_max=40.0,
+    keep_near_touch=48,
+    keep_center_distance=170.0,
+)
+
+PROFILE_BY_KEYWORD: List[Tuple[str, ThresholdProfile]] = [
+    (
+        "relics",
+        ThresholdProfile(
+            name="relics",
+            keep_area_min=1200,
+            keep_area_ratio=0.025,
+            keep_gap_max=28.0,
+            keep_near_touch=24,
+            keep_center_distance=130.0,
+        ),
+    ),
+    (
+        "economy/resources",
+        ThresholdProfile(
+            name="resources",
+            keep_area_min=900,
+            keep_area_ratio=0.022,
+            keep_gap_max=24.0,
+            keep_near_touch=20,
+            keep_center_distance=120.0,
+        ),
+    ),
+    (
+        "nodes/icons",
+        ThresholdProfile(
+            name="node_icons",
+            keep_area_min=700,
+            keep_area_ratio=0.02,
+            keep_gap_max=20.0,
+            keep_near_touch=18,
+            keep_center_distance=115.0,
+        ),
+    ),
+    (
+        "economy/materials",
+        ThresholdProfile(
+            name="materials",
+            keep_area_min=850,
+            keep_area_ratio=0.02,
+            keep_gap_max=24.0,
+            keep_near_touch=20,
+            keep_center_distance=125.0,
+        ),
+    ),
+]
+
 
 def relpath_posix(path: Path, root: Path) -> str:
     return path.relative_to(root).as_posix()
@@ -134,40 +205,72 @@ def expanded_bbox_contains(main: Component, c: Component, margin: int) -> bool:
     return cx1 >= x1 and cy1 >= y1 and cx2 <= x2 and cy2 <= y2
 
 
-def is_likely_noise(c: Component, main: Component, args: argparse.Namespace) -> Tuple[bool, str]:
+def bboxes_overlap_or_near(main: Component, c: Component, near_touch: int) -> bool:
+    mx1, my1, mx2, my2 = main.bbox
+    cx1, cy1, cx2, cy2 = c.bbox
+    return not (
+        (cx2 + near_touch) < mx1
+        or (mx2 + near_touch) < cx1
+        or (cy2 + near_touch) < my1
+        or (my2 + near_touch) < cy1
+    )
+
+
+def center_distance(main: Component, c: Component) -> float:
+    mcx, mcy = main.center
+    ccx, ccy = c.center
+    return math.hypot(ccx - mcx, ccy - mcy)
+
+
+def profile_for_relpath(asset_path_hint: str, args: argparse.Namespace) -> ThresholdProfile:
+    rel = asset_path_hint.lower()
+    for key, profile in PROFILE_BY_KEYWORD:
+        if key in rel:
+            return profile
+    return ThresholdProfile(
+        name="custom_default",
+        keep_area_min=args.keep_area_min,
+        keep_area_ratio=args.keep_area_ratio,
+        keep_gap_max=args.keep_near_distance,
+        keep_near_touch=args.keep_margin,
+        keep_center_distance=args.keep_center_distance,
+    )
+
+
+def is_likely_noise(c: Component, main: Component, profile: ThresholdProfile) -> Tuple[bool, str]:
     if c.cid == main.cid:
         return False, "main"
 
     area_ratio = c.area / max(main.area, 1)
-    distance = bbox_edge_distance(main, c)
+    gap = bbox_edge_distance(main, c)
+    ctr_dist = center_distance(main, c)
 
-    if c.area >= args.keep_area_min:
-        return False, f"keep_area_min:{c.area}>={args.keep_area_min}"
+    if c.area >= profile.keep_area_min:
+        return False, f"keep_area:{c.area}>={profile.keep_area_min}"
 
-    if area_ratio >= args.keep_area_ratio:
-        return False, f"keep_area_ratio:{area_ratio:.5f}>={args.keep_area_ratio}"
+    if area_ratio >= profile.keep_area_ratio:
+        return False, f"keep_ratio:{area_ratio:.5f}>={profile.keep_area_ratio}"
 
-    if expanded_bbox_contains(main, c, args.keep_margin):
-        return False, f"inside_keep_margin:{args.keep_margin}px"
+    if bboxes_overlap_or_near(main, c, profile.keep_near_touch):
+        return False, f"keep_near_bbox:near_touch={profile.keep_near_touch}"
 
-    if distance <= args.keep_near_distance:
-        return False, f"near_main:{distance:.2f}<={args.keep_near_distance}"
+    if gap <= profile.keep_gap_max:
+        return False, f"keep_near_main:gap={gap:.0f}"
 
-    # removal only if tiny and clearly detached
-    far_enough = distance >= args.remove_min_distance
-    tiny_enough = c.area <= args.remove_max_area
-    tiny_ratio = area_ratio <= args.remove_max_area_ratio
+    if expanded_bbox_contains(main, c, profile.keep_near_touch):
+        return False, f"keep_inside_margin:{profile.keep_near_touch}px"
 
-    if far_enough and tiny_enough and tiny_ratio:
-        return True, (
-            f"remove:far({distance:.2f}>={args.remove_min_distance}),"
-            f"tiny({c.area}<={args.remove_max_area}),"
-            f"ratio({area_ratio:.5f}<={args.remove_max_area_ratio})"
-        )
+    if ctr_dist <= profile.keep_center_distance:
+        return False, f"keep_center_near:{ctr_dist:.1f}<={profile.keep_center_distance}"
 
-    return False, (
-        f"keep_uncertain:dist={distance:.2f},area={c.area},ratio={area_ratio:.5f}"
-    )
+    small_area = c.area < profile.keep_area_min
+    small_ratio = area_ratio < profile.keep_area_ratio
+    far_from_main = gap > profile.keep_gap_max
+
+    if small_area and small_ratio and far_from_main:
+        return True, f"remove_small_far: area={c.area} ratio={area_ratio:.4f} gap={gap:.0f}"
+
+    return False, f"keep_extension_candidate: area={c.area} ratio={area_ratio:.4f} gap={gap:.0f} center={ctr_dist:.1f}"
 
 
 def remove_components(alpha: Sequence[int], width: int, components: Sequence[Component], remove_ids: set[int]) -> bytes:
@@ -202,6 +305,7 @@ def process_png(path: Path, input_root: Path, output_root: Path, args: argparse.
 
     comps = connected_components(alpha_values, width, height, args.alpha_threshold)
     rel = relpath_posix(path, input_root)
+    profile = profile_for_relpath(path.as_posix(), args)
 
     if not comps:
         dest = path if args.in_place else (output_root / rel)
@@ -226,7 +330,7 @@ def process_png(path: Path, input_root: Path, output_root: Path, args: argparse.
     decisions: List[Dict[str, object]] = []
 
     for c in comps:
-        remove, reason = is_likely_noise(c, main, args)
+        remove, reason = is_likely_noise(c, main, profile)
         if remove:
             remove_ids.add(c.cid)
             removed_sizes.append(c.area)
@@ -236,6 +340,10 @@ def process_png(path: Path, input_root: Path, output_root: Path, args: argparse.
             "id": c.cid,
             "area": c.area,
             "bbox": [c.min_x, c.min_y, c.max_x, c.max_y],
+            "area_ratio": round(c.area / max(main.area, 1), 6),
+            "gap_to_main_bbox": round(bbox_edge_distance(main, c), 3),
+            "center_distance": round(center_distance(main, c), 3),
+            "profile": profile.name,
             "remove": remove,
             "reason": reason,
         })
@@ -260,6 +368,7 @@ def process_png(path: Path, input_root: Path, output_root: Path, args: argparse.
         "kept_sizes": sorted(kept_sizes, reverse=True),
         "changed": changed,
         "output_file": str(dest),
+        "threshold_profile": profile.name,
         "component_decisions": decisions,
     }
 
@@ -361,11 +470,7 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--keep-area-ratio", type=float, default=0.012)
     ap.add_argument("--keep-margin", type=int, default=48)
     ap.add_argument("--keep-near-distance", type=float, default=40.0)
-
-    # Strict remove heuristics
-    ap.add_argument("--remove-max-area", type=int, default=120)
-    ap.add_argument("--remove-max-area-ratio", type=float, default=0.0035)
-    ap.add_argument("--remove-min-distance", type=float, default=80.0)
+    ap.add_argument("--keep-center-distance", type=float, default=170.0)
 
     ap.add_argument("--report-base", default="")
     ap.add_argument("--preview-sheet", default="")
