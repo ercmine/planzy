@@ -107,7 +107,9 @@ import { createDryadMarketplaceHttpHandlers } from "../dryad/http.js";
 import type { DryadMarketplaceService } from "../dryad/service.js";
 import type { createPerbugWorldHttpHandlers } from "../perbugWorld/http.js";
 import { createPerbugMarketplaceHttpHandlers } from "../perbugMarketplace/http.js";
+import { createWalletAuthHttpHandlers } from "../walletAuth/http.js";
 import type { PerbugMarketplaceService } from "../perbugMarketplace/service.js";
+import type { WalletAuthService } from "../walletAuth/service.js";
 
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
@@ -212,6 +214,7 @@ export function createRoutes(
     reviewEligibilityService?: ReviewEligibilityService;
     perbugWorldHandlers?: ReturnType<typeof createPerbugWorldHttpHandlers>;
     perbugMarketplaceService?: PerbugMarketplaceService;
+    walletAuthService?: WalletAuthService;
   }
 ) {
   const handlers = createVenueClaimsHttpHandlers(service);
@@ -256,6 +259,7 @@ export function createRoutes(
   const socialGamificationHandlers = deps?.socialGamificationService ? createSocialGamificationHttpHandlers(deps.socialGamificationService) : null;
   const gamificationControlHandlers = deps?.gamificationControlService ? createGamificationControlHttpHandlers(deps.gamificationControlService) : null;
   const dryadRewardsHandlers = deps?.dryadRewardsService ? createDryadRewardsHttpHandlers(deps.dryadRewardsService) : null;
+  const walletAuthHandlers = deps?.walletAuthService ? createWalletAuthHttpHandlers(deps.walletAuthService) : null;
   const dryadTipsHandlers = deps?.dryadTipsService ? createDryadTipsHttpHandlers(deps.dryadTipsService) : null;
   const competitionHandlers = deps?.competitionService ? createCompetitionHttpHandlers(deps.competitionService) : null;
   const sponsoredLocationHandlers = deps?.sponsoredLocationsService ? createSponsoredLocationsHttpHandlers(deps.sponsoredLocationsService) : null;
@@ -851,6 +855,37 @@ export function createRoutes(
 
       if (req.method === "GET" && normalizedPath === "/v1/collections" && collectionsHandlers) {
         await collectionsHandlers.list(req, res);
+        return;
+      }
+
+
+      if (req.method === "POST" && normalizedPath === "/v1/auth/wallet/challenge" && walletAuthHandlers) {
+        await walletAuthHandlers.createChallenge(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/auth/wallet/verify" && walletAuthHandlers) {
+        await walletAuthHandlers.verifyChallenge(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/auth/session" && walletAuthHandlers) {
+        await walletAuthHandlers.restoreSession(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && normalizedPath === "/v1/auth/logout" && walletAuthHandlers) {
+        await walletAuthHandlers.logout(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/auth/wallets" && walletAuthHandlers) {
+        await walletAuthHandlers.listWallets(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && normalizedPath === "/v1/auth/wallet-events" && walletAuthHandlers) {
+        await walletAuthHandlers.verificationEvents(req, res);
         return;
       }
 

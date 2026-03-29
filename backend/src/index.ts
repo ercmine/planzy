@@ -139,3 +139,5 @@ export * from "./sponsoredLocations/index.js";
 export * from "./viewerEngagementRewards/index.js";
 
 export * from "./dryad/index.js";
+
+export * from "./walletAuth/index.js";
