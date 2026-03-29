@@ -754,10 +754,6 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     if (session == null) return;
     _puzzleTimer?.cancel();
     final elapsed = DateTime.now().toUtc().difference(session.session.startedAt);
-    final metadata = <String, Object>{
-      'generated_solution_length': session.puzzle.suggestedSolutionLength,
-      if (failureReason != null) 'failure_reason': failureReason,
-    };
     final result = PuzzleResult(
       sessionId: session.session.sessionId,
       nodeId: session.session.nodeId,
