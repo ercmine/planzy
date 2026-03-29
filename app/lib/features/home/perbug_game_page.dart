@@ -3,11 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../app/theme/tokens.dart';
 import '../../app/theme/widgets.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_state.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';
+import 'perbug_asset_registry.dart';
 import 'perbug_economy_models.dart';
 import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
@@ -118,12 +118,15 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   runSpacing: 8,
                   children: [
                     for (final nodeType in PerbugNodeType.values)
-                      AppPill(
-                        label: nodeType.name,
-                        icon: _iconForNodeType(nodeType),
-                        backgroundColor: _colorForNodeType(nodeType).withOpacity(0.16),
-                        foregroundColor: _colorForNodeType(nodeType),
-                      ),
+                      (() {
+                        final visual = PerbugAssetRegistry.nodeVisual(nodeType);
+                        return AppPill(
+                          label: visual.label,
+                          icon: visual.icon,
+                          backgroundColor: visual.color.withOpacity(0.16),
+                          foregroundColor: visual.color,
+                        );
+                      })(),
                   ],
                 ),
               ],
@@ -265,10 +268,11 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   .map(
                     (unit) => ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(child: Text(unit.rarity.name.substring(0, 1).toUpperCase())),
-                      title: Text('${unit.name} • ${unit.role.name}/${unit.unitClass.name}'),
+                      leading: CircleAvatar(child: Icon(PerbugAssetRegistry.roleVisual(unit.role).icon, size: 18)),
+                      title: Text('${unit.name} • ${PerbugAssetRegistry.roleVisual(unit.role).label}/${unit.unitClass.name}'),
                       subtitle: Text(
-                        'Lv ${unit.progression.level} • ${unit.rarity.name} • ${unit.resolvedProvenance.source.name} • Power ${unit.power}',
+                        'Lv ${unit.progression.level} • ${unit.rarity.name} • ${unit.resolvedProvenance.source.name} • '
+                        'Power ${unit.power} • ${PerbugAssetRegistry.roleVisual(unit.role).portraitRef.sheet}',
                       ),
                       trailing: unit.isChainBacked
                           ? const Icon(Icons.verified, color: Colors.amber)
@@ -311,31 +315,35 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             subtitle: 'No free teleporting. Reachability is based on real distance and energy.',
             children: moves
                 .map(
-                  (move) => ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      _iconForNodeType(move.node.nodeType),
-                      color: move.isReachable ? _colorForNodeType(move.node.nodeType) : Colors.blueGrey,
-                    ),
-                    title: Text('${move.node.label} • ${move.node.nodeType.name}'),
-                    subtitle: Text(
-                      '${move.node.region} • ${((move.node.distanceFromCurrentMeters ?? 0) / 1000).toStringAsFixed(2)}km • ${move.reason}',
-                    ),
-                    trailing: TextButton(
-                      onPressed: move.isReachable
-                          ? () async {
-                              final ok = await controller.jumpTo(move);
-                              if (!context.mounted || !ok) return;
-                              await onboardingController.recordFirstMove();
-                              if (onboarding.step == OnboardingStep.firstMove) {
-                                await onboardingController.advanceTo(OnboardingStep.firstEncounter);
+                  (move) {
+                    final visual = PerbugAssetRegistry.nodeVisual(move.node.nodeType);
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        visual.icon,
+                        color: move.isReachable ? visual.color : Colors.blueGrey,
+                      ),
+                      title: Text('${move.node.label} • ${visual.label}'),
+                      subtitle: Text(
+                        '${move.node.region} • ${((move.node.distanceFromCurrentMeters ?? 0) / 1000).toStringAsFixed(2)}km • ${move.reason}\n'
+                        'Icon ${visual.iconRef.id} • Tile ${visual.tileRef.id}',
+                      ),
+                      trailing: TextButton(
+                        onPressed: move.isReachable
+                            ? () async {
+                                final ok = await controller.jumpTo(move);
+                                if (!context.mounted || !ok) return;
+                                await onboardingController.recordFirstMove();
+                                if (onboarding.step == OnboardingStep.firstMove) {
+                                  await onboardingController.advanceTo(OnboardingStep.firstEncounter);
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Moved to ${move.node.label}')));
                               }
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Moved to ${move.node.label}')));
-                            }
-                          : null,
-                      child: Text('Move (${move.energyCost}⚡ + ${move.totalPerbugCost}Ⓟ)'),
-                    ),
-                  ),
+                            : null,
+                        child: Text('Move (${move.energyCost}⚡ + ${move.totalPerbugCost}Ⓟ)'),
+                      ),
+                    );
+                  },
                 )
                 .toList(growable: false),
           ),
@@ -645,7 +653,7 @@ class _BoardPainter extends CustomPainter {
         ..color = isCurrent
             ? const Color(0xFFFFD166)
             : isReachable
-                ? _colorForNodeType(node.nodeType)
+                ? PerbugAssetRegistry.nodeVisual(node.nodeType).color
                 : (isVisited ? const Color(0xFF4ECDC4) : const Color(0xFF8D99AE));
       canvas.drawCircle(p, isCurrent ? 7 : 5, fill);
     }
@@ -653,23 +661,6 @@ class _BoardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BoardPainter oldDelegate) => oldDelegate.state != state;
-}
-
-IconData _iconForNodeType(PerbugNodeType type) {
-  return switch (type) {
-    PerbugNodeType.encounter => Icons.flash_on_rounded,
-    PerbugNodeType.resource => Icons.forest_rounded,
-    PerbugNodeType.mission => Icons.flag_circle_rounded,
-    PerbugNodeType.shop => Icons.storefront_rounded,
-    PerbugNodeType.rare => Icons.auto_awesome_rounded,
-    PerbugNodeType.boss => Icons.health_and_safety_rounded,
-    PerbugNodeType.rest => Icons.nightlight_round,
-    PerbugNodeType.event => Icons.celebration_rounded,
-  };
-}
-
-Color _colorForNodeType(PerbugNodeType type) {
-  return AppSemanticColors.mapNode[type.name] ?? const Color(0xFF5E8BFF);
 }
 
 class _Section extends StatelessWidget {
