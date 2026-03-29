@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import WalletIdentityPanel from "./WalletIdentityPanel";
 
 type AssetType = "character" | "item" | "relic" | "map_asset" | "cosmetic" | "special_event_asset" | "nft_backed_asset";
 
@@ -78,7 +79,8 @@ export default function MarketplaceExperience() {
         />
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+        <div className="flex flex-wrap gap-2">
         {categories.map((entry) => (
           <button
             key={entry.key}
@@ -88,6 +90,8 @@ export default function MarketplaceExperience() {
             {entry.label}
           </button>
         ))}
+        </div>
+        <WalletIdentityPanel />
       </div>
 
       {loading ? <p className="mt-6 text-sm text-slate-400">Opening market ledgers…</p> : null}

@@ -71,6 +71,7 @@ import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../spon
 import { MemoryDryadEconomyStore, DryadEconomyService } from "../perbugEconomy/index.js";
 import { MemoryViewerEngagementStore, ViewerEngagementRewardsService } from "../viewerEngagementRewards/index.js";
 import { DryadMarketplaceService } from "../dryad/service.js";
+import { MemoryWalletAuthStore, WalletAuthService } from "../walletAuth/index.js";
 import { createPerbugWorldHttpHandlers, MemoryPerbugWorldStore, PerbugWorldService } from "../perbugWorld/index.js";
 import { PerbugMarketplaceService, seedMarketplaceListings } from "../perbugMarketplace/index.js";
 import type { DryadTree } from "../dryad/domain.js";
@@ -315,6 +316,7 @@ export function createServer(options?: CreateServerOptions) {
     { spotId: "spot-102", placeId: "spot-102", label: "South Congress Bloomfield, Austin", lat: 30.248, lng: -97.752, claimState: "unclaimed" },
   ]);
 
+  const walletAuthService = new WalletAuthService(new MemoryWalletAuthStore(), accountsService);
   const dryadEconomyService = new DryadEconomyService(new MemoryDryadEconomyStore());
   const perbugWorldService = new PerbugWorldService(new MemoryPerbugWorldStore());
   const perbugMarketplaceService = new PerbugMarketplaceService(seedMarketplaceListings());
@@ -395,6 +397,7 @@ export function createServer(options?: CreateServerOptions) {
     dryadEconomyService,
     viewerEngagementRewardsService,
     dryadMarketplaceService,
+    walletAuthService,
     perbugWorldHandlers,
     perbugMarketplaceService
   });
