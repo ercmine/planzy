@@ -1,15 +1,15 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:dryad/app/router.dart';
 import 'package:dryad/core/identity/identity_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('routes to bootstrap while onboarding state is loading', () {
+  test('routes to bootstrap while onboarding intro gate is loading', () {
     final container = ProviderContainer(
       overrides: [
-        onboardingCompletedProvider.overrideWith((ref) async {
+        onboardingIntroRequiredProvider.overrideWith((ref) async {
           await Future<void>.delayed(const Duration(seconds: 1));
-          return false;
+          return true;
         }),
       ],
     );
@@ -21,10 +21,10 @@ void main() {
     container.dispose();
   });
 
-  test('routes to onboarding when onboarding is incomplete', () {
+  test('routes to onboarding when intro is still required', () {
     final container = ProviderContainer(
       overrides: [
-        onboardingCompletedProvider.overrideWith((ref) async => false),
+        onboardingIntroRequiredProvider.overrideWith((ref) async => true),
       ],
     );
 
@@ -36,10 +36,10 @@ void main() {
     container.dispose();
   });
 
-  test('routes completed onboarding away from onboarding pages to home', () {
+  test('routes away from onboarding after expedition starts', () {
     final container = ProviderContainer(
       overrides: [
-        onboardingCompletedProvider.overrideWith((ref) async => true),
+        onboardingIntroRequiredProvider.overrideWith((ref) async => false),
       ],
     );
 
@@ -51,4 +51,3 @@ void main() {
     container.dispose();
   });
 }
-

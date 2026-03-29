@@ -67,7 +67,7 @@ class OnboardingScaffold extends StatelessWidget {
                           Expanded(child: child),
                           const SizedBox(height: AppSpacing.s),
                           Text(
-                            'Focused planning with a calmer, cleaner palette.',
+                            'Perbug onboarding: learn the live loop, then play immediately.',
                             style: Theme.of(context).textTheme.labelMedium?.copyWith(
                                   color: scheme.onSurfaceVariant,
                                 ),

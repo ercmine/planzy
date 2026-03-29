@@ -42,6 +42,23 @@ class LocalUserProfile {
   }
 }
 
+
+class OnboardingProgressSnapshot {
+  const OnboardingProgressSnapshot({
+    required this.step,
+    required this.startedAt,
+    required this.firstMoveAt,
+    required this.firstRewardAt,
+    required this.skipped,
+  });
+
+  final String step;
+  final DateTime? startedAt;
+  final DateTime? firstMoveAt;
+  final DateTime? firstRewardAt;
+  final bool skipped;
+}
+
 class IdentityStore {
   IdentityStore({
     required SharedPreferences sharedPreferences,
@@ -52,6 +69,11 @@ class IdentityStore {
   static const userIdKey = 'dryad_user_id';
   static const onboardingCompletedKey = 'onboarding_completed';
   static const onboardingCategoriesKey = 'onboarding_categories';
+  static const onboardingStepKey = 'onboarding_step';
+  static const onboardingStartedAtKey = 'onboarding_started_at';
+  static const onboardingFirstMoveAtKey = 'onboarding_first_move_at';
+  static const onboardingFirstRewardAtKey = 'onboarding_first_reward_at';
+  static const onboardingSkippedKey = 'onboarding_skipped';
   static const displayNameKey = 'profile_display_name';
   static const usernameKey = 'profile_username';
   static const bioKey = 'profile_bio';
@@ -81,6 +103,40 @@ class IdentityStore {
   Future<List<String>> getOnboardingCategories() async {
     final values = _prefs.getStringList(onboardingCategoriesKey) ?? const <String>[];
     return values.where((value) => value.isNotEmpty).toList(growable: false);
+  }
+
+
+  Future<OnboardingProgressSnapshot> getOnboardingProgress() async {
+    final startedRaw = _prefs.getString(onboardingStartedAtKey);
+    final firstMoveRaw = _prefs.getString(onboardingFirstMoveAtKey);
+    final firstRewardRaw = _prefs.getString(onboardingFirstRewardAtKey);
+    return OnboardingProgressSnapshot(
+      step: _prefs.getString(onboardingStepKey) ?? 'identityIntro',
+      startedAt: startedRaw == null ? null : DateTime.tryParse(startedRaw),
+      firstMoveAt: firstMoveRaw == null ? null : DateTime.tryParse(firstMoveRaw),
+      firstRewardAt: firstRewardRaw == null ? null : DateTime.tryParse(firstRewardRaw),
+      skipped: _prefs.getBool(onboardingSkippedKey) ?? false,
+    );
+  }
+
+  Future<void> setOnboardingStep(String step) {
+    return _prefs.setString(onboardingStepKey, step);
+  }
+
+  Future<void> setOnboardingStartedAt(DateTime value) {
+    return _prefs.setString(onboardingStartedAtKey, value.toUtc().toIso8601String());
+  }
+
+  Future<void> setOnboardingFirstMoveAt(DateTime value) {
+    return _prefs.setString(onboardingFirstMoveAtKey, value.toUtc().toIso8601String());
+  }
+
+  Future<void> setOnboardingFirstRewardAt(DateTime value) {
+    return _prefs.setString(onboardingFirstRewardAtKey, value.toUtc().toIso8601String());
+  }
+
+  Future<void> setOnboardingSkipped(bool skipped) {
+    return _prefs.setBool(onboardingSkippedKey, skipped);
   }
 
   Future<void> setOnboardingCategories(List<String> values) {
@@ -132,6 +188,11 @@ class IdentityStore {
     await _prefs.remove(bioKey);
     await _prefs.remove(onboardingCompletedKey);
     await _prefs.remove(onboardingCategoriesKey);
+    await _prefs.remove(onboardingStepKey);
+    await _prefs.remove(onboardingStartedAtKey);
+    await _prefs.remove(onboardingFirstMoveAtKey);
+    await _prefs.remove(onboardingFirstRewardAtKey);
+    await _prefs.remove(onboardingSkippedKey);
   }
 
   String _sanitizeUsername(String value) {

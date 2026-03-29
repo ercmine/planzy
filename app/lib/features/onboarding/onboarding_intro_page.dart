@@ -5,113 +5,80 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import '../../core/location/location_controller.dart';
-import '../../core/location/location_models.dart';
 import 'onboarding_controller.dart';
 import 'onboarding_widgets.dart';
 
-enum _OnboardingStep { briefing, location }
-
-class OnboardingIntroPage extends ConsumerStatefulWidget {
+class OnboardingIntroPage extends ConsumerWidget {
   const OnboardingIntroPage({super.key});
 
   @override
-  ConsumerState<OnboardingIntroPage> createState() => _OnboardingIntroPageState();
-}
-
-class _OnboardingIntroPageState extends ConsumerState<OnboardingIntroPage> {
-  _OnboardingStep _step = _OnboardingStep.briefing;
-
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(onboardingControllerProvider);
-    final locationState = ref.watch(locationControllerProvider);
-
-    if (state.hasCompleted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.go('/');
-      });
-    }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final onboarding = ref.watch(onboardingControllerProvider);
+    final location = ref.watch(locationControllerProvider);
 
     return OnboardingScaffold(
-      showBackButton: _step == _OnboardingStep.location,
-      onBackPressed: _step == _OnboardingStep.location ? () => setState(() => _step = _OnboardingStep.briefing) : null,
+      showBackButton: false,
       child: SingleChildScrollView(
-        child: _step == _OnboardingStep.briefing
-            ? _buildBriefing(context)
-            : _buildLocationStep(context, locationState, state.isBusy),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('The real world is now your tactical map.', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
+            const SizedBox(height: AppSpacing.s),
+            const Text(
+              'Perbug is a world-map strategy RPG built on real geography. Move node-to-node, deploy your squad, earn Perbug + resources, and expand your frontier.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.m),
+            const PermissionInfoCard(
+              icon: Icons.public,
+              title: 'Real places become playable nodes',
+              description: 'Your nearby streets, parks, and districts become strategic jump targets on the map.',
+            ),
+            const SizedBox(height: AppSpacing.s),
+            const PermissionInfoCard(
+              icon: Icons.groups_rounded,
+              title: 'Your starter squad drives encounters',
+              description: 'You begin with an active 3-unit squad. Roles matter immediately when encounters trigger.',
+            ),
+            const SizedBox(height: AppSpacing.s),
+            const PermissionInfoCard(
+              icon: Icons.bolt_rounded,
+              title: 'Movement costs, nodes reward',
+              description: 'Each move spends energy and Perbug. Clearing nodes returns XP, materials, and momentum.',
+            ),
+            const SizedBox(height: AppSpacing.m),
+            PrimaryButton(
+              label: 'Deploy to live map',
+              isLoading: onboarding.isBusy,
+              onPressed: onboarding.isBusy
+                  ? null
+                  : () async {
+                      await ref.read(locationControllerProvider.notifier).requestPermissionAndRefresh();
+                      await ref.read(onboardingControllerProvider.notifier).startOnboardingExpedition();
+                      if (context.mounted) {
+                        context.go('/');
+                      }
+                    },
+            ),
+            const SizedBox(height: AppSpacing.s),
+            TextButton(
+              onPressed: () async {
+                await ref.read(onboardingControllerProvider.notifier).skipOnboarding();
+                if (context.mounted) context.go('/');
+              },
+              child: const Text('Skip tutorial and enter command map'),
+            ),
+            if (location.errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.s),
+                child: Text(
+                  'Location fallback active. We will start you in the default mission region. (${location.errorMessage})',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildBriefing(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Welcome to Perbug', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
-        const SizedBox(height: AppSpacing.s),
-        const Text(
-          'Perbug is a map-native strategy RPG. You move between nearby real-world nodes, resolve encounters, earn rewards, and push outward.',
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: AppSpacing.m),
-        const PermissionInfoCard(
-          icon: Icons.public,
-          title: 'Real geography board',
-          description: 'Nodes are derived from real map data so each jump is grounded in actual places.',
-        ),
-        const SizedBox(height: AppSpacing.s),
-        const PermissionInfoCard(
-          icon: Icons.bolt,
-          title: 'Energy drives progression',
-          description: 'Energy is earned through gameplay loops and spent to jump to new nearby nodes.',
-        ),
-        const SizedBox(height: AppSpacing.s),
-        const PermissionInfoCard(
-          icon: Icons.extension,
-          title: 'Encounter-ready nodes',
-          description: 'Every node can launch encounters (puzzle, battle, harvest, missions) without changing the world-map loop.',
-        ),
-        const SizedBox(height: AppSpacing.m),
-        PrimaryButton(label: 'Start expedition', onPressed: () => setState(() => _step = _OnboardingStep.location)),
-      ],
-    );
-  }
-
-  Widget _buildLocationStep(BuildContext context, LocationControllerState locationState, bool busy) {
-    final isLoading = locationState.status == LocationStatus.loading;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Enable location anchor', style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
-        const SizedBox(height: AppSpacing.s),
-        const Text(
-          'We use your location as your starting anchor to fetch nearby real nodes with geocoding data.',
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: AppSpacing.m),
-        PrimaryButton(
-          label: 'Allow location',
-          isLoading: isLoading,
-          onPressed: isLoading ? null : () => ref.read(locationControllerProvider.notifier).requestPermissionAndRefresh(),
-        ),
-        if (locationState.effectiveLocation case final AppLocation effective) ...[
-          const SizedBox(height: AppSpacing.s),
-          Text(
-            'Anchor ready: ${effective.lat.toStringAsFixed(4)}, ${effective.lng.toStringAsFixed(4)}',
-            textAlign: TextAlign.center,
-          ),
-        ],
-        if (locationState.errorMessage != null) ...[
-          const SizedBox(height: AppSpacing.s),
-          Text(locationState.errorMessage!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-        ],
-        const SizedBox(height: AppSpacing.m),
-        PrimaryButton(
-          label: 'Start first mission',
-          isLoading: busy,
-          onPressed: busy ? null : () => ref.read(onboardingControllerProvider.notifier).completeOnboarding(),
-        ),
-      ],
     );
   }
 }

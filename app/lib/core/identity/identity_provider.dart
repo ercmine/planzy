@@ -22,3 +22,12 @@ final localUserProfileProvider = FutureProvider<LocalUserProfile>((ref) async {
   final identityStore = await ref.watch(identityStoreProvider.future);
   return identityStore.getOrCreateProfile();
 });
+
+
+final onboardingIntroRequiredProvider = FutureProvider<bool>((ref) async {
+  final identityStore = await ref.watch(identityStoreProvider.future);
+  final completed = await identityStore.isOnboardingCompleted();
+  if (completed) return false;
+  final progress = await identityStore.getOnboardingProgress();
+  return progress.step == 'identityIntro';
+});

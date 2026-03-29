@@ -1,10 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/identity/identity_provider.dart';
-import '../dryad/chain/dryad_chain_providers.dart';
-import '../dryad/chain/evm_abi.dart';
-import '../dryad/chain/grove_nft_service.dart';
-import '../dryad/chain/seed_codec.dart';
 import 'onboarding_state.dart';
 
 class OnboardingController extends Notifier<OnboardingState> {
@@ -14,150 +10,108 @@ class OnboardingController extends Notifier<OnboardingState> {
     return OnboardingState.initial();
   }
 
+  static const List<OnboardingStep> _flow = [
+    OnboardingStep.identityIntro,
+    OnboardingStep.mapNodes,
+    OnboardingStep.squadIntro,
+    OnboardingStep.firstMove,
+    OnboardingStep.firstEncounter,
+    OnboardingStep.firstReward,
+    OnboardingStep.progressionCue,
+    OnboardingStep.liveLoop,
+    OnboardingStep.completed,
+  ];
+
   Future<void> _load() async {
-    final identity = await ref.read(identityStoreProvider.future);
-    final completed = await identity.isOnboardingCompleted();
-    if (completed) {
-      state = state.copyWith(status: OnboardingFlowStatus.onboardingCompleted, hasCompleted: true);
-      return;
-    }
-    state = state.copyWith(status: OnboardingFlowStatus.walletDisconnected);
-  }
-
-  void setWalletAddress(String value) {
-    state = state.copyWith(
-      walletAddress: value.trim(),
-      status: value.trim().isEmpty ? OnboardingFlowStatus.walletDisconnected : OnboardingFlowStatus.walletConnected,
-      clearError: true,
-    );
-    ref.read(walletAddressProvider.notifier).state = value.trim().isEmpty ? null : value.trim();
-  }
-
-
-  Future<void> connectWallet() async {
-    final connector = ref.read(walletConnectorProvider);
-    if (!connector.isAvailable) {
-      state = state.copyWith(
-        status: OnboardingFlowStatus.onboardingFailed,
-        errorMessage:
-            'No wallet connector detected. Use a wallet app on phone or a browser extension on web, or paste your wallet manually.',
-      );
-      return;
-    }
-
     state = state.copyWith(isBusy: true, clearError: true);
     try {
-      final account = await connector.connectWallet();
-      setWalletAddress(account);
-      state = state.copyWith(isBusy: false, status: OnboardingFlowStatus.walletConnected);
-    } catch (error) {
+      final identity = await ref.read(identityStoreProvider.future);
+      final completed = await identity.isOnboardingCompleted();
+      final progress = await identity.getOnboardingProgress();
+      final step = _parseStep(progress.step);
       state = state.copyWith(
-        status: OnboardingFlowStatus.onboardingFailed,
         isBusy: false,
-        errorMessage: 'Wallet connection failed: $error',
+        hasCompleted: completed,
+        step: completed ? OnboardingStep.completed : step,
+        startedAt: progress.startedAt,
+        firstMoveAt: progress.firstMoveAt,
+        firstRewardAt: progress.firstRewardAt,
+        skipped: progress.skipped,
       );
+    } catch (error) {
+      state = state.copyWith(isBusy: false, errorMessage: 'Failed to load onboarding progress: $error');
     }
   }
 
-  Future<void> refreshNftStatus() async {
-    if (state.walletAddress.isEmpty) {
-      state = state.copyWith(status: OnboardingFlowStatus.walletDisconnected, errorMessage: 'Connect a wallet address first.');
-      return;
+  OnboardingStep _parseStep(String raw) {
+    for (final value in OnboardingStep.values) {
+      if (value.name == raw) return value;
     }
+    return OnboardingStep.identityIntro;
+  }
 
-    state = state.copyWith(status: OnboardingFlowStatus.readyToFetchNft, isBusy: true, clearError: true);
-    try {
-      final service = ref.read(groveNftServiceProvider);
-      final snapshot = await service.fetchWalletSnapshot(state.walletAddress);
-      final expectedChain = ref.read(dryadContractConfigProvider).chainId;
-      final connector = ref.read(walletConnectorProvider);
-      final activeWalletChain = connector.isAvailable ? await connector.readChainId() : snapshot.chainId;
-      if (activeWalletChain != expectedChain) {
-        final config = ref.read(dryadContractConfigProvider);
-        final switched = connector.isAvailable
-            ? await connector.switchChain(
-                chainId: config.chainId,
-                rpcUrl: config.rpcUrl,
-                chainName: config.networkName,
-                nativeCurrencySymbol: config.nativeSymbol,
-                explorerUrl: config.explorerBaseUrl,
-              )
-            : false;
-        final resolvedChain = connector.isAvailable ? await connector.readChainId() : activeWalletChain;
-        if (switched && resolvedChain == expectedChain) {
-          state = state.copyWith(
-            status: snapshot.hasNft ? OnboardingFlowStatus.nftFound : OnboardingFlowStatus.nftNotMinted,
-            isBusy: false,
-            snapshot: snapshot,
-          );
-          return;
-        }
-        state = state.copyWith(
-          status: OnboardingFlowStatus.wrongNetwork,
-          isBusy: false,
-          snapshot: snapshot,
-          errorMessage: 'Wrong network. Expected chain ID $expectedChain but connected wallet is on $resolvedChain.',
-        );
-        return;
-      }
-      state = state.copyWith(
-        status: snapshot.hasNft ? OnboardingFlowStatus.nftFound : OnboardingFlowStatus.nftNotMinted,
-        isBusy: false,
-        snapshot: snapshot,
-      );
-    } catch (error) {
-      state = state.copyWith(
-        status: OnboardingFlowStatus.onboardingFailed,
-        isBusy: false,
-        errorMessage: 'Unable to load NFT from chain: $error',
-      );
+  Future<void> startOnboardingExpedition() async {
+    final identity = await ref.read(identityStoreProvider.future);
+    final now = DateTime.now().toUtc();
+    await identity.setOnboardingStartedAt(now);
+    await identity.setOnboardingStep(OnboardingStep.mapNodes.name);
+    await identity.setOnboardingSkipped(false);
+    state = state.copyWith(
+      step: OnboardingStep.mapNodes,
+      startedAt: now,
+      skipped: false,
+      clearError: true,
+    );
+  }
+
+  Future<void> advanceTo(OnboardingStep step) async {
+    if (state.hasCompleted) return;
+    final identity = await ref.read(identityStoreProvider.future);
+    await identity.setOnboardingStep(step.name);
+    state = state.copyWith(step: step, clearError: true);
+  }
+
+  Future<void> advanceStep() async {
+    if (state.hasCompleted) return;
+    final currentIndex = _flow.indexOf(state.step);
+    final next = currentIndex < 0 || currentIndex >= _flow.length - 1 ? OnboardingStep.completed : _flow[currentIndex + 1];
+    await advanceTo(next);
+    if (next == OnboardingStep.completed) {
+      await completeOnboarding();
     }
   }
 
-  Future<void> mintNft({required String seedInput}) async {
-    final service = ref.read(groveNftServiceProvider);
-    final config = ref.read(dryadContractConfigProvider);
-    final connector = ref.read(walletConnectorProvider);
-    final seedValidation = validatePlantSeed(seedInput);
-    if (!seedValidation.isValid) {
-      state = state.copyWith(
-        status: OnboardingFlowStatus.onboardingFailed,
-        isBusy: false,
-        errorMessage: seedValidation.errorMessage ?? 'Invalid plant seed.',
-      );
-      return;
-    }
-    state = state.copyWith(status: OnboardingFlowStatus.mintInProgress, isBusy: true, clearError: true);
+  Future<void> recordFirstMove() async {
+    if (state.firstMoveAt != null) return;
+    final identity = await ref.read(identityStoreProvider.future);
+    final now = DateTime.now().toUtc();
+    await identity.setOnboardingFirstMoveAt(now);
+    state = state.copyWith(firstMoveAt: now);
+  }
 
-    try {
-      final txHash = connector.isAvailable
-          ? await connector.sendTransaction(
-              from: state.walletAddress,
-              to: config.groveNftAddress,
-              data: encodeWriteCall(
-                config.mintMethodSignature,
-                walletAddress: state.walletAddress,
-                seedInput: seedInput,
-              ),
-            )
-          : await service.mint(walletAddress: state.walletAddress, methodSignature: config.mintMethodSignature, seedInput: seedInput);
-      state = state.copyWith(status: OnboardingFlowStatus.mintSucceeded, isBusy: false, txHash: txHash);
-      await refreshNftStatus();
-    } catch (error) {
-      state = state.copyWith(
-        status: OnboardingFlowStatus.onboardingFailed,
-        isBusy: false,
-        errorMessage:
-            'On-chain transaction failed. Connect using a mobile wallet app (or in-app web wallet where available) and approve the request, or provide a wallet-enabled RPC. Error: $error',
-      );
-    }
+  Future<void> recordFirstReward() async {
+    if (state.firstRewardAt != null) return;
+    final identity = await ref.read(identityStoreProvider.future);
+    final now = DateTime.now().toUtc();
+    await identity.setOnboardingFirstRewardAt(now);
+    state = state.copyWith(firstRewardAt: now);
+  }
+
+  Future<void> skipOnboarding() async {
+    final identity = await ref.read(identityStoreProvider.future);
+    await identity.setOnboardingSkipped(true);
+    await identity.setOnboardingStep(OnboardingStep.completed.name);
+    await identity.setOnboardingCompleted(true);
+    ref.invalidate(onboardingCompletedProvider);
+    state = state.copyWith(step: OnboardingStep.completed, hasCompleted: true, skipped: true);
   }
 
   Future<void> completeOnboarding() async {
     final identity = await ref.read(identityStoreProvider.future);
+    await identity.setOnboardingStep(OnboardingStep.completed.name);
     await identity.setOnboardingCompleted(true);
     ref.invalidate(onboardingCompletedProvider);
-    state = state.copyWith(status: OnboardingFlowStatus.onboardingCompleted, hasCompleted: true);
+    state = state.copyWith(step: OnboardingStep.completed, hasCompleted: true, clearError: true);
   }
 }
 
