@@ -2,28 +2,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/identity/identity_provider.dart';
+import '../features/auth/perbug_wallet_entry_page.dart';
+import '../features/dryad/chain/dryad_chain_providers.dart';
 import '../features/home/home_page.dart';
 import '../features/home/perbug_flow_pages.dart';
 import '../features/home/perbug_navigation_debug_page.dart';
-import '../features/onboarding/bootstrap_page.dart';
-import '../features/onboarding/onboarding_discovery_page.dart';
-import '../features/onboarding/onboarding_interests_page.dart';
-import '../features/onboarding/onboarding_intro_page.dart';
-import '../features/onboarding/onboarding_location_page.dart';
-import '../features/onboarding/onboarding_permissions_page.dart';
-import '../features/onboarding/onboarding_signin_page.dart';
 import 'app_routes.dart';
 
-final onboardingGateProvider = Provider<ChangeNotifier>((ref) {
+final authGateProvider = Provider<ChangeNotifier>((ref) {
   final gate = ValueNotifier<int>(0);
-  ref.listen<AsyncValue<bool>>(
-    onboardingIntroRequiredProvider,
-    (_, __) => gate.value++,
-    fireImmediately: true,
-  );
-  ref.listen<AsyncValue<bool>>(
-    onboardingCompletedProvider,
+  ref.listen<String?>(
+    walletAddressProvider,
     (_, __) => gate.value++,
     fireImmediately: true,
   );
@@ -32,34 +21,23 @@ final onboardingGateProvider = Provider<ChangeNotifier>((ref) {
 });
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final refreshListenable = ref.watch(onboardingGateProvider);
+  final refreshListenable = ref.watch(authGateProvider);
 
   return GoRouter(
-    initialLocation: AppRoutes.home,
+    initialLocation: AppRoutes.entry,
     refreshListenable: refreshListenable,
     redirect: (context, state) {
       final path = state.uri.path;
-      final isOnboardingRoute = path == AppRoutes.onboarding || path.startsWith('${AppRoutes.onboarding}/');
-      final isBootstrapRoute = path == AppRoutes.bootstrap;
-      final introGateState = ref.read(onboardingIntroRequiredProvider);
+      final wallet = ref.read(walletAddressProvider);
+      final hasWalletSession = wallet != null && wallet.trim().isNotEmpty;
+      final onEntry = path == AppRoutes.entry;
 
-      if (introGateState.isLoading || introGateState.hasError) {
-        return isBootstrapRoute ? null : AppRoutes.bootstrap;
-      }
-
-      final requiresIntro = introGateState.valueOrNull ?? false;
-      if (requiresIntro && !isOnboardingRoute) return AppRoutes.onboarding;
-      if (!requiresIntro && (isOnboardingRoute || isBootstrapRoute)) return AppRoutes.liveMap;
+      if (!hasWalletSession && !onEntry) return AppRoutes.entry;
+      if (hasWalletSession && onEntry) return AppRoutes.liveMap;
       return null;
     },
     routes: [
-      GoRoute(path: AppRoutes.bootstrap, name: 'bootstrap', builder: (context, state) => const BootstrapPage()),
-      GoRoute(path: AppRoutes.onboarding, name: 'onboarding', builder: (context, state) => const OnboardingIntroPage()),
-      GoRoute(path: AppRoutes.onboardingLocation, name: 'onboarding-location', builder: (context, state) => const OnboardingLocationPage()),
-      GoRoute(path: AppRoutes.onboardingInterests, name: 'onboarding-interests', builder: (context, state) => const OnboardingInterestsPage()),
-      GoRoute(path: AppRoutes.onboardingDiscovery, name: 'onboarding-discovery', builder: (context, state) => const OnboardingDiscoveryPage()),
-      GoRoute(path: AppRoutes.onboardingPermissions, name: 'onboarding-permissions', builder: (context, state) => const OnboardingPermissionsPage()),
-      GoRoute(path: AppRoutes.onboardingSignin, name: 'onboarding-signin', builder: (context, state) => const OnboardingSignInPage()),
+      GoRoute(path: AppRoutes.entry, name: 'entry', builder: (context, state) => const PerbugWalletEntryPage()),
       GoRoute(path: AppRoutes.home, name: 'home', builder: (context, state) => const HomePage()),
       GoRoute(path: AppRoutes.liveMap, name: 'live-map', builder: (context, state) => const HomePage(initialTab: HomeTab.world)),
       GoRoute(path: AppRoutes.world, name: 'world', builder: (context, state) => const HomePage(initialTab: HomeTab.world)),

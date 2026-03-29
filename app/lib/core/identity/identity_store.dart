@@ -77,6 +77,7 @@ class IdentityStore {
   static const displayNameKey = 'profile_display_name';
   static const usernameKey = 'profile_username';
   static const bioKey = 'profile_bio';
+  static const walletSessionAddressKey = 'wallet_session_address';
 
   final SharedPreferences _prefs;
   final FlutterSecureStorage _secureStorage;
@@ -144,6 +145,22 @@ class IdentityStore {
     return _prefs.setStringList(onboardingCategoriesKey, cleaned);
   }
 
+
+  Future<String?> getWalletSessionAddress() async {
+    final value = _prefs.getString(walletSessionAddressKey)?.trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  Future<void> setWalletSessionAddress(String? address) async {
+    final cleaned = address?.trim();
+    if (cleaned == null || cleaned.isEmpty) {
+      await _prefs.remove(walletSessionAddressKey);
+      return;
+    }
+    await _prefs.setString(walletSessionAddressKey, cleaned);
+  }
+
   Future<LocalUserProfile> getOrCreateProfile() async {
     final userId = await getOrCreateUserId();
     final fallbackSuffix = userId.replaceAll('-', '').substring(0, 6).toLowerCase();
@@ -193,6 +210,7 @@ class IdentityStore {
     await _prefs.remove(onboardingFirstMoveAtKey);
     await _prefs.remove(onboardingFirstRewardAtKey);
     await _prefs.remove(onboardingSkippedKey);
+    await _prefs.remove(walletSessionAddressKey);
   }
 
   String _sanitizeUsername(String value) {
