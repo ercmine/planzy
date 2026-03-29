@@ -15,9 +15,10 @@ void main() {
       AppRoutes.collection,
       AppRoutes.profile,
       AppRoutes.wallet,
+      AppRoutes.learnMore,
     };
 
-    expect(routes.length, 11);
+    expect(routes.length, 12);
     for (final route in routes) {
       expect(route, startsWith('/'));
       expect(route.trim(), isNotEmpty);

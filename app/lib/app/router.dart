@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/auth/perbug_learn_more_page.dart';
 import '../features/auth/perbug_wallet_entry_page.dart';
 import '../features/dryad/chain/dryad_chain_providers.dart';
 import '../features/home/home_page.dart';
@@ -51,6 +52,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: AppRoutes.nodeDetails, name: 'node-details', builder: (context, state) => const PerbugNodeDetailsPage()),
       GoRoute(path: AppRoutes.encounter, name: 'encounter', builder: (context, state) => const PerbugEncounterPage()),
       GoRoute(path: AppRoutes.wallet, name: 'wallet', builder: (context, state) => const PerbugWalletPage()),
+      GoRoute(path: AppRoutes.learnMore, name: 'learn-more', builder: (context, state) => const PerbugLearnMorePage()),
       GoRoute(path: '/debug/navigation', name: 'debug-navigation', builder: (context, state) => const PerbugNavigationDebugPage()),
     ],
   );
