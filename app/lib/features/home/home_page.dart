@@ -31,7 +31,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final pages = const [
       PerbugGamePage(),
-      CollectionsPage(),
+      CollectionsPage(collections: []),
       SettingsPage(),
     ];
 

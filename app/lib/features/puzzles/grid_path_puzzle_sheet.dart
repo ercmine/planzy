@@ -134,7 +134,7 @@ class GridPathPuzzleSheet extends StatelessWidget {
       child: ListView(
         children: [
           AppCard(
-            tone: success ? AppCardTone.featured : AppCardTone.defaultTone,
+            tone: success ? AppCardTone.featured : AppCardTone.standard,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

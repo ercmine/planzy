@@ -754,6 +754,10 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     if (session == null) return;
     _puzzleTimer?.cancel();
     final elapsed = DateTime.now().toUtc().difference(session.session.startedAt);
+    final metadata = <String, Object>{
+      'generated_solution_length': session.puzzle.suggestedSolutionLength,
+      if (failureReason != null) 'failure_reason': failureReason,
+    };
     final result = PuzzleResult(
       sessionId: session.session.sessionId,
       nodeId: session.session.nodeId,
@@ -792,6 +796,10 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     _puzzleTimer?.cancel();
     final elapsed = DateTime.now().toUtc().difference(session.session.startedAt);
     final status = succeeded ? PuzzleSessionStatus.succeeded : PuzzleSessionStatus.failed;
+    final metadata = <String, Object>{
+      'generated_solution_length': session.puzzle.suggestedSolutionLength,
+      if (failureReason != null) 'failure_reason': failureReason,
+    };
     final result = PuzzleResult(
       sessionId: session.session.sessionId,
       nodeId: session.session.nodeId,
@@ -801,10 +809,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       retryCount: session.session.retryCount,
       difficulty: session.puzzle.preview.difficulty,
       seed: session.puzzle.seed,
-      metadata: {
-        'generated_solution_length': session.puzzle.suggestedSolutionLength,
-        'failure_reason': failureReason,
-      },
+      metadata: metadata,
     );
 
     final nodeProgress = state.puzzleProgressByNode[session.session.nodeId] ??
