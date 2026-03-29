@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/identity/identity_provider.dart';
+import 'onboarding_models.dart';
 import 'onboarding_state.dart';
 
 class OnboardingController extends Notifier<OnboardingState> {
@@ -113,6 +114,63 @@ class OnboardingController extends Notifier<OnboardingState> {
     ref.invalidate(onboardingCompletedProvider);
     state = state.copyWith(step: OnboardingStep.completed, hasCompleted: true, clearError: true);
   }
+
+  void updateLocationMode(bool useCurrentLocation) {
+    state = state.copyWith(useCurrentLocation: useCurrentLocation);
+  }
+
+  void updateCity(String city) {
+    state = state.copyWith(city: city);
+  }
+
+  void updateRegion(String region) {
+    state = state.copyWith(region: region);
+  }
+
+  void toggleCategory(String categoryId) {
+    final next = state.selectedCategories.toSet();
+    if (next.contains(categoryId)) {
+      next.remove(categoryId);
+    } else {
+      next.add(categoryId);
+    }
+    state = state.copyWith(selectedCategories: next.toList(growable: false));
+  }
+
+  void setDiscoveryMode(DiscoveryMode mode) {
+    state = state.copyWith(discoveryMode: mode);
+  }
+
+  Future<void> finish() async {
+    if (state.isFinishing) return;
+    state = state.copyWith(isFinishing: true, clearError: true);
+    try {
+      await completeOnboarding();
+    } catch (error) {
+      state = state.copyWith(errorMessage: 'Failed to finish onboarding: $error');
+    } finally {
+      state = state.copyWith(isFinishing: false);
+    }
+  }
+
+  Future<OnboardingFinishResult> finishAndBootstrapFeed() async {
+    await finish();
+    if (state.errorMessage != null) {
+      return OnboardingFinishResult.failure(state.errorMessage!);
+    }
+    return const OnboardingFinishResult.success();
+  }
+}
+
+class OnboardingFinishResult {
+  const OnboardingFinishResult._({required this.isSuccess, this.message});
+
+  const OnboardingFinishResult.success() : this._(isSuccess: true);
+
+  const OnboardingFinishResult.failure(String message) : this._(isSuccess: false, message: message);
+
+  final bool isSuccess;
+  final String? message;
 }
 
 final onboardingControllerProvider = NotifierProvider<OnboardingController, OnboardingState>(() {
