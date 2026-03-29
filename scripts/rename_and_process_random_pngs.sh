@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # rename_and_process_random_pngs.sh
-# Safe workflow for UUID-style PNG assets.
+# Deterministic rename + optional split workflow for known UUID-style PNG assets.
 
 TARGET_DIR="${TARGET_DIR:-/root/perbug}"
 APPLY="${APPLY:-0}"
@@ -19,18 +19,7 @@ fi
 
 UUID_RE='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\.png$'
 
-# Known explicit exclusions.
-EXCLUDED_NAMES=(
-  perbug.png
-  perbug.svg
-  perbug1.png
-  doge.png
-  dryad.svg
-  dryad1.svg
-)
-
 log() { echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] $*"; }
-warn() { echo "[WARN] $*" >&2; }
 err() { echo "[ERROR] $*" >&2; }
 
 require_cmd() {
@@ -47,63 +36,50 @@ fi
 SCRIPT_HOME="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "$SCRIPT_HOME/.." && pwd)"
 
-# Build mapping from canonical asset file name -> split script.
-declare -A SPLIT_BY_TYPE=(
-  [tank_sheet]="split_perbug_tank_nfts.sh"
-  [scout_sheet]="split_perbug_scout_nfts.sh"
-  [caster_sheet]="split_perbug_caster_nfts.sh"
-  [support_sheet]="split_perbug_support_nfts.sh"
-  [cleric_sheet]="split_perbug_cleric_nfts.sh"
-  [assassin_sheet]="split_perbug_assassin_nfts.sh"
-  [engineer_sheet]="split_perbug_engineer_nfts.sh"
-  [warrior_sheet]="split_perbug_warrior_nfts.sh"
-  [relic_sheet]="split_perbug_relics.sh"
-  [resource_sheet]="split_perbug_resources.sh"
-  [material_sheet]="split_perbug_material_nfts.sh"
-  [token_family]="split_perbug_token_family.sh"
-  [node_tiles_sheet]="split_perbug_node_tiles.sh"
-  [node_icon_sheet]="split_perbug_icons.sh"
-  [portrait_sheet]="split_perbug_portraits.sh"
-  [encounter_cards_sheet]="split_perbug_encounter_cards.sh"
+# UUID -> canonical asset filename mapping (grounded from ZIP).
+declare -A UUID_TO_NAME=(
+  [228C5CE8-D3B0-453A-8E46-64F01FAB93E9.png]="perbug_encounter_cards_sheet.png"
+  [3BB6CC35-BFDC-4C18-BA87-C1CD0A668DF6.png]="perbug_warrior_sheet.png"
+  [3C5A7529-A0F5-4A1C-9039-4A96BC0F673C.png]="perbug_resource_sheet.png"
+  [526CE866-1F9E-40B1-9B7F-509BB540C38C.png]="perbug_assassin_sheet.png"
+  [54C6227D-EE5B-48CB-AE6A-1E82C0D5A013.png]="perbug_material_sheet.png"
+  [5D739433-EC5F-49C2-B306-41A13C0F91F5.png]="perbug_tank_sheet.png"
+  [60461184-BB64-40A7-9FB6-48D295DEAC2E.png]="perbug_portrait_sheet.png"
+  [6BD97D60-8C42-451B-AAEC-69A15E785C1C.png]="perbug_token_hud.png"
+  [795171AC-B951-424C-AF25-F5D6A843DFED.png]="perbug_relic_sheet_01.png"
+  [7CB2E2A9-9052-4655-99AA-020DF4C3A53A.png]="perbug_token_family.png"
+  [8B4C5729-C6A4-4EE5-8D66-187C90C6FC6C.png]="perbug_node_tiles_sheet.png"
+  [90C8F1DA-7F1F-4F2B-8B54-B39F86440FB4.png]="perbug_scout_sheet.png"
+  [937EBBF0-AB03-41C3-90D9-65C4234ADE7B.png]="perbug_encounter_transition.png"
+  [9535BADF-DAC6-4AFB-AB59-9950A43A09E2.png]="perbug_node_icon_sheet.png"
+  [96E4EBAB-01F6-417F-9592-4AD7CD0E47B8.png]="perbug_caster_sheet.png"
+  [A65E65B4-E6C2-4F7B-97A0-5D1C3214992C.png]="perbug_engineer_sheet.png"
+  [B1E34202-F8A9-4CA9-A2E0-F54773A08D2C.png]="perbug_support_sheet.png"
+  [C165F0F5-CCEE-46CE-8FA3-4C2C61035D3C.png]="perbug_crafting_screen.png"
+  [CB9375F7-152D-4D4D-8F86-CC94B49679B9.png]="perbug_cleric_sheet.png"
+  [DA733532-603A-4638-96C8-F592294046B2.png]="perbug_relic_sheet_02.png"
 )
 
-# Type to preferred canonical output names.
-declare -A TYPE_PRIMARY_NAME=(
-  [tank_sheet]="perbug_tank_sheet.png"
-  [scout_sheet]="perbug_scout_sheet.png"
-  [caster_sheet]="perbug_caster_sheet.png"
-  [support_sheet]="perbug_support_sheet.png"
-  [cleric_sheet]="perbug_cleric_sheet.png"
-  [assassin_sheet]="perbug_assassin_sheet.png"
-  [engineer_sheet]="perbug_engineer_sheet.png"
-  [warrior_sheet]="perbug_warrior_sheet.png"
-  [relic_sheet]="perbug_relic_sheet_01.png"
-  [resource_sheet]="perbug_resource_sheet.png"
-  [material_sheet]="perbug_material_sheet.png"
-  [token_family]="perbug_token_family.png"
-  [node_tiles_sheet]="perbug_node_tiles_sheet.png"
-  [node_icon_sheet]="perbug_node_icon_sheet.png"
-  [portrait_sheet]="perbug_portrait_sheet.png"
-  [encounter_cards_sheet]="perbug_encounter_cards_sheet.png"
+# Canonical asset filename -> split script mapping.
+declare -A SPLIT_BY_NAME=(
+  [perbug_encounter_cards_sheet.png]="split_perbug_encounter_cards.sh"
+  [perbug_warrior_sheet.png]="split_perbug_warrior_nfts.sh"
+  [perbug_resource_sheet.png]="split_perbug_resources.sh"
+  [perbug_assassin_sheet.png]="split_perbug_assassin_nfts.sh"
+  [perbug_material_sheet.png]="split_perbug_material_nfts.sh"
+  [perbug_tank_sheet.png]="split_perbug_tank_nfts.sh"
+  [perbug_portrait_sheet.png]="split_perbug_portraits.sh"
+  [perbug_relic_sheet_01.png]="split_perbug_relics.sh"
+  [perbug_relic_sheet_02.png]="split_perbug_relics.sh"
+  [perbug_token_family.png]="split_perbug_token_family.sh"
+  [perbug_node_tiles_sheet.png]="split_perbug_node_tiles.sh"
+  [perbug_scout_sheet.png]="split_perbug_scout_nfts.sh"
+  [perbug_node_icon_sheet.png]="split_perbug_icons.sh"
+  [perbug_caster_sheet.png]="split_perbug_caster_nfts.sh"
+  [perbug_engineer_sheet.png]="split_perbug_engineer_nfts.sh"
+  [perbug_support_sheet.png]="split_perbug_support_nfts.sh"
+  [perbug_cleric_sheet.png]="split_perbug_cleric_nfts.sh"
 )
-
-choose_unknown_name() {
-  local idx="$1"
-  local style="$2"
-  if [[ "$style" == "sheet" ]]; then
-    printf 'unknown_sheet_%02d.png' "$idx"
-  else
-    printf 'unknown_ui_asset_%02d.png' "$idx"
-  fi
-}
-
-is_excluded_name() {
-  local n="$1"
-  for x in "${EXCLUDED_NAMES[@]}"; do
-    [[ "$x" == "$n" ]] && return 0
-  done
-  return 1
-}
 
 safe_target_path() {
   local dir="$1"; shift
@@ -131,226 +107,49 @@ create_svg_wrapper() {
 SVG
 }
 
-try_true_vector_icon() {
-  local normalized_png="$1"
-  local svg_out="$2"
-  # Best-effort only: suitable for simple icon-like assets.
-  if command -v convert >/dev/null 2>&1 && command -v potrace >/dev/null 2>&1; then
-    local tmp_pbm
-    tmp_pbm="$(mktemp --suffix=.pbm)"
-    if convert "$normalized_png" -alpha set -background none -colorspace Gray -threshold 60% "$tmp_pbm" >/dev/null 2>&1 && potrace "$tmp_pbm" -s -o "$svg_out" >/dev/null 2>&1; then
-      rm -f "$tmp_pbm"
-      return 0
-    fi
-    rm -f "$tmp_pbm"
-  fi
-  return 1
-}
+mapfile -t UUID_FILES < <(find "$TARGET_DIR" -maxdepth 1 -type f -name '*.png' -printf '%f\n' | grep -E "$UUID_RE" | sort)
 
-TMP_PLAN="$(mktemp)"
-trap 'rm -f "$TMP_PLAN"' EXIT
-
-python3 - "$TARGET_DIR" "$UUID_RE" <<'PY' > "$TMP_PLAN"
-import json
-import os
-import re
-import sys
-from pathlib import Path
-
-from PIL import Image
-
-root = Path(sys.argv[1])
-uuid_re = re.compile(sys.argv[2], re.IGNORECASE)
-
-canon = {
-    "perbug_tank_sheet.png": "tank_sheet",
-    "perbug_scout_sheet.png": "scout_sheet",
-    "perbug_caster_sheet.png": "caster_sheet",
-    "perbug_support_sheet.png": "support_sheet",
-    "perbug_cleric_sheet.png": "cleric_sheet",
-    "perbug_assassin_sheet.png": "assassin_sheet",
-    "perbug_engineer_sheet.png": "engineer_sheet",
-    "perbug_warrior_sheet.png": "warrior_sheet",
-    "perbug_relic_sheet_01.png": "relic_sheet",
-    "perbug_relic_sheet_02.png": "relic_sheet",
-    "perbug_resource_sheet.png": "resource_sheet",
-    "perbug_material_sheet.png": "material_sheet",
-    "perbug_token_family.png": "token_family",
-    "perbug_node_tiles_sheet.png": "node_tiles_sheet",
-    "perbug_node_icon_sheet.png": "node_icon_sheet",
-    "perbug_portrait_sheet.png": "portrait_sheet",
-    "perbug_encounter_cards_sheet.png": "encounter_cards_sheet",
-}
-
-
-def ahash(path):
-    with Image.open(path) as im:
-        rgba = im.convert("RGBA")
-        small = rgba.resize((16, 16), Image.Resampling.BILINEAR).convert("L")
-        px = list(small.tobytes())
-        avg = sum(px) / len(px)
-        bits = ''.join('1' if value >= avg else '0' for value in px)
-        return bits, rgba.size
-
-
-def hamming(a, b):
-    return sum(ch1 != ch2 for ch1, ch2 in zip(a, b))
-
-references = []
-for p in root.iterdir():
-    if not p.is_file() or p.suffix.lower() != ".png":
-        continue
-    if p.name not in canon:
-        continue
-    try:
-        h, size = ahash(p)
-    except Exception:
-        continue
-    references.append({"name": p.name, "type": canon[p.name], "hash": h, "size": size})
-
-items = []
-for p in sorted(root.iterdir()):
-    if not p.is_file() or p.suffix.lower() != ".png":
-        continue
-    if not uuid_re.match(p.name):
-        continue
-    try:
-        h, (w, hgt) = ahash(p)
-    except Exception as exc:
-        items.append({
-            "source": p.name,
-            "error": str(exc),
-            "classification": "unknown",
-            "confidence": 0.0,
-            "reason": "image-read-failed",
-            "style": "ui",
-        })
-        continue
-
-    best = None
-    for ref in references:
-        d = hamming(h, ref["hash"])
-        if best is None or d < best["d"]:
-            best = {"d": d, "ref": ref}
-
-    classification = "unknown"
-    confidence = 0.20
-    reason = []
-    style = "sheet" if (w % 8 == 0 and hgt % 8 == 0 and min(w, hgt) >= 256) else "ui"
-
-    if best is not None:
-        d = best["d"]
-        ref = best["ref"]
-        if d <= 8:
-            classification = ref["type"]
-            confidence = 0.98
-            reason.append(f"hash-distance={d} to {ref['name']}")
-        elif d <= 16:
-            classification = ref["type"]
-            confidence = 0.80
-            reason.append(f"hash-distance={d} to {ref['name']}")
-        elif d <= 24:
-            confidence = 0.55
-            reason.append(f"weak-hash-distance={d} to {ref['name']}")
-
-    if classification == "unknown":
-        if w == hgt and w in (2048, 4096):
-            reason.append("square-sheet-like-dimensions")
-            confidence = max(confidence, 0.35)
-        if w > hgt * 1.3 or hgt > w * 1.3:
-            reason.append("non-square-ui-or-card-like")
-            style = "ui"
-
-    items.append({
-        "source": p.name,
-        "width": w,
-        "height": hgt,
-        "classification": classification,
-        "confidence": round(confidence, 2),
-        "reason": "; ".join(reason) if reason else "dimension-heuristic-only",
-        "style": style,
-    })
-
-print(json.dumps({"items": items}, indent=2))
-PY
-
-PLAN_JSON="$(cat "$TMP_PLAN")"
-
-mapfile -t PLAN_ROWS < <(python3 - <<'PY' "$TMP_PLAN"
-import json,sys
-obj=json.load(open(sys.argv[1]))
-for it in obj["items"]:
-    print("\t".join([
-        it.get("source",""),
-        it.get("classification","unknown"),
-        str(it.get("confidence",0.0)),
-        it.get("reason",""),
-        it.get("style","ui")
-    ]))
-PY
-)
-
-if [[ ${#PLAN_ROWS[@]} -eq 0 ]]; then
+if [[ ${#UUID_FILES[@]} -eq 0 ]]; then
   log "No UUID-style PNG files found in $TARGET_DIR. Nothing to do."
   exit 0
 fi
-
-unknown_sheet_i=1
-unknown_ui_i=1
 
 declare -a SUMMARY_RENAMED=()
 declare -a SUMMARY_1024=()
 declare -a SUMMARY_SVG=()
 declare -a SUMMARY_SPLITS=()
+declare -a SUMMARY_SKIPPED=()
 
 echo
-printf '%-40s | %-28s | %-10s | %-34s | %-34s | %-35s\n' "SOURCE" "CLASSIFICATION" "CONF" "RENAMED_PNG" "PNG_1024" "SVG"
-printf '%s\n' "$(printf -- '-%.0s' {1..195})"
+printf '%-40s | %-34s | %-34s | %-35s | %-35s\n' "SOURCE" "RENAMED_PNG" "PNG_1024" "SVG" "SPLIT_SCRIPT"
+printf '%s\n' "$(printf -- '-%.0s' {1..190})"
 
-for row in "${PLAN_ROWS[@]}"; do
-  IFS=$'\t' read -r src class conf reason style <<< "$row"
-
-  local_name=""
-  if [[ -n "${TYPE_PRIMARY_NAME[$class]:-}" ]]; then
-    local_name="${TYPE_PRIMARY_NAME[$class]}"
-  else
-    if [[ "$style" == "sheet" ]]; then
-      local_name="$(choose_unknown_name "$unknown_sheet_i" "sheet")"
-      ((unknown_sheet_i++))
-    else
-      local_name="$(choose_unknown_name "$unknown_ui_i" "ui")"
-      ((unknown_ui_i++))
-    fi
+for src in "${UUID_FILES[@]}"; do
+  mapped_name="${UUID_TO_NAME[$src]:-}"
+  if [[ -z "$mapped_name" ]]; then
+    SUMMARY_SKIPPED+=("$src (not in explicit UUID mapping)")
+    continue
   fi
 
-  target_png="$(safe_target_path "$TARGET_DIR" "$local_name")"
+  target_png="$(safe_target_path "$TARGET_DIR" "$mapped_name")"
   target_png_name="$(basename "$target_png")"
   target_1024="${target_png%.png}_1024.png"
   target_svg="${target_png%.png}.svg"
 
-  split_script=""
-  split_status="SKIP"
-  if (( $(awk "BEGIN{print ($conf >= 0.80)}") )); then
-    split_script="${SPLIT_BY_TYPE[$class]:-}"
-  fi
+  split_script="${SPLIT_BY_NAME[$mapped_name]:-none}"
 
-  printf '%-40s | %-28s | %-10s | %-34s | %-34s | %-35s\n' "$src" "$class" "$conf" "$target_png_name" "$(basename "$target_1024")" "$(basename "$target_svg")"
-  log "Reason for $src: $reason"
+  printf '%-40s | %-34s | %-34s | %-35s | %-35s\n' "$src" "$target_png_name" "$(basename "$target_1024")" "$(basename "$target_svg")" "$split_script"
 
   if [[ "$DRY_RUN" == "1" ]]; then
-    if [[ -n "$split_script" ]]; then
+    if [[ "$split_script" != "none" ]]; then
       SUMMARY_SPLITS+=("DRY-RUN would run: $split_script IMAGE_NAME=$target_png")
     else
-      SUMMARY_SPLITS+=("DRY-RUN no split: $src (confidence=$conf)")
+      SUMMARY_SPLITS+=("DRY-RUN no split: $target_png_name")
     fi
     continue
   fi
 
   src_path="$TARGET_DIR/$src"
-  if [[ ! -f "$src_path" ]]; then
-    warn "Source disappeared, skipping: $src_path"
-    continue
-  fi
 
   if [[ "$REPLACE_ORIGINALS" == "1" ]]; then
     mv -- "$src_path" "$target_png"
@@ -376,21 +175,12 @@ with Image.open(src).convert("RGBA") as im:
 PY
   SUMMARY_1024+=("$target_1024")
 
-  vectorized=0
-  if [[ "$class" == "node_icon_sheet" || "$class" == "resource_sheet" || "$class" == "relic_sheet" ]]; then
-    if try_true_vector_icon "$target_1024" "$target_svg"; then
-      vectorized=1
-    fi
-  fi
-  if [[ "$vectorized" == "0" ]]; then
-    create_svg_wrapper "$target_1024" "$target_svg"
-  fi
+  create_svg_wrapper "$target_1024" "$target_svg"
   SUMMARY_SVG+=("$target_svg")
 
-  if [[ "$RUN_SPLITS" == "1" && -n "$split_script" ]]; then
+  if [[ "$RUN_SPLITS" == "1" && "$split_script" != "none" ]]; then
     split_path="$ROOT_DIR/$split_script"
     if [[ ! -x "$split_path" ]]; then
-      # Some repos may not preserve executable bit in all environments.
       chmod +x "$split_path" 2>/dev/null || true
     fi
     if [[ -f "$split_path" ]]; then
@@ -403,7 +193,7 @@ PY
       SUMMARY_SPLITS+=("MISSING $split_script for $target_png")
     fi
   else
-    SUMMARY_SPLITS+=("SKIP split for $target_png_name (confidence=$conf RUN_SPLITS=$RUN_SPLITS)")
+    SUMMARY_SPLITS+=("SKIP split for $target_png_name (RUN_SPLITS=$RUN_SPLITS)")
   fi
 
 done
@@ -411,6 +201,11 @@ done
 echo
 if [[ "$DRY_RUN" == "1" ]]; then
   log "Dry-run complete. No files were changed."
+fi
+
+if [[ ${#SUMMARY_SKIPPED[@]} -gt 0 ]]; then
+  log "UUID PNGs skipped (no explicit mapping):"
+  printf '  %s\n' "${SUMMARY_SKIPPED[@]}"
 fi
 
 log "Renamed/created source PNGs:"
