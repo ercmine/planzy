@@ -12,6 +12,7 @@ import 'perbug_economy_models.dart';
 import 'perbug_game_models.dart';
 import 'perbug_economy_store.dart';
 import 'perbug_node_world_engine.dart';
+import 'perbug_asset_models.dart';
 import 'perbug_progression_models.dart';
 
 final perbugGameControllerProvider = StateNotifierProvider<PerbugGameController, PerbugGameState>((ref) {
@@ -152,6 +153,29 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     return true;
   }
 
+
+
+  Future<void> setWalletLink({
+    String? walletAddress,
+    AssetLinkStatus status = AssetLinkStatus.pendingSync,
+  }) async {
+    final cleaned = walletAddress?.trim();
+    final connected = cleaned != null && cleaned.isNotEmpty;
+    state = state.copyWith(
+      economy: state.economy.copyWith(
+        walletLink: WalletLinkState(
+          isConnected: connected,
+          walletAddress: connected ? cleaned : null,
+          lastSyncStatus: connected ? status : AssetLinkStatus.notLinked,
+        ),
+      ),
+      history: [
+        connected ? 'Wallet linked: ${cleaned!}' : 'Wallet disconnected.',
+        ...state.history,
+      ],
+    );
+    await _persistEconomyState();
+  }
 
   void debugSetActiveEncounter(NodeEncounter encounter) {
     state = state.copyWith(activeEncounter: encounter);

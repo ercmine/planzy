@@ -1,13 +1,6 @@
 class AppRoutes {
-  static const bootstrap = '/bootstrap';
-  static const onboarding = '/onboarding';
-  static const onboardingLocation = '/onboarding/location';
-  static const onboardingInterests = '/onboarding/interests';
-  static const onboardingDiscovery = '/onboarding/discovery';
-  static const onboardingPermissions = '/onboarding/permissions';
-  static const onboardingSignin = '/onboarding/signin';
-
-  static const home = '/';
+  static const entry = '/';
+  static const home = '/home';
   static const liveMap = '/live-map';
   static const world = '/world';
   static const squad = '/squad';
@@ -20,4 +13,13 @@ class AppRoutes {
   static const collection = '/collection';
   static const profile = '/profile';
   static const wallet = '/wallet';
+
+  // Legacy onboarding paths retained for deep-link compatibility only.
+  static const bootstrap = '/bootstrap';
+  static const onboarding = '/onboarding';
+  static const onboardingLocation = '/onboarding/location';
+  static const onboardingInterests = '/onboarding/interests';
+  static const onboardingDiscovery = '/onboarding/discovery';
+  static const onboardingPermissions = '/onboarding/permissions';
+  static const onboardingSignin = '/onboarding/signin';
 }
