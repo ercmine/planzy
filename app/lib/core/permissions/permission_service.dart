@@ -1,28 +1,70 @@
 // iOS Info.plist note: add NSLocationWhenInUseUsageDescription and
 // NSContactsUsageDescription for runtime permission prompts.
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart' as permission_handler;
 
 import 'permission_state.dart';
 
 class PermissionService {
   Future<PermissionState> checkLocation() async {
-    final status = await permission_handler.Permission.locationWhenInUse.status;
-    return _mapStatus(status);
+    return _withFallback(
+      action: () async => _mapStatus(await permission_handler.Permission.locationWhenInUse.status),
+      fallbackOnWeb: PermissionState.denied,
+      fallbackOnError: PermissionState.denied,
+      operation: 'checkLocation',
+    );
   }
 
   Future<PermissionState> requestLocation() async {
-    final status = await permission_handler.Permission.locationWhenInUse.request();
-    return _mapStatus(status);
+    return _withFallback(
+      action: () async => _mapStatus(await permission_handler.Permission.locationWhenInUse.request()),
+      fallbackOnWeb: PermissionState.denied,
+      fallbackOnError: PermissionState.denied,
+      operation: 'requestLocation',
+    );
   }
 
   Future<PermissionState> checkContacts() async {
-    final status = await permission_handler.Permission.contacts.status;
-    return _mapStatus(status);
+    return _withFallback(
+      action: () async => _mapStatus(await permission_handler.Permission.contacts.status),
+      fallbackOnWeb: PermissionState.denied,
+      fallbackOnError: PermissionState.denied,
+      operation: 'checkContacts',
+    );
   }
 
   Future<PermissionState> requestContacts() async {
-    final status = await permission_handler.Permission.contacts.request();
-    return _mapStatus(status);
+    return _withFallback(
+      action: () async => _mapStatus(await permission_handler.Permission.contacts.request()),
+      fallbackOnWeb: PermissionState.denied,
+      fallbackOnError: PermissionState.denied,
+      operation: 'requestContacts',
+    );
+  }
+
+  Future<PermissionState> _withFallback({
+    required Future<PermissionState> Function() action,
+    required PermissionState fallbackOnWeb,
+    required PermissionState fallbackOnError,
+    required String operation,
+  }) async {
+    if (kIsWeb) {
+      return fallbackOnWeb;
+    }
+
+    try {
+      return await action();
+    } on UnimplementedError catch (error) {
+      _debugLog('$operation fallback due to unimplemented API: $error');
+      return fallbackOnError;
+    } on MissingPluginException catch (error) {
+      _debugLog('$operation fallback due to missing plugin: $error');
+      return fallbackOnError;
+    } on PlatformException catch (error) {
+      _debugLog('$operation fallback due to platform exception: $error');
+      return fallbackOnError;
+    }
   }
 
   PermissionState _mapStatus(permission_handler.PermissionStatus status) {
@@ -39,6 +81,12 @@ class PermissionService {
         return PermissionState.limited;
       case permission_handler.PermissionStatus.provisional:
         return PermissionState.limited;
+    }
+  }
+
+  void _debugLog(String message) {
+    if (kDebugMode) {
+      debugPrint('[PermissionService] $message');
     }
   }
 }
