@@ -47,13 +47,20 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
 
   late final AnimationController _pulse;
   late final MapController _mapController;
+  late final ValueNotifier<int> _paintTick;
   String? _hoverNodeId;
+  bool _mapBootstrapped = false;
 
   @override
   void initState() {
     super.initState();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
     _mapController = MapController();
+    _paintTick = ValueNotifier<int>(0);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _mapBootstrapped = true);
+    });
   }
 
   @override
@@ -70,15 +77,24 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
   @override
   void dispose() {
     _pulse.dispose();
+    _paintTick.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final hasLiveNodes = widget.nodes.isNotEmpty;
-    final visibleNodes = hasLiveNodes ? widget.nodes : _demoNodes(widget.viewport);
-    final activeConnections = hasLiveNodes ? widget.connections : _demoConnections(visibleNodes);
-    final snapshot = _engine.build(viewport: widget.viewport, nodes: visibleNodes, graph: activeConnections);
+    final sourceNodes = hasLiveNodes ? widget.nodes : _demoNodes(widget.viewport);
+    final sourceConnections = hasLiveNodes ? widget.connections : _demoConnections(sourceNodes);
+    final rawSnapshot = _engine.build(viewport: widget.viewport, nodes: sourceNodes, graph: sourceConnections);
+    final safeSnapshot = rawSnapshot.visibleNodes.isNotEmpty
+        ? rawSnapshot
+        : _engine.build(
+            viewport: widget.viewport,
+            nodes: _demoNodes(widget.viewport),
+            graph: _demoConnections(_demoNodes(widget.viewport)),
+          );
+    final renderMode = hasLiveNodes ? 'real' : 'demo';
 
     return RepaintBoundary(
       child: LayoutBuilder(
@@ -92,9 +108,13 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
           final safeWidth = width <= 0 ? 1.0 : width;
           final safeHeight = height <= 0 ? 1.0 : height;
           final size = Size(safeWidth, safeHeight);
+          final hasInvalidSize = width <= 0 || height <= 0;
 
           return Stack(
             children: [
+              Positioned.fill(
+                child: _buildFallbackBaseSurface(),
+              ),
               Positioned.fill(
                 child: _buildBaseMap(),
               ),
@@ -107,17 +127,18 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
                       return CustomPaint(
                         painter: _PerbugWorldPainter(
                           viewport: widget.viewport,
-                          snapshot: snapshot,
-                          currentNodeId: widget.currentNodeId ?? (visibleNodes.isEmpty ? null : visibleNodes.first.id),
+                          snapshot: safeSnapshot,
+                          currentNodeId: widget.currentNodeId ?? (safeSnapshot.visibleNodes.isEmpty ? null : safeSnapshot.visibleNodes.first.id),
                           selectedNodeId: widget.selectedNodeId ?? _hoverNodeId,
                           hoverNodeId: _hoverNodeId,
                           reachableNodeIds: widget.reachableNodeIds.isEmpty
-                              ? visibleNodes.take(4).map((n) => n.id).toSet()
+                              ? safeSnapshot.visibleNodes.take(4).map((n) => n.id).toSet()
                               : widget.reachableNodeIds,
                           completedNodeIds: widget.completedNodeIds,
                           pulse: _pulse.value,
                           textStyle: Theme.of(context).textTheme.labelSmall ?? const TextStyle(fontSize: 11),
                           showDebugOverlay: widget.showDebugOverlay,
+                          onPainted: () => _paintTick.value = _paintTick.value + 1,
                         ),
                         child: const SizedBox.expand(),
                       );
@@ -128,7 +149,7 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
               Positioned.fill(
                 child: MouseRegion(
                   onHover: (event) {
-                    final id = _hoveredNodeAt(event.localPosition, size, snapshot);
+                    final id = _hoveredNodeAt(event.localPosition, size, safeSnapshot);
                     if (id != _hoverNodeId) {
                       setState(() => _hoverNodeId = id);
                     }
@@ -136,10 +157,28 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
                   onExit: (_) => setState(() => _hoverNodeId = null),
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTapUp: (details) => _onTap(details.localPosition, size, snapshot),
+                    onTapUp: (details) => _onTap(details.localPosition, size, safeSnapshot),
                   ),
                 ),
               ),
+              if (!_mapBootstrapped)
+                const Positioned(
+                  left: 12,
+                  bottom: 12,
+                  child: _DebugStatusChip(
+                    label: 'MAP LOADING',
+                    color: Color(0xFFF59E0B),
+                  ),
+                ),
+              if (hasInvalidSize)
+                const Positioned(
+                  left: 12,
+                  bottom: 12,
+                  child: _DebugStatusChip(
+                    label: 'MAP ERROR: invalid viewport size',
+                    color: Color(0xFFEF4444),
+                  ),
+                ),
               Positioned(
                 left: 10,
                 top: 10,
@@ -158,6 +197,24 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
                   ),
                 ),
               ),
+              if (widget.showDebugOverlay)
+                Positioned(
+                  right: 10,
+                  bottom: 10,
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _paintTick,
+                    builder: (context, tick, _) {
+                      return _DebugStatePanel(
+                        size: size,
+                        viewport: widget.viewport,
+                        nodeCount: safeSnapshot.visibleNodes.length,
+                        mode: renderMode,
+                        painterTick: tick,
+                        routeName: ModalRoute.of(context)?.settings.name ?? '/live-map',
+                      );
+                    },
+                  ),
+                ),
             ],
           );
         },
@@ -165,34 +222,50 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
     );
   }
 
-  Widget _buildBaseMap() {
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: latlong.LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
-        initialZoom: widget.viewport.zoom,
-        minZoom: 3.5,
-        maxZoom: 17,
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
+  Widget _buildFallbackBaseSurface() {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF10203C), Color(0xFF1E3A5F), Color(0xFF0A4D3F)],
         ),
-        onPositionChanged: (position, hasGesture) {
-          final center = position.center;
-          final zoom = position.zoom;
-          if (center == null || zoom == null) return;
-          widget.onViewportChanged(
-            MapViewport(centerLat: center.latitude, centerLng: center.longitude, zoom: zoom),
-            hasGesture: hasGesture,
-          );
-        },
       ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.perbug.app',
-          maxZoom: 19,
+      child: CustomPaint(painter: _DebugGridPainter()),
+    );
+  }
+
+  Widget _buildBaseMap() {
+    return Opacity(
+      opacity: 0.92,
+      child: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: latlong.LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
+          initialZoom: widget.viewport.zoom,
+          minZoom: 3.5,
+          maxZoom: 17,
+          interactionOptions: const InteractionOptions(
+            flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
+          ),
+          onPositionChanged: (position, hasGesture) {
+            final center = position.center;
+            final zoom = position.zoom;
+            if (center == null || zoom == null) return;
+            widget.onViewportChanged(
+              MapViewport(centerLat: center.latitude, centerLng: center.longitude, zoom: zoom),
+              hasGesture: hasGesture,
+            );
+          },
         ),
-      ],
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.perbug.app',
+            maxZoom: 19,
+          ),
+        ],
+      ),
     );
   }
 
@@ -276,6 +349,7 @@ class _PerbugWorldPainter extends CustomPainter {
     required this.textStyle,
     required this.pulse,
     required this.showDebugOverlay,
+    required this.onPainted,
   });
 
   final MapViewport viewport;
@@ -288,9 +362,11 @@ class _PerbugWorldPainter extends CustomPainter {
   final TextStyle textStyle;
   final double pulse;
   final bool showDebugOverlay;
+  final VoidCallback onPainted;
 
   @override
   void paint(Canvas canvas, Size size) {
+    onPainted();
     final rect = Offset.zero & size;
     _paintBackdropTint(canvas, rect);
     _paintFog(canvas, rect);
@@ -515,4 +591,84 @@ class _PerbugWorldPainter extends CustomPainter {
         oldDelegate.showDebugOverlay != showDebugOverlay ||
         oldDelegate.pulse != pulse;
   }
+}
+
+class _DebugStatusChip extends StatelessWidget {
+  const _DebugStatusChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(color: color.withOpacity(0.92), borderRadius: BorderRadius.circular(8)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11)),
+      ),
+    );
+  }
+}
+
+class _DebugStatePanel extends StatelessWidget {
+  const _DebugStatePanel({
+    required this.size,
+    required this.viewport,
+    required this.nodeCount,
+    required this.mode,
+    required this.painterTick,
+    required this.routeName,
+  });
+
+  final Size size;
+  final MapViewport viewport;
+  final int nodeCount;
+  final String mode;
+  final int painterTick;
+  final String routeName;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.52),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: DefaultTextStyle(
+          style: const TextStyle(color: Colors.white, fontSize: 10.5, height: 1.3),
+          child: Text(
+            'route: $routeName\n'
+            'viewport: ${size.width.toStringAsFixed(0)}x${size.height.toStringAsFixed(0)}\n'
+            'mode: $mode • nodes: $nodeCount\n'
+            'center: ${viewport.centerLat.toStringAsFixed(4)}, ${viewport.centerLng.toStringAsFixed(4)}\n'
+            'zoom: ${viewport.zoom.toStringAsFixed(2)}\n'
+            'painter tick: $painterTick',
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DebugGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.08)
+      ..strokeWidth = 1;
+    const step = 36.0;
+    for (double x = 0; x <= size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (double y = 0; y <= size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

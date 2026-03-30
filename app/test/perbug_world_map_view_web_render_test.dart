@@ -32,6 +32,7 @@ void main() {
     expect(find.byType(PerbugWorldMapView), findsOneWidget);
     expect(find.byType(CustomPaint), findsOneWidget);
     expect(find.text('Demo frontier fallback'), findsOneWidget);
+    expect(find.textContaining('mode: demo'), findsOneWidget);
   });
 
   testWidgets('world map view renders with populated fallback-like nodes', (tester) async {
@@ -83,5 +84,6 @@ void main() {
     expect(find.byType(PerbugWorldMapView), findsOneWidget);
     expect(find.byType(CustomPaint), findsOneWidget);
     expect(find.text('Live tactical region'), findsOneWidget);
+    expect(find.textContaining('mode: real'), findsOneWidget);
   });
 }
