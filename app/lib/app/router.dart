@@ -2,9 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/identity/identity_provider.dart';
 import '../features/auth/perbug_learn_more_page.dart';
 import '../features/auth/perbug_wallet_entry_page.dart';
-import '../core/identity/identity_provider.dart';
 import '../features/dryad/chain/dryad_chain_providers.dart';
 import '../features/home/home_page.dart';
 import '../features/home/perbug_flow_pages.dart';
@@ -27,6 +27,27 @@ final authGateProvider = Provider<ChangeNotifier>((ref) {
   return gate;
 });
 
+String? resolvePerbugRedirect({
+  required String path,
+  required bool hasWalletSession,
+  required bool hasDemoSession,
+}) {
+  final onEntry = path == AppRoutes.entry;
+  final onLearnMore = path == AppRoutes.learnMore;
+  final onMap = path == AppRoutes.liveMap || path == AppRoutes.world;
+  final onProfile = path == AppRoutes.profile;
+  final isAllowedUnauthed = onEntry || onLearnMore || onMap || onProfile;
+  final canEnterGame = hasWalletSession || hasDemoSession;
+
+  if (!canEnterGame && !isAllowedUnauthed) {
+    return AppRoutes.entry;
+  }
+  if (canEnterGame && onEntry) {
+    return AppRoutes.liveMap;
+  }
+  return null;
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final refreshListenable = ref.watch(authGateProvider);
 
@@ -34,21 +55,13 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: AppRoutes.entry,
     refreshListenable: refreshListenable,
     redirect: (context, state) {
-      final path = state.uri.path;
       final wallet = ref.read(walletAddressProvider);
       final authMode = ref.read(entryAuthModeProvider);
-      final hasWalletSession = wallet != null && wallet.trim().isNotEmpty;
-      final hasDemoSession = authMode == EntryAuthMode.demo;
-      final onEntry = path == AppRoutes.entry;
-      final onLearnMore = path == AppRoutes.learnMore;
-      final onMap = path == AppRoutes.liveMap || path == AppRoutes.world;
-      final onProfile = path == AppRoutes.profile;
-      final isAllowedUnauthed = onEntry || onLearnMore || onMap || onProfile;
-      final canEnterGame = hasWalletSession || hasDemoSession;
-
-      if (!canEnterGame && !isAllowedUnauthed) return AppRoutes.liveMap;
-      if (canEnterGame && onEntry) return AppRoutes.liveMap;
-      return null;
+      return resolvePerbugRedirect(
+        path: state.uri.path,
+        hasWalletSession: wallet != null && wallet.trim().isNotEmpty,
+        hasDemoSession: authMode == EntryAuthMode.demo,
+      );
     },
     routes: [
       GoRoute(path: AppRoutes.entry, name: 'entry', builder: (context, state) => const PerbugWalletEntryPage()),

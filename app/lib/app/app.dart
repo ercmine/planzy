@@ -5,6 +5,7 @@ import '../api/api_error.dart';
 import '../core/connectivity/offline_banner.dart';
 import '../core/debug_flags.dart';
 import '../core/identity/identity_provider.dart';
+import '../core/platform/perbug_platform.dart';
 import '../core/telemetry/telemetry_dispatcher.dart';
 import '../providers/app_providers.dart';
 import 'router.dart';
@@ -65,21 +66,12 @@ class _DryadAppState extends ConsumerState<DryadApp> {
           children: [
             if (child != null) child,
             const OfflineBanner(),
-            if (kShowDebugUi && _startupHealthError != null)
+            if (kShowDebugUi)
               Positioned(
                 left: 12,
-                right: 12,
                 top: 52,
-                child: Material(
-                  color: Colors.red.shade700,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      _startupHealthError!,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
+                child: _PerbugDebugOverlay(
+                  startupHealthError: _startupHealthError,
                 ),
               ),
           ],
@@ -150,5 +142,50 @@ class _DryadAppState extends ConsumerState<DryadApp> {
       WidgetsBinding.instance.addObserver(dispatcher);
       dispatcher.start();
     }
+  }
+}
+
+class _PerbugDebugOverlay extends ConsumerWidget {
+  const _PerbugDebugOverlay({required this.startupHealthError});
+
+  final String? startupHealthError;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snapshot = ref.watch(perbugPlatformSnapshotProvider);
+    final router = ref.watch(routerProvider);
+    final uri = router.routerDelegate.currentConfiguration.uri;
+
+    final status = snapshot.maybeWhen(
+      data: (data) =>
+          '${data.modeLabel} • wallet:${data.walletAvailable ? 'ok' : 'none'} • location:${data.locationApiSupported ? 'ready' : 'blocked'}',
+      orElse: () => 'platform: probing…',
+    );
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 560),
+      child: Material(
+        color: Colors.black.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: DefaultTextStyle(
+            style: Theme.of(context).textTheme.bodySmall!.copyWith(color: Colors.white),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('route: ${uri.path}${uri.hasQuery ? '?${uri.query}' : ''}'),
+                Text(status),
+                if (startupHealthError != null)
+                  Text(
+                    startupHealthError!,
+                    style: const TextStyle(color: Colors.redAccent),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
