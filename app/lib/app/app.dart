@@ -8,6 +8,7 @@ import '../core/identity/identity_provider.dart';
 import '../core/platform/perbug_platform.dart';
 import '../core/telemetry/telemetry_dispatcher.dart';
 import '../providers/app_providers.dart';
+import 'perbug_recovery_page.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 
@@ -62,9 +63,10 @@ class _DryadAppState extends ConsumerState<DryadApp> {
       themeMode: ThemeMode.system,
       routerConfig: router,
       builder: (context, child) {
+        final content = child ?? const PerbugRecoveryPage();
         return Stack(
           children: [
-            if (child != null) child,
+            content,
             const OfflineBanner(),
             if (kShowDebugUi)
               Positioned(

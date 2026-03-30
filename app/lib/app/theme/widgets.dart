@@ -47,11 +47,24 @@ class PerbugPageBackground extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         Positioned.fill(
-          child: Image.asset(
-            imagePath,
-            fit: fit,
-            alignment: alignment,
-            filterQuality: FilterQuality.medium,
+          child: IgnorePointer(
+            child: Image.asset(
+              imagePath,
+              fit: fit,
+              alignment: alignment,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (context, error, stackTrace) {
+                return const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFF151A26), Color(0xFF1F2D3D), Color(0xFF253B50)],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ),
         if (blurSigma > 0)

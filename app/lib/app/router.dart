@@ -11,6 +11,7 @@ import '../features/home/perbug_map_debug_page.dart';
 import '../features/home/perbug_flow_pages.dart';
 import '../features/home/perbug_navigation_debug_page.dart';
 import 'app_routes.dart';
+import 'perbug_recovery_page.dart';
 
 final authGateProvider = Provider<ChangeNotifier>((ref) {
   final gate = ValueNotifier<int>(0);
@@ -54,6 +55,10 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: AppRoutes.entry,
+    errorBuilder: (context, state) => PerbugRecoveryPage(
+      title: 'Route recovery mode',
+      message: 'Could not open "${state.uri.path}". Use one of the safe routes below.',
+    ),
     refreshListenable: refreshListenable,
     redirect: (context, state) {
       final wallet = ref.read(walletAddressProvider);
