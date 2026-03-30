@@ -359,10 +359,8 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
 
 
   Future<void> _goToPostAuthStart() async {
-    final store = await ref.read(identityStoreProvider.future);
-    final completed = await store.isOnboardingCompleted();
     if (!mounted) return;
-    context.go(completed ? AppRoutes.liveMap : AppRoutes.onboarding);
+    context.go(AppRoutes.liveMap);
   }
 
   Future<void> _openLearnMore() async {
