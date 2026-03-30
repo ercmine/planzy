@@ -46,6 +46,7 @@ class PerbugRenderNode {
     required this.isHovered,
     required this.isReachable,
     required this.isCompleted,
+    required this.chunkId,
   });
 
   final String id;
@@ -58,6 +59,7 @@ class PerbugRenderNode {
   final bool isHovered;
   final bool isReachable;
   final bool isCompleted;
+  final WorldChunkId chunkId;
 }
 
 class PerbugRenderEdge {
@@ -72,11 +74,13 @@ class PerbugRenderFrame {
   const PerbugRenderFrame({
     required this.nodes,
     required this.edges,
+    required this.visibleChunks,
     required this.debug,
   });
 
   final List<PerbugRenderNode> nodes;
   final List<PerbugRenderEdge> edges;
+  final List<WorldChunk> visibleChunks;
   final Map<String, Object> debug;
 
   String? hitTest(Offset point, {double hitPadding = 12}) {
@@ -160,23 +164,27 @@ class PerbugRenderEngine {
     final transformer = PerbugGeoWorldTransformer(viewport, settings);
     final camera = PerbugCameraRig(viewport: viewport, settings: settings);
     final nodeMap = <String, PerbugRenderNode>{};
+    final visibleChunks = snapshot.visibleChunks;
 
-    for (final node in snapshot.visibleNodes) {
-      final world = transformer.toWorld(node);
-      final screen = camera.project(world, canvasSize);
-      final radius = settings.baseNodeSize + (node.rarityScore * 5) + (node.id == selectedNodeId ? 3 : 0);
-      nodeMap[node.id] = PerbugRenderNode(
-        id: node.id,
-        node: node,
-        world: world,
-        screen: screen,
-        radius: radius,
-        isCurrent: node.id == currentNodeId,
-        isSelected: node.id == selectedNodeId,
-        isHovered: node.id == hoverNodeId,
-        isReachable: reachableNodeIds.contains(node.id),
-        isCompleted: completedNodeIds.contains(node.id),
-      );
+    for (final chunk in visibleChunks) {
+      for (final node in chunk.nodes) {
+        final world = transformer.toWorld(node);
+        final screen = camera.project(world, canvasSize);
+        final radius = settings.baseNodeSize + (node.rarityScore * 5) + (node.id == selectedNodeId ? 3 : 0);
+        nodeMap[node.id] = PerbugRenderNode(
+          id: node.id,
+          node: node,
+          world: world,
+          screen: screen,
+          radius: radius,
+          isCurrent: node.id == currentNodeId,
+          isSelected: node.id == selectedNodeId,
+          isHovered: node.id == hoverNodeId,
+          isReachable: reachableNodeIds.contains(node.id),
+          isCompleted: completedNodeIds.contains(node.id),
+          chunkId: chunk.id,
+        );
+      }
     }
 
     final nodes = nodeMap.values.toList(growable: false)
@@ -200,15 +208,19 @@ class PerbugRenderEngine {
       );
     }
 
-    final atmosphere = (0.5 + (snapshot.regionTheme.magicFlux * 0.4) + math.sin(viewport.centerLat * 0.15) * 0.1).clamp(0.35, 1.0);
+    final atmosphere =
+        (0.5 + (snapshot.regionTheme.magicFlux * 0.4) + math.sin(viewport.centerLat * 0.15) * 0.1).clamp(0.35, 1.0);
 
     return PerbugRenderFrame(
       nodes: nodes,
       edges: edges,
+      visibleChunks: visibleChunks,
       debug: {
         ...snapshot.debug,
         'render_nodes': nodes.length,
         'render_edges': edges.length,
+        'painted_objects': nodes.length + edges.length,
+        'traversed_chunks': visibleChunks.length,
         'atmosphere': atmosphere,
         'camera_pitch': settings.cameraPitch,
         'world_scale': settings.worldScale,
