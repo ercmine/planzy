@@ -1,15 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api/api_error.dart';
 import '../core/connectivity/offline_banner.dart';
 import '../core/debug_flags.dart';
-import '../core/identity/identity_provider.dart';
 import '../core/platform/perbug_platform.dart';
 import '../core/telemetry/telemetry_dispatcher.dart';
 import '../providers/app_providers.dart';
+import 'app_routes.dart';
 import 'perbug_recovery_page.dart';
 import 'router.dart';
+import 'startup_health.dart';
 import 'theme/app_theme.dart';
 
 class DryadApp extends ConsumerStatefulWidget {
@@ -22,14 +23,11 @@ class DryadApp extends ConsumerStatefulWidget {
 class _DryadAppState extends ConsumerState<DryadApp> {
   TelemetryDispatcher? _registeredDispatcher;
   bool _adsInitialized = false;
-  bool _healthCheckStarted = false;
-  String? _startupHealthError;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _syncDispatcherRegistration();
-    _checkStartupHealth();
   }
 
   @override
@@ -49,8 +47,9 @@ class _DryadAppState extends ConsumerState<DryadApp> {
     ref.watch(telemetryRepositoryProvider);
     ref.watch(telemetryDispatcherProvider);
 
+    final startupState = ref.watch(startupHealthControllerProvider);
+
     _syncDispatcherRegistration();
-    _checkStartupHealth();
     _initializeAds();
 
     final router = ref.watch(routerProvider);
@@ -68,55 +67,22 @@ class _DryadAppState extends ConsumerState<DryadApp> {
           children: [
             content,
             const OfflineBanner(),
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: startupState.hasCompleted,
+                child: _StartupStatusPanel(state: startupState),
+              ),
+            ),
             if (kShowDebugUi)
               Positioned(
                 left: 12,
                 top: 52,
-                child: _PerbugDebugOverlay(
-                  startupHealthError: _startupHealthError,
-                ),
+                child: _PerbugDebugOverlay(startupState: startupState),
               ),
           ],
         );
       },
     );
-  }
-
-  Future<void> _checkStartupHealth() async {
-    if (_healthCheckStarted) {
-      return;
-    }
-
-    final apiClient = ref.read(apiClientProvider).valueOrNull;
-    if (apiClient == null) {
-      return;
-    }
-
-    _healthCheckStarted = true;
-
-    try {
-      await apiClient.pingHealth();
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _startupHealthError = null;
-      });
-    } on ApiError catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _startupHealthError = 'Startup health check failed.';
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _startupHealthError = 'Startup health check failed.';
-      });
-    }
   }
 
   void _initializeAds() {
@@ -147,10 +113,112 @@ class _DryadAppState extends ConsumerState<DryadApp> {
   }
 }
 
-class _PerbugDebugOverlay extends ConsumerWidget {
-  const _PerbugDebugOverlay({required this.startupHealthError});
+class _StartupStatusPanel extends ConsumerWidget {
+  const _StartupStatusPanel({required this.state});
 
-  final String? startupHealthError;
+  final StartupHealthState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (state.stage == StartupStage.startupReadyFull || state.stage == StartupStage.startupReadyDemo) {
+      return const SizedBox.shrink();
+    }
+
+    final isHardFailure = state.stage == StartupStage.startupFailedHard;
+    final isDegraded = state.stage == StartupStage.degradedOptionalFailure;
+    final canRetry = !state.isLoading;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      color: Colors.black.withOpacity(state.isLoading ? 0.32 : 0.55),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620),
+          child: Card(
+            color: const Color(0xEE21142E),
+            margin: const EdgeInsets.all(20),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isHardFailure
+                        ? 'Perbug startup failed'
+                        : isDegraded
+                            ? 'Perbug started with degraded optional services'
+                            : 'Starting Perbug…',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: const Color(0xFFFFE7B5),
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    state.userMessage ?? 'Initializing startup health checks.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                  ),
+                  if (state.isLoading) ...[
+                    const SizedBox(height: 14),
+                    const LinearProgressIndicator(minHeight: 3),
+                  ],
+                  if (state.checks.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    ...state.checks.map(
+                      (check) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(
+                          '${check.ok ? '✅' : '⚠️'} ${check.label} (${check.tier.name})'
+                          '${check.message == null ? '' : ' • ${check.message}'}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (!state.isLoading) ...[
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (canRetry)
+                          FilledButton.icon(
+                            onPressed: () => ref.read(startupHealthControllerProvider.notifier).retry(),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry Startup'),
+                          ),
+                        if (isDegraded)
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              ref.read(startupHealthControllerProvider.notifier).continueInDemoMode();
+                            },
+                            icon: const Icon(Icons.play_arrow_outlined),
+                            label: const Text('Continue in Demo Mode'),
+                          ),
+                        if (isHardFailure)
+                          TextButton.icon(
+                            onPressed: () => ref.read(routerProvider).go(AppRoutes.entry),
+                            icon: const Icon(Icons.home_outlined),
+                            label: const Text('Return to Entry Screen'),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PerbugDebugOverlay extends ConsumerWidget {
+  const _PerbugDebugOverlay({required this.startupState});
+
+  final StartupHealthState startupState;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -165,7 +233,7 @@ class _PerbugDebugOverlay extends ConsumerWidget {
     );
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 560),
+      constraints: const BoxConstraints(maxWidth: 620),
       child: Material(
         color: Colors.black.withOpacity(0.72),
         borderRadius: BorderRadius.circular(10),
@@ -178,11 +246,19 @@ class _PerbugDebugOverlay extends ConsumerWidget {
               children: [
                 Text('route: ${uri.path}${uri.hasQuery ? '?${uri.query}' : ''}'),
                 Text(status),
-                if (startupHealthError != null)
-                  Text(
-                    startupHealthError!,
-                    style: const TextStyle(color: Colors.redAccent),
-                  ),
+                Text('startup: ${startupStageLabel(startupState.stage)}'),
+                ...startupState.checks
+                    .where((check) => !check.ok)
+                    .map(
+                      (check) => Text(
+                        '[${check.tier.name}] ${check.key}: ${check.message ?? check.error}',
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    ),
+                if (kDebugMode)
+                  ...startupState.checks
+                      .where((check) => !check.ok && check.stackTrace != null)
+                      .map((check) => Text('stack(${check.key}): ${check.stackTrace}')),
               ],
             ),
           ),
