@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'map_discovery_models.dart';
 import 'perbug_asset_registry.dart';
 import 'perbug_game_models.dart';
+import 'perbug_render_engine.dart';
 import 'perbug_world_map_engine.dart';
 
 class PerbugWorldMapView extends StatefulWidget {
@@ -43,6 +44,7 @@ class PerbugWorldMapView extends StatefulWidget {
 
 class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTickerProviderStateMixin {
   static const _engine = PerbugWorldMapEngine();
+  static const _renderEngine = PerbugRenderEngine();
 
   late final AnimationController _pulse;
   late final ValueNotifier<int> _paintTick;
@@ -128,6 +130,7 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
                           painter: _PerbugWorldPainter(
                             viewport: cameraViewport,
                             snapshot: safeSnapshot,
+                            renderEngine: _renderEngine,
                             currentNodeId: widget.currentNodeId ??
                                 (safeSnapshot.visibleNodes.isEmpty ? null : safeSnapshot.visibleNodes.first.id),
                             selectedNodeId: widget.selectedNodeId ?? _hoverNodeId,
@@ -288,21 +291,17 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
   }
 
   String? _hoveredNodeAt(Offset tap, Size size, PerbugWorldMapSnapshot snapshot, MapViewport viewport) {
-    final projection = PerbugGeoProjection(viewport);
-    String? closest;
-    var closestDistance = double.infinity;
-
-    for (final node in snapshot.visibleNodes) {
-      final point = projection.project(PerbugGeoPoint(lat: node.latitude, lng: node.longitude));
-      final px = Offset(point.x * size.width, point.y * size.height);
-      final distance = (tap - px).distance;
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closest = node.id;
-      }
-    }
-
-    return closestDistance <= 30 ? closest : null;
+    final frame = _renderEngine.composeFrame(
+      viewport: viewport,
+      canvasSize: size,
+      snapshot: snapshot,
+      currentNodeId: widget.currentNodeId,
+      selectedNodeId: widget.selectedNodeId,
+      hoverNodeId: _hoverNodeId,
+      reachableNodeIds: widget.reachableNodeIds,
+      completedNodeIds: widget.completedNodeIds,
+    );
+    return frame.hitTest(tap);
   }
 
   List<PerbugNode> _demoNodes(MapViewport viewport) {
@@ -350,6 +349,7 @@ class _PerbugWorldPainter extends CustomPainter {
   _PerbugWorldPainter({
     required this.viewport,
     required this.snapshot,
+    required this.renderEngine,
     required this.currentNodeId,
     required this.selectedNodeId,
     required this.hoverNodeId,
@@ -363,6 +363,7 @@ class _PerbugWorldPainter extends CustomPainter {
 
   final MapViewport viewport;
   final PerbugWorldMapSnapshot snapshot;
+  final PerbugRenderEngine renderEngine;
   final String? currentNodeId;
   final String? selectedNodeId;
   final String? hoverNodeId;
@@ -376,17 +377,27 @@ class _PerbugWorldPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     onPainted();
+    final frame = renderEngine.composeFrame(
+      viewport: viewport,
+      canvasSize: size,
+      snapshot: snapshot,
+      currentNodeId: currentNodeId,
+      selectedNodeId: selectedNodeId,
+      hoverNodeId: hoverNodeId,
+      reachableNodeIds: reachableNodeIds,
+      completedNodeIds: completedNodeIds,
+    );
     final rect = Offset.zero & size;
     _paintBackdropTint(canvas, rect);
     _paintTerrainBands(canvas, rect, size);
     _paintDistrictPlates(canvas, size);
     _paintFog(canvas, rect);
-    _paintConnections(canvas, size);
-    _paintSelectedPath(canvas, size);
-    _paintNodes(canvas, size);
-    _paintPlayerPresence(canvas, size);
+    _paintConnections(canvas, frame);
+    _paintSelectedPath(canvas, frame);
+    _paintNodes(canvas, frame);
+    _paintPlayerPresence(canvas, frame);
     if (showDebugOverlay) {
-      _paintDebugLayer(canvas, size);
+      _paintDebugLayer(canvas, size, frame);
     }
   }
 
@@ -490,31 +501,24 @@ class _PerbugWorldPainter extends CustomPainter {
     canvas.drawRect(rect, Paint()..shader = shader);
   }
 
-  void _paintConnections(Canvas canvas, Size size) {
-    final projection = PerbugGeoProjection(viewport);
-    for (final edge in snapshot.connections) {
-      final from = projection.project(PerbugGeoPoint(lat: edge.from.latitude, lng: edge.from.longitude));
-      final to = projection.project(PerbugGeoPoint(lat: edge.to.latitude, lng: edge.to.longitude));
-      final fromPx = Offset(from.x * size.width, from.y * size.height);
-      final toPx = Offset(to.x * size.width, to.y * size.height);
-      final reachable = reachableNodeIds.contains(edge.from.id) || reachableNodeIds.contains(edge.to.id);
+  void _paintConnections(Canvas canvas, PerbugRenderFrame frame) {
+    for (final edge in frame.edges) {
+      final fromPx = edge.from.screen.position;
+      final toPx = edge.to.screen.position;
       final paint = Paint()
-        ..color = reachable ? const Color(0xFF7CE0C8).withOpacity(0.8) : Colors.white.withOpacity(0.28)
-        ..strokeWidth = reachable ? 2.8 : 1.6;
+        ..color = edge.reachable ? const Color(0xFF7CE0C8).withOpacity(0.8) : Colors.white.withOpacity(0.28)
+        ..strokeWidth = edge.reachable ? 2.8 : 1.6;
       canvas.drawLine(fromPx, toPx, paint);
     }
   }
 
-  void _paintSelectedPath(Canvas canvas, Size size) {
+  void _paintSelectedPath(Canvas canvas, PerbugRenderFrame frame) {
     if (currentNodeId == null || selectedNodeId == null || currentNodeId == selectedNodeId) return;
-    final from = _findNode(currentNodeId!);
-    final to = _findNode(selectedNodeId!);
+    final from = _findNode(currentNodeId!, frame);
+    final to = _findNode(selectedNodeId!, frame);
     if (from == null || to == null) return;
-    final projection = PerbugGeoProjection(viewport);
-    final start = projection.project(PerbugGeoPoint(lat: from.latitude, lng: from.longitude));
-    final end = projection.project(PerbugGeoPoint(lat: to.latitude, lng: to.longitude));
-    final a = Offset(start.x * size.width, start.y * size.height);
-    final b = Offset(end.x * size.width, end.y * size.height);
+    final a = from.screen.position;
+    final b = to.screen.position;
     final mid = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2 - 18);
 
     final path = Path()
@@ -530,17 +534,16 @@ class _PerbugWorldPainter extends CustomPainter {
     );
   }
 
-  void _paintNodes(Canvas canvas, Size size) {
-    final projection = PerbugGeoProjection(viewport);
-    for (final node in snapshot.visibleNodes) {
-      final projected = projection.project(PerbugGeoPoint(lat: node.latitude, lng: node.longitude));
-      final center = Offset(projected.x * size.width, projected.y * size.height);
+  void _paintNodes(Canvas canvas, PerbugRenderFrame frame) {
+    for (final renderNode in frame.nodes) {
+      final node = renderNode.node;
+      final center = renderNode.screen.position;
       final visual = PerbugAssetRegistry.nodeVisual(node.nodeType);
-      final current = node.id == currentNodeId;
-      final selected = node.id == selectedNodeId;
-      final hovered = node.id == hoverNodeId;
-      final completed = completedNodeIds.contains(node.id);
-      final reachable = reachableNodeIds.contains(node.id);
+      final current = renderNode.isCurrent;
+      final selected = renderNode.isSelected;
+      final hovered = renderNode.isHovered;
+      final completed = renderNode.isCompleted;
+      final reachable = renderNode.isReachable;
 
       final pulseScale = selected || hovered ? (1 + 0.08 * math.sin(pulse * math.pi * 2)) : 1.0;
 
@@ -552,11 +555,7 @@ class _PerbugWorldPainter extends CustomPainter {
         );
       }
 
-      canvas.drawCircle(
-        center,
-        (selected ? 16 : 12) * pulseScale,
-        Paint()..color = visual.color.withOpacity(selected || hovered ? 0.95 : 0.72),
-      );
+      canvas.drawCircle(center, renderNode.radius * pulseScale, Paint()..color = visual.color.withOpacity(selected || hovered ? 0.95 : 0.72));
       canvas.drawCircle(
         center,
         (selected ? 20 : 14) * pulseScale,
@@ -593,13 +592,11 @@ class _PerbugWorldPainter extends CustomPainter {
     }
   }
 
-  void _paintPlayerPresence(Canvas canvas, Size size) {
+  void _paintPlayerPresence(Canvas canvas, PerbugRenderFrame frame) {
     if (currentNodeId == null) return;
-    final currentNode = _findNode(currentNodeId!);
+    final currentNode = _findNode(currentNodeId!, frame);
     if (currentNode == null) return;
-    final projection = PerbugGeoProjection(viewport);
-    final projected = projection.project(PerbugGeoPoint(lat: currentNode.latitude, lng: currentNode.longitude));
-    final center = Offset(projected.x * size.width, projected.y * size.height);
+    final center = currentNode.screen.position;
 
     canvas.drawCircle(
       center,
@@ -625,11 +622,9 @@ class _PerbugWorldPainter extends CustomPainter {
     );
   }
 
-  void _paintDebugLayer(Canvas canvas, Size size) {
-    final projection = PerbugGeoProjection(viewport);
-    for (final node in snapshot.visibleNodes) {
-      final projected = projection.project(PerbugGeoPoint(lat: node.latitude, lng: node.longitude));
-      final center = Offset(projected.x * size.width, projected.y * size.height);
+  void _paintDebugLayer(Canvas canvas, Size size, PerbugRenderFrame frame) {
+    for (final node in frame.nodes) {
+      final center = node.screen.position;
       canvas.drawCircle(
         center,
         30,
@@ -643,7 +638,7 @@ class _PerbugWorldPainter extends CustomPainter {
     final debugText = TextPainter(
       text: TextSpan(
         text: 'center ${viewport.centerLat.toStringAsFixed(4)}, ${viewport.centerLng.toStringAsFixed(4)}\n'
-            'zoom ${viewport.zoom.toStringAsFixed(2)} • nodes ${snapshot.visibleNodes.length}',
+            'zoom ${viewport.zoom.toStringAsFixed(2)} • nodes ${snapshot.visibleNodes.length} • atmosphere ${((frame.debug['atmosphere'] as num?) ?? 0).toDouble().toStringAsFixed(2)}',
         style: textStyle.copyWith(color: Colors.white.withOpacity(0.86), fontSize: 10),
       ),
       textDirection: TextDirection.ltr,
@@ -652,8 +647,8 @@ class _PerbugWorldPainter extends CustomPainter {
     debugText.paint(canvas, const Offset(8, 8));
   }
 
-  PerbugNode? _findNode(String id) {
-    for (final node in snapshot.visibleNodes) {
+  PerbugRenderNode? _findNode(String id, PerbugRenderFrame frame) {
+    for (final node in frame.nodes) {
       if (node.id == id) return node;
     }
     return null;
@@ -665,6 +660,7 @@ class _PerbugWorldPainter extends CustomPainter {
         oldDelegate.snapshot.visibleNodes != snapshot.visibleNodes ||
         oldDelegate.snapshot.connections != snapshot.connections ||
         oldDelegate.snapshot.regionTheme != snapshot.regionTheme ||
+        oldDelegate.renderEngine != renderEngine ||
         oldDelegate.selectedNodeId != selectedNodeId ||
         oldDelegate.currentNodeId != currentNodeId ||
         oldDelegate.hoverNodeId != hoverNodeId ||
