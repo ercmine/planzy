@@ -66,6 +66,9 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     }
     final selectedNode = _selectedNode(state);
     final selectedMove = selectedNode == null ? null : _moveForNode(state, selectedNode.id);
+    final mapUiState = _mapUiState(state: state, locationState: locationState);
+    final showBlockingMapOverlay = _shouldShowBlockingMapOverlay(mapUiState);
+    final showDemoLocationCta = _shouldShowDemoLocationCta(state: state, locationState: locationState);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -243,14 +246,23 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                             icon: Icons.bolt_rounded,
                           ),
                         ),
-                        if (_mapUiState(state: state, locationState: locationState) != _MapUiState.ready)
+                        if (showBlockingMapOverlay)
                           Positioned.fill(
                             child: _MapStatusOverlay(
-                              state: _mapUiState(state: state, locationState: locationState),
+                              state: mapUiState,
                               locationState: locationState,
                               details: _entryDetails ?? state.error ?? state.worldDebug['fallback_reason']?.toString(),
                               onRequestLocation: _useMyLocation,
                               onContinueDemo: _continueInDemoMode,
+                            ),
+                          ),
+                        if (showDemoLocationCta)
+                          Positioned(
+                            top: 10,
+                            right: 10,
+                            child: _DemoModeLocationButton(
+                              requestingLocation: _entryState == _MapEntryState.requestingLocation,
+                              onPressed: _useMyLocation,
                             ),
                           ),
                         if (kDebugMode)
@@ -741,6 +753,41 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     return _MapUiState.ready;
   }
 
+  bool _shouldShowBlockingMapOverlay(_MapUiState state) {
+    switch (state) {
+      case _MapUiState.idle:
+      case _MapUiState.loading:
+      case _MapUiState.requestingLocation:
+      case _MapUiState.permissionDenied:
+      case _MapUiState.unsupported:
+      case _MapUiState.empty:
+        return true;
+      case _MapUiState.locationGranted:
+      case _MapUiState.demoMode:
+      case _MapUiState.generationFailed:
+      case _MapUiState.ready:
+        return false;
+    }
+  }
+
+  bool _shouldShowDemoLocationCta({
+    required PerbugGameState state,
+    required LocationControllerState locationState,
+  }) {
+    if (_entryState == _MapEntryState.requestingLocation) return false;
+    if (locationState.effectiveLocation != null && locationState.status == LocationStatus.ready) {
+      return false;
+    }
+    if (_entryState == _MapEntryState.demoMode ||
+        _entryState == _MapEntryState.locationDenied ||
+        _entryState == _MapEntryState.unsupported) {
+      return true;
+    }
+    return state.worldDebug['location_mode'] == 'demo' ||
+        state.worldDebug['fallback_active'] == true ||
+        state.worldDebug['generation_status'] == 'fallback';
+  }
+
   Future<void> _useMyLocation() async {
     if (_entryState == _MapEntryState.requestingLocation) return;
     if (kIsWeb && !_webCanRequestGeolocation()) {
@@ -981,6 +1028,28 @@ class _MapStatusOverlay extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DemoModeLocationButton extends StatelessWidget {
+  const _DemoModeLocationButton({
+    required this.onPressed,
+    required this.requestingLocation,
+  });
+
+  final VoidCallback onPressed;
+  final bool requestingLocation;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Switch from demo to real-world map anchoring',
+      child: FilledButton.tonalIcon(
+        onPressed: requestingLocation ? null : onPressed,
+        icon: const Icon(Icons.explore_outlined),
+        label: const Text('Switch to Real World'),
       ),
     );
   }
