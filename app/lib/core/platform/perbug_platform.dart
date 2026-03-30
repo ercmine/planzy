@@ -17,7 +17,16 @@ class PerbugPlatformSnapshot {
   final bool walletAvailable;
   final bool locationApiSupported;
 
-  String get modeLabel => web ? 'web-first' : 'native';
+  bool get isPrimaryMobileTarget => !web && (target == TargetPlatform.iOS || target == TargetPlatform.android);
+
+  int get platformPriority {
+    if (target == TargetPlatform.iOS) return 1;
+    if (target == TargetPlatform.android) return 2;
+    if (web) return 3;
+    return 4;
+  }
+
+  String get modeLabel => isPrimaryMobileTarget ? 'mobile-first' : (web ? 'web-secondary' : 'native-secondary');
 }
 
 final perbugPlatformSnapshotProvider = FutureProvider<PerbugPlatformSnapshot>((ref) async {
