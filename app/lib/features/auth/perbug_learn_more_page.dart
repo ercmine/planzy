@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class PerbugLearnMorePage extends StatelessWidget {
+import '../../app/app_routes.dart';
+import '../../core/identity/identity_provider.dart';
+import '../dryad/chain/dryad_chain_providers.dart';
+import '../home/perbug_asset_models.dart';
+import '../home/perbug_game_controller.dart';
+
+class PerbugLearnMorePage extends ConsumerWidget {
   const PerbugLearnMorePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFF0E0A18),
@@ -43,7 +51,19 @@ class PerbugLearnMorePage extends StatelessWidget {
                   'Your wallet ties your identity to live progression and asset-linked systems so your campaign can travel with you.',
               icon: Icons.account_balance_wallet,
             ),
+            _LoreCard(
+              title: 'Demo Mode',
+              body:
+                  'No wallet available yet? Enter Demo Mode to open the live map, try squad systems, and explore progression offline.',
+              icon: Icons.videogame_asset,
+            ),
             const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => _enterDemoMode(context, ref),
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Try Demo Mode'),
+            ),
+            const SizedBox(height: 10),
             FilledButton.icon(
               onPressed: () => Navigator.of(context).pop(),
               icon: const Icon(Icons.arrow_back_rounded),
@@ -53,6 +73,18 @@ class PerbugLearnMorePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _enterDemoMode(BuildContext context, WidgetRef ref) async {
+    final store = await ref.read(identityStoreProvider.future);
+    await store.getOrCreateDemoSessionId();
+    await store.setWalletSessionAddress(null);
+    await store.setAuthMode('demo');
+    ref.read(walletAddressProvider.notifier).state = null;
+    ref.read(entryAuthModeProvider.notifier).state = EntryAuthMode.demo;
+    await ref.read(perbugGameControllerProvider.notifier).setWalletLink(status: AssetLinkStatus.pending);
+    if (!context.mounted) return;
+    context.go(AppRoutes.liveMap);
   }
 }
 

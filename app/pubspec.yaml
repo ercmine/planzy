@@ -58,6 +58,8 @@ flutter:
     - .env.dev
     - .env.stage
     - .env.prod
+    - ../29C05777-776F-450F-B071-691DE175BA89.png
+    - ../322AE031-DFBD-475E-97FB-C2FFD6CE5964.png
     - assets/branding/perbug.svg
     - assets/branding/perbug1.svg
     - assets/game_world/collectibles/common/
