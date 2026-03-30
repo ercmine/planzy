@@ -35,6 +35,8 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
   String? _mapAnchoredNodeId;
   late MapViewport _mapViewport;
   final TextEditingController _searchController = TextEditingController();
+  _MapEntryState _entryState = _MapEntryState.idle;
+  String? _entryDetails;
 
   @override
   void dispose() {
@@ -46,7 +48,6 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
   void initState() {
     super.initState();
     _mapViewport = const MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
-    Future<void>.microtask(() => ref.read(perbugGameControllerProvider.notifier).initialize());
   }
 
   @override
@@ -67,7 +68,13 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     final selectedMove = selectedNode == null ? null : _moveForNode(state, selectedNode.id);
 
     return RefreshIndicator(
-      onRefresh: controller.initialize,
+      onRefresh: () async {
+        if (_entryState == _MapEntryState.locationGranted) {
+          await controller.requestLocationAndRefresh();
+        } else {
+          await _continueInDemoMode();
+        }
+      },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
@@ -241,9 +248,9 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                             child: _MapStatusOverlay(
                               state: _mapUiState(state: state, locationState: locationState),
                               locationState: locationState,
-                              details: state.error ?? state.worldDebug['fallback_reason']?.toString(),
-                              onRequestLocation: () => controller.requestLocationAndRefresh(),
-                              onContinueDemo: () => controller.initialize(),
+                              details: _entryDetails ?? state.error ?? state.worldDebug['fallback_reason']?.toString(),
+                              onRequestLocation: _useMyLocation,
+                              onContinueDemo: _continueInDemoMode,
                             ),
                           ),
                         if (kDebugMode)
@@ -713,18 +720,92 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     required PerbugGameState state,
     required LocationControllerState locationState,
   }) {
+    if (_entryState == _MapEntryState.idle) return _MapUiState.idle;
+    if (_entryState == _MapEntryState.requestingLocation) return _MapUiState.requestingLocation;
+    if (_entryState == _MapEntryState.locationDenied) return _MapUiState.permissionDenied;
+    if (_entryState == _MapEntryState.unsupported) return _MapUiState.unsupported;
     if (state.loading) {
-      final requesting = state.worldDebug['requesting_location'] == true;
-      return requesting ? _MapUiState.requestingLocation : _MapUiState.loading;
+      if (_entryState == _MapEntryState.locationGranted) return _MapUiState.requestingLocation;
+      return _MapUiState.loading;
     }
-    if (locationState.status == LocationStatus.permissionDenied) return _MapUiState.permissionDenied;
-    if (locationState.status == LocationStatus.serviceDisabled) return _MapUiState.unsupported;
     if (state.nodes.isEmpty) return _MapUiState.empty;
-    if (state.worldDebug['generation_status'] == 'fallback' || state.worldDebug['fallback_active'] == true) {
+    if (_entryState == _MapEntryState.demoMode ||
+        state.worldDebug['generation_status'] == 'fallback' ||
+        state.worldDebug['fallback_active'] == true) {
       return _MapUiState.demoMode;
+    }
+    if (_entryState == _MapEntryState.locationGranted && locationState.status == LocationStatus.ready) {
+      return _MapUiState.locationGranted;
     }
     if (state.error != null && state.nodes.isNotEmpty) return _MapUiState.generationFailed;
     return _MapUiState.ready;
+  }
+
+  Future<void> _useMyLocation() async {
+    if (_entryState == _MapEntryState.requestingLocation) return;
+    if (kIsWeb && !_webCanRequestGeolocation()) {
+      setState(() {
+        _entryState = _MapEntryState.unsupported;
+        _entryDetails = 'Location prompts on web require HTTPS (or localhost).';
+      });
+      return;
+    }
+
+    setState(() {
+      _entryState = _MapEntryState.requestingLocation;
+      _entryDetails = 'Requesting real location permission from your device/browser.';
+    });
+
+    await ref.read(perbugGameControllerProvider.notifier).requestLocationAndRefresh();
+    if (!mounted) return;
+    final locationState = ref.read(locationControllerProvider);
+    final gameState = ref.read(perbugGameControllerProvider);
+
+    if (locationState.effectiveLocation != null && locationState.status == LocationStatus.ready) {
+      setState(() {
+        _entryState = _MapEntryState.locationGranted;
+        _entryDetails = 'Live location enabled. Your world is now anchored to your real position.';
+      });
+      return;
+    }
+
+    if (locationState.status == LocationStatus.permissionDenied) {
+      setState(() {
+        _entryState = _MapEntryState.locationDenied;
+        _entryDetails = locationState.errorMessage ?? 'Location access was denied. Continue in demo mode to keep playing.';
+      });
+      return;
+    }
+
+    if (locationState.status == LocationStatus.serviceDisabled) {
+      setState(() {
+        _entryState = _MapEntryState.unsupported;
+        _entryDetails = locationState.errorMessage ?? 'Location services are unavailable. Continue in demo mode to explore.';
+      });
+      return;
+    }
+
+    setState(() {
+      _entryState = gameState.worldDebug['fallback_active'] == true ? _MapEntryState.demoMode : _MapEntryState.locationDenied;
+      _entryDetails = gameState.worldDebug['fallback_active'] == true
+          ? 'Live position was unavailable. Demo frontier loaded so your run continues.'
+          : 'Could not confirm live location. You can continue in demo mode.';
+    });
+  }
+
+  Future<void> _continueInDemoMode() async {
+    setState(() {
+      _entryState = _MapEntryState.demoMode;
+      _entryDetails = 'Demo mode loaded. Use My Location any time to generate your real world.';
+    });
+    await ref.read(perbugGameControllerProvider.notifier).initialize();
+  }
+
+  bool _webCanRequestGeolocation() {
+    if (!kIsWeb) return true;
+    final base = Uri.base;
+    final localHost = base.host == 'localhost' || base.host == '127.0.0.1';
+    return base.scheme == 'https' || localHost;
   }
 
   Future<void> _openPuzzleSheet(BuildContext context) async {
@@ -801,14 +882,25 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
 }
 
 enum _MapUiState {
+  idle,
   loading,
   requestingLocation,
+  locationGranted,
   permissionDenied,
   unsupported,
   demoMode,
   generationFailed,
   empty,
   ready,
+}
+
+enum _MapEntryState {
+  idle,
+  requestingLocation,
+  locationGranted,
+  locationDenied,
+  unsupported,
+  demoMode,
 }
 
 class _MapStatusOverlay extends StatelessWidget {
@@ -828,33 +920,25 @@ class _MapStatusOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String title;
-    String subtitle;
-    switch (state) {
-      case _MapUiState.requestingLocation:
-        title = 'Requesting location';
-        subtitle = 'Waiting for browser/device location permission.';
-      case _MapUiState.permissionDenied:
-        title = 'Location denied';
-        subtitle = locationState.errorMessage ?? 'Location access was denied. You can continue in demo mode.';
-      case _MapUiState.unsupported:
-        title = 'Location unavailable';
-        subtitle = 'Location services are disabled or unsupported. Demo map is active.';
-      case _MapUiState.demoMode:
-        title = 'Demo map active';
-        subtitle = 'Using deterministic fallback world so gameplay remains available.';
-      case _MapUiState.generationFailed:
-        title = 'Live generation failed';
-        subtitle = 'Using fallback frontier so the map loop continues.';
-      case _MapUiState.empty:
-        title = 'No world nodes yet';
-        subtitle = 'Retry with location or continue in demo mode.';
-      case _MapUiState.loading:
-        title = 'Loading frontier';
-        subtitle = 'Building world nodes…';
-      case _MapUiState.ready:
-        return const SizedBox.shrink();
-    }
+    if (state == _MapUiState.ready) return const SizedBox.shrink();
+    final (title, subtitle) = switch (state) {
+      _MapUiState.idle => (
+          'Choose your world anchor',
+          'Use your real location to generate your world. Or continue in Demo Mode.',
+        ),
+      _MapUiState.requestingLocation => ('Requesting location', 'Waiting for browser/device location permission.'),
+      _MapUiState.locationGranted => ('Live location active', 'Your tactical world is now generated from your real location.'),
+      _MapUiState.permissionDenied => (
+          'Location denied',
+          locationState.errorMessage ?? 'Location access was denied. Continue in demo mode immediately.',
+        ),
+      _MapUiState.unsupported => ('Location unavailable', 'Location services are disabled or unsupported on this device/browser.'),
+      _MapUiState.demoMode => ('Demo map active', 'Using deterministic fallback world so gameplay remains available.'),
+      _MapUiState.generationFailed => ('Live generation failed', 'Using fallback frontier so the map loop continues.'),
+      _MapUiState.empty => ('No world nodes yet', 'Retry with location or continue in demo mode.'),
+      _MapUiState.loading => ('Loading frontier', 'Building world nodes…'),
+      _MapUiState.ready => throw StateError('unreachable'),
+    };
 
     return ColoredBox(
       color: Colors.black.withOpacity(0.35),
@@ -881,7 +965,7 @@ class _MapStatusOverlay extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       FilledButton.icon(
-                        onPressed: onRequestLocation,
+                        onPressed: state == _MapUiState.requestingLocation ? null : onRequestLocation,
                         icon: const Icon(Icons.my_location),
                         label: const Text('Use My Location'),
                       ),
