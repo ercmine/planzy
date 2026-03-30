@@ -83,7 +83,10 @@ describe("geo route alias routing", () => {
       geoStatus: {
         gateway: null,
         mode: "custom",
+        customGeoServiceEnabled: true,
         routesMounted: true,
+        customGeoBaseUrl: "https://geo.example.test",
+        nominatimBaseUrl: undefined,
         upstreamBaseUrl: "https://geo.example.test",
         validationErrors: [],
         validationWarnings: []
@@ -188,7 +191,10 @@ describe("geo route alias routing", () => {
       geoStatus: {
         gateway: null,
         mode: "nominatim",
+        customGeoServiceEnabled: false,
         routesMounted: true,
+        customGeoBaseUrl: "https://geo.perbug.com",
+        nominatimBaseUrl: "https://geo.perbug.com",
         upstreamBaseUrl: "https://geo.perbug.com",
         validationErrors: ["NOMINATIM_BASE_URL is required when GEO_MODE=nominatim."],
         validationWarnings: []

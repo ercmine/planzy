@@ -82,8 +82,7 @@ class LocalGeoGateway {
         };
     }
     async health() {
-        const upstream = await this.service.health();
-        return { ok: upstream.ok, upstream, mode: "local", metrics: this.service.metricsSnapshot(), version: "1.0.0" };
+        return { ok: true, mode: "local", metrics: this.service.metricsSnapshot(), version: "1.0.0" };
     }
 }
 export function initBackendGeoRuntime(env = process.env) {
@@ -114,7 +113,10 @@ export function initBackendGeoRuntime(env = process.env) {
     return {
         gateway,
         mode: validation.mode,
+        customGeoServiceEnabled: config.client.enabled,
         routesMounted: true,
+        customGeoBaseUrl: config.client.baseUrl,
+        nominatimBaseUrl: config.local.nominatimBaseUrl,
         upstreamBaseUrl,
         validationErrors: validation.errors,
         validationWarnings: validation.warnings

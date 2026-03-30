@@ -35,6 +35,17 @@ describe("readGeoRuntimeConfig", () => {
         const validation = validateGeoRuntimeConfig(config, env);
         expect(validation.mode).toBe("nominatim");
     });
+    it("parses explicit false-ish GEO_SERVICE_ENABLED values", () => {
+        const env = {
+            GEO_SERVICE_ENABLED: "off",
+            GEO_SERVICE_BASE_URL: "https://geo.perbug.com",
+            NOMINATIM_BASE_URL: "https://nominatim.perbug.com"
+        };
+        const config = readGeoRuntimeConfig(env);
+        const validation = validateGeoRuntimeConfig(config, env);
+        expect(config.client.enabled).toBe(false);
+        expect(validation.mode).toBe("nominatim");
+    });
     it("uses explicit GEO_MODE for custom and nominatim modes", () => {
         const nominatimEnv = {
             GEO_MODE: "nominatim",

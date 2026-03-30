@@ -29,8 +29,12 @@ export interface GeoRuntimeValidation {
 }
 
 function parseBool(value: string | undefined, fallback: boolean): boolean {
-  if (!value) return fallback;
-  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+  if (value == null) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
 }
 
 function parseNum(value: string | undefined, fallback: number): number {

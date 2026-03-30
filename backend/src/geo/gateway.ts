@@ -27,7 +27,10 @@ export interface GeoGateway {
 export interface BackendGeoRuntime {
   gateway: GeoGateway | null;
   mode: "custom" | "nominatim" | "disabled";
+  customGeoServiceEnabled: boolean;
   routesMounted: boolean;
+  customGeoBaseUrl?: string;
+  nominatimBaseUrl?: string;
   upstreamBaseUrl?: string;
   validationErrors: string[];
   validationWarnings: string[];
@@ -116,8 +119,7 @@ class LocalGeoGateway implements GeoGateway {
   }
 
   async health(): Promise<GeoHealthResponse> {
-    const upstream = await this.service.health();
-    return { ok: upstream.ok, upstream, mode: "local", metrics: this.service.metricsSnapshot(), version: "1.0.0" };
+    return { ok: true, mode: "local", metrics: this.service.metricsSnapshot(), version: "1.0.0" };
   }
 }
 
@@ -153,7 +155,10 @@ export function initBackendGeoRuntime(env: NodeJS.ProcessEnv = process.env): Bac
   return {
     gateway,
     mode: validation.mode,
+    customGeoServiceEnabled: config.client.enabled,
     routesMounted: true,
+    customGeoBaseUrl: config.client.baseUrl,
+    nominatimBaseUrl: config.local.nominatimBaseUrl,
     upstreamBaseUrl,
     validationErrors: validation.errors,
     validationWarnings: validation.warnings
