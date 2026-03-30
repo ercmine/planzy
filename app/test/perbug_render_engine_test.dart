@@ -51,11 +51,31 @@ void main() {
       tags: {'rare'},
       metadata: {'source': 'geo_nominatim'},
     ),
+    PerbugNode(
+      id: 'n3_far',
+      placeId: 'p3',
+      label: 'Far Bastion',
+      latitude: 38.9000,
+      longitude: -121.1000,
+      region: 'Bay',
+      city: 'Farlands',
+      neighborhood: 'Outer',
+      country: 'USA',
+      nodeType: PerbugNodeType.resource,
+      difficulty: 3,
+      state: PerbugNodeState.available,
+      energyReward: 1,
+      movementCost: 2,
+      rarityScore: 0.3,
+      tags: {'resource'},
+      metadata: {'source': 'geo_nominatim'},
+    ),
   ];
 
   final graph = {
     'n1': {'n2'},
     'n2': {'n1'},
+    'n3_far': <String>{},
   };
 
   test('composeFrame generates deterministic frame payload for same input', () {
@@ -85,7 +105,26 @@ void main() {
 
     expect(first.nodes.map((n) => n.id).toList(), equals(second.nodes.map((n) => n.id).toList()));
     expect(first.edges.length, equals(second.edges.length));
-    expect(first.debug['render_nodes'], equals(2));
+    expect(first.debug['render_nodes'], equals(snapshot.visibleNodes.length));
+    expect(first.debug['traversed_chunks'], equals(snapshot.visibleChunks.length));
+  });
+
+  test('composeFrame traverses visible chunks only', () {
+    final snapshot = worldEngine.build(viewport: viewport, nodes: nodes, graph: graph);
+    final frame = renderEngine.composeFrame(
+      viewport: viewport,
+      canvasSize: const Size(1000, 700),
+      snapshot: snapshot,
+      currentNodeId: 'n1',
+      selectedNodeId: null,
+      hoverNodeId: null,
+      reachableNodeIds: const {'n1', 'n2'},
+      completedNodeIds: const <String>{},
+    );
+
+    expect(snapshot.chunks.length, greaterThanOrEqualTo(snapshot.visibleChunks.length));
+    expect(frame.nodes.any((node) => node.id == 'n3_far'), isFalse);
+    expect(frame.nodes.every((node) => snapshot.visibleChunkIds.contains(node.chunkId)), isTrue);
   });
 
   test('hit testing returns nearby node id', () {

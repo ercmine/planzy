@@ -215,6 +215,8 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
                           size: size,
                           viewport: cameraViewport,
                           nodeCount: safeSnapshot.visibleNodes.length,
+                          chunkCount: (safeSnapshot.debug['total_chunks'] as num?)?.toInt() ?? 0,
+                          visibleChunkCount: (safeSnapshot.debug['visible_chunks'] as num?)?.toInt() ?? 0,
                           mode: renderMode,
                           painterTick: tick,
                           routeName: ModalRoute.of(context)?.settings.name ?? '/live-map',
@@ -623,6 +625,33 @@ class _PerbugWorldPainter extends CustomPainter {
   }
 
   void _paintDebugLayer(Canvas canvas, Size size, PerbugRenderFrame frame) {
+    final projection = PerbugGeoProjection(viewport);
+    for (final chunk in frame.visibleChunks) {
+      final topLeft = projection.project(PerbugGeoPoint(lat: chunk.bounds.maxLat, lng: chunk.bounds.minLng));
+      final bottomRight = projection.project(PerbugGeoPoint(lat: chunk.bounds.minLat, lng: chunk.bounds.maxLng));
+      final rect = Rect.fromLTRB(
+        topLeft.x * size.width,
+        topLeft.y * size.height,
+        bottomRight.x * size.width,
+        bottomRight.y * size.height,
+      );
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = const Color(0xFF34D399).withOpacity(0.68),
+      );
+      final chunkLabel = TextPainter(
+        text: TextSpan(
+          text: '${chunk.id.value} (${chunk.nodes.length})',
+          style: textStyle.copyWith(color: const Color(0xFF34D399), fontSize: 8.5, fontWeight: FontWeight.w700),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: 130);
+      chunkLabel.paint(canvas, rect.topLeft + const Offset(2, 2));
+    }
+
     for (final node in frame.nodes) {
       final center = node.screen.position;
       canvas.drawCircle(
@@ -638,11 +667,11 @@ class _PerbugWorldPainter extends CustomPainter {
     final debugText = TextPainter(
       text: TextSpan(
         text: 'center ${viewport.centerLat.toStringAsFixed(4)}, ${viewport.centerLng.toStringAsFixed(4)}\n'
-            'zoom ${viewport.zoom.toStringAsFixed(2)} • nodes ${snapshot.visibleNodes.length} • atmosphere ${((frame.debug['atmosphere'] as num?) ?? 0).toDouble().toStringAsFixed(2)}',
+            'zoom ${viewport.zoom.toStringAsFixed(2)} • nodes ${snapshot.visibleNodes.length} • chunks ${frame.visibleChunks.length} • atmosphere ${((frame.debug['atmosphere'] as num?) ?? 0).toDouble().toStringAsFixed(2)}',
         style: textStyle.copyWith(color: Colors.white.withOpacity(0.86), fontSize: 10),
       ),
       textDirection: TextDirection.ltr,
-      maxLines: 2,
+      maxLines: 3,
     )..layout(maxWidth: size.width - 16);
     debugText.paint(canvas, const Offset(8, 8));
   }
@@ -761,6 +790,8 @@ class _DebugStatePanel extends StatelessWidget {
     required this.size,
     required this.viewport,
     required this.nodeCount,
+    required this.chunkCount,
+    required this.visibleChunkCount,
     required this.mode,
     required this.painterTick,
     required this.routeName,
@@ -771,6 +802,8 @@ class _DebugStatePanel extends StatelessWidget {
   final Size size;
   final MapViewport viewport;
   final int nodeCount;
+  final int chunkCount;
+  final int visibleChunkCount;
   final String mode;
   final int painterTick;
   final String routeName;
@@ -793,6 +826,7 @@ class _DebugStatePanel extends StatelessWidget {
             'route: $routeName\n'
             'viewport: ${size.width.toStringAsFixed(0)}x${size.height.toStringAsFixed(0)}\n'
             'mode: $mode • nodes: $nodeCount\n'
+            'chunks: $visibleChunkCount visible / $chunkCount total\n'
             'center: ${viewport.centerLat.toStringAsFixed(4)}, ${viewport.centerLng.toStringAsFixed(4)}\n'
             'zoom: ${viewport.zoom.toStringAsFixed(2)}\n'
             'seed: $seed\n'
