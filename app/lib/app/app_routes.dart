@@ -14,6 +14,7 @@ class AppRoutes {
   static const profile = '/profile';
   static const wallet = '/wallet';
   static const learnMore = '/learn-more';
+  static const debugMap = '/debug/map';
 
   // Legacy onboarding paths retained for deep-link compatibility only.
   static const bootstrap = '/bootstrap';
