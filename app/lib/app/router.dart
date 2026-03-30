@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/perbug_learn_more_page.dart';
 import '../features/auth/perbug_wallet_entry_page.dart';
+import '../core/identity/identity_provider.dart';
 import '../features/dryad/chain/dryad_chain_providers.dart';
 import '../features/home/home_page.dart';
 import '../features/home/perbug_flow_pages.dart';
@@ -14,6 +15,11 @@ final authGateProvider = Provider<ChangeNotifier>((ref) {
   final gate = ValueNotifier<int>(0);
   ref.listen<String?>(
     walletAddressProvider,
+    (_, __) => gate.value++,
+    fireImmediately: true,
+  );
+  ref.listen<EntryAuthMode>(
+    entryAuthModeProvider,
     (_, __) => gate.value++,
     fireImmediately: true,
   );
@@ -30,11 +36,16 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final path = state.uri.path;
       final wallet = ref.read(walletAddressProvider);
+      final authMode = ref.read(entryAuthModeProvider);
       final hasWalletSession = wallet != null && wallet.trim().isNotEmpty;
+      final hasDemoSession = authMode == EntryAuthMode.demo;
       final onEntry = path == AppRoutes.entry;
+      final onLearnMore = path == AppRoutes.learnMore;
+      final isAllowedUnauthed = onEntry || onLearnMore;
+      final canEnterGame = hasWalletSession || hasDemoSession;
 
-      if (!hasWalletSession && !onEntry) return AppRoutes.entry;
-      if (hasWalletSession && onEntry) return AppRoutes.liveMap;
+      if (!canEnterGame && !isAllowedUnauthed) return AppRoutes.entry;
+      if (canEnterGame && onEntry) return AppRoutes.liveMap;
       return null;
     },
     routes: [

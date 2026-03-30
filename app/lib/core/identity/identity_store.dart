@@ -78,6 +78,8 @@ class IdentityStore {
   static const usernameKey = 'profile_username';
   static const bioKey = 'profile_bio';
   static const walletSessionAddressKey = 'wallet_session_address';
+  static const authModeKey = 'auth_mode';
+  static const demoSessionIdKey = 'demo_session_id';
 
   final SharedPreferences _prefs;
   final FlutterSecureStorage _secureStorage;
@@ -161,6 +163,29 @@ class IdentityStore {
     await _prefs.setString(walletSessionAddressKey, cleaned);
   }
 
+  Future<String?> getAuthMode() async {
+    final value = _prefs.getString(authModeKey)?.trim().toLowerCase();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  Future<void> setAuthMode(String? mode) async {
+    final cleaned = mode?.trim().toLowerCase();
+    if (cleaned == null || cleaned.isEmpty) {
+      await _prefs.remove(authModeKey);
+      return;
+    }
+    await _prefs.setString(authModeKey, cleaned);
+  }
+
+  Future<String> getOrCreateDemoSessionId() async {
+    final existing = _prefs.getString(demoSessionIdKey)?.trim();
+    if (existing != null && existing.isNotEmpty) return existing;
+    final generated = 'demo_${Uuid.v4().replaceAll('-', '').substring(0, 12)}';
+    await _prefs.setString(demoSessionIdKey, generated);
+    return generated;
+  }
+
   Future<LocalUserProfile> getOrCreateProfile() async {
     final userId = await getOrCreateUserId();
     final fallbackSuffix = userId.replaceAll('-', '').substring(0, 6).toLowerCase();
@@ -211,6 +236,8 @@ class IdentityStore {
     await _prefs.remove(onboardingFirstRewardAtKey);
     await _prefs.remove(onboardingSkippedKey);
     await _prefs.remove(walletSessionAddressKey);
+    await _prefs.remove(authModeKey);
+    await _prefs.remove(demoSessionIdKey);
   }
 
   String _sanitizeUsername(String value) {

@@ -3,6 +3,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'identity_store.dart';
 
+enum EntryAuthMode {
+  none,
+  wallet,
+  demo,
+}
+
 final identityStoreProvider = FutureProvider<IdentityStore>((ref) async {
   final prefs = await SharedPreferences.getInstance();
   return IdentityStore(sharedPreferences: prefs);
@@ -31,3 +37,5 @@ final onboardingIntroRequiredProvider = FutureProvider<bool>((ref) async {
   final progress = await identityStore.getOnboardingProgress();
   return progress.step == 'identityIntro';
 });
+
+final entryAuthModeProvider = StateProvider<EntryAuthMode>((ref) => EntryAuthMode.none);

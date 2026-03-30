@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -95,6 +94,8 @@ class PerbugWalletEntryPage extends ConsumerStatefulWidget {
 class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
   bool _restoring = true;
   bool _connecting = false;
+  bool _startingDemo = false;
+  bool _walletAvailable = true;
   String? _error;
   String? _pressedButtonId;
 
@@ -106,15 +107,26 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
 
   Future<void> _restoreSession() async {
     try {
+      final connector = ref.read(walletConnectorProvider);
+      _walletAvailable = connector.isAvailable;
       final store = await ref.read(identityStoreProvider.future);
+      final authMode = await store.getAuthMode();
       final restored = await store.getWalletSessionAddress();
       if (!mounted) return;
       if (restored != null && restored.trim().isNotEmpty) {
         ref.read(walletAddressProvider.notifier).state = restored;
+        ref.read(entryAuthModeProvider.notifier).state = EntryAuthMode.wallet;
         await ref.read(perbugGameControllerProvider.notifier).setWalletLink(
           walletAddress: restored,
           status: AssetLinkStatus.linked,
         );
+        if (!mounted) return;
+        context.go(AppRoutes.liveMap);
+        return;
+      }
+      if (authMode == 'demo') {
+        ref.read(entryAuthModeProvider.notifier).state = EntryAuthMode.demo;
+        await ref.read(perbugGameControllerProvider.notifier).setWalletLink(status: AssetLinkStatus.pending);
         if (!mounted) return;
         context.go(AppRoutes.liveMap);
         return;
@@ -128,6 +140,10 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
       if (mounted) {
         setState(() {
           _restoring = false;
+          if (!_walletAvailable) {
+            _error = _error ??
+                'No wallet provider detected here. You can still enter Demo Mode now.';
+          }
         });
       }
     }
@@ -135,6 +151,14 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
 
   Future<void> _connectWallet({String? walletId}) async {
     final connector = ref.read(walletConnectorProvider);
+    if (!connector.isAvailable) {
+      if (!mounted) return;
+      setState(() {
+        _walletAvailable = false;
+        _error = 'Wallet connection is unavailable in this environment. Enter Demo Mode to keep playing.';
+      });
+      return;
+    }
     setState(() {
       _error = null;
       _connecting = true;
@@ -144,7 +168,9 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
       final account = await connector.connectWallet(walletId: walletId);
       if (!mounted) return;
       ref.read(walletAddressProvider.notifier).state = account;
+      ref.read(entryAuthModeProvider.notifier).state = EntryAuthMode.wallet;
       final store = await ref.read(identityStoreProvider.future);
+      await store.setAuthMode('wallet');
       await store.setWalletSessionAddress(account);
       await ref.read(perbugGameControllerProvider.notifier).setWalletLink(
         walletAddress: account,
@@ -155,7 +181,7 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not connect wallet: $error';
+        _error = 'Could not connect wallet: $error. You can still enter Demo Mode.';
       });
       await ref.read(perbugGameControllerProvider.notifier).setWalletLink(
         status: AssetLinkStatus.failed,
@@ -164,6 +190,36 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
       if (mounted) {
         setState(() {
           _connecting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _enterDemoMode() async {
+    if (_restoring || _connecting || _startingDemo) return;
+    setState(() {
+      _startingDemo = true;
+      _error = null;
+    });
+    try {
+      final store = await ref.read(identityStoreProvider.future);
+      await store.getOrCreateDemoSessionId();
+      await store.setWalletSessionAddress(null);
+      await store.setAuthMode('demo');
+      ref.read(walletAddressProvider.notifier).state = null;
+      ref.read(entryAuthModeProvider.notifier).state = EntryAuthMode.demo;
+      await ref.read(perbugGameControllerProvider.notifier).setWalletLink(status: AssetLinkStatus.pending);
+      if (!mounted) return;
+      context.go(AppRoutes.liveMap);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not start Demo Mode: $error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _startingDemo = false;
         });
       }
     }
@@ -202,13 +258,14 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
         fit: StackFit.expand,
         children: [
           Positioned.fill(
-            child: Image.file(
-              File(AppAssets.perbugLoginBackdropAbsolutePath),
+            child: Image.asset(
+              AppAssets.perbugLoginBackdrop,
               fit: BoxFit.contain,
               alignment: Alignment.center,
               errorBuilder: (_, __, ___) => _EntryFallbackScreen(
                 restoring: _restoring,
                 connecting: _connecting,
+                startingDemo: _startingDemo,
                 error: _error,
                 onConnectWallet: () => _runButtonAction(
                   buttonId: _connectWalletRegion.id,
@@ -218,6 +275,7 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
                   buttonId: _learnMoreRegion.id,
                   action: () => _openLearnMore(),
                 ),
+                onPlayDemo: _enterDemoMode,
               ),
             ),
           ),
@@ -234,7 +292,7 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
               _EntryHitButton(
                 rect: layout.connectWalletRect,
                 semanticsLabel: _connectWalletRegion.semanticsLabel,
-                isDisabled: _restoring || _connecting,
+                isDisabled: _restoring || _connecting || _startingDemo,
                 isPressed: _pressedButtonId == _connectWalletRegion.id,
                 onTap: () => _runButtonAction(
                   buttonId: _connectWalletRegion.id,
@@ -244,7 +302,7 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
               _EntryHitButton(
                 rect: layout.learnMoreRect,
                 semanticsLabel: _learnMoreRegion.semanticsLabel,
-                isDisabled: _restoring || _connecting,
+                isDisabled: _restoring || _connecting || _startingDemo,
                 isPressed: _pressedButtonId == _learnMoreRegion.id,
                 onTap: () => _runButtonAction(
                   buttonId: _learnMoreRegion.id,
@@ -252,6 +310,16 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
                 ),
               ),
             ],
+          Positioned(
+            left: 18,
+            right: 18,
+            bottom: 14 + media.padding.bottom,
+            child: _DemoModeBar(
+              disabled: _restoring || _connecting || _startingDemo,
+              walletUnavailable: !_walletAvailable,
+              onPlayDemo: _enterDemoMode,
+            ),
+          ),
           if (_showDebugHitBoxes && artRect != Rect.zero)
             Positioned.fill(
               child: IgnorePointer(
@@ -299,20 +367,24 @@ class _EntryFallbackScreen extends StatelessWidget {
   const _EntryFallbackScreen({
     required this.restoring,
     required this.connecting,
+    required this.startingDemo,
     required this.error,
     required this.onConnectWallet,
     required this.onLearnMore,
+    required this.onPlayDemo,
   });
 
   final bool restoring;
   final bool connecting;
+  final bool startingDemo;
   final String? error;
   final VoidCallback onConnectWallet;
   final VoidCallback onLearnMore;
+  final VoidCallback onPlayDemo;
 
   @override
   Widget build(BuildContext context) {
-    final disabled = restoring || connecting;
+    final disabled = restoring || connecting || startingDemo;
     return DecoratedBox(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -350,6 +422,11 @@ class _EntryFallbackScreen extends StatelessWidget {
                 onPressed: disabled ? null : onLearnMore,
                 child: const Text('Learn More'),
               ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: disabled ? null : onPlayDemo,
+                child: Text(startingDemo ? 'Entering Demo Mode…' : 'Play Demo'),
+              ),
               if (error != null) ...[
                 const SizedBox(height: 12),
                 Text(
@@ -360,6 +437,48 @@ class _EntryFallbackScreen extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DemoModeBar extends StatelessWidget {
+  const _DemoModeBar({
+    required this.disabled,
+    required this.walletUnavailable,
+    required this.onPlayDemo,
+  });
+
+  final bool disabled;
+  final bool walletUnavailable;
+  final VoidCallback onPlayDemo;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0x8F110A19),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x60D2B6FF)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            Icon(walletUnavailable ? Icons.wifi_off_rounded : Icons.auto_awesome_rounded, color: const Color(0xFFD9CCFF), size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                walletUnavailable ? 'Wallet unavailable here. Enter Demo Mode.' : 'Skip wallet for now and enter Demo Mode.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: const Color(0xFFE7DBFF)),
+              ),
+            ),
+            TextButton(
+              onPressed: disabled ? null : onPlayDemo,
+              child: const Text('Play Demo'),
+            ),
+          ],
         ),
       ),
     );

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../assets.dart';
@@ -51,7 +49,7 @@ class RpgBarSurface extends StatelessWidget {
             ),
             Positioned.fill(
               child: Image(
-                image: FileImage(File(AppAssets.rpgBarFrameAbsolutePath)),
+                image: const AssetImage(AppAssets.rpgBarFrame),
                 fit: BoxFit.fill,
                 centerSlice: _centerSlice,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),

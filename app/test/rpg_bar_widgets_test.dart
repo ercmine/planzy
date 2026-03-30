@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('rpg bar asset path is registered centrally', () {
-    expect(AppAssets.rpgBarFrameAbsolutePath, '/workspace/planzy/322AE031-DFBD-475E-97FB-C2FFD6CE5964.png');
+    expect(AppAssets.rpgBarFrame, '../322AE031-DFBD-475E-97FB-C2FFD6CE5964.png');
   });
 
   testWidgets('RpgBarButton renders label and respects disabled state', (tester) async {
