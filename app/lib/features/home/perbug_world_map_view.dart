@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'map_discovery_models.dart';
 import 'perbug_asset_registry.dart';
@@ -20,6 +23,7 @@ class PerbugWorldMapView extends StatefulWidget {
     required this.onViewportChanged,
     required this.onNodeSelected,
     required this.onTapEmpty,
+    this.showDebugOverlay = kDebugMode,
   });
 
   final MapViewport viewport;
@@ -32,6 +36,7 @@ class PerbugWorldMapView extends StatefulWidget {
   final void Function(MapViewport viewport, {required bool hasGesture}) onViewportChanged;
   final void Function(String nodeId) onNodeSelected;
   final VoidCallback onTapEmpty;
+  final bool showDebugOverlay;
 
   @override
   State<PerbugWorldMapView> createState() => _PerbugWorldMapViewState();
@@ -40,15 +45,26 @@ class PerbugWorldMapView extends StatefulWidget {
 class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTickerProviderStateMixin {
   static const _engine = PerbugWorldMapEngine();
 
-  Offset? _gestureStartFocal;
-  MapViewport? _gestureStartViewport;
   late final AnimationController _pulse;
+  late final MapController _mapController;
   String? _hoverNodeId;
 
   @override
   void initState() {
     super.initState();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
+    _mapController = MapController();
+  }
+
+  @override
+  void didUpdateWidget(covariant PerbugWorldMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.viewport.isSimilarTo(oldWidget.viewport, centerThreshold: 0.0002, zoomThreshold: 0.001)) {
+      _mapController.move(
+        LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
+        widget.viewport.zoom,
+      );
+    }
   }
 
   @override
@@ -76,82 +92,108 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
           final safeWidth = width <= 0 ? 1.0 : width;
           final safeHeight = height <= 0 ? 1.0 : height;
           final size = Size(safeWidth, safeHeight);
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapUp: (details) => _onTap(details.localPosition, size, snapshot),
-            onScaleStart: (details) {
-              _gestureStartFocal = details.localFocalPoint;
-              _gestureStartViewport = widget.viewport;
-            },
-            onScaleUpdate: (details) {
-              final start = _gestureStartViewport;
-              final focal = _gestureStartFocal;
-              if (start == null || focal == null) return;
-              final zoom = (start.zoom * details.scale).clamp(3.5, 17.0).toDouble();
-              final pan = details.localFocalPoint - focal;
-              final latPerPixel = start.latSpan / math.max(1.0, size.height);
-              final lngPerPixel = start.lngSpan / math.max(1.0, size.width);
-              final centerLat = (start.centerLat - pan.dy * latPerPixel).clamp(-85.0, 85.0);
-              var centerLng = start.centerLng - pan.dx * lngPerPixel;
-              while (centerLng < -180) centerLng += 360;
-              while (centerLng > 180) centerLng -= 360;
-              widget.onViewportChanged(
-                MapViewport(centerLat: centerLat, centerLng: centerLng, zoom: zoom),
-                hasGesture: true,
-              );
-            },
-            child: MouseRegion(
-              onHover: (event) => setState(() => _hoverNodeId = _hoveredNodeAt(event.localPosition, size, snapshot)),
-              onExit: (_) => setState(() => _hoverNodeId = null),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: AnimatedBuilder(
-                      animation: _pulse,
-                      builder: (context, child) {
-                        return CustomPaint(
-                          painter: _PerbugWorldPainter(
-                            viewport: widget.viewport,
-                            snapshot: snapshot,
-                            currentNodeId: widget.currentNodeId ?? (visibleNodes.isEmpty ? null : visibleNodes.first.id),
-                            selectedNodeId: widget.selectedNodeId ?? _hoverNodeId,
-                            hoverNodeId: _hoverNodeId,
-                            reachableNodeIds: widget.reachableNodeIds.isEmpty
-                                ? visibleNodes.take(4).map((n) => n.id).toSet()
-                                : widget.reachableNodeIds,
-                            completedNodeIds: widget.completedNodeIds,
-                            pulse: _pulse.value,
-                            textStyle: Theme.of(context).textTheme.labelSmall ?? const TextStyle(fontSize: 11),
-                          ),
-                          child: const SizedBox.expand(),
-                        );
-                      },
-                    ),
-                  ),
-                  Positioned(
-                    left: 10,
-                    top: 10,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.36),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: Colors.white.withOpacity(0.16)),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        child: Text(
-                          hasLiveNodes ? 'Live tactical region' : 'Demo frontier fallback',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: _buildBaseMap(),
               ),
-            ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: true,
+                  child: AnimatedBuilder(
+                    animation: _pulse,
+                    builder: (context, child) {
+                      return CustomPaint(
+                        painter: _PerbugWorldPainter(
+                          viewport: widget.viewport,
+                          snapshot: snapshot,
+                          currentNodeId: widget.currentNodeId ?? (visibleNodes.isEmpty ? null : visibleNodes.first.id),
+                          selectedNodeId: widget.selectedNodeId ?? _hoverNodeId,
+                          hoverNodeId: _hoverNodeId,
+                          reachableNodeIds: widget.reachableNodeIds.isEmpty
+                              ? visibleNodes.take(4).map((n) => n.id).toSet()
+                              : widget.reachableNodeIds,
+                          completedNodeIds: widget.completedNodeIds,
+                          pulse: _pulse.value,
+                          textStyle: Theme.of(context).textTheme.labelSmall ?? const TextStyle(fontSize: 11),
+                          showDebugOverlay: widget.showDebugOverlay,
+                        ),
+                        child: const SizedBox.expand(),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: MouseRegion(
+                  onHover: (event) {
+                    final id = _hoveredNodeAt(event.localPosition, size, snapshot);
+                    if (id != _hoverNodeId) {
+                      setState(() => _hoverNodeId = id);
+                    }
+                  },
+                  onExit: (_) => setState(() => _hoverNodeId = null),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapUp: (details) => _onTap(details.localPosition, size, snapshot),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 10,
+                top: 10,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.36),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: Colors.white.withOpacity(0.16)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    child: Text(
+                      hasLiveNodes ? 'Live tactical region' : 'Demo frontier fallback',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
+    );
+  }
+
+  Widget _buildBaseMap() {
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
+        initialZoom: widget.viewport.zoom,
+        minZoom: 3.5,
+        maxZoom: 17,
+        interactionOptions: const InteractionOptions(
+          flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
+        ),
+        onPositionChanged: (position, hasGesture) {
+          final center = position.center;
+          final zoom = position.zoom;
+          if (center == null || zoom == null) return;
+          widget.onViewportChanged(
+            MapViewport(centerLat: center.latitude, centerLng: center.longitude, zoom: zoom),
+            hasGesture: hasGesture,
+          );
+        },
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.perbug.app',
+          maxZoom: 19,
+          backgroundColor: const Color(0xFF0D1B2A),
+        ),
+      ],
     );
   }
 
@@ -179,7 +221,7 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
       }
     }
 
-    return closestDistance <= 26 ? closest : null;
+    return closestDistance <= 28 ? closest : null;
   }
 
   List<PerbugNode> _demoNodes(MapViewport viewport) {
@@ -234,6 +276,7 @@ class _PerbugWorldPainter extends CustomPainter {
     required this.completedNodeIds,
     required this.textStyle,
     required this.pulse,
+    required this.showDebugOverlay,
   });
 
   final MapViewport viewport;
@@ -245,66 +288,34 @@ class _PerbugWorldPainter extends CustomPainter {
   final Set<String> completedNodeIds;
   final TextStyle textStyle;
   final double pulse;
+  final bool showDebugOverlay;
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    _paintBackdrop(canvas, rect);
-    _paintTerrain(canvas, size);
+    _paintBackdropTint(canvas, rect);
     _paintFog(canvas, rect);
-    _paintGrid(canvas, size);
     _paintConnections(canvas, size);
     _paintSelectedPath(canvas, size);
     _paintNodes(canvas, size);
     _paintPlayerPresence(canvas, size);
+    if (showDebugOverlay) {
+      _paintDebugLayer(canvas, size);
+    }
   }
 
-  void _paintBackdrop(Canvas canvas, Rect rect) {
+  void _paintBackdropTint(Canvas canvas, Rect rect) {
     final palette = snapshot.regionTheme.palette.map((value) => Color(value)).toList(growable: false);
-    final gradient = LinearGradient(
+    final tint = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [palette[0], palette[1], palette[2]],
-    );
-    canvas.drawRect(rect, Paint()..shader = gradient.createShader(rect));
-    final shimmer = LinearGradient(
-      begin: const Alignment(-0.8, -1),
-      end: const Alignment(0.8, 1),
       colors: [
-        Colors.transparent,
-        Colors.white.withOpacity(0.035 + (0.025 * math.sin(pulse * math.pi * 2))),
-        Colors.transparent,
+        palette.first.withOpacity(0.18),
+        palette[1].withOpacity(0.12),
+        Colors.black.withOpacity(0.18),
       ],
-      stops: const [0, 0.5, 1],
     );
-    canvas.drawRect(rect, Paint()..shader = shimmer.createShader(rect));
-  }
-
-  void _paintTerrain(Canvas canvas, Size size) {
-    final palette = snapshot.regionTheme.palette.map((value) => Color(value)).toList(growable: false);
-    for (var i = 0; i < snapshot.terrainBands.length; i++) {
-      final band = snapshot.terrainBands[i];
-      final path = Path();
-      for (var x = 0; x <= size.width; x += 8) {
-        final nx = x / size.width;
-        final wave = math.sin((nx * math.pi * 2 * (1.2 + i * 0.5)) + band.seed + (pulse * 0.7)) * band.wave;
-        final y = size.height * (0.25 + i * 0.18 + band.latitudeBias + wave).clamp(0.0, 1.0);
-        if (x == 0) {
-          path.moveTo(x.toDouble(), y);
-        } else {
-          path.lineTo(x.toDouble(), y);
-        }
-      }
-      path.lineTo(size.width, size.height);
-      path.lineTo(0, size.height);
-      path.close();
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.fill
-          ..color = Color.lerp(palette[1], palette.last, i / snapshot.terrainBands.length)!.withOpacity(0.24),
-      );
-    }
+    canvas.drawRect(rect, Paint()..shader = tint.createShader(rect));
   }
 
   void _paintFog(Canvas canvas, Rect rect) {
@@ -315,25 +326,11 @@ class _PerbugWorldPainter extends CustomPainter {
       radius: 1.1,
       colors: [
         Colors.transparent,
-        Colors.black.withOpacity((0.18 + fog * 0.4).clamp(0, 0.5)),
+        Colors.black.withOpacity((0.1 + fog * 0.2).clamp(0, 0.35)),
       ],
       stops: const [0.58, 1],
     ).createShader(rect);
     canvas.drawRect(rect, Paint()..shader = shader);
-  }
-
-  void _paintGrid(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
-      ..strokeWidth = 1;
-    for (var i = 0; i <= 8; i++) {
-      final y = size.height * i / 8;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-    for (var i = 0; i <= 10; i++) {
-      final x = size.width * i / 10;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
   }
 
   void _paintConnections(Canvas canvas, Size size) {
@@ -345,8 +342,8 @@ class _PerbugWorldPainter extends CustomPainter {
       final toPx = Offset(to.x * size.width, to.y * size.height);
       final reachable = reachableNodeIds.contains(edge.from.id) || reachableNodeIds.contains(edge.to.id);
       final paint = Paint()
-        ..color = reachable ? const Color(0xFF7CE0C8).withOpacity(0.75) : Colors.white.withOpacity(0.25)
-        ..strokeWidth = reachable ? 2.4 : 1.4;
+        ..color = reachable ? const Color(0xFF7CE0C8).withOpacity(0.8) : Colors.white.withOpacity(0.28)
+        ..strokeWidth = reachable ? 2.8 : 1.6;
       canvas.drawLine(fromPx, toPx, paint);
     }
   }
@@ -372,7 +369,7 @@ class _PerbugWorldPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3
-        ..color = const Color(0xFFF6C85F).withOpacity(0.86),
+        ..color = const Color(0xFFF6C85F).withOpacity(0.9),
     );
   }
 
@@ -401,7 +398,7 @@ class _PerbugWorldPainter extends CustomPainter {
       canvas.drawCircle(
         center,
         (selected ? 16 : 12) * pulseScale,
-        Paint()..color = visual.color.withOpacity(selected || hovered ? 0.95 : 0.68),
+        Paint()..color = visual.color.withOpacity(selected || hovered ? 0.95 : 0.72),
       );
       canvas.drawCircle(
         center,
@@ -411,7 +408,7 @@ class _PerbugWorldPainter extends CustomPainter {
           ..strokeWidth = current ? 3 : (hovered ? 2.4 : 1.6)
           ..color = current
               ? const Color(0xFFFFD166)
-              : (reachable ? Colors.white.withOpacity(0.92) : Colors.white.withOpacity(0.35)),
+              : (reachable ? Colors.white.withOpacity(0.95) : Colors.white.withOpacity(0.38)),
       );
 
       if (completed) {
@@ -427,7 +424,7 @@ class _PerbugWorldPainter extends CustomPainter {
         text: TextSpan(
           text: '${node.label}\n$semantic',
           style: textStyle.copyWith(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.white.withOpacity(0.92),
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
@@ -453,7 +450,7 @@ class _PerbugWorldPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4
-        ..color = const Color(0xFF9DE4D9).withOpacity(0.45),
+        ..color = const Color(0xFF9DE4D9).withOpacity(0.48),
     );
 
     canvas.drawCircle(
@@ -469,6 +466,33 @@ class _PerbugWorldPainter extends CustomPainter {
         ..strokeWidth = 2.2
         ..color = const Color(0xFFFFD166),
     );
+  }
+
+  void _paintDebugLayer(Canvas canvas, Size size) {
+    final projection = PerbugGeoProjection(viewport);
+    for (final node in snapshot.visibleNodes) {
+      final projected = projection.project(PerbugGeoPoint(lat: node.latitude, lng: node.longitude));
+      final center = Offset(projected.x * size.width, projected.y * size.height);
+      canvas.drawCircle(
+        center,
+        28,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.8
+          ..color = Colors.white.withOpacity(0.35),
+      );
+    }
+
+    final debugText = TextPainter(
+      text: TextSpan(
+        text: 'center ${viewport.centerLat.toStringAsFixed(4)}, ${viewport.centerLng.toStringAsFixed(4)}\n'
+            'zoom ${viewport.zoom.toStringAsFixed(2)} • nodes ${snapshot.visibleNodes.length}',
+        style: textStyle.copyWith(color: Colors.white.withOpacity(0.86), fontSize: 10),
+      ),
+      textDirection: TextDirection.ltr,
+      maxLines: 2,
+    )..layout(maxWidth: size.width - 16);
+    debugText.paint(canvas, const Offset(8, 8));
   }
 
   PerbugNode? _findNode(String id) {
@@ -489,6 +513,7 @@ class _PerbugWorldPainter extends CustomPainter {
         oldDelegate.hoverNodeId != hoverNodeId ||
         oldDelegate.reachableNodeIds != reachableNodeIds ||
         oldDelegate.completedNodeIds != completedNodeIds ||
+        oldDelegate.showDebugOverlay != showDebugOverlay ||
         oldDelegate.pulse != pulse;
   }
 }
