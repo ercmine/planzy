@@ -6,6 +6,9 @@ import '../../app/theme/spacing.dart';
 import '../../app/theme/widgets.dart';
 import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
+import '../../core/location/location_permission_service.dart';
+import '../../core/widgets/section_card.dart';
+import '../../providers/app_providers.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
