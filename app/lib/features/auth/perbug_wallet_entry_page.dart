@@ -313,7 +313,24 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
           Positioned(
             left: 18,
             right: 18,
-            bottom: 14 + media.padding.bottom,
+            bottom: 74 + media.padding.bottom,
+            child: _EntryActionRail(
+              disabled: _restoring || _connecting || _startingDemo,
+              onConnectWallet: () => _runButtonAction(
+                buttonId: _connectWalletRegion.id,
+                action: () => _connectWallet(),
+              ),
+              onLearnMore: () => _runButtonAction(
+                buttonId: _learnMoreRegion.id,
+                action: () => _openLearnMore(),
+              ),
+              onUseMyLocation: _enterDemoMode,
+            ),
+          ),
+          Positioned(
+            left: 18,
+            right: 18,
+            bottom: 12 + media.padding.bottom,
             child: _DemoModeBar(
               disabled: _restoring || _connecting || _startingDemo,
               walletUnavailable: !_walletAvailable,
@@ -483,6 +500,56 @@ class _DemoModeBar extends StatelessWidget {
             TextButton(
               onPressed: disabled ? null : onPlayDemo,
               child: const Text('Play Demo'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EntryActionRail extends StatelessWidget {
+  const _EntryActionRail({
+    required this.disabled,
+    required this.onConnectWallet,
+    required this.onLearnMore,
+    required this.onUseMyLocation,
+  });
+
+  final bool disabled;
+  final VoidCallback onConnectWallet;
+  final VoidCallback onLearnMore;
+  final VoidCallback onUseMyLocation;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0x9311091A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0x63BCA8FF)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.center,
+          children: [
+            FilledButton.icon(
+              onPressed: disabled ? null : onConnectWallet,
+              icon: const Icon(Icons.account_balance_wallet_outlined),
+              label: const Text('Connect Wallet'),
+            ),
+            OutlinedButton.icon(
+              onPressed: disabled ? null : onLearnMore,
+              icon: const Icon(Icons.auto_stories_outlined),
+              label: const Text('Learn More'),
+            ),
+            TextButton.icon(
+              onPressed: disabled ? null : onUseMyLocation,
+              icon: const Icon(Icons.my_location_outlined),
+              label: const Text('Use My Location'),
             ),
           ],
         ),
