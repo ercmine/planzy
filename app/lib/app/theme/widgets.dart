@@ -1,11 +1,100 @@
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../assets.dart';
 import 'color_scheme.dart';
 import 'rpg_bar.dart';
 import 'spacing.dart';
 import 'tokens.dart';
+
+enum PerbugBackgroundStyle {
+  standard,
+  strongerScrim,
+}
+
+class PerbugPageBackground extends StatelessWidget {
+  const PerbugPageBackground({
+    required this.child,
+    this.enabled = true,
+    this.style = PerbugBackgroundStyle.standard,
+    this.imagePath = AppAssets.perbugAmbientBackdrop,
+    this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
+    this.blurSigma = 0,
+    super.key,
+  });
+
+  final Widget child;
+  final bool enabled;
+  final PerbugBackgroundStyle style;
+  final String imagePath;
+  final BoxFit fit;
+  final Alignment alignment;
+  final double blurSigma;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+
+    final scrimAlpha = switch (style) {
+      PerbugBackgroundStyle.standard => 0.42,
+      PerbugBackgroundStyle.strongerScrim => 0.56,
+    };
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          child: Image.asset(
+            imagePath,
+            fit: fit,
+            alignment: alignment,
+            filterQuality: FilterQuality.medium,
+          ),
+        ),
+        if (blurSigma > 0)
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(scrimAlpha + 0.08),
+                  Colors.black.withOpacity(scrimAlpha),
+                  Colors.black.withOpacity(scrimAlpha + 0.1),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0, -0.1),
+                radius: 1.05,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.28),
+                ],
+              ),
+            ),
+          ),
+        ),
+        child,
+      ],
+    );
+  }
+}
 
 class PrimaryButton extends StatelessWidget {
   const PrimaryButton({
@@ -244,6 +333,12 @@ class AppScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.bottomNavigationBar,
     this.padding = const EdgeInsets.all(AppSpacing.m),
+    this.useDefaultBackground = true,
+    this.backgroundStyle = PerbugBackgroundStyle.standard,
+    this.backgroundImagePath = AppAssets.perbugAmbientBackdrop,
+    this.backgroundFit = BoxFit.cover,
+    this.backgroundAlignment = Alignment.center,
+    this.backgroundBlurSigma = 0,
     super.key,
   });
 
@@ -252,6 +347,12 @@ class AppScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
   final Widget? bottomNavigationBar;
   final EdgeInsetsGeometry padding;
+  final bool useDefaultBackground;
+  final PerbugBackgroundStyle backgroundStyle;
+  final String backgroundImagePath;
+  final BoxFit backgroundFit;
+  final Alignment backgroundAlignment;
+  final double backgroundBlurSigma;
 
   @override
   Widget build(BuildContext context) {
@@ -261,42 +362,50 @@ class AppScaffold extends StatelessWidget {
       appBar: appBar,
       floatingActionButton: floatingActionButton,
       bottomNavigationBar: bottomNavigationBar,
-      body: DecoratedBox(
-        decoration: _appScaffoldDecoration(scheme),
-        child: Stack(
-          children: [
-            Positioned(
-              top: -56,
-              right: -72,
-              left: 80,
-              child: _SurfaceAccent(
-                alignment: Alignment.topRight,
-                color: scheme.primary.withOpacity(0.05),
-              ),
-            ),
-            Positioned(
-              bottom: -72,
-              left: -48,
-              right: 120,
-              child: _SurfaceAccent(
-                alignment: Alignment.bottomLeft,
-                color: scheme.surfaceContainerHighest.withOpacity(0.30),
-              ),
-            ),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: scheme.surface.withOpacity(0.16),
+      body: PerbugPageBackground(
+        enabled: useDefaultBackground,
+        style: backgroundStyle,
+        imagePath: backgroundImagePath,
+        fit: backgroundFit,
+        alignment: backgroundAlignment,
+        blurSigma: backgroundBlurSigma,
+        child: DecoratedBox(
+          decoration: _appScaffoldDecoration(scheme),
+          child: Stack(
+            children: [
+              Positioned(
+                top: -56,
+                right: -72,
+                left: 80,
+                child: _SurfaceAccent(
+                  alignment: Alignment.topRight,
+                  color: scheme.primary.withOpacity(0.05),
                 ),
               ),
-            ),
-            SafeArea(
-              child: Padding(
-                padding: padding,
-                child: body,
+              Positioned(
+                bottom: -72,
+                left: -48,
+                right: 120,
+                child: _SurfaceAccent(
+                  alignment: Alignment.bottomLeft,
+                  color: scheme.surfaceContainerHighest.withOpacity(0.30),
+                ),
               ),
-            ),
-          ],
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.surface.withOpacity(0.16),
+                  ),
+                ),
+              ),
+              SafeArea(
+                child: Padding(
+                  padding: padding,
+                  child: body,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

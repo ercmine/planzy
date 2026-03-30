@@ -13,7 +13,7 @@ class ViewerRewardsDashboardPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(viewerRewardSummaryProvider);
     final history = ref.watch(viewerRewardHistoryProvider);
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('Viewer earnings')),
       body: RefreshIndicator(
         onRefresh: () async {

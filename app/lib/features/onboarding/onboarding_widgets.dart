@@ -18,10 +18,12 @@ class OnboardingScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(color: scheme.surface),
-        child: Stack(
-          children: [
+      body: PerbugPageBackground(
+        style: PerbugBackgroundStyle.strongerScrim,
+        child: DecoratedBox(
+          decoration: BoxDecoration(color: scheme.surface.withOpacity(0.3)),
+          child: Stack(
+            children: [
             Positioned(
               top: 0,
               left: 0,
@@ -79,7 +81,8 @@ class OnboardingScaffold extends StatelessWidget {
                 ),
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
