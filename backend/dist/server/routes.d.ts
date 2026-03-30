@@ -47,6 +47,9 @@ import type { SponsoredLocationsService } from "../sponsoredLocations/service.js
 import type { DryadEconomyService } from "../perbugEconomy/service.js";
 import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
 import type { DryadMarketplaceService } from "../dryad/service.js";
+import type { createPerbugWorldHttpHandlers } from "../perbugWorld/http.js";
+import type { PerbugMarketplaceService } from "../perbugMarketplace/service.js";
+import type { WalletAuthService } from "../walletAuth/service.js";
 export declare function createRoutes(service: VenueClaimsService, merchantService: MerchantService, deps?: {
     deckHandler?: SessionDeckHandler;
     ideasHandlers?: SessionIdeasHandlers;
@@ -97,4 +100,7 @@ export declare function createRoutes(service: VenueClaimsService, merchantServic
     viewerEngagementRewardsService?: ViewerEngagementRewardsService;
     dryadMarketplaceService?: DryadMarketplaceService;
     reviewEligibilityService?: ReviewEligibilityService;
+    perbugWorldHandlers?: ReturnType<typeof createPerbugWorldHttpHandlers>;
+    perbugMarketplaceService?: PerbugMarketplaceService;
+    walletAuthService?: WalletAuthService;
 }): (req: IncomingMessage, res: ServerResponse) => Promise<void>;

@@ -58,6 +58,9 @@ import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../spon
 import { MemoryDryadEconomyStore, DryadEconomyService } from "../perbugEconomy/index.js";
 import { MemoryViewerEngagementStore, ViewerEngagementRewardsService } from "../viewerEngagementRewards/index.js";
 import { DryadMarketplaceService } from "../dryad/service.js";
+import { MemoryWalletAuthStore, WalletAuthService } from "../walletAuth/index.js";
+import { createPerbugWorldHttpHandlers, MemoryPerbugWorldStore, PerbugWorldService } from "../perbugWorld/index.js";
+import { PerbugMarketplaceService, seedMarketplaceListings } from "../perbugMarketplace/index.js";
 import { createHttpServer } from "./httpServer.js";
 function createDefaultDeckRouter(sharedIdeasStore) {
     return new ProviderRouter({
@@ -270,7 +273,11 @@ export function createServer(options) {
         { spotId: "spot-101", placeId: "spot-101", label: "Golden Path Grove, SF", lat: 37.7714, lng: -122.4032, claimState: "unclaimed" },
         { spotId: "spot-102", placeId: "spot-102", label: "South Congress Bloomfield, Austin", lat: 30.248, lng: -97.752, claimState: "unclaimed" },
     ]);
+    const walletAuthService = new WalletAuthService(new MemoryWalletAuthStore(), accountsService);
     const dryadEconomyService = new DryadEconomyService(new MemoryDryadEconomyStore());
+    const perbugWorldService = new PerbugWorldService(new MemoryPerbugWorldStore());
+    const perbugMarketplaceService = new PerbugMarketplaceService(seedMarketplaceListings());
+    const perbugWorldHandlers = createPerbugWorldHttpHandlers(perbugWorldService);
     const viewerEngagementRewardsService = new ViewerEngagementRewardsService(new MemoryViewerEngagementStore(), {
         getVideoContext: (videoId) => ({ creatorId: `creator_${videoId}`, placeId: `place_${videoId}` }),
         analytics: analyticsService
@@ -344,12 +351,24 @@ export function createServer(options) {
         sponsoredLocationsService,
         dryadEconomyService,
         viewerEngagementRewardsService,
-        dryadMarketplaceService
+        dryadMarketplaceService,
+        walletAuthService,
+        perbugWorldHandlers,
+        perbugMarketplaceService
     });
 }
 export function main() {
-    const server = createServer();
     const port = Number(process.env.PORT ?? 8080);
+    console.info("[api.startup]", {
+        port,
+        nodeEnv: process.env.NODE_ENV ?? "dev",
+        appEnv: process.env.APP_ENV ?? null,
+        geoMode: process.env.GEO_MODE ?? null,
+        geoServiceEnabled: process.env.GEO_SERVICE_ENABLED ?? null,
+        geoServiceBaseUrl: process.env.GEO_SERVICE_BASE_URL ?? null,
+        nominatimBaseUrl: process.env.NOMINATIM_BASE_URL ?? null
+    });
+    const server = createServer();
     server.listen(port, () => {
         console.log(`Server listening on :${port}`);
     });

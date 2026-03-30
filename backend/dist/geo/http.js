@@ -300,7 +300,7 @@ export function createGeoHttpHandlers(gateway, options = {}) {
         return true;
     };
     const status = () => options.getStatus?.() ?? {
-        mode: gateway ? "remote" : "disabled",
+        mode: gateway ? "custom" : "disabled",
         routesMounted: true,
         envValidationErrors: gateway ? [] : ["geo gateway unavailable"],
         envValidationWarnings: []

@@ -82,7 +82,7 @@ describe("geo route alias routing", () => {
       geoGateway: createGeoGatewayStub(),
       geoStatus: {
         gateway: null,
-        mode: "remote",
+        mode: "custom",
         routesMounted: true,
         upstreamBaseUrl: "https://geo.example.test",
         validationErrors: [],
@@ -154,6 +154,22 @@ describe("geo route alias routing", () => {
     });
   });
 
+  it("keeps /health green and reports geo dependency details", async () => {
+    const response = await fetch(`${baseUrl}/health`);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      dependencies: {
+        geo: {
+          mode: "custom",
+          healthy: true,
+          degraded: false,
+          required: false
+        }
+      }
+    });
+  });
+
   it("keeps normalization and geo matching consistent across aliases", async () => {
     const variants = ["/api/geo/search?q=Berlin", "/geo/search?q=Berlin"];
     for (const path of variants) {
@@ -163,5 +179,47 @@ describe("geo route alias routing", () => {
         results: expect.arrayContaining([expect.objectContaining({ displayName: "Berlin, Germany" })])
       });
     }
+  });
+
+  it("keeps /health=200 when nominatim mode is configured but unavailable", async () => {
+    const claimsService = new VenueClaimsService(new MemoryVenueClaimStore());
+    const merchantService = new MerchantService(new MemoryMerchantStore());
+    const degradedServer = createHttpServer(claimsService, merchantService, {
+      geoStatus: {
+        gateway: null,
+        mode: "nominatim",
+        routesMounted: true,
+        upstreamBaseUrl: "https://geo.perbug.com",
+        validationErrors: ["NOMINATIM_BASE_URL is required when GEO_MODE=nominatim."],
+        validationWarnings: []
+      }
+    });
+
+    await new Promise<void>((resolve) => degradedServer.listen(0, "127.0.0.1", () => resolve()));
+    const address = degradedServer.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Server failed to bind for degraded health test");
+    }
+    const response = await fetch(`http://127.0.0.1:${address.port}/health`);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      dependencies: {
+        geo: {
+          mode: "nominatim",
+          healthy: false,
+          degraded: true
+        }
+      }
+    });
+    await new Promise<void>((resolve, reject) => {
+      degradedServer.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
   });
 });

@@ -22,7 +22,7 @@ export interface GeoRuntimeConfig {
 }
 
 export interface GeoRuntimeValidation {
-  mode: "remote" | "local" | "disabled";
+  mode: "custom" | "nominatim" | "disabled";
   shouldFailFast: boolean;
   errors: string[];
   warnings: string[];
@@ -69,11 +69,20 @@ export function validateGeoRuntimeConfig(config: GeoRuntimeConfig, env: NodeJS.P
   const errors: string[] = [];
   const warnings: string[] = [];
   const isProd = isProdEnv(env);
+  const explicitGeoMode = String(env.GEO_MODE ?? "").trim().toLowerCase();
+  const geoMode = explicitGeoMode === "custom" || explicitGeoMode === "nominatim" || explicitGeoMode === "disabled"
+    ? explicitGeoMode
+    : undefined;
 
-  const hasExplicitRemoteBaseUrl = typeof env.GEO_SERVICE_BASE_URL === "string" && env.GEO_SERVICE_BASE_URL.trim().length > 0;
-  const remoteRequested = config.client.enabled || hasExplicitRemoteBaseUrl;
+  if (explicitGeoMode && !geoMode) {
+    warnings.push(`Unknown GEO_MODE="${env.GEO_MODE}". Falling back to legacy GEO_SERVICE_ENABLED/NOMINATIM_BASE_URL detection.`);
+  }
 
-  if (remoteRequested) {
+  const customRequested = geoMode
+    ? geoMode === "custom"
+    : config.client.enabled;
+
+  if (customRequested) {
     const parsed = URL.canParse(config.client.baseUrl) ? new URL(config.client.baseUrl) : null;
     if (!parsed) {
       errors.push("GEO_SERVICE_BASE_URL is invalid.");
@@ -84,27 +93,36 @@ export function validateGeoRuntimeConfig(config: GeoRuntimeConfig, env: NodeJS.P
       warnings.push("GEO_SERVICE_ENABLED=true but GEO_SERVICE_AUTH_SECRET is not set.");
     }
     return {
-      mode: "remote",
+      mode: "custom",
       shouldFailFast: isProd && (errors.length > 0 || parseBool(env.GEO_REQUIRED, true)),
       errors,
       warnings
     };
   }
 
-  if (config.local.nominatimBaseUrl) {
-    const parsed = URL.canParse(config.local.nominatimBaseUrl) ? new URL(config.local.nominatimBaseUrl) : null;
-    if (!parsed) {
+  const nominatimRequested = geoMode
+    ? geoMode === "nominatim"
+    : Boolean(config.local.nominatimBaseUrl);
+
+  if (nominatimRequested) {
+    if (!config.local.nominatimBaseUrl) {
+      errors.push("NOMINATIM_BASE_URL is required when GEO_MODE=nominatim.");
+    }
+    const parsed = config.local.nominatimBaseUrl && URL.canParse(config.local.nominatimBaseUrl)
+      ? new URL(config.local.nominatimBaseUrl)
+      : null;
+    if (config.local.nominatimBaseUrl && !parsed) {
       errors.push("NOMINATIM_BASE_URL is invalid.");
     }
     return {
-      mode: "local",
+      mode: "nominatim",
       shouldFailFast: isProd && errors.length > 0,
       errors,
       warnings
     };
   }
 
-  errors.push("Geo is disabled because neither GEO_SERVICE_BASE_URL/GEO_SERVICE_ENABLED nor NOMINATIM_BASE_URL is configured.");
+  errors.push("Geo is disabled because neither GEO_MODE, GEO_SERVICE_ENABLED=true, nor NOMINATIM_BASE_URL is configured.");
   return {
     mode: "disabled",
     shouldFailFast: isProd && parseBool(env.GEO_REQUIRED, true),
