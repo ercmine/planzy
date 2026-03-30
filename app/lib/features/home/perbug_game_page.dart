@@ -24,7 +24,12 @@ import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
 
 class PerbugGamePage extends ConsumerStatefulWidget {
-  const PerbugGamePage({super.key});
+  const PerbugGamePage({
+    super.key,
+    this.showTacticalHud = true,
+  });
+
+  final bool showTacticalHud;
 
   @override
   ConsumerState<PerbugGamePage> createState() => _PerbugGamePageState();
@@ -130,49 +135,50 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             ),
           ),
           const SizedBox(height: 12),
-          AppCard(
-            tone: AppCardTone.kpi,
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
+          if (widget.showTacticalHud)
+            AppCard(
+              tone: AppCardTone.kpi,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                SizedBox(
-                  width: 176,
-                  child: RpgBarButton(label: 'Node details', onPressed: () => context.go(AppRoutes.nodeDetails), icon: const Icon(Icons.place_outlined), height: 50),
-                ),
-                SizedBox(
-                  width: 176,
-                  child: RpgBarButton(label: 'Enter Encounter', onPressed: () => context.go(AppRoutes.encounter), icon: const Icon(Icons.sports_martial_arts), height: 50),
-                ),
-                SizedBox(
-                  width: 176,
-                  child: RpgBarButton(label: 'View Squad', onPressed: () => context.go(AppRoutes.squad), icon: const Icon(Icons.groups_2_outlined), height: 50),
-                ),
-                SizedBox(
-                  width: 176,
-                  child: RpgBarButton(label: 'Inventory', onPressed: () => context.go(AppRoutes.inventory), icon: const Icon(Icons.inventory_2_outlined), height: 50),
-                ),
-                SizedBox(
-                  width: 176,
-                  child: RpgBarButton(label: 'Open Marketplace', onPressed: () => context.go(AppRoutes.marketplace), icon: const Icon(Icons.storefront_outlined), height: 50),
-                ),
-                SizedBox(
-                  width: 176,
-                  child: RpgBarButton(label: 'Objectives', onPressed: () => context.go(AppRoutes.progression), icon: const Icon(Icons.flag_outlined), height: 50),
-                ),
-                SizedBox(
-                  width: 176,
-                  child: RpgBarButton(
-                    label: 'Wallet/Login',
-                    onPressed: () => context.go(AppRoutes.wallet),
-                    icon: const Icon(Icons.account_balance_wallet_outlined),
-                    variant: RpgButtonVariant.secondary,
-                    height: 50,
+                  SizedBox(
+                    width: 176,
+                    child: RpgBarButton(label: 'Node details', onPressed: () => context.go(AppRoutes.nodeDetails), icon: const Icon(Icons.place_outlined), height: 50),
                   ),
-                ),
-              ],
+                  SizedBox(
+                    width: 176,
+                    child: RpgBarButton(label: 'Enter Encounter', onPressed: () => context.go(AppRoutes.encounter), icon: const Icon(Icons.sports_martial_arts), height: 50),
+                  ),
+                  SizedBox(
+                    width: 176,
+                    child: RpgBarButton(label: 'View Squad', onPressed: () => context.go(AppRoutes.squad), icon: const Icon(Icons.groups_2_outlined), height: 50),
+                  ),
+                  SizedBox(
+                    width: 176,
+                    child: RpgBarButton(label: 'Inventory', onPressed: () => context.go(AppRoutes.inventory), icon: const Icon(Icons.inventory_2_outlined), height: 50),
+                  ),
+                  SizedBox(
+                    width: 176,
+                    child: RpgBarButton(label: 'Open Marketplace', onPressed: () => context.go(AppRoutes.marketplace), icon: const Icon(Icons.storefront_outlined), height: 50),
+                  ),
+                  SizedBox(
+                    width: 176,
+                    child: RpgBarButton(label: 'Objectives', onPressed: () => context.go(AppRoutes.progression), icon: const Icon(Icons.flag_outlined), height: 50),
+                  ),
+                  SizedBox(
+                    width: 176,
+                    child: RpgBarButton(
+                      label: 'Wallet/Login',
+                      onPressed: () => context.go(AppRoutes.wallet),
+                      icon: const Icon(Icons.account_balance_wallet_outlined),
+                      variant: RpgButtonVariant.secondary,
+                      height: 50,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
           if (!onboarding.hasCompleted && onboarding.step != OnboardingStep.identityIntro) ...[
             _OnboardingCoachCard(
               state: onboarding,

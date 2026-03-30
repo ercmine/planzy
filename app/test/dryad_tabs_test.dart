@@ -60,6 +60,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Buy from anywhere'), findsOneWidget);
   });
+
+  testWidgets('tactical HUD toggle hides and restores RPG controls', (tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(home: HomePage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Node details'), findsOneWidget);
+    expect(find.byTooltip('Hide tactical HUD'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Hide tactical HUD'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Node details'), findsNothing);
+    expect(find.text('Tactical RPG HUD: Off'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Show tactical HUD'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Node details'), findsOneWidget);
+    expect(find.text('Tactical RPG HUD: On'), findsOneWidget);
+  });
 }
 
 extension on DryadTree {
