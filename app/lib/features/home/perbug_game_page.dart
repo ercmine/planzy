@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/rpg_bar.dart';
 import '../../app/theme/widgets.dart';
 import '../../app/app_routes.dart';
+import '../../core/location/location_controller.dart';
+import '../../core/location/location_models.dart';
 import '../../core/navigation/navigation_utils.dart';
 import '../../providers/app_providers.dart';
 import '../onboarding/onboarding_controller.dart';
@@ -49,6 +52,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(perbugGameControllerProvider);
+    final locationState = ref.watch(locationControllerProvider);
     final controller = ref.read(perbugGameControllerProvider.notifier);
     final onboarding = ref.watch(onboardingControllerProvider);
     final onboardingController = ref.read(onboardingControllerProvider.notifier);
@@ -232,6 +236,26 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                             icon: Icons.bolt_rounded,
                           ),
                         ),
+                        if (_mapUiState(state: state, locationState: locationState) != _MapUiState.ready)
+                          Positioned.fill(
+                            child: _MapStatusOverlay(
+                              state: _mapUiState(state: state, locationState: locationState),
+                              locationState: locationState,
+                              details: state.error ?? state.worldDebug['fallback_reason']?.toString(),
+                              onRequestLocation: () => controller.requestLocationAndRefresh(),
+                              onContinueDemo: () => controller.initialize(),
+                            ),
+                          ),
+                        if (kDebugMode)
+                          Positioned(
+                            right: 8,
+                            bottom: 8,
+                            child: _DebugMapOverlay(
+                              gameState: state,
+                              locationState: locationState,
+                              viewport: _mapViewport,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -685,6 +709,24 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     );
   }
 
+  _MapUiState _mapUiState({
+    required PerbugGameState state,
+    required LocationControllerState locationState,
+  }) {
+    if (state.loading) {
+      final requesting = state.worldDebug['requesting_location'] == true;
+      return requesting ? _MapUiState.requestingLocation : _MapUiState.loading;
+    }
+    if (locationState.status == LocationStatus.permissionDenied) return _MapUiState.permissionDenied;
+    if (locationState.status == LocationStatus.serviceDisabled) return _MapUiState.unsupported;
+    if (state.nodes.isEmpty) return _MapUiState.empty;
+    if (state.worldDebug['generation_status'] == 'fallback' || state.worldDebug['fallback_active'] == true) {
+      return _MapUiState.demoMode;
+    }
+    if (state.error != null && state.nodes.isNotEmpty) return _MapUiState.generationFailed;
+    return _MapUiState.ready;
+  }
+
   Future<void> _openPuzzleSheet(BuildContext context) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -756,6 +798,149 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     return null;
   }
 
+}
+
+enum _MapUiState {
+  loading,
+  requestingLocation,
+  permissionDenied,
+  unsupported,
+  demoMode,
+  generationFailed,
+  empty,
+  ready,
+}
+
+class _MapStatusOverlay extends StatelessWidget {
+  const _MapStatusOverlay({
+    required this.state,
+    required this.locationState,
+    required this.onRequestLocation,
+    required this.onContinueDemo,
+    this.details,
+  });
+
+  final _MapUiState state;
+  final LocationControllerState locationState;
+  final VoidCallback onRequestLocation;
+  final VoidCallback onContinueDemo;
+  final String? details;
+
+  @override
+  Widget build(BuildContext context) {
+    String title;
+    String subtitle;
+    switch (state) {
+      case _MapUiState.requestingLocation:
+        title = 'Requesting location';
+        subtitle = 'Waiting for browser/device location permission.';
+      case _MapUiState.permissionDenied:
+        title = 'Location denied';
+        subtitle = locationState.errorMessage ?? 'Location access was denied. You can continue in demo mode.';
+      case _MapUiState.unsupported:
+        title = 'Location unavailable';
+        subtitle = 'Location services are disabled or unsupported. Demo map is active.';
+      case _MapUiState.demoMode:
+        title = 'Demo map active';
+        subtitle = 'Using deterministic fallback world so gameplay remains available.';
+      case _MapUiState.generationFailed:
+        title = 'Live generation failed';
+        subtitle = 'Using fallback frontier so the map loop continues.';
+      case _MapUiState.empty:
+        title = 'No world nodes yet';
+        subtitle = 'Retry with location or continue in demo mode.';
+      case _MapUiState.loading:
+        title = 'Loading frontier';
+        subtitle = 'Building world nodes…';
+      case _MapUiState.ready:
+        return const SizedBox.shrink();
+    }
+
+    return ColoredBox(
+      color: Colors.black.withOpacity(0.35),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  Text(subtitle),
+                  if (details != null && details!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(details!, style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: onRequestLocation,
+                        icon: const Icon(Icons.my_location),
+                        label: const Text('Use My Location'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: onContinueDemo,
+                        icon: const Icon(Icons.smart_toy_outlined),
+                        label: const Text('Continue Demo Mode'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DebugMapOverlay extends StatelessWidget {
+  const _DebugMapOverlay({
+    required this.gameState,
+    required this.locationState,
+    required this.viewport,
+  });
+
+  final PerbugGameState gameState;
+  final LocationControllerState locationState;
+  final MapViewport viewport;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white) ?? const TextStyle(color: Colors.white, fontSize: 11);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.62),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: DefaultTextStyle(
+          style: style,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('mode=${gameState.worldDebug['location_mode'] ?? 'unknown'}'),
+              Text('perm=${locationState.status.name}'),
+              Text('nodes=${gameState.nodes.length} edges=${gameState.connections.length}'),
+              Text('center=${viewport.centerLat.toStringAsFixed(4)},${viewport.centerLng.toStringAsFixed(4)} z=${viewport.zoom.toStringAsFixed(1)}'),
+              Text('gen=${gameState.worldDebug['generation_status'] ?? 'n/a'}'),
+              if (gameState.worldDebug['seed'] != null) Text('seed=${gameState.worldDebug['seed']}'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _OnboardingCoachCard extends StatelessWidget {

@@ -49,7 +49,15 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> {
     return RepaintBoundary(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, constraints.maxHeight);
+          final width = constraints.hasBoundedWidth && constraints.maxWidth.isFinite
+              ? constraints.maxWidth
+              : MediaQuery.sizeOf(context).width;
+          final height = constraints.hasBoundedHeight && constraints.maxHeight.isFinite
+              ? constraints.maxHeight
+              : 320.0;
+          final safeWidth = width <= 0 ? 1.0 : width;
+          final safeHeight = height <= 0 ? 1.0 : height;
+          final size = Size(safeWidth, safeHeight);
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapUp: (details) => _onTap(details.localPosition, size, snapshot),

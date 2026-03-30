@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -36,35 +37,59 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
 
   static const MapViewport _fixedGameplayViewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
 
-  Future<void> initialize() async {
-    state = state.copyWith(loading: true, clearError: true);
+  Future<void> initialize({bool requestLocationPermission = false}) async {
+    state = state.copyWith(
+      loading: true,
+      clearError: true,
+      worldDebug: {
+        ...state.worldDebug,
+        'generation_status': 'loading',
+        'requesting_location': requestLocationPermission,
+      },
+    );
     try {
       await _hydrateEconomyState();
+      if (requestLocationPermission) {
+        await _ref.read(locationControllerProvider.notifier).requestPermissionAndLoad();
+      } else {
+        await _ref.read(locationControllerProvider.notifier).loadCurrentLocation();
+      }
       final geoClient = await _ref.read(mapGeoClientProvider.future);
-      final location = _ref.read(locationControllerProvider).effectiveLocation;
+      final locationState = _ref.read(locationControllerProvider);
+      final location = locationState.effectiveLocation;
       final viewport = location == null
           ? _fixedGameplayViewport
           : MapViewport(centerLat: location.lat, centerLng: location.lng, zoom: _fixedGameplayViewport.zoom);
 
-      final area = await geoClient.reverseGeocode(lat: viewport.centerLat, lng: viewport.centerLng);
-      final pins = await geoClient.nearby(context: SearchAreaContext(viewport: viewport, radiusMeters: 3000, mode: 'perbug_nodes'));
-      if (pins.isEmpty) {
-        state = state.copyWith(loading: false, error: 'No nearby world nodes found yet. Try moving the anchor area.');
-        return;
+      ReverseGeocodeResult? area;
+      List<MapPin> pins = const [];
+      Object? generationError;
+      try {
+        area = await geoClient.reverseGeocode(lat: viewport.centerLat, lng: viewport.centerLng);
+        pins = await geoClient.nearby(context: SearchAreaContext(viewport: viewport, radiusMeters: 3000, mode: 'perbug_nodes'));
+      } catch (error) {
+        generationError = error;
       }
 
-      final worldSnapshot = _worldEngine.build(
-        pins: pins,
-        context: PerbugNodeGenerationContext(
-          anchorLat: viewport.centerLat,
-          anchorLng: viewport.centerLng,
-          playerLevel: state.progression.level,
-          maxNodes: 24,
-          minNodeSpacingMeters: 220,
-          maxLinkDistanceMeters: state.maxJumpMeters * 1.3,
-        ),
-        anchorArea: area,
-      );
+      final bool useFallback = generationError != null || pins.isEmpty;
+      final worldSnapshot = useFallback
+          ? _buildFallbackWorld(
+              viewport: viewport,
+              area: area,
+              reason: generationError?.toString() ?? 'No nearby world nodes found',
+            )
+          : _worldEngine.build(
+              pins: pins,
+              context: PerbugNodeGenerationContext(
+                anchorLat: viewport.centerLat,
+                anchorLng: viewport.centerLng,
+                playerLevel: state.progression.level,
+                maxNodes: 24,
+                minNodeSpacingMeters: 220,
+                maxLinkDistanceMeters: state.maxJumpMeters * 1.3,
+              ),
+              anchorArea: area,
+            );
       final nodes = worldSnapshot.nodes;
       final start = state.currentNodeId == null ? nodes.first : nodes.firstWhere((n) => n.id == state.currentNodeId, orElse: () => nodes.first);
       state = state.copyWith(
@@ -74,14 +99,113 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
         areaLabel: [area?.city, area?.region].whereType<String>().where((e) => e.isNotEmpty).join(', '),
         history: state.history.isEmpty ? ['Landed at ${start.label}'] : state.history,
         connections: worldSnapshot.connections,
-        worldDebug: worldSnapshot.debug,
+        worldDebug: {
+          ...worldSnapshot.debug,
+          'generation_status': useFallback ? 'fallback' : 'ready',
+          'fallback_active': useFallback,
+          'fallback_reason': useFallback ? (generationError?.toString() ?? 'empty pins') : null,
+          'location_status': locationState.status.name,
+          'location_mode': location == null ? 'demo' : 'real',
+        },
         loading: false,
+        error: useFallback ? null : state.error,
       );
       _syncProgression(reason: 'initialize');
       await _persistEconomyState();
     } catch (error) {
-      state = state.copyWith(loading: false, error: 'Unable to load Perbug world nodes: $error');
+      final fallback = _buildFallbackWorld(
+        viewport: _fixedGameplayViewport,
+        area: null,
+        reason: error.toString(),
+      );
+      final start = fallback.nodes.first;
+      state = state.copyWith(
+        nodes: fallback.nodes,
+        currentNodeId: start.id,
+        visitedNodeIds: {...state.visitedNodeIds, start.id},
+        connections: fallback.connections,
+        worldDebug: {
+          ...fallback.debug,
+          'generation_status': 'failed_fallback',
+          'fallback_active': true,
+          'fallback_reason': error.toString(),
+        },
+        loading: false,
+        error: 'Live map unavailable right now. Running demo frontier instead.',
+      );
     }
+  }
+
+  Future<void> requestLocationAndRefresh() {
+    return initialize(requestLocationPermission: true);
+  }
+
+  ({List<PerbugNode> nodes, Map<String, Set<String>> connections, Map<String, Object> debug}) _buildFallbackWorld({
+    required MapViewport viewport,
+    required ReverseGeocodeResult? area,
+    required String reason,
+  }) {
+    final seed = (viewport.centerLat * 1000).round() ^ (viewport.centerLng * 1000).round();
+    final regionLabel = area?.region ?? 'Demo Frontier';
+    final cityLabel = area?.city ?? 'Fallback Command Zone';
+    final baseTypes = <PerbugNodeType>[
+      PerbugNodeType.rest,
+      PerbugNodeType.encounter,
+      PerbugNodeType.resource,
+      PerbugNodeType.shop,
+      PerbugNodeType.mission,
+      PerbugNodeType.rare,
+      PerbugNodeType.event,
+      PerbugNodeType.boss,
+    ];
+    final nodes = List<PerbugNode>.generate(baseTypes.length, (index) {
+      final theta = (math.pi * 2 * index) / baseTypes.length;
+      final ringLat = viewport.centerLat + math.sin(theta) * viewport.latSpan * 0.24;
+      final ringLng = viewport.centerLng + math.cos(theta) * viewport.lngSpan * 0.24;
+      final type = baseTypes[index];
+      return PerbugNode(
+        id: 'fallback-$seed-$index',
+        placeId: 'fallback-place-$index',
+        label: 'Fallback ${type.name.toUpperCase()}',
+        latitude: ringLat,
+        longitude: ringLng,
+        region: regionLabel,
+        city: cityLabel,
+        neighborhood: 'Demo Sector ${index + 1}',
+        country: 'Simulation',
+        nodeType: type,
+        difficulty: (index % 5) + 1,
+        state: PerbugNodeState.available,
+        energyReward: 2 + (index % 2),
+        movementCost: 2 + (index % 3),
+        rarityScore: 0.3 + (index / (baseTypes.length * 1.4)),
+        tags: {'fallback', type.name},
+        metadata: {
+          'source': 'fallback_demo',
+          'reason': reason,
+          'seed': seed,
+        },
+      );
+    }, growable: false);
+
+    final connections = <String, Set<String>>{};
+    for (var i = 0; i < nodes.length; i++) {
+      final current = nodes[i];
+      final next = nodes[(i + 1) % nodes.length];
+      final prev = nodes[(i - 1 + nodes.length) % nodes.length];
+      connections[current.id] = {next.id, prev.id};
+    }
+
+    return (
+      nodes: nodes,
+      connections: connections,
+      debug: <String, Object>{
+        'source': 'fallback_demo_world',
+        'seed': seed,
+        'reason': reason,
+        'selected_nodes': nodes.length,
+      },
+    );
   }
 
   Future<bool> jumpTo(PerbugMoveCandidate move) async {
