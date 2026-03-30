@@ -12,6 +12,7 @@ import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_state.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';
 import 'map_discovery_models.dart';
+import 'map_discovery_tab.dart' show mapGeoClientProvider;
 import 'perbug_world_map_view.dart';
 import 'perbug_asset_registry.dart';
 import 'perbug_economy_models.dart';
@@ -29,6 +30,13 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
   String? _selectedNodeId;
   String? _mapAnchoredNodeId;
   late MapViewport _mapViewport;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -63,6 +71,48 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
             title: 'Perbug Tactical Atlas',
             subtitle: 'Traverse the fixed-zoom world board, deploy your squad, and expand from ${state.areaLabel ?? 'your anchor region'}.',
             badge: const AppPill(label: 'Map-native strategy RPG', icon: Icons.explore),
+          ),
+          const SizedBox(height: 12),
+
+          AppCard(
+            tone: AppCardTone.muted,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Region targeting // Nominatim search', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: const InputDecoration(
+                          hintText: 'Search a city, district, or landmark…',
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        onSubmitted: (_) => _runGeoSearch(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SecondaryButton(label: 'Jump', onPressed: _runGeoSearch),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    AppPill(
+                      label: ref.watch(locationControllerProvider).effectiveLocation == null ? 'Demo mode anchor' : 'Live location anchor',
+                      icon: ref.watch(locationControllerProvider).effectiveLocation == null ? Icons.smart_toy_outlined : Icons.my_location,
+                    ),
+                    AppPill(label: state.areaLabel ?? 'Unknown region', icon: Icons.public),
+                    AppPill(label: 'Nodes ${state.nodes.length}', icon: Icons.hub),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           AppCard(
@@ -664,6 +714,29 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
         );
       },
     );
+  }
+
+
+  Future<void> _runGeoSearch() async {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final geo = await ref.read(mapGeoClientProvider.future);
+      final results = await geo.geocode(query);
+      if (results.isEmpty) {
+        messenger.showSnackBar(const SnackBar(content: Text('No matching region found.')));
+        return;
+      }
+      final top = results.first;
+      if (!mounted) return;
+      setState(() {
+        _mapViewport = MapViewport(centerLat: top.lat, centerLng: top.lng, zoom: _mapViewport.zoom);
+      });
+      messenger.showSnackBar(SnackBar(content: Text('Retargeted to ${top.displayName}.')));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Search unavailable right now.')));
+    }
   }
 
   PerbugNode? _selectedNode(PerbugGameState state) {
