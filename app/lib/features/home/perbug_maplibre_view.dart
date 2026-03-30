@@ -1003,60 +1003,83 @@ class _WebStaticFallbackMap extends StatelessWidget {
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: latlng.LatLng(viewport.centerLat, viewport.centerLng),
-                    initialZoom: viewport.zoom.clamp(5, 17),
-                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
-                    onTap: (_, __) => onTapEmpty(),
-                    onPositionChanged: (position, hasGesture) {
-                      final center = position.center;
-                      if (center == null) return;
-                      onViewportChanged(
-                        MapViewport(centerLat: center.latitude, centerLng: center.longitude, zoom: position.zoom ?? viewport.zoom),
-                        hasGesture: hasGesture,
-                      );
-                    },
-                  ),
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.perbug.app',
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        if (userLocation != null)
-                          Marker(
-                            width: 28,
-                            height: 28,
-                            point: latlng.LatLng(userLocation!.lat, userLocation!.lng),
-                            child: const Icon(Icons.my_location, color: Colors.lightBlueAccent),
+                    Positioned.fill(
+                      child: Image.network(
+                        _fallbackStaticMapUrl(),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
                           ),
-                        ...interactiveNodes.map((node) {
-                          final isCurrent = node.id == currentNodeId;
-                          final isSelected = node.id == selectedNodeId;
-                          final reachable = reachableNodeIds.contains(node.id);
-                          return Marker(
-                            width: 34,
-                            height: 34,
-                            point: latlng.LatLng(node.latitude, node.longitude),
-                            child: GestureDetector(
-                              onTap: () => onNodeSelected?.call(node.id),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isCurrent
-                                      ? const Color(0xFF7C3AED)
-                                      : reachable
-                                          ? const Color(0xFF16A34A)
-                                          : const Color(0xFF334155),
-                                  border: Border.all(color: isSelected ? Colors.white : Colors.black54, width: isSelected ? 2.6 : 1),
-                                ),
-                              ),
+                          child: Center(
+                            child: Text(
+                              'Static map preview unavailable. Use chips below to navigate.',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall,
                             ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    FlutterMap(
+                      options: MapOptions(
+                        initialCenter: latlng.LatLng(viewport.centerLat, viewport.centerLng),
+                        initialZoom: viewport.zoom.clamp(5, 17),
+                        interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+                        onTap: (_, __) => onTapEmpty(),
+                        onPositionChanged: (position, hasGesture) {
+                          final center = position.center;
+                          if (center == null) return;
+                          onViewportChanged(
+                            MapViewport(centerLat: center.latitude, centerLng: center.longitude, zoom: position.zoom ?? viewport.zoom),
+                            hasGesture: hasGesture,
                           );
-                        }),
+                        },
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.perbug.app',
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            if (userLocation != null)
+                              Marker(
+                                width: 28,
+                                height: 28,
+                                point: latlng.LatLng(userLocation!.lat, userLocation!.lng),
+                                child: const Icon(Icons.my_location, color: Colors.lightBlueAccent),
+                              ),
+                            ...interactiveNodes.map((node) {
+                              final isCurrent = node.id == currentNodeId;
+                              final isSelected = node.id == selectedNodeId;
+                              final reachable = reachableNodeIds.contains(node.id);
+                              return Marker(
+                                width: 34,
+                                height: 34,
+                                point: latlng.LatLng(node.latitude, node.longitude),
+                                child: GestureDetector(
+                                  onTap: () => onNodeSelected?.call(node.id),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isCurrent
+                                          ? const Color(0xFF7C3AED)
+                                          : reachable
+                                              ? const Color(0xFF16A34A)
+                                              : const Color(0xFF334155),
+                                      border: Border.all(color: isSelected ? Colors.white : Colors.black54, width: isSelected ? 2.6 : 1),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
                       ],
                     ),
                   ],
