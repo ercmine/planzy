@@ -137,6 +137,7 @@ class PerbugWorldMapEngine {
 
     final terrainBands = _terrainForViewport(viewport: viewport, nodes: visible);
     final theme = _deriveTheme(viewport: viewport, nodes: visible);
+    final seed = ((viewport.centerLat * 10000).round() * 31) ^ (viewport.centerLng * 10000).round() ^ nodes.length;
 
     return PerbugWorldMapSnapshot(
       visibleNodes: visible,
@@ -145,6 +146,7 @@ class PerbugWorldMapEngine {
       regionTheme: theme,
       debug: {
         'projection': 'equirectangular_runtime',
+        'seed': seed,
         'nominatim_semantic_nodes': visible.where((node) => node.metadata['source'] == 'geo_nominatim').length,
         'visible_nodes': visible.length,
         'edges': edges.length,

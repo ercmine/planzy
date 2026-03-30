@@ -1,9 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart' as latlong;
 
 import 'map_discovery_models.dart';
 import 'perbug_asset_registry.dart';
@@ -46,31 +45,30 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
   static const _engine = PerbugWorldMapEngine();
 
   late final AnimationController _pulse;
-  late final MapController _mapController;
   late final ValueNotifier<int> _paintTick;
+  late _PerbugCameraState _camera;
+  _PerbugCameraGesture? _gesture;
   String? _hoverNodeId;
-  bool _mapBootstrapped = false;
+  bool _cameraBootstrapped = false;
 
   @override
   void initState() {
     super.initState();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
-    _mapController = MapController();
     _paintTick = ValueNotifier<int>(0);
+    _camera = _PerbugCameraState.fromViewport(widget.viewport);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      setState(() => _mapBootstrapped = true);
+      setState(() => _cameraBootstrapped = true);
     });
   }
 
   @override
   void didUpdateWidget(covariant PerbugWorldMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!widget.viewport.isSimilarTo(oldWidget.viewport, centerThreshold: 0.0002, zoomThreshold: 0.001)) {
-      _mapController.move(
-        latlong.LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
-        widget.viewport.zoom,
-      );
+    final cameraViewport = _camera.toViewport();
+    if (_gesture == null && !widget.viewport.isSimilarTo(cameraViewport, centerThreshold: 0.0002, zoomThreshold: 0.001)) {
+      _camera = _PerbugCameraState.fromViewport(widget.viewport);
     }
   }
 
@@ -84,15 +82,15 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
   @override
   Widget build(BuildContext context) {
     final hasLiveNodes = widget.nodes.isNotEmpty;
-    final sourceNodes = hasLiveNodes ? widget.nodes : _demoNodes(widget.viewport);
+    final sourceNodes = hasLiveNodes ? widget.nodes : _demoNodes(_camera.toViewport());
     final sourceConnections = hasLiveNodes ? widget.connections : _demoConnections(sourceNodes);
-    final rawSnapshot = _engine.build(viewport: widget.viewport, nodes: sourceNodes, graph: sourceConnections);
+    final rawSnapshot = _engine.build(viewport: _camera.toViewport(), nodes: sourceNodes, graph: sourceConnections);
     final safeSnapshot = rawSnapshot.visibleNodes.isNotEmpty
         ? rawSnapshot
         : _engine.build(
-            viewport: widget.viewport,
-            nodes: _demoNodes(widget.viewport),
-            graph: _demoConnections(_demoNodes(widget.viewport)),
+            viewport: _camera.toViewport(),
+            nodes: _demoNodes(_camera.toViewport()),
+            graph: _demoConnections(_demoNodes(_camera.toViewport())),
           );
     final renderMode = hasLiveNodes ? 'real' : 'demo';
 
@@ -109,113 +107,122 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
           final safeHeight = height <= 0 ? 1.0 : height;
           final size = Size(safeWidth, safeHeight);
           final hasInvalidSize = width <= 0 || height <= 0;
+          final cameraViewport = _camera.toViewport();
 
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: _buildFallbackBaseSurface(),
-              ),
-              Positioned.fill(
-                child: _buildBaseMap(),
-              ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  ignoring: true,
-                  child: AnimatedBuilder(
-                    animation: _pulse,
-                    builder: (context, child) {
-                      return CustomPaint(
-                        painter: _PerbugWorldPainter(
-                          viewport: widget.viewport,
-                          snapshot: safeSnapshot,
-                          currentNodeId: widget.currentNodeId ?? (safeSnapshot.visibleNodes.isEmpty ? null : safeSnapshot.visibleNodes.first.id),
-                          selectedNodeId: widget.selectedNodeId ?? _hoverNodeId,
-                          hoverNodeId: _hoverNodeId,
-                          reachableNodeIds: widget.reachableNodeIds.isEmpty
-                              ? safeSnapshot.visibleNodes.take(4).map((n) => n.id).toSet()
-                              : widget.reachableNodeIds,
-                          completedNodeIds: widget.completedNodeIds,
-                          pulse: _pulse.value,
-                          textStyle: Theme.of(context).textTheme.labelSmall ?? const TextStyle(fontSize: 11),
-                          showDebugOverlay: widget.showDebugOverlay,
-                          onPainted: () => _paintTick.value = _paintTick.value + 1,
-                        ),
-                        child: const SizedBox.expand(),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: MouseRegion(
-                  onHover: (event) {
-                    final id = _hoveredNodeAt(event.localPosition, size, safeSnapshot);
-                    if (id != _hoverNodeId) {
-                      setState(() => _hoverNodeId = id);
-                    }
-                  },
-                  onExit: (_) => setState(() => _hoverNodeId = null),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapUp: (details) => _onTap(details.localPosition, size, safeSnapshot),
-                  ),
-                ),
-              ),
-              if (!_mapBootstrapped)
-                const Positioned(
-                  left: 12,
-                  bottom: 12,
-                  child: _DebugStatusChip(
-                    label: 'MAP LOADING',
-                    color: Color(0xFFF59E0B),
-                  ),
-                ),
-              if (hasInvalidSize)
-                const Positioned(
-                  left: 12,
-                  bottom: 12,
-                  child: _DebugStatusChip(
-                    label: 'MAP ERROR: invalid viewport size',
-                    color: Color(0xFFEF4444),
-                  ),
-                ),
-              Positioned(
-                left: 10,
-                top: 10,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.36),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withOpacity(0.16)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    child: Text(
-                      hasLiveNodes ? 'Live tactical region' : 'Demo frontier fallback',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white),
+          return Listener(
+            onPointerSignal: (event) {
+              if (event is PointerScrollEvent && event.scrollDelta.dy != 0) {
+                _onScrollZoom(event.scrollDelta.dy, size);
+              }
+            },
+            child: Stack(
+              children: [
+                Positioned.fill(child: _buildFallbackBaseSurface()),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    ignoring: true,
+                    child: AnimatedBuilder(
+                      animation: _pulse,
+                      builder: (context, child) {
+                        return CustomPaint(
+                          painter: _PerbugWorldPainter(
+                            viewport: cameraViewport,
+                            snapshot: safeSnapshot,
+                            currentNodeId: widget.currentNodeId ??
+                                (safeSnapshot.visibleNodes.isEmpty ? null : safeSnapshot.visibleNodes.first.id),
+                            selectedNodeId: widget.selectedNodeId ?? _hoverNodeId,
+                            hoverNodeId: _hoverNodeId,
+                            reachableNodeIds: widget.reachableNodeIds.isEmpty
+                                ? safeSnapshot.visibleNodes.take(4).map((n) => n.id).toSet()
+                                : widget.reachableNodeIds,
+                            completedNodeIds: widget.completedNodeIds,
+                            pulse: _pulse.value,
+                            textStyle: Theme.of(context).textTheme.labelSmall ?? const TextStyle(fontSize: 11),
+                            showDebugOverlay: widget.showDebugOverlay,
+                            onPainted: () => _paintTick.value = _paintTick.value + 1,
+                          ),
+                          child: const SizedBox.expand(),
+                        );
+                      },
                     ),
                   ),
                 ),
-              ),
-              if (widget.showDebugOverlay)
-                Positioned(
-                  right: 10,
-                  bottom: 10,
-                  child: ValueListenableBuilder<int>(
-                    valueListenable: _paintTick,
-                    builder: (context, tick, _) {
-                      return _DebugStatePanel(
-                        size: size,
-                        viewport: widget.viewport,
-                        nodeCount: safeSnapshot.visibleNodes.length,
-                        mode: renderMode,
-                        painterTick: tick,
-                        routeName: ModalRoute.of(context)?.settings.name ?? '/live-map',
-                      );
+                Positioned.fill(
+                  child: MouseRegion(
+                    onHover: (event) {
+                      final id = _hoveredNodeAt(event.localPosition, size, safeSnapshot, cameraViewport);
+                      if (id != _hoverNodeId) {
+                        setState(() => _hoverNodeId = id);
+                      }
                     },
+                    onExit: (_) => setState(() => _hoverNodeId = null),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: (details) => _onTap(details.localPosition, size, safeSnapshot, cameraViewport),
+                      onScaleStart: _startGesture,
+                      onScaleUpdate: (details) => _updateGesture(details, size),
+                      onScaleEnd: (_) => _endGesture(),
+                    ),
                   ),
                 ),
-            ],
+                if (!_cameraBootstrapped)
+                  const Positioned(
+                    left: 12,
+                    bottom: 12,
+                    child: _DebugStatusChip(
+                      label: 'WORLD ENGINE LOADING',
+                      color: Color(0xFFF59E0B),
+                    ),
+                  ),
+                if (hasInvalidSize)
+                  const Positioned(
+                    left: 12,
+                    bottom: 12,
+                    child: _DebugStatusChip(
+                      label: 'MAP ERROR: invalid viewport size',
+                      color: Color(0xFFEF4444),
+                    ),
+                  ),
+                Positioned(
+                  left: 10,
+                  top: 10,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.36),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: Colors.white.withOpacity(0.16)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      child: Text(
+                        hasLiveNodes ? 'Live tactical region' : 'Demo frontier fallback',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+                if (widget.showDebugOverlay)
+                  Positioned(
+                    right: 10,
+                    bottom: 10,
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: _paintTick,
+                      builder: (context, tick, _) {
+                        return _DebugStatePanel(
+                          size: size,
+                          viewport: cameraViewport,
+                          nodeCount: safeSnapshot.visibleNodes.length,
+                          mode: renderMode,
+                          painterTick: tick,
+                          routeName: ModalRoute.of(context)?.settings.name ?? '/live-map',
+                          selectedNodeId: widget.selectedNodeId,
+                          seed: safeSnapshot.debug['seed']?.toString() ?? 'n/a',
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
           );
         },
       ),
@@ -228,49 +235,51 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF10203C), Color(0xFF1E3A5F), Color(0xFF0A4D3F)],
+          colors: [Color(0xFF0A122E), Color(0xFF163A53), Color(0xFF1A4E45)],
         ),
       ),
       child: CustomPaint(painter: _DebugGridPainter()),
     );
   }
 
-  Widget _buildBaseMap() {
-    return Opacity(
-      opacity: 0.92,
-      child: FlutterMap(
-        mapController: _mapController,
-        options: MapOptions(
-          initialCenter: latlong.LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
-          initialZoom: widget.viewport.zoom,
-          minZoom: 3.5,
-          maxZoom: 17,
-          interactionOptions: const InteractionOptions(
-            flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom,
-          ),
-          onPositionChanged: (position, hasGesture) {
-            final center = position.center;
-            final zoom = position.zoom;
-            if (center == null || zoom == null) return;
-            widget.onViewportChanged(
-              MapViewport(centerLat: center.latitude, centerLng: center.longitude, zoom: zoom),
-              hasGesture: hasGesture,
-            );
-          },
-        ),
-        children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.perbug.app',
-            maxZoom: 19,
-          ),
-        ],
-      ),
+  void _startGesture(ScaleStartDetails details) {
+    _gesture = _PerbugCameraGesture(
+      startFocal: details.localFocalPoint,
+      startViewport: _camera.toViewport(),
     );
   }
 
-  void _onTap(Offset tap, Size size, PerbugWorldMapSnapshot snapshot) {
-    final closest = _hoveredNodeAt(tap, size, snapshot);
+  void _updateGesture(ScaleUpdateDetails details, Size size) {
+    final gesture = _gesture;
+    if (gesture == null) return;
+    final next = _camera
+        .fromPanZoom(
+          focalDelta: details.localFocalPoint - gesture.startFocal,
+          scale: details.scale,
+          startViewport: gesture.startViewport,
+          canvasSize: size,
+        )
+        .clamped();
+    _camera = next;
+    widget.onViewportChanged(_camera.toViewport(), hasGesture: true);
+    setState(() {});
+  }
+
+  void _endGesture() {
+    _gesture = null;
+  }
+
+  void _onScrollZoom(double deltaY, Size size) {
+    final zoomDelta = (-deltaY / 240).clamp(-0.7, 0.7);
+    final next = _camera.copyWith(zoom: _camera.zoom + zoomDelta).clamped();
+    if (next == _camera) return;
+    _camera = next;
+    widget.onViewportChanged(_camera.toViewport(), hasGesture: true);
+    setState(() {});
+  }
+
+  void _onTap(Offset tap, Size size, PerbugWorldMapSnapshot snapshot, MapViewport viewport) {
+    final closest = _hoveredNodeAt(tap, size, snapshot, viewport);
     if (closest != null) {
       widget.onNodeSelected(closest);
     } else {
@@ -278,8 +287,8 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
     }
   }
 
-  String? _hoveredNodeAt(Offset tap, Size size, PerbugWorldMapSnapshot snapshot) {
-    final projection = PerbugGeoProjection(widget.viewport);
+  String? _hoveredNodeAt(Offset tap, Size size, PerbugWorldMapSnapshot snapshot, MapViewport viewport) {
+    final projection = PerbugGeoProjection(viewport);
     String? closest;
     var closestDistance = double.infinity;
 
@@ -293,7 +302,7 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
       }
     }
 
-    return closestDistance <= 28 ? closest : null;
+    return closestDistance <= 30 ? closest : null;
   }
 
   List<PerbugNode> _demoNodes(MapViewport viewport) {
@@ -369,6 +378,8 @@ class _PerbugWorldPainter extends CustomPainter {
     onPainted();
     final rect = Offset.zero & size;
     _paintBackdropTint(canvas, rect);
+    _paintTerrainBands(canvas, rect, size);
+    _paintDistrictPlates(canvas, size);
     _paintFog(canvas, rect);
     _paintConnections(canvas, size);
     _paintSelectedPath(canvas, size);
@@ -381,16 +392,87 @@ class _PerbugWorldPainter extends CustomPainter {
 
   void _paintBackdropTint(Canvas canvas, Rect rect) {
     final palette = snapshot.regionTheme.palette.map((value) => Color(value)).toList(growable: false);
-    final tint = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
+    final tint = RadialGradient(
+      center: const Alignment(0.2, -0.65),
+      radius: 1.2,
       colors: [
-        palette.first.withOpacity(0.18),
-        palette[1].withOpacity(0.12),
-        Colors.black.withOpacity(0.18),
+        palette.last.withOpacity(0.18),
+        palette.first.withOpacity(0.2),
+        Colors.black.withOpacity(0.22),
       ],
+      stops: const [0, 0.54, 1],
     );
     canvas.drawRect(rect, Paint()..shader = tint.createShader(rect));
+  }
+
+  void _paintTerrainBands(Canvas canvas, Rect rect, Size size) {
+    final palette = snapshot.regionTheme.palette.map((value) => Color(value)).toList(growable: false);
+    for (var i = 0; i < snapshot.terrainBands.length; i++) {
+      final band = snapshot.terrainBands[i];
+      final path = Path();
+      for (double x = 0; x <= size.width; x += 12) {
+        final fx = x / size.width;
+        final y = (size.height * (0.22 + i * 0.18 + band.latitudeBias)).clamp(0, size.height) +
+            math.sin((fx * 7.4) + band.wave * 40 + i * 1.7) * (24 + i * 5);
+        if (x == 0) {
+          path.moveTo(x, y);
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+      path
+        ..lineTo(size.width, size.height)
+        ..lineTo(0, size.height)
+        ..close();
+      canvas.drawPath(
+        path,
+        Paint()..color = palette[i % palette.length].withOpacity(0.16 + (i * 0.04)),
+      );
+    }
+
+    for (var i = 0; i < 26; i++) {
+      final dx = (i * 37.0 + viewport.centerLng * 11).remainder(size.width + 70) - 35;
+      final dy = ((i * 53.0) + viewport.centerLat * 17).remainder(size.height + 70) - 35;
+      canvas.drawCircle(
+        Offset(dx, dy),
+        1.4 + ((i % 4) * 0.45),
+        Paint()..color = Colors.white.withOpacity(0.09 + (i % 5) * 0.012),
+      );
+    }
+  }
+
+  void _paintDistrictPlates(Canvas canvas, Size size) {
+    if (snapshot.visibleNodes.isEmpty) return;
+    final projection = PerbugGeoProjection(viewport);
+    final grouped = <String, List<PerbugNode>>{};
+    for (final node in snapshot.visibleNodes) {
+      final key = node.neighborhood.isNotEmpty ? node.neighborhood : node.city;
+      grouped.putIfAbsent(key, () => <PerbugNode>[]).add(node);
+    }
+
+    final paint = Paint()..style = PaintingStyle.fill;
+    for (final entry in grouped.entries) {
+      if (entry.value.length < 2) continue;
+      final points = entry.value
+          .map((node) {
+            final p = projection.project(PerbugGeoPoint(lat: node.latitude, lng: node.longitude));
+            return Offset(p.x * size.width, p.y * size.height);
+          })
+          .toList(growable: false);
+      final center = points.reduce((a, b) => Offset(a.dx + b.dx, a.dy + b.dy)) / points.length.toDouble();
+      final radius = points.map((point) => (point - center).distance).reduce(math.max) + 22;
+      paint.color = Colors.white.withOpacity(0.05);
+      canvas.drawCircle(center, radius, paint);
+
+      final labelPainter = TextPainter(
+        text: TextSpan(
+          text: entry.key,
+          style: textStyle.copyWith(color: Colors.white.withOpacity(0.58), fontSize: 10, fontWeight: FontWeight.w600),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: 120);
+      labelPainter.paint(canvas, center + Offset(-(labelPainter.width / 2), -radius - 14));
+    }
   }
 
   void _paintFog(Canvas canvas, Rect rect) {
@@ -550,7 +632,7 @@ class _PerbugWorldPainter extends CustomPainter {
       final center = Offset(projected.x * size.width, projected.y * size.height);
       canvas.drawCircle(
         center,
-        28,
+        30,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 0.8
@@ -593,6 +675,73 @@ class _PerbugWorldPainter extends CustomPainter {
   }
 }
 
+class _PerbugCameraState {
+  const _PerbugCameraState({required this.centerLat, required this.centerLng, required this.zoom});
+
+  factory _PerbugCameraState.fromViewport(MapViewport viewport) {
+    return _PerbugCameraState(centerLat: viewport.centerLat, centerLng: viewport.centerLng, zoom: viewport.zoom);
+  }
+
+  final double centerLat;
+  final double centerLng;
+  final double zoom;
+
+  MapViewport toViewport() => MapViewport(centerLat: centerLat, centerLng: centerLng, zoom: zoom);
+
+  _PerbugCameraState copyWith({double? centerLat, double? centerLng, double? zoom}) {
+    return _PerbugCameraState(
+      centerLat: centerLat ?? this.centerLat,
+      centerLng: centerLng ?? this.centerLng,
+      zoom: zoom ?? this.zoom,
+    );
+  }
+
+  _PerbugCameraState fromPanZoom({
+    required Offset focalDelta,
+    required double scale,
+    required MapViewport startViewport,
+    required Size canvasSize,
+  }) {
+    final safeWidth = canvasSize.width <= 1 ? 1 : canvasSize.width;
+    final safeHeight = canvasSize.height <= 1 ? 1 : canvasSize.height;
+    final zoomOffset = math.log(scale.clamp(0.4, 2.6)) / math.ln2;
+    final nextZoom = (startViewport.zoom + (zoomOffset * 1.1)).clamp(4.3, 16.8);
+    final worldAtStart = startViewport;
+    final nextCenterLng = startViewport.centerLng - (focalDelta.dx / safeWidth) * worldAtStart.lngSpan;
+    final nextCenterLat = startViewport.centerLat + (focalDelta.dy / safeHeight) * worldAtStart.latSpan;
+    return _PerbugCameraState(centerLat: nextCenterLat, centerLng: nextCenterLng, zoom: nextZoom.toDouble());
+  }
+
+  _PerbugCameraState clamped() {
+    var lng = centerLng;
+    while (lng > 180) lng -= 360;
+    while (lng < -180) lng += 360;
+    return _PerbugCameraState(
+      centerLat: centerLat.clamp(-80.0, 80.0).toDouble(),
+      centerLng: lng,
+      zoom: zoom.clamp(4.3, 16.8).toDouble(),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is _PerbugCameraState &&
+        (other.centerLat - centerLat).abs() < 0.000001 &&
+        (other.centerLng - centerLng).abs() < 0.000001 &&
+        (other.zoom - zoom).abs() < 0.000001;
+  }
+
+  @override
+  int get hashCode => Object.hash(centerLat, centerLng, zoom);
+}
+
+class _PerbugCameraGesture {
+  const _PerbugCameraGesture({required this.startFocal, required this.startViewport});
+
+  final Offset startFocal;
+  final MapViewport startViewport;
+}
+
 class _DebugStatusChip extends StatelessWidget {
   const _DebugStatusChip({required this.label, required this.color});
 
@@ -619,6 +768,8 @@ class _DebugStatePanel extends StatelessWidget {
     required this.mode,
     required this.painterTick,
     required this.routeName,
+    required this.selectedNodeId,
+    required this.seed,
   });
 
   final Size size;
@@ -627,6 +778,8 @@ class _DebugStatePanel extends StatelessWidget {
   final String mode;
   final int painterTick;
   final String routeName;
+  final String? selectedNodeId;
+  final String seed;
 
   @override
   Widget build(BuildContext context) {
@@ -646,6 +799,8 @@ class _DebugStatePanel extends StatelessWidget {
             'mode: $mode • nodes: $nodeCount\n'
             'center: ${viewport.centerLat.toStringAsFixed(4)}, ${viewport.centerLng.toStringAsFixed(4)}\n'
             'zoom: ${viewport.zoom.toStringAsFixed(2)}\n'
+            'seed: $seed\n'
+            'selected: ${selectedNodeId ?? 'none'}\n'
             'painter tick: $painterTick',
           ),
         ),
