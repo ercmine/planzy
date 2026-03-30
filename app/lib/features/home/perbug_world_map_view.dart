@@ -37,15 +37,33 @@ class PerbugWorldMapView extends StatefulWidget {
   State<PerbugWorldMapView> createState() => _PerbugWorldMapViewState();
 }
 
-class _PerbugWorldMapViewState extends State<PerbugWorldMapView> {
+class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTickerProviderStateMixin {
   static const _engine = PerbugWorldMapEngine();
 
   Offset? _gestureStartFocal;
   MapViewport? _gestureStartViewport;
+  late final AnimationController _pulse;
+  String? _hoverNodeId;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final snapshot = _engine.build(viewport: widget.viewport, nodes: widget.nodes, graph: widget.connections);
+    final hasLiveNodes = widget.nodes.isNotEmpty;
+    final visibleNodes = hasLiveNodes ? widget.nodes : _demoNodes(widget.viewport);
+    final activeConnections = hasLiveNodes ? widget.connections : _demoConnections(visibleNodes);
+    final snapshot = _engine.build(viewport: widget.viewport, nodes: visibleNodes, graph: activeConnections);
+
     return RepaintBoundary(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -82,17 +100,54 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> {
                 hasGesture: true,
               );
             },
-            child: CustomPaint(
-              painter: _PerbugWorldPainter(
-                viewport: widget.viewport,
-                snapshot: snapshot,
-                currentNodeId: widget.currentNodeId,
-                selectedNodeId: widget.selectedNodeId,
-                reachableNodeIds: widget.reachableNodeIds,
-                completedNodeIds: widget.completedNodeIds,
-                textStyle: Theme.of(context).textTheme.labelSmall ?? const TextStyle(fontSize: 11),
+            child: MouseRegion(
+              onHover: (event) => setState(() => _hoverNodeId = _hoveredNodeAt(event.localPosition, size, snapshot)),
+              onExit: (_) => setState(() => _hoverNodeId = null),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: _pulse,
+                      builder: (context, child) {
+                        return CustomPaint(
+                          painter: _PerbugWorldPainter(
+                            viewport: widget.viewport,
+                            snapshot: snapshot,
+                            currentNodeId: widget.currentNodeId ?? (visibleNodes.isEmpty ? null : visibleNodes.first.id),
+                            selectedNodeId: widget.selectedNodeId ?? _hoverNodeId,
+                            hoverNodeId: _hoverNodeId,
+                            reachableNodeIds: widget.reachableNodeIds.isEmpty
+                                ? visibleNodes.take(4).map((n) => n.id).toSet()
+                                : widget.reachableNodeIds,
+                            completedNodeIds: widget.completedNodeIds,
+                            pulse: _pulse.value,
+                            textStyle: Theme.of(context).textTheme.labelSmall ?? const TextStyle(fontSize: 11),
+                          ),
+                          child: const SizedBox.expand(),
+                        );
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    left: 10,
+                    top: 10,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.36),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: Colors.white.withOpacity(0.16)),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        child: Text(
+                          hasLiveNodes ? 'Live tactical region' : 'Demo frontier fallback',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: const SizedBox.expand(),
             ),
           );
         },
@@ -101,6 +156,15 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> {
   }
 
   void _onTap(Offset tap, Size size, PerbugWorldMapSnapshot snapshot) {
+    final closest = _hoveredNodeAt(tap, size, snapshot);
+    if (closest != null) {
+      widget.onNodeSelected(closest);
+    } else {
+      widget.onTapEmpty();
+    }
+  }
+
+  String? _hoveredNodeAt(Offset tap, Size size, PerbugWorldMapSnapshot snapshot) {
     final projection = PerbugGeoProjection(widget.viewport);
     String? closest;
     var closestDistance = double.infinity;
@@ -115,11 +179,47 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> {
       }
     }
 
-    if (closest != null && closestDistance <= 24) {
-      widget.onNodeSelected(closest);
-    } else {
-      widget.onTapEmpty();
+    return closestDistance <= 26 ? closest : null;
+  }
+
+  List<PerbugNode> _demoNodes(MapViewport viewport) {
+    const types = PerbugNodeType.values;
+    return List<PerbugNode>.generate(types.length, (index) {
+      final ring = 0.015 + ((index % 3) * 0.009);
+      final angle = (index / types.length) * math.pi * 2;
+      final lat = viewport.centerLat + math.sin(angle) * ring;
+      final lng = viewport.centerLng + math.cos(angle) * ring;
+      return PerbugNode(
+        id: 'demo_$index',
+        placeId: 'demo_$index',
+        label: '${types[index].name.toUpperCase()} Spire',
+        latitude: lat,
+        longitude: lng,
+        region: 'Demo Realm',
+        city: 'Perbug',
+        neighborhood: 'Shard ${index + 1}',
+        country: 'Web',
+        nodeType: types[index],
+        difficulty: (index % 5) + 1,
+        state: PerbugNodeState.available,
+        energyReward: 2,
+        movementCost: 2,
+        rarityScore: types[index] == PerbugNodeType.boss || types[index] == PerbugNodeType.rare ? 0.95 : 0.3,
+        tags: const {'demo', 'fallback'},
+        metadata: const {'source': 'web_fallback'},
+      );
+    });
+  }
+
+  Map<String, Set<String>> _demoConnections(List<PerbugNode> nodes) {
+    final graph = <String, Set<String>>{};
+    for (var i = 0; i < nodes.length; i++) {
+      final current = nodes[i].id;
+      final next = nodes[(i + 1) % nodes.length].id;
+      graph.putIfAbsent(current, () => <String>{}).add(next);
+      graph.putIfAbsent(next, () => <String>{}).add(current);
     }
+    return graph;
   }
 }
 
@@ -129,18 +229,22 @@ class _PerbugWorldPainter extends CustomPainter {
     required this.snapshot,
     required this.currentNodeId,
     required this.selectedNodeId,
+    required this.hoverNodeId,
     required this.reachableNodeIds,
     required this.completedNodeIds,
     required this.textStyle,
+    required this.pulse,
   });
 
   final MapViewport viewport;
   final PerbugWorldMapSnapshot snapshot;
   final String? currentNodeId;
   final String? selectedNodeId;
+  final String? hoverNodeId;
   final Set<String> reachableNodeIds;
   final Set<String> completedNodeIds;
   final TextStyle textStyle;
+  final double pulse;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -163,6 +267,17 @@ class _PerbugWorldPainter extends CustomPainter {
       colors: [palette[0], palette[1], palette[2]],
     );
     canvas.drawRect(rect, Paint()..shader = gradient.createShader(rect));
+    final shimmer = LinearGradient(
+      begin: const Alignment(-0.8, -1),
+      end: const Alignment(0.8, 1),
+      colors: [
+        Colors.transparent,
+        Colors.white.withOpacity(0.035 + (0.025 * math.sin(pulse * math.pi * 2))),
+        Colors.transparent,
+      ],
+      stops: const [0, 0.5, 1],
+    );
+    canvas.drawRect(rect, Paint()..shader = shimmer.createShader(rect));
   }
 
   void _paintTerrain(Canvas canvas, Size size) {
@@ -172,7 +287,7 @@ class _PerbugWorldPainter extends CustomPainter {
       final path = Path();
       for (var x = 0; x <= size.width; x += 8) {
         final nx = x / size.width;
-        final wave = math.sin((nx * math.pi * 2 * (1.2 + i * 0.5)) + band.seed) * band.wave;
+        final wave = math.sin((nx * math.pi * 2 * (1.2 + i * 0.5)) + band.seed + (pulse * 0.7)) * band.wave;
         final y = size.height * (0.25 + i * 0.18 + band.latitudeBias + wave).clamp(0.0, 1.0);
         if (x == 0) {
           path.moveTo(x.toDouble(), y);
@@ -230,7 +345,7 @@ class _PerbugWorldPainter extends CustomPainter {
       final toPx = Offset(to.x * size.width, to.y * size.height);
       final reachable = reachableNodeIds.contains(edge.from.id) || reachableNodeIds.contains(edge.to.id);
       final paint = Paint()
-        ..color = reachable ? const Color(0xFF7CE0C8).withOpacity(0.7) : Colors.white.withOpacity(0.25)
+        ..color = reachable ? const Color(0xFF7CE0C8).withOpacity(0.75) : Colors.white.withOpacity(0.25)
         ..strokeWidth = reachable ? 2.4 : 1.4;
       canvas.drawLine(fromPx, toPx, paint);
     }
@@ -257,7 +372,7 @@ class _PerbugWorldPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3
-        ..color = const Color(0xFFF6C85F).withOpacity(0.9),
+        ..color = const Color(0xFFF6C85F).withOpacity(0.86),
     );
   }
 
@@ -269,31 +384,34 @@ class _PerbugWorldPainter extends CustomPainter {
       final visual = PerbugAssetRegistry.nodeVisual(node.nodeType);
       final current = node.id == currentNodeId;
       final selected = node.id == selectedNodeId;
+      final hovered = node.id == hoverNodeId;
       final completed = completedNodeIds.contains(node.id);
       final reachable = reachableNodeIds.contains(node.id);
+
+      final pulseScale = selected || hovered ? (1 + 0.08 * math.sin(pulse * math.pi * 2)) : 1.0;
 
       if (node.nodeType == PerbugNodeType.rare || node.nodeType == PerbugNodeType.event || node.nodeType == PerbugNodeType.boss) {
         canvas.drawCircle(
           center,
-          selected ? 26 : 22,
+          (selected ? 28 : 22) * pulseScale,
           Paint()..color = visual.color.withOpacity(0.16),
         );
       }
 
       canvas.drawCircle(
         center,
-        selected ? 16 : 12,
-        Paint()..color = visual.color.withOpacity(selected ? 0.9 : 0.68),
+        (selected ? 16 : 12) * pulseScale,
+        Paint()..color = visual.color.withOpacity(selected || hovered ? 0.95 : 0.68),
       );
       canvas.drawCircle(
         center,
-        selected ? 20 : 14,
+        (selected ? 20 : 14) * pulseScale,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = current ? 3 : 1.6
+          ..strokeWidth = current ? 3 : (hovered ? 2.4 : 1.6)
           ..color = current
               ? const Color(0xFFFFD166)
-              : (reachable ? Colors.white.withOpacity(0.9) : Colors.white.withOpacity(0.35)),
+              : (reachable ? Colors.white.withOpacity(0.92) : Colors.white.withOpacity(0.35)),
       );
 
       if (completed) {
@@ -345,14 +463,13 @@ class _PerbugWorldPainter extends CustomPainter {
     );
     canvas.drawCircle(
       center,
-      18,
+      18 + (2.2 * math.sin(pulse * math.pi * 2)),
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.2
         ..color = const Color(0xFFFFD166),
     );
   }
-
 
   PerbugNode? _findNode(String id) {
     for (final node in snapshot.visibleNodes) {
@@ -369,7 +486,9 @@ class _PerbugWorldPainter extends CustomPainter {
         oldDelegate.snapshot.regionTheme != snapshot.regionTheme ||
         oldDelegate.selectedNodeId != selectedNodeId ||
         oldDelegate.currentNodeId != currentNodeId ||
+        oldDelegate.hoverNodeId != hoverNodeId ||
         oldDelegate.reachableNodeIds != reachableNodeIds ||
-        oldDelegate.completedNodeIds != completedNodeIds;
+        oldDelegate.completedNodeIds != completedNodeIds ||
+        oldDelegate.pulse != pulse;
   }
 }

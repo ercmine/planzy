@@ -227,7 +227,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 Text('World board: fixed tactical zoom ${state.fixedZoom.toStringAsFixed(0)}', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 SizedBox(
-                  height: 340,
+                  height: 420,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: Stack(
@@ -245,11 +245,30 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                           onNodeSelected: (nodeId) => setState(() => _selectedNodeId = nodeId),
                         ),
                         Positioned(
-                          top: 10,
+                          top: 12,
                           left: 10,
                           child: AppPill(
                             label: 'Energy ${state.energy}/${state.maxEnergy}',
                             icon: Icons.bolt_rounded,
+                          ),
+                        ),
+                        Positioned(
+                          left: 10,
+                          top: 46,
+                          child: AppPill(
+                            label: state.worldDebug['location_mode'] == 'demo' ? 'DEMO WORLD' : 'LIVE WORLD',
+                            icon: state.worldDebug['location_mode'] == 'demo' ? Icons.smart_toy_outlined : Icons.travel_explore,
+                          ),
+                        ),
+                        Positioned(
+                          right: 10,
+                          top: 12,
+                          child: Wrap(
+                            spacing: 8,
+                            children: [
+                              AppPill(label: 'Nodes ${state.nodes.length}', icon: Icons.hub_outlined),
+                              AppPill(label: state.areaLabel ?? 'Unknown region', icon: Icons.public),
+                            ],
                           ),
                         ),
                         if (showBlockingMapOverlay)
@@ -279,6 +298,27 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                               gameState: state,
                               locationState: locationState,
                               viewport: _mapViewport,
+                            ),
+                          ),
+                        if (!showBlockingMapOverlay && selectedNode != null)
+                          Positioned(
+                            left: 12,
+                            right: 12,
+                            bottom: 12,
+                            child: _NodeTacticalPanel(
+                              node: selectedNode,
+                              move: selectedMove,
+                              onDeploy: selectedMove == null || !selectedMove.isReachable
+                                  ? null
+                                  : () async {
+                                      final ok = await controller.jumpTo(selectedMove);
+                                      if (!mounted || !ok) return;
+                                      setState(() => _selectedNodeId = selectedMove.node.id);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Deployed to ${selectedMove.node.label}.')),
+                                      );
+                                    },
+                              onEnterEncounter: state.currentNodeId == selectedNode.id ? () => context.go(AppRoutes.encounter) : null,
                             ),
                           ),
                       ],
@@ -1061,6 +1101,103 @@ class _DemoModeLocationButton extends StatelessWidget {
   }
 }
 
+class _NodeTacticalPanel extends StatelessWidget {
+  const _NodeTacticalPanel({
+    required this.node,
+    required this.move,
+    required this.onDeploy,
+    required this.onEnterEncounter,
+  });
+
+  final PerbugNode node;
+  final PerbugMoveCandidate? move;
+  final VoidCallback? onDeploy;
+  final VoidCallback? onEnterEncounter;
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = PerbugAssetRegistry.nodeVisual(node.nodeType);
+    final style = Theme.of(context).textTheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF0D1022).withOpacity(0.92),
+            visual.color.withOpacity(0.3),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.16)),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.35),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(visual.icon, color: visual.color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    node.label,
+                    style: style.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: Colors.white),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                AppPill(
+                  label: node.nodeType.name.toUpperCase(),
+                  icon: Icons.auto_awesome,
+                  backgroundColor: visual.color.withOpacity(0.2),
+                  foregroundColor: Colors.white,
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${node.neighborhood}, ${node.city} • Difficulty ${node.difficulty}',
+              style: style.bodySmall?.copyWith(color: Colors.white70),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: RpgBarButton(
+                    height: 40,
+                    label: move?.isReachable == true ? 'Deploy (-${move!.energyCost}⚡)' : (move?.reason ?? 'Current node'),
+                    onPressed: onDeploy,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RpgBarButton(
+                    height: 40,
+                    label: 'Enter encounter',
+                    variant: RpgButtonVariant.secondary,
+                    onPressed: onEnterEncounter,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DebugMapOverlay extends StatelessWidget {
   const _DebugMapOverlay({
     required this.gameState,
@@ -1093,6 +1230,8 @@ class _DebugMapOverlay extends StatelessWidget {
               Text('nodes=${gameState.nodes.length} edges=${gameState.connections.length}'),
               Text('center=${viewport.centerLat.toStringAsFixed(4)},${viewport.centerLng.toStringAsFixed(4)} z=${viewport.zoom.toStringAsFixed(1)}'),
               Text('gen=${gameState.worldDebug['generation_status'] ?? 'n/a'}'),
+              Text('fallback=${gameState.worldDebug['fallback_active'] == true ? 'on' : 'off'}'),
+              if (gameState.error != null) Text('error=${gameState.error}'),
               if (gameState.worldDebug['seed'] != null) Text('seed=${gameState.worldDebug['seed']}'),
             ],
           ),
