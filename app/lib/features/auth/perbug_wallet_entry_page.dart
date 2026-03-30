@@ -121,14 +121,14 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
           status: AssetLinkStatus.linked,
         );
         if (!mounted) return;
-        context.go(AppRoutes.liveMap);
+        await _goToPostAuthStart();
         return;
       }
       if (authMode == 'demo') {
         ref.read(entryAuthModeProvider.notifier).state = EntryAuthMode.demo;
         await ref.read(perbugGameControllerProvider.notifier).setWalletLink(status: AssetLinkStatus.pendingSync);
         if (!mounted) return;
-        context.go(AppRoutes.liveMap);
+        await _goToPostAuthStart();
         return;
       }
     } catch (_) {
@@ -177,7 +177,7 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
         status: AssetLinkStatus.linked,
       );
       if (!mounted) return;
-      context.go(AppRoutes.liveMap);
+      await _goToPostAuthStart();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -210,7 +210,7 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
       ref.read(entryAuthModeProvider.notifier).state = EntryAuthMode.demo;
       await ref.read(perbugGameControllerProvider.notifier).setWalletLink(status: AssetLinkStatus.pendingSync);
       if (!mounted) return;
-      context.go(AppRoutes.liveMap);
+      await _goToPostAuthStart();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -355,6 +355,14 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
         ],
       ),
     );
+  }
+
+
+  Future<void> _goToPostAuthStart() async {
+    final store = await ref.read(identityStoreProvider.future);
+    final completed = await store.isOnboardingCompleted();
+    if (!mounted) return;
+    context.go(completed ? AppRoutes.liveMap : AppRoutes.onboarding);
   }
 
   Future<void> _openLearnMore() async {
