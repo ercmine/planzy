@@ -3,13 +3,16 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart' as latlng;
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../core/env/env.dart';
 import '../../core/logging/log.dart';
 import 'map_discovery_models.dart';
 import 'map_game_world.dart';
+import 'perbug_game_models.dart';
 import 'perbug_map_theme.dart';
 
 class DryadMapLibreView extends StatefulWidget {
@@ -32,6 +35,13 @@ class DryadMapLibreView extends StatefulWidget {
     required this.onTapEmpty,
     required this.onLongPress,
     required this.onPlaceSelected,
+    this.tacticalNodes = const <PerbugNode>[],
+    this.tacticalConnections = const <String, Set<String>>{},
+    this.currentNodeId,
+    this.selectedNodeId,
+    this.reachableNodeIds = const <String>{},
+    this.completedNodeIds = const <String>{},
+    this.onNodeSelected,
   });
 
   final MapViewport viewport;
@@ -51,6 +61,13 @@ class DryadMapLibreView extends StatefulWidget {
   final VoidCallback onTapEmpty;
   final void Function(double lat, double lng) onLongPress;
   final void Function(String placeId) onPlaceSelected;
+  final List<PerbugNode> tacticalNodes;
+  final Map<String, Set<String>> tacticalConnections;
+  final String? currentNodeId;
+  final String? selectedNodeId;
+  final Set<String> reachableNodeIds;
+  final Set<String> completedNodeIds;
+  final void Function(String nodeId)? onNodeSelected;
 
   @override
   State<DryadMapLibreView> createState() => _DryadMapLibreViewState();
@@ -102,7 +119,13 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
         oldWidget.is3dMode != widget.is3dMode ||
         oldWidget.sponsoredPlaceIds != widget.sponsoredPlaceIds ||
         oldWidget.questPlaceIds != widget.questPlaceIds ||
-        oldWidget.collectionPlaceIds != widget.collectionPlaceIds) {
+        oldWidget.collectionPlaceIds != widget.collectionPlaceIds ||
+        oldWidget.tacticalNodes != widget.tacticalNodes ||
+        oldWidget.currentNodeId != widget.currentNodeId ||
+        oldWidget.selectedNodeId != widget.selectedNodeId ||
+        oldWidget.reachableNodeIds != widget.reachableNodeIds ||
+        oldWidget.completedNodeIds != widget.completedNodeIds ||
+        oldWidget.tacticalConnections != widget.tacticalConnections) {
       _syncMapData();
     }
   }
@@ -116,6 +139,12 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
         pins: widget.pins,
         selectedPlaceId: widget.selectedPlaceId,
         userLocation: widget.userLocation,
+        tacticalNodes: widget.tacticalNodes,
+        currentNodeId: widget.currentNodeId,
+        selectedNodeId: widget.selectedNodeId,
+        reachableNodeIds: widget.reachableNodeIds,
+        onTapEmpty: widget.onTapEmpty,
+        onNodeSelected: widget.onNodeSelected,
         onViewportChanged: widget.onViewportChanged,
         onPlaceSelected: widget.onPlaceSelected,
       );
@@ -171,7 +200,7 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
               await _applyStyleEnhancements();
               await _syncMapData();
             },
-            onMapClick: (_, __) => widget.onTapEmpty(),
+            onMapClick: (_, point) => _handleMapClick(point),
             onMapLongClick: (_, point) => widget.onLongPress(point.latitude, point.longitude),
             onCameraIdle: () {
               final camera = _lastCamera;
@@ -502,6 +531,8 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
     await _upsertGeoJsonSource('dryad-places', placeFeatures);
     await _upsertGeoJsonSource('dryad-districts', districtFeatures);
     await _upsertGeoJsonSource('dryad-user', userFeatures);
+    await _upsertGeoJsonSource('dryad-tactical-nodes', _tacticalNodeFeatures());
+    await _upsertGeoJsonSource('dryad-tactical-links', _tacticalLinkFeatures());
 
     await _ensureDryadLayers();
 
@@ -546,6 +577,93 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
     final controller = _controller;
     if (controller == null) return;
     final mapTheme = _theme;
+
+    try {
+      await controller.addLayer(
+        'dryad-tactical-links',
+        'dryad-tactical-link-layer',
+        LineLayerProperties(
+          lineColor: mapTheme.overlay.focusRing,
+          lineOpacity: 0.36,
+          lineWidth: ['interpolate', ['linear'], ['zoom'], 11, 1.2, 15.5, 3.4],
+        ),
+      );
+    } catch (error) {
+      if (widget.config.enableDiagnostics) Log.warn('map.layer dryad-tactical-link-layer skipped error=$error');
+    }
+
+    try {
+      await controller.addLayer(
+        'dryad-tactical-nodes',
+        'dryad-tactical-node-halo-layer',
+        CircleLayerProperties(
+          circleColor: [
+            'case',
+            ['==', ['get', 'is_current'], 1],
+            '#7C3AED',
+            ['==', ['get', 'is_selected'], 1],
+            '#0EA5E9',
+            ['==', ['get', 'is_reachable'], 1],
+            '#22C55E',
+            '#475569',
+          ],
+          circleOpacity: 0.24,
+          circleRadius: ['interpolate', ['linear'], ['zoom'], 11, 8, 16, 18],
+          circleBlur: 0.65,
+        ),
+      );
+      await controller.addLayer(
+        'dryad-tactical-nodes',
+        'dryad-tactical-node-layer',
+        CircleLayerProperties(
+          circleColor: [
+            'match',
+            ['get', 'type'],
+            'resource',
+            '#22C55E',
+            'mission',
+            '#38BDF8',
+            'shop',
+            '#F97316',
+            'rare',
+            '#FACC15',
+            'boss',
+            '#EF4444',
+            'rest',
+            '#A78BFA',
+            'event',
+            '#EC4899',
+            '#14B8A6',
+          ],
+          circleStrokeColor: [
+            'case',
+            ['==', ['get', 'is_selected'], 1],
+            '#FFFFFF',
+            ['==', ['get', 'is_current'], 1],
+            '#E9D5FF',
+            '#0F172A',
+          ],
+          circleStrokeWidth: ['case', ['==', ['get', 'is_selected'], 1], 3.1, 1.4],
+          circleOpacity: ['case', ['==', ['get', 'is_reachable'], 1], 1.0, 0.76],
+          circleRadius: ['interpolate', ['linear'], ['zoom'], 11, 4.8, 15.8, 11.8],
+        ),
+      );
+      await controller.addLayer(
+        'dryad-tactical-nodes',
+        'dryad-tactical-node-label-layer',
+        SymbolLayerProperties(
+          textField: ['get', 'label'],
+          textSize: ['interpolate', ['linear'], ['zoom'], 11, 8, 15.8, 11],
+          textColor: mapTheme.label.primary,
+          textHaloColor: mapTheme.label.halo,
+          textHaloWidth: 1.2,
+          textOffset: const [0, 1.65],
+          textAllowOverlap: false,
+        ),
+      );
+    } catch (error) {
+      if (widget.config.enableDiagnostics) Log.warn('map.layer dryad-tactical-node layers skipped error=$error');
+    }
 
     try {
       await controller.addLayer(
@@ -730,6 +848,86 @@ class _DryadMapLibreViewState extends State<DryadMapLibreView> {
       if (widget.config.enableDiagnostics) Log.warn('map.layer dryad-user layers skipped error=$error');
     }
   }
+
+  List<Map<String, dynamic>> _tacticalNodeFeatures() {
+    return widget.tacticalNodes
+        .map((node) => {
+              'type': 'Feature',
+              'geometry': {
+                'type': 'Point',
+                'coordinates': [node.longitude, node.latitude],
+              },
+              'properties': {
+                'id': node.id,
+                'label': node.label,
+                'type': node.nodeType.name,
+                'state': node.state.name,
+                'is_current': node.id == widget.currentNodeId ? 1 : 0,
+                'is_selected': node.id == widget.selectedNodeId ? 1 : 0,
+                'is_reachable': widget.reachableNodeIds.contains(node.id) ? 1 : 0,
+                'is_completed': widget.completedNodeIds.contains(node.id) ? 1 : 0,
+              },
+            })
+        .toList(growable: false);
+  }
+
+  List<Map<String, dynamic>> _tacticalLinkFeatures() {
+    final emitted = <String>{};
+    final features = <Map<String, dynamic>>[];
+    for (final node in widget.tacticalNodes) {
+      final neighbors = widget.tacticalConnections[node.id] ?? const <String>{};
+      for (final neighborId in neighbors) {
+        final other = _nodeById(neighborId);
+        if (other == null) continue;
+        final key = node.id.compareTo(other.id) < 0 ? '${node.id}|${other.id}' : '${other.id}|${node.id}';
+        if (!emitted.add(key)) continue;
+        features.add({
+          'type': 'Feature',
+          'geometry': {
+            'type': 'LineString',
+            'coordinates': [
+              [node.longitude, node.latitude],
+              [other.longitude, other.latitude],
+            ],
+          },
+          'properties': {'id': key},
+        });
+      }
+    }
+    return features;
+  }
+
+  PerbugNode? _nodeById(String id) {
+    for (final node in widget.tacticalNodes) {
+      if (node.id == id) return node;
+    }
+    return null;
+  }
+
+  void _handleMapClick(LatLng point) {
+    if (widget.tacticalNodes.isNotEmpty) {
+      final nearest = _nearestNode(point.latitude, point.longitude);
+      if (nearest != null) {
+        widget.onNodeSelected?.call(nearest.id);
+        return;
+      }
+    }
+    widget.onTapEmpty();
+  }
+
+  PerbugNode? _nearestNode(double lat, double lng) {
+    PerbugNode? best;
+    var bestDistance = double.infinity;
+    for (final node in widget.tacticalNodes) {
+      final d = haversineMeters(lat, lng, node.latitude, node.longitude);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = node;
+      }
+    }
+    if (bestDistance > 180) return null;
+    return best;
+  }
 }
 
 class _WebStaticFallbackMap extends StatelessWidget {
@@ -738,6 +936,12 @@ class _WebStaticFallbackMap extends StatelessWidget {
     required this.pins,
     required this.selectedPlaceId,
     required this.userLocation,
+    required this.tacticalNodes,
+    required this.currentNodeId,
+    required this.selectedNodeId,
+    required this.reachableNodeIds,
+    required this.onTapEmpty,
+    required this.onNodeSelected,
     required this.onViewportChanged,
     required this.onPlaceSelected,
   });
@@ -746,6 +950,12 @@ class _WebStaticFallbackMap extends StatelessWidget {
   final List<MapPin> pins;
   final String? selectedPlaceId;
   final ({double lat, double lng})? userLocation;
+  final List<PerbugNode> tacticalNodes;
+  final String? currentNodeId;
+  final String? selectedNodeId;
+  final Set<String> reachableNodeIds;
+  final VoidCallback onTapEmpty;
+  final void Function(String nodeId)? onNodeSelected;
   final void Function(MapViewport viewport, {required bool hasGesture}) onViewportChanged;
   final void Function(String placeId) onPlaceSelected;
 
@@ -772,6 +982,7 @@ class _WebStaticFallbackMap extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final highlighted = pins.take(8).toList(growable: false);
+    final interactiveNodes = tacticalNodes.take(24).toList(growable: false);
     return ColoredBox(
       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
       child: Padding(
@@ -792,19 +1003,66 @@ class _WebStaticFallbackMap extends StatelessWidget {
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(color: theme.colorScheme.surface),
-                  child: Image.network(
-                    _fallbackStaticMapUrl(),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Center(
-                      child: Text(
-                        'Unable to load fallback map tiles right now.',
-                        style: theme.textTheme.bodyMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: latlng.LatLng(viewport.centerLat, viewport.centerLng),
+                    initialZoom: viewport.zoom.clamp(5, 17),
+                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+                    onTap: (_, __) => onTapEmpty(),
+                    onPositionChanged: (position, hasGesture) {
+                      final center = position.center;
+                      if (center == null) return;
+                      onViewportChanged(
+                        MapViewport(centerLat: center.latitude, centerLng: center.longitude, zoom: position.zoom ?? viewport.zoom),
+                        hasGesture: hasGesture,
+                      );
+                    },
                   ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.perbug.app',
+                    ),
+                    PolylineLayer(
+                      polylines: const [],
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        if (userLocation != null)
+                          Marker(
+                            width: 28,
+                            height: 28,
+                            point: latlng.LatLng(userLocation!.lat, userLocation!.lng),
+                            child: const Icon(Icons.my_location, color: Colors.lightBlueAccent),
+                          ),
+                        ...interactiveNodes.map((node) {
+                          final isCurrent = node.id == currentNodeId;
+                          final isSelected = node.id == selectedNodeId;
+                          final reachable = reachableNodeIds.contains(node.id);
+                          return Marker(
+                            width: 34,
+                            height: 34,
+                            point: latlng.LatLng(node.latitude, node.longitude),
+                            child: GestureDetector(
+                              onTap: () => onNodeSelected?.call(node.id),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isCurrent
+                                      ? const Color(0xFF7C3AED)
+                                      : reachable
+                                          ? const Color(0xFF16A34A)
+                                          : const Color(0xFF334155),
+                                  border: Border.all(color: isSelected ? Colors.white : Colors.black54, width: isSelected ? 2.6 : 1),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),

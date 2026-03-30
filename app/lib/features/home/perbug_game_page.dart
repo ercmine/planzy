@@ -11,6 +11,10 @@ import '../../core/navigation/navigation_utils.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_state.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';
+import '../../core/env/env.dart';
+import 'map_discovery_models.dart';
+import 'map_game_world.dart';
+import 'perbug_maplibre_view.dart';
 import 'perbug_asset_registry.dart';
 import 'perbug_economy_models.dart';
 import 'perbug_game_controller.dart';
@@ -24,9 +28,14 @@ class PerbugGamePage extends ConsumerStatefulWidget {
 }
 
 class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
+  String? _selectedNodeId;
+  String? _mapAnchoredNodeId;
+  late MapViewport _mapViewport;
+
   @override
   void initState() {
     super.initState();
+    _mapViewport = const MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
     Future<void>.microtask(() => ref.read(perbugGameControllerProvider.notifier).initialize());
   }
 
@@ -37,6 +46,17 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     final onboarding = ref.watch(onboardingControllerProvider);
     final onboardingController = ref.read(onboardingControllerProvider.notifier);
     final moves = state.reachableMoves().take(8).toList(growable: false);
+    final currentNode = state.currentNode;
+    final config = ref.watch(envConfigProvider).mapStack;
+    if (currentNode != null && _selectedNodeId == null) _selectedNodeId = currentNode.id;
+    if (currentNode != null && _mapAnchoredNodeId != currentNode.id) {
+      _mapAnchoredNodeId = currentNode.id;
+      _mapViewport = MapViewport(centerLat: currentNode.latitude, centerLng: currentNode.longitude, zoom: state.fixedZoom);
+    }
+    final selectedNode = _selectedNode(state);
+    final selectedMove = selectedNode == null ? null : _moveForNode(state, selectedNode.id);
+    final pins = state.nodes.map(_mapPinFromNode).toList(growable: false);
+    final world = const MapWorldEngine().build(pins: pins, viewport: _mapViewport);
 
     return RefreshIndicator(
       onRefresh: controller.initialize,
@@ -141,15 +161,46 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                 Text('World board: fixed tactical zoom ${state.fixedZoom.toStringAsFixed(0)}', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 SizedBox(
-                  height: 240,
-                  child: CustomPaint(
-                    painter: _BoardPainter(state: state),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF101527),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                      ),
+                  height: 340,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      children: [
+                        DryadMapLibreView(
+                          viewport: _mapViewport,
+                          pins: pins,
+                          selectedPlaceId: null,
+                          userLocation: currentNode == null ? null : (lat: currentNode.latitude, lng: currentNode.longitude),
+                          world: world,
+                          sponsoredPlaceIds: const <String>{},
+                          questPlaceIds: const <String>{},
+                          collectionPlaceIds: const <String>{},
+                          is3dMode: false,
+                          config: config,
+                          tacticalNodes: state.nodes,
+                          tacticalConnections: state.connections,
+                          currentNodeId: state.currentNodeId,
+                          selectedNodeId: selectedNode?.id,
+                          reachableNodeIds: state.reachableMoves().where((m) => m.isReachable).map((m) => m.node.id).toSet(),
+                          completedNodeIds: state.visitedNodeIds,
+                          onMapLoadStarted: () {},
+                          onMapReady: () {},
+                          onMapLoadError: (_) {},
+                          onViewportChanged: (viewport, {required hasGesture}) => setState(() => _mapViewport = viewport),
+                          onTapEmpty: () => setState(() => _selectedNodeId = null),
+                          onLongPress: (_, __) {},
+                          onPlaceSelected: (_) {},
+                          onNodeSelected: (nodeId) => setState(() => _selectedNodeId = nodeId),
+                        ),
+                        Positioned(
+                          top: 10,
+                          left: 10,
+                          child: AppPill(
+                            label: 'Energy ${state.energy}/${state.maxEnergy}',
+                            icon: Icons.bolt_rounded,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -176,6 +227,53 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                       })(),
                   ],
                 ),
+                if (selectedNode != null) ...[
+                  const SizedBox(height: 12),
+                  AppCard(
+                    tone: AppCardTone.muted,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Selected: ${selectedNode.label}', style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${selectedNode.nodeType.name.toUpperCase()} • Difficulty ${selectedNode.difficulty} • ${selectedMove?.reason ?? 'Current position'}',
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (selectedMove != null)
+                              RpgBarButton(
+                                height: 44,
+                                label: selectedMove.isReachable
+                                    ? 'Deploy (-${selectedMove.energyCost} energy)'
+                                    : selectedMove.reason,
+                                onPressed: selectedMove.isReachable
+                                    ? () async {
+                                        final ok = await controller.jumpTo(selectedMove);
+                                        if (!mounted) return;
+                                        if (ok) {
+                                          setState(() => _selectedNodeId = selectedMove.node.id);
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Deployed to ${selectedMove.node.label}.')),
+                                          );
+                                        }
+                                      }
+                                    : null,
+                              ),
+                            RpgBarButton(
+                              height: 44,
+                              label: 'Enter encounter',
+                              onPressed: state.currentNodeId == selectedNode.id ? () => context.go(AppRoutes.encounter) : null,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -584,6 +682,38 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
           },
         );
       },
+    );
+  }
+
+  PerbugNode? _selectedNode(PerbugGameState state) {
+    final id = _selectedNodeId ?? state.currentNodeId;
+    if (id == null) return null;
+    for (final node in state.nodes) {
+      if (node.id == id) return node;
+    }
+    return null;
+  }
+
+  PerbugMoveCandidate? _moveForNode(PerbugGameState state, String nodeId) {
+    for (final move in state.reachableMoves()) {
+      if (move.node.id == nodeId) return move;
+    }
+    return null;
+  }
+
+  MapPin _mapPinFromNode(PerbugNode node) {
+    return MapPin(
+      canonicalPlaceId: node.placeId,
+      name: node.label,
+      category: node.nodeType.name,
+      latitude: node.latitude,
+      longitude: node.longitude,
+      rating: (node.rarityScore * 0.9).clamp(0.1, 1.0),
+      city: node.city,
+      region: node.region,
+      neighborhood: node.neighborhood,
+      hasCreatorMedia: node.nodeType == PerbugNodeType.rare || node.nodeType == PerbugNodeType.event,
+      hasReviews: node.nodeType == PerbugNodeType.encounter || node.nodeType == PerbugNodeType.mission,
     );
   }
 }
