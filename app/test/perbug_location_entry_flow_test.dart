@@ -63,17 +63,27 @@ class _FakeLocationService extends LocationService {
   }
 }
 
+class _DeniedLocationService extends LocationService {
+  @override
+  Future<AppLocation> getCurrentLocation() async {
+    throw StateError('Location unavailable');
+  }
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  Widget buildHarness(_FakeLocationPermissionService permissionService) {
+  Widget buildHarness(
+    _FakeLocationPermissionService permissionService, {
+    LocationService? locationService,
+  }) {
     return ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWith((ref) async => await SharedPreferences.getInstance()),
         locationPermissionServiceProvider.overrideWithValue(permissionService),
-        locationServiceProvider.overrideWithValue(_FakeLocationService()),
+        locationServiceProvider.overrideWithValue(locationService ?? _FakeLocationService()),
         mapGeoClientProvider.overrideWith((ref) async => _FakeGeoClient(pins: const [])),
       ],
       child: const MaterialApp(home: Scaffold(body: PerbugGamePage())),
@@ -111,7 +121,38 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, 'Continue Demo Mode'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Demo map active'), findsOneWidget);
-    expect(find.textContaining('Demo mode loaded'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Switch to Real World'), findsOneWidget);
+    expect(find.text('World board: fixed tactical zoom 13'), findsOneWidget);
+  });
+
+  testWidgets('demo HUD location button retries permission and switches to live mode when granted', (tester) async {
+    final permissionService = _FakeLocationPermissionService(outcome: LocationPermissionOutcome.granted);
+    await tester.pumpWidget(buildHarness(permissionService, locationService: _DeniedLocationService()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Continue Demo Mode'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(FilledButton, 'Switch to Real World'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Switch to Real World'));
+    await tester.pumpAndSettle();
+
+    expect(permissionService.ensureCalls, 1);
+    expect(find.textContaining('Live location anchor'), findsOneWidget);
+  });
+
+  testWidgets('denied retry keeps demo mode active and leaves HUD location button visible', (tester) async {
+    final permissionService = _FakeLocationPermissionService(outcome: LocationPermissionOutcome.denied);
+    await tester.pumpWidget(buildHarness(permissionService, locationService: _DeniedLocationService()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Continue Demo Mode'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Switch to Real World'));
+    await tester.pumpAndSettle();
+
+    expect(permissionService.ensureCalls, 1);
+    expect(find.widgetWithText(FilledButton, 'Switch to Real World'), findsOneWidget);
+    expect(find.textContaining('Demo mode anchor'), findsOneWidget);
   });
 }
