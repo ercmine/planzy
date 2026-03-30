@@ -20,12 +20,13 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   static const List<HomeTab> _tabs = [HomeTab.world, HomeTab.collection, HomeTab.profile];
+  bool _showTacticalHud = true;
 
   @override
   Widget build(BuildContext context) {
     final selectedIndex = _tabs.indexOf(widget.initialTab).clamp(0, _tabs.length - 1);
-    final pages = const [
-      PerbugGamePage(),
+    final pages = [
+      PerbugGamePage(showTacticalHud: _showTacticalHud),
       CollectionsPage(collections: []),
       SettingsPage(),
     ];
@@ -34,11 +35,19 @@ class _HomePageState extends State<HomePage> {
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
       appBar: AppBar(
         title: const Text('Perbug // World Command'),
-        actions: const [
+        actions: [
+          IconButton(
+            tooltip: _showTacticalHud ? 'Hide tactical HUD' : 'Show tactical HUD',
+            onPressed: () => setState(() => _showTacticalHud = !_showTacticalHud),
+            icon: Icon(_showTacticalHud ? Icons.visibility : Icons.visibility_off),
+          ),
           Padding(
             padding: EdgeInsets.only(right: 8),
             child: Center(
-              child: AppPill(label: 'Tactical RPG HUD', icon: Icons.auto_awesome),
+              child: AppPill(
+                label: _showTacticalHud ? 'Tactical RPG HUD: On' : 'Tactical RPG HUD: Off',
+                icon: _showTacticalHud ? Icons.auto_awesome : Icons.auto_awesome_outlined,
+              ),
             ),
           ),
         ],
