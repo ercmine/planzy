@@ -536,11 +536,14 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   .map(
                     (unit) => ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(child: Icon(PerbugAssetRegistry.roleVisual(unit.role).icon, size: 18)),
+                      leading: _PerbugArtAvatar(
+                        assetPath: PerbugAssetRegistry.roleVisual(unit.role).portraitRef.assetPath,
+                        fallbackIcon: PerbugAssetRegistry.roleVisual(unit.role).icon,
+                      ),
                       title: Text('${unit.name} • ${PerbugAssetRegistry.roleVisual(unit.role).label}/${unit.unitClass.name}'),
                       subtitle: Text(
                         'Lv ${unit.progression.level} • ${unit.rarity.name} • ${unit.resolvedProvenance.source.name} • '
-                        'Power ${unit.power} • ${PerbugAssetRegistry.roleVisual(unit.role).portraitRef.sheet}',
+                        'Power ${unit.power}',
                       ),
                       trailing: unit.isChainBacked
                           ? const Icon(Icons.verified, color: Colors.amber)
@@ -587,14 +590,15 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                     final visual = PerbugAssetRegistry.nodeVisual(move.node.nodeType);
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        visual.icon,
-                        color: move.isReachable ? visual.color : Colors.blueGrey,
+                      leading: _PerbugArtAvatar(
+                        assetPath: visual.tileRef.assetPath,
+                        fallbackIcon: visual.icon,
+                        tint: move.isReachable ? null : Colors.blueGrey.withOpacity(0.45),
                       ),
                       title: Text('${move.node.label} • ${visual.label}'),
                       subtitle: Text(
                         '${move.node.region} • ${((move.node.distanceFromCurrentMeters ?? 0) / 1000).toStringAsFixed(2)}km • ${move.reason}\n'
-                        'Icon ${visual.iconRef.id} • Tile ${visual.tileRef.id}',
+                        'Art ${visual.iconRef.id}/${visual.tileRef.id}',
                       ),
                       trailing: RpgBarButton(
                         height: 42,
@@ -1079,6 +1083,37 @@ class _MapStatusOverlay extends StatelessWidget {
   }
 }
 
+class _PerbugArtAvatar extends StatelessWidget {
+  const _PerbugArtAvatar({
+    required this.assetPath,
+    required this.fallbackIcon,
+    this.tint,
+  });
+
+  final String? assetPath;
+  final IconData fallbackIcon;
+  final Color? tint;
+
+  @override
+  Widget build(BuildContext context) {
+    if (assetPath == null || assetPath!.isEmpty) {
+      return CircleAvatar(child: Icon(fallbackIcon, size: 18));
+    }
+    return ClipOval(
+      child: SizedBox.square(
+        dimension: 40,
+        child: Image.asset(
+          assetPath!,
+          fit: BoxFit.cover,
+          color: tint,
+          colorBlendMode: tint == null ? null : BlendMode.modulate,
+          errorBuilder: (_, __, ___) => CircleAvatar(child: Icon(fallbackIcon, size: 18)),
+        ),
+      ),
+    );
+  }
+}
+
 class _DemoModeLocationButton extends StatelessWidget {
   const _DemoModeLocationButton({
     required this.onPressed,
@@ -1146,7 +1181,10 @@ class _NodeTacticalPanel extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(visual.icon, color: visual.color),
+                _PerbugArtAvatar(
+                  assetPath: visual.tileRef.assetPath,
+                  fallbackIcon: visual.icon,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

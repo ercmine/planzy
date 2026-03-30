@@ -57,6 +57,29 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - ../29C05777-776F-450F-B071-691DE175BA89.png
+    - ../322AE031-DFBD-475E-97FB-C2FFD6CE5964.png
+    - ../8E1E0147-C0E1-4240-8903-57AEFA42137B.png
+    - ../perbug_assassin_sheet_1024.png
+    - ../perbug_caster_sheet_1024.png
+    - ../perbug_cleric_sheet_1024.png
+    - ../perbug_crafting_screen_1024.png
+    - ../perbug_encounter_cards_sheet_1024.png
+    - ../perbug_encounter_transition_1024.png
+    - ../perbug_engineer_sheet_1024.png
+    - ../perbug_material_sheet_1024.png
+    - ../perbug_node_icon_sheet_1024.png
+    - ../perbug_node_tiles_sheet_1024.png
+    - ../perbug_portrait_sheet_1024.png
+    - ../perbug_relic_sheet_01_1024.png
+    - ../perbug_relic_sheet_02_1024.png
+    - ../perbug_resource_sheet_1024.png
+    - ../perbug_scout_sheet_1024.png
+    - ../perbug_support_sheet_1024.png
+    - ../perbug_tank_sheet_1024.png
+    - ../perbug_token_family_1024.png
+    - ../perbug_token_hud_1024.png
+    - ../perbug_warrior_sheet_1024.png
     - .env.dev
     - .env.stage
     - .env.prod

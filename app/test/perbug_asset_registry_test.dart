@@ -12,6 +12,8 @@ void main() {
         expect(visual.tileRef.id, isNotEmpty);
         expect(visual.iconRef.sheet, 'perbug_node_icon_sheet');
         expect(visual.tileRef.sheet, 'perbug_node_tiles_sheet');
+        expect(visual.iconRef.assetPath, isNotEmpty);
+        expect(visual.tileRef.assetPath, isNotEmpty);
       }
     });
 
@@ -21,6 +23,8 @@ void main() {
         expect(visual.label, isNotEmpty);
         expect(visual.sheetRef.sheet, isNotEmpty);
         expect(visual.portraitRef.sheet, 'perbug_portrait_sheet');
+        expect(visual.sheetRef.assetPath, isNotEmpty);
+        expect(visual.portraitRef.assetPath, isNotEmpty);
       }
     });
   });
