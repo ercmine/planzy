@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 
 import 'map_discovery_models.dart';
 import 'perbug_asset_registry.dart';
@@ -61,7 +61,7 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
     super.didUpdateWidget(oldWidget);
     if (!widget.viewport.isSimilarTo(oldWidget.viewport, centerThreshold: 0.0002, zoomThreshold: 0.001)) {
       _mapController.move(
-        LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
+        latlong.LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
         widget.viewport.zoom,
       );
     }
@@ -169,7 +169,7 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
-        initialCenter: LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
+        initialCenter: latlong.LatLng(widget.viewport.centerLat, widget.viewport.centerLng),
         initialZoom: widget.viewport.zoom,
         minZoom: 3.5,
         maxZoom: 17,
@@ -191,7 +191,6 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.perbug.app',
           maxZoom: 19,
-          backgroundColor: const Color(0xFF0D1B2A),
         ),
       ],
     );
