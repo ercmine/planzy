@@ -143,13 +143,11 @@ BoxDecoration _appScaffoldDecoration(ColorScheme scheme) {
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        scheme.surface,
-        scheme.surfaceContainerLowest.withOpacity(0.98),
+        scheme.surface.withOpacity(0.06),
+        scheme.surfaceContainerLowest.withOpacity(0.22),
       ],
     ),
-    border: Border(
-      top: BorderSide(color: scheme.outlineVariant.withOpacity(0.28)),
-    ),
+    border: Border(top: BorderSide(color: scheme.outlineVariant.withOpacity(0.14))),
   );
 }
 
@@ -407,7 +405,7 @@ class AppScaffold extends StatelessWidget {
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: scheme.surface.withOpacity(0.16),
+                    color: scheme.surface.withOpacity(0.06),
                   ),
                 ),
               ),
