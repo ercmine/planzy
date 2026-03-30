@@ -82,7 +82,7 @@ class PerbugLearnMorePage extends ConsumerWidget {
     await store.setAuthMode('demo');
     ref.read(walletAddressProvider.notifier).state = null;
     ref.read(entryAuthModeProvider.notifier).state = EntryAuthMode.demo;
-    await ref.read(perbugGameControllerProvider.notifier).setWalletLink(status: AssetLinkStatus.pending);
+    await ref.read(perbugGameControllerProvider.notifier).setWalletLink(status: AssetLinkStatus.pendingSync);
     if (!context.mounted) return;
     context.go(AppRoutes.liveMap);
   }
