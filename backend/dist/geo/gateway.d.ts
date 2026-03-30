@@ -9,7 +9,7 @@ export interface GeoGateway {
 }
 export interface BackendGeoRuntime {
     gateway: GeoGateway | null;
-    mode: "remote" | "local" | "disabled";
+    mode: "custom" | "nominatim" | "disabled";
     routesMounted: boolean;
     upstreamBaseUrl?: string;
     validationErrors: string[];

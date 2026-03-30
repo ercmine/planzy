@@ -230,7 +230,7 @@ export function createRoutes(
     rateLimitPerMinute: Number(process.env.GEO_PUBLIC_RATE_LIMIT_PER_MINUTE ?? 180),
     listCanonicalPlaces: () => deps?.placeService?.listCanonicalPlaces() ?? [],
     getStatus: () => ({
-      mode: deps?.geoStatus?.mode ?? (deps?.geoGateway ? "remote" : "disabled"),
+      mode: deps?.geoStatus?.mode ?? (deps?.geoGateway ? "custom" : "disabled"),
       routesMounted: true,
       upstreamBaseUrl: deps?.geoStatus?.upstreamBaseUrl,
       envValidationErrors: deps?.geoStatus?.validationErrors ?? [],
@@ -1155,11 +1155,6 @@ export function createRoutes(
       }
 
 
-      if (deps?.geoGateway && req.method === "GET" && normalizedPath === "/health") {
-        await geoHandlers.health(req, res);
-        return;
-      }
-
       if (deps?.geoGateway && req.method === "GET" && normalizedPath === "/ready") {
         await geoHandlers.ready(req, res);
         return;
@@ -1773,11 +1768,32 @@ export function createRoutes(
       }
 
       if (req.method === "GET" && normalizedPath === "/health") {
+        const geoMode = deps?.geoStatus?.mode ?? (deps?.geoGateway ? "custom" : "disabled");
+        const geoValidationErrors = deps?.geoStatus?.validationErrors ?? [];
+        const geoValidationWarnings = deps?.geoStatus?.validationWarnings ?? [];
+        const geoConfigured = Boolean(deps?.geoGateway);
+        const geoHealthy = geoMode === "disabled"
+          ? true
+          : geoConfigured && geoValidationErrors.length === 0;
+        const overallOk = true;
+
         sendJson(res, 200, {
-          ok: true,
+          ok: overallOk,
           service: "dryad-api",
           version: "1.0.0",
-          time: new Date().toISOString()
+          time: new Date().toISOString(),
+          dependencies: {
+            geo: {
+              mode: geoMode,
+              configured: geoConfigured,
+              healthy: geoHealthy,
+              required: false,
+              degraded: !geoHealthy,
+              upstreamBaseUrl: deps?.geoStatus?.upstreamBaseUrl ?? null,
+              validationErrors: geoValidationErrors,
+              validationWarnings: geoValidationWarnings
+            }
+          }
         });
         return;
       }

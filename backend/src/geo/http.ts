@@ -12,7 +12,7 @@ interface RateLimitOptions {
 }
 
 export interface GeoRuntimeStatus {
-  mode: "remote" | "local" | "disabled";
+  mode: "custom" | "nominatim" | "disabled";
   routesMounted: boolean;
   upstreamBaseUrl?: string;
   envValidationErrors: string[];
@@ -388,7 +388,7 @@ export function createGeoHttpHandlers(
   };
 
   const status = () => options.getStatus?.() ?? {
-    mode: gateway ? "remote" : "disabled",
+    mode: gateway ? "custom" : "disabled",
     routesMounted: true,
     envValidationErrors: gateway ? [] : ["geo gateway unavailable"],
     envValidationWarnings: []

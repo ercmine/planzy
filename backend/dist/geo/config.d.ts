@@ -19,7 +19,7 @@ export interface GeoRuntimeConfig {
     local: GeoLocalConfig;
 }
 export interface GeoRuntimeValidation {
-    mode: "remote" | "local" | "disabled";
+    mode: "custom" | "nominatim" | "disabled";
     shouldFailFast: boolean;
     errors: string[];
     warnings: string[];

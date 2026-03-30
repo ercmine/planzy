@@ -29,4 +29,32 @@ describe("readGeoRuntimeConfig", () => {
     expect(validation.shouldFailFast).toBe(true);
     expect(validation.errors.length).toBeGreaterThan(0);
   });
+
+  it("honors GEO_SERVICE_ENABLED=false when custom base URL exists", () => {
+    const env = {
+      GEO_SERVICE_ENABLED: "false",
+      GEO_SERVICE_BASE_URL: "https://geo.perbug.com",
+      NOMINATIM_BASE_URL: "https://nominatim.perbug.com"
+    };
+    const config = readGeoRuntimeConfig(env);
+    const validation = validateGeoRuntimeConfig(config, env);
+    expect(validation.mode).toBe("nominatim");
+  });
+
+  it("uses explicit GEO_MODE for custom and nominatim modes", () => {
+    const nominatimEnv = {
+      GEO_MODE: "nominatim",
+      GEO_SERVICE_ENABLED: "true",
+      NOMINATIM_BASE_URL: "https://nominatim.perbug.com"
+    };
+    const nominatimConfig = readGeoRuntimeConfig(nominatimEnv);
+    expect(validateGeoRuntimeConfig(nominatimConfig, nominatimEnv).mode).toBe("nominatim");
+
+    const customEnv = {
+      GEO_MODE: "custom",
+      GEO_SERVICE_BASE_URL: "https://geo.perbug.com"
+    };
+    const customConfig = readGeoRuntimeConfig(customEnv);
+    expect(validateGeoRuntimeConfig(customConfig, customEnv).mode).toBe("custom");
+  });
 });

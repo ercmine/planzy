@@ -49,6 +49,8 @@ import { createSponsoredLocationsHttpHandlers } from "../sponsoredLocations/http
 import { createDryadEconomyHttpHandlers } from "../perbugEconomy/http.js";
 import { createViewerEngagementRewardsHttpHandlers } from "../viewerEngagementRewards/http.js";
 import { createDryadMarketplaceHttpHandlers } from "../dryad/http.js";
+import { createPerbugMarketplaceHttpHandlers } from "../perbugMarketplace/http.js";
+import { createWalletAuthHttpHandlers } from "../walletAuth/http.js";
 const DEFAULT_PUBLIC_API_BASE_URL = "https://api.perbug.com";
 const DEFAULT_GOOGLE_PLACES_PHOTO_MEDIA_BASE_URL = "https://places.googleapis.com/v1";
 const PREMIUM_CONTENT = {
@@ -111,7 +113,7 @@ export function createRoutes(service, merchantService, deps) {
         rateLimitPerMinute: Number(process.env.GEO_PUBLIC_RATE_LIMIT_PER_MINUTE ?? 180),
         listCanonicalPlaces: () => deps?.placeService?.listCanonicalPlaces() ?? [],
         getStatus: () => ({
-            mode: deps?.geoStatus?.mode ?? (deps?.geoGateway ? "remote" : "disabled"),
+            mode: deps?.geoStatus?.mode ?? (deps?.geoGateway ? "custom" : "disabled"),
             routesMounted: true,
             upstreamBaseUrl: deps?.geoStatus?.upstreamBaseUrl,
             envValidationErrors: deps?.geoStatus?.validationErrors ?? [],
@@ -140,12 +142,15 @@ export function createRoutes(service, merchantService, deps) {
     const socialGamificationHandlers = deps?.socialGamificationService ? createSocialGamificationHttpHandlers(deps.socialGamificationService) : null;
     const gamificationControlHandlers = deps?.gamificationControlService ? createGamificationControlHttpHandlers(deps.gamificationControlService) : null;
     const dryadRewardsHandlers = deps?.dryadRewardsService ? createDryadRewardsHttpHandlers(deps.dryadRewardsService) : null;
+    const walletAuthHandlers = deps?.walletAuthService ? createWalletAuthHttpHandlers(deps.walletAuthService) : null;
     const dryadTipsHandlers = deps?.dryadTipsService ? createDryadTipsHttpHandlers(deps.dryadTipsService) : null;
     const competitionHandlers = deps?.competitionService ? createCompetitionHttpHandlers(deps.competitionService) : null;
     const sponsoredLocationHandlers = deps?.sponsoredLocationsService ? createSponsoredLocationsHttpHandlers(deps.sponsoredLocationsService) : null;
     const economyHandlers = deps?.dryadEconomyService ? createDryadEconomyHttpHandlers(deps.dryadEconomyService) : null;
     const viewerRewardsHandlers = deps?.viewerEngagementRewardsService ? createViewerEngagementRewardsHttpHandlers(deps.viewerEngagementRewardsService) : null;
     const dryadMarketplaceHandlers = deps?.dryadMarketplaceService ? createDryadMarketplaceHttpHandlers(deps.dryadMarketplaceService) : null;
+    const perbugWorldHandlers = deps?.perbugWorldHandlers ?? null;
+    const perbugMarketplaceHandlers = deps?.perbugMarketplaceService ? createPerbugMarketplaceHttpHandlers(deps.perbugMarketplaceService) : null;
     const placeAutocompleteCache = new Map();
     const adminHandlers = deps?.accountsService && deps?.moderationService
         ? createAdminHttpHandlers(new AdminService({
@@ -172,6 +177,76 @@ export function createRoutes(service, merchantService, deps) {
         const url = new URL(req.url ?? "/", base);
         const normalizedPath = normalizeAliasPath(url.pathname);
         try {
+            if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/listings" && perbugMarketplaceHandlers) {
+                await perbugMarketplaceHandlers.listListings(req, res);
+                return;
+            }
+            const perbugListingDetailMatch = matchPath("/v1/perbug/marketplace/listings/:listingId", normalizedPath);
+            if (req.method === "GET" && perbugListingDetailMatch && perbugMarketplaceHandlers) {
+                await perbugMarketplaceHandlers.getListingDetail(req, res, perbugListingDetailMatch.listingId);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/featured" && perbugMarketplaceHandlers) {
+                await perbugMarketplaceHandlers.featuredListings(req, res);
+                return;
+            }
+            const perbugCategoryMatch = matchPath("/v1/perbug/marketplace/categories/:category", normalizedPath);
+            if (req.method === "GET" && perbugCategoryMatch && perbugMarketplaceHandlers) {
+                await perbugMarketplaceHandlers.listByCategory(req, res, perbugCategoryMatch.category);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/search" && perbugMarketplaceHandlers) {
+                await perbugMarketplaceHandlers.search(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/categories" && perbugMarketplaceHandlers) {
+                await perbugMarketplaceHandlers.categories(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/analytics" && perbugMarketplaceHandlers) {
+                await perbugMarketplaceHandlers.analytics(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/perbug/marketplace/capabilities" && perbugMarketplaceHandlers) {
+                await perbugMarketplaceHandlers.capabilities(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/perbug/world/bootstrap" && perbugWorldHandlers) {
+                await perbugWorldHandlers.bootstrap(req, res);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/perbug/world/move" && perbugWorldHandlers) {
+                await perbugWorldHandlers.move(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/perbug/world/encounter/preview" && perbugWorldHandlers) {
+                await perbugWorldHandlers.previewEncounter(req, res);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/launch" && perbugWorldHandlers) {
+                await perbugWorldHandlers.launchEncounter(req, res);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/action" && perbugWorldHandlers) {
+                await perbugWorldHandlers.submitEncounterAction(req, res);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/finalize" && perbugWorldHandlers) {
+                await perbugWorldHandlers.finalizeEncounter(req, res);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/abandon" && perbugWorldHandlers) {
+                await perbugWorldHandlers.abandonEncounter(req, res);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/retry" && perbugWorldHandlers) {
+                await perbugWorldHandlers.retryEncounter(req, res);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/perbug/world/encounter/resolve" && perbugWorldHandlers) {
+                await perbugWorldHandlers.resolveEncounter(req, res);
+                return;
+            }
             if (req.method === "GET" && normalizedPath === "/v1/competition/home" && competitionHandlers) {
                 await competitionHandlers.home(req, res);
                 return;
@@ -629,6 +704,30 @@ export function createRoutes(service, merchantService, deps) {
                 await collectionsHandlers.list(req, res);
                 return;
             }
+            if (req.method === "POST" && normalizedPath === "/v1/auth/wallet/challenge" && walletAuthHandlers) {
+                await walletAuthHandlers.createChallenge(req, res);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/auth/wallet/verify" && walletAuthHandlers) {
+                await walletAuthHandlers.verifyChallenge(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/auth/session" && walletAuthHandlers) {
+                await walletAuthHandlers.restoreSession(req, res);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/auth/logout" && walletAuthHandlers) {
+                await walletAuthHandlers.logout(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/auth/wallets" && walletAuthHandlers) {
+                await walletAuthHandlers.listWallets(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/auth/wallet-events" && walletAuthHandlers) {
+                await walletAuthHandlers.verificationEvents(req, res);
+                return;
+            }
             if (req.method === "POST" && normalizedPath === "/v1/wallet-auth/nonce" && dryadRewardsHandlers) {
                 await dryadRewardsHandlers.createWalletNonce(req, res);
                 return;
@@ -854,10 +953,6 @@ export function createRoutes(service, merchantService, deps) {
                     service: "dryad-api",
                     version: "1.0.0"
                 });
-                return;
-            }
-            if (deps?.geoGateway && req.method === "GET" && normalizedPath === "/health") {
-                await geoHandlers.health(req, res);
                 return;
             }
             if (deps?.geoGateway && req.method === "GET" && normalizedPath === "/ready") {
@@ -1384,11 +1479,31 @@ export function createRoutes(service, merchantService, deps) {
                 return;
             }
             if (req.method === "GET" && normalizedPath === "/health") {
+                const geoMode = deps?.geoStatus?.mode ?? (deps?.geoGateway ? "custom" : "disabled");
+                const geoValidationErrors = deps?.geoStatus?.validationErrors ?? [];
+                const geoValidationWarnings = deps?.geoStatus?.validationWarnings ?? [];
+                const geoConfigured = Boolean(deps?.geoGateway);
+                const geoHealthy = geoMode === "disabled"
+                    ? true
+                    : geoConfigured && geoValidationErrors.length === 0;
+                const overallOk = true;
                 sendJson(res, 200, {
-                    ok: true,
+                    ok: overallOk,
                     service: "dryad-api",
                     version: "1.0.0",
-                    time: new Date().toISOString()
+                    time: new Date().toISOString(),
+                    dependencies: {
+                        geo: {
+                            mode: geoMode,
+                            configured: geoConfigured,
+                            healthy: geoHealthy,
+                            required: false,
+                            degraded: !geoHealthy,
+                            upstreamBaseUrl: deps?.geoStatus?.upstreamBaseUrl ?? null,
+                            validationErrors: geoValidationErrors,
+                            validationWarnings: geoValidationWarnings
+                        }
+                    }
                 });
                 return;
             }

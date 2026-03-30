@@ -91,11 +91,11 @@ export function initBackendGeoRuntime(env = process.env) {
     const validation = validateGeoRuntimeConfig(config, env);
     let gateway = null;
     let upstreamBaseUrl;
-    if (validation.mode === "remote" && validation.errors.length === 0) {
+    if (validation.mode === "custom" && validation.errors.length === 0) {
         upstreamBaseUrl = config.client.baseUrl;
         gateway = new RemoteGeoGateway(new GeoServiceClient(config.client));
     }
-    if (validation.mode === "local" && validation.errors.length === 0 && config.local.nominatimBaseUrl) {
+    if (validation.mode === "nominatim" && validation.errors.length === 0 && config.local.nominatimBaseUrl) {
         upstreamBaseUrl = config.local.nominatimBaseUrl;
         const service = new GeocodingService({
             baseUrl: config.local.nominatimBaseUrl,

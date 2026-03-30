@@ -46,6 +46,9 @@ import type { SponsoredLocationsService } from "../sponsoredLocations/service.js
 import type { DryadEconomyService } from "../perbugEconomy/service.js";
 import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
 import type { DryadMarketplaceService } from "../dryad/service.js";
+import type { createPerbugWorldHttpHandlers } from "../perbugWorld/http.js";
+import type { PerbugMarketplaceService } from "../perbugMarketplace/service.js";
+import type { WalletAuthService } from "../walletAuth/service.js";
 export declare function matchPath(pattern: string, pathname: string): Record<string, string> | null;
 export declare function createHttpServer(service: VenueClaimsService, merchantService: MerchantService, deps?: {
     deckHandler?: SessionDeckHandler;
@@ -96,4 +99,7 @@ export declare function createHttpServer(service: VenueClaimsService, merchantSe
     dryadEconomyService?: DryadEconomyService;
     viewerEngagementRewardsService?: ViewerEngagementRewardsService;
     dryadMarketplaceService?: DryadMarketplaceService;
+    perbugWorldHandlers?: ReturnType<typeof createPerbugWorldHttpHandlers>;
+    perbugMarketplaceService?: PerbugMarketplaceService;
+    walletAuthService?: WalletAuthService;
 }): Server;

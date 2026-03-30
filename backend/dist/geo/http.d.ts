@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { CanonicalPlace } from "../places/types.js";
 import type { GeoGateway } from "./gateway.js";
 export interface GeoRuntimeStatus {
-    mode: "remote" | "local" | "disabled";
+    mode: "custom" | "nominatim" | "disabled";
     routesMounted: boolean;
     upstreamBaseUrl?: string;
     envValidationErrors: string[];

@@ -404,8 +404,17 @@ export function createServer(options?: CreateServerOptions) {
 }
 
 export function main(): void {
-  const server = createServer();
   const port = Number(process.env.PORT ?? 8080);
+  console.info("[api.startup]", {
+    port,
+    nodeEnv: process.env.NODE_ENV ?? "dev",
+    appEnv: process.env.APP_ENV ?? null,
+    geoMode: process.env.GEO_MODE ?? null,
+    geoServiceEnabled: process.env.GEO_SERVICE_ENABLED ?? null,
+    geoServiceBaseUrl: process.env.GEO_SERVICE_BASE_URL ?? null,
+    nominatimBaseUrl: process.env.NOMINATIM_BASE_URL ?? null
+  });
+  const server = createServer();
   server.listen(port, () => {
     console.log(`Server listening on :${port}`);
   });
