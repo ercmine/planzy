@@ -11,10 +11,8 @@ import '../../core/navigation/navigation_utils.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_state.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';
-import '../../core/env/env.dart';
 import 'map_discovery_models.dart';
-import 'map_game_world.dart';
-import 'perbug_maplibre_view.dart';
+import 'perbug_world_map_view.dart';
 import 'perbug_asset_registry.dart';
 import 'perbug_economy_models.dart';
 import 'perbug_game_controller.dart';
@@ -47,7 +45,6 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     final onboardingController = ref.read(onboardingControllerProvider.notifier);
     final moves = state.reachableMoves().take(8).toList(growable: false);
     final currentNode = state.currentNode;
-    final config = ref.watch(envConfigProvider).mapStack;
     if (currentNode != null && _selectedNodeId == null) _selectedNodeId = currentNode.id;
     if (currentNode != null && _mapAnchoredNodeId != currentNode.id) {
       _mapAnchoredNodeId = currentNode.id;
@@ -55,8 +52,6 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     }
     final selectedNode = _selectedNode(state);
     final selectedMove = selectedNode == null ? null : _moveForNode(state, selectedNode.id);
-    final pins = state.nodes.map(_mapPinFromNode).toList(growable: false);
-    final world = const MapWorldEngine().build(pins: pins, viewport: _mapViewport);
 
     return RefreshIndicator(
       onRefresh: controller.initialize,
@@ -166,30 +161,16 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                     borderRadius: BorderRadius.circular(16),
                     child: Stack(
                       children: [
-                        DryadMapLibreView(
+                        PerbugWorldMapView(
                           viewport: _mapViewport,
-                          pins: pins,
-                          selectedPlaceId: null,
-                          userLocation: currentNode == null ? null : (lat: currentNode.latitude, lng: currentNode.longitude),
-                          world: world,
-                          sponsoredPlaceIds: const <String>{},
-                          questPlaceIds: const <String>{},
-                          collectionPlaceIds: const <String>{},
-                          is3dMode: false,
-                          config: config,
-                          tacticalNodes: state.nodes,
-                          tacticalConnections: state.connections,
+                          nodes: state.nodes,
+                          connections: state.connections,
                           currentNodeId: state.currentNodeId,
                           selectedNodeId: selectedNode?.id,
                           reachableNodeIds: state.reachableMoves().where((m) => m.isReachable).map((m) => m.node.id).toSet(),
                           completedNodeIds: state.visitedNodeIds,
-                          onMapLoadStarted: () {},
-                          onMapReady: () {},
-                          onMapLoadError: (_) {},
                           onViewportChanged: (viewport, {required hasGesture}) => setState(() => _mapViewport = viewport),
                           onTapEmpty: () => setState(() => _selectedNodeId = null),
-                          onLongPress: (_, __) {},
-                          onPlaceSelected: (_) {},
                           onNodeSelected: (nodeId) => setState(() => _selectedNodeId = nodeId),
                         ),
                         Positioned(
@@ -701,21 +682,6 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     return null;
   }
 
-  MapPin _mapPinFromNode(PerbugNode node) {
-    return MapPin(
-      canonicalPlaceId: node.placeId,
-      name: node.label,
-      category: node.nodeType.name,
-      latitude: node.latitude,
-      longitude: node.longitude,
-      rating: (node.rarityScore * 0.9).clamp(0.1, 1.0),
-      city: node.city,
-      region: node.region,
-      neighborhood: node.neighborhood,
-      hasCreatorMedia: node.nodeType == PerbugNodeType.rare || node.nodeType == PerbugNodeType.event,
-      hasReviews: node.nodeType == PerbugNodeType.encounter || node.nodeType == PerbugNodeType.mission,
-    );
-  }
 }
 
 class _OnboardingCoachCard extends StatelessWidget {
