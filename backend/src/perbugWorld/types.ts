@@ -7,6 +7,11 @@ export type EncounterFailureReason = "rules_failed" | "timeout" | "abandoned" | 
 
 export interface PerbugNode {
   id: string;
+  chunkId?: string;
+  macroRegionId?: string;
+  districtId?: string;
+  factionZoneId?: string;
+  progressionBandId?: string;
   label: string;
   lat: number;
   lng: number;
@@ -15,6 +20,8 @@ export interface PerbugNode {
   rarity?: "common" | "uncommon" | "rare" | "epic" | "legendary";
   nodeType: PerbugNodeType;
   difficulty: number;
+  macroDanger?: number;
+  landmarkInfluence?: number;
   state: PerbugNodeState;
   energyReward: number;
 }
