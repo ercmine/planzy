@@ -72,7 +72,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       }
 
       final bool useFallback = generationError != null || pins.isEmpty;
-      final worldSnapshot = useFallback
+      final PerbugNodeWorldSnapshot worldSnapshot = useFallback
           ? _buildFallbackWorld(
               viewport: viewport,
               area: area,
@@ -103,7 +103,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
           ...worldSnapshot.debug,
           'generation_status': useFallback ? 'fallback' : 'ready',
           'fallback_active': useFallback,
-          'fallback_reason': useFallback ? (generationError?.toString() ?? 'empty pins') : null,
+          if (useFallback) 'fallback_reason': generationError?.toString() ?? 'empty pins',
           'location_status': locationState.status.name,
           'location_mode': location == null ? 'demo' : 'real',
         },
@@ -140,7 +140,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
     return initialize(requestLocationPermission: true);
   }
 
-  ({List<PerbugNode> nodes, Map<String, Set<String>> connections, Map<String, Object> debug}) _buildFallbackWorld({
+  PerbugNodeWorldSnapshot _buildFallbackWorld({
     required MapViewport viewport,
     required ReverseGeocodeResult? area,
     required String reason,
@@ -196,7 +196,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
       connections[current.id] = {next.id, prev.id};
     }
 
-    return (
+    return PerbugNodeWorldSnapshot(
       nodes: nodes,
       connections: connections,
       debug: <String, Object>{
