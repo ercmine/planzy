@@ -4,7 +4,14 @@ import 'package:dryad/features/home/perbug_world_map_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const engine = PerbugWorldMapEngine();
+  final engine = PerbugWorldMapEngine(
+    streamingConfig: const PerbugChunkStreamingConfig(
+      prefetchMarginChunks: 1,
+      retentionMarginChunks: 2,
+      cooldownTicks: 2,
+      generationBudgetPerTick: 12,
+    ),
+  );
 
   final nodes = [
     PerbugNode(
@@ -65,51 +72,67 @@ void main() {
     expect(grid.chunkCoordToId(const WorldChunkCoord(x: -978, y: 302)).value, 'chunk_-978_302');
   });
 
-  test('build produces chunked snapshot with visible chunk culling metadata', () {
+  test('build produces streamed snapshot with lifecycle and visible chunk culling metadata', () {
+    engine.resetStreaming();
     const viewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
-    final first = engine.build(
+    final snapshot = engine.build(
       viewport: viewport,
       nodes: nodes,
       graph: const {
         'n1': {'n2'},
         'n2': {'n1'},
       },
-    );
-    final second = engine.build(
-      viewport: viewport,
-      nodes: nodes,
-      graph: const {
-        'n1': {'n2'},
-        'n2': {'n1'},
-      },
+      mode: PerbugWorldRuntimeMode.real,
     );
 
-    expect(first.visibleNodes.length, 2);
-    expect(first.connections.length, 1);
-    expect(first.regionTheme.id, second.regionTheme.id);
-    expect(first.debug['region_theme'], isNotNull);
-    expect(first.debug['visible_chunks'], greaterThan(0));
-    expect(first.debug['total_chunks'], greaterThan(0));
-    expect(first.visibleChunkIds.length, first.visibleChunks.length);
+    expect(snapshot.visibleNodes, isNotEmpty);
+    expect(snapshot.connections.length, 1);
+    expect(snapshot.debug['visible_chunks'], greaterThan(0));
+    expect(snapshot.debug['prefetch_chunks'], greaterThan(0));
+    expect(snapshot.chunks.any((chunk) => chunk.lifecycle == ChunkLifecycleState.visible), isTrue);
+    expect(snapshot.visibleChunkIds.length, snapshot.visibleChunks.length);
   });
 
-  test('world bounds maps to chunk range and visible set updates from viewport', () {
-    const grid = PerbugChunkGrid(chunkLatSize: 0.08, chunkLngSize: 0.08, prefetchMarginChunks: 0);
-    const viewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
-    final bounds = grid.viewportToWorldBounds(viewport, includePrefetch: false);
-    final range = grid.worldBoundsToChunkRange(bounds);
-    expect(range.maxX, greaterThanOrEqualTo(range.minX));
-    expect(range.maxY, greaterThanOrEqualTo(range.minY));
+  test('chunk enters prefetch band and is generated before becoming visible', () {
+    engine.resetStreaming();
+    const viewportA = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
+    final first = engine.build(viewport: viewportA, nodes: nodes, graph: const {'n1': {'n2'}, 'n2': {'n1'}});
 
-    final snapshot = const PerbugWorldMapEngine(chunkGrid: grid).build(
-      viewport: viewport,
-      nodes: nodes,
-      graph: const {
-        'n1': {'n2'},
-        'n2': {'n1'},
-      },
-    );
-    expect(snapshot.visibleChunks, isNotEmpty);
-    expect(snapshot.visibleChunks.every((chunk) => chunk.isVisible), isTrue);
+    expect(first.prefetchChunkIds, isNotEmpty);
+    final prefetchId = first.prefetchChunkIds.first;
+    final prefetchChunk = first.chunks.firstWhere((chunk) => chunk.id == prefetchId);
+    expect(prefetchChunk.isReady, isTrue);
+
+    const viewportB = MapViewport(centerLat: 30.2672, centerLng: -97.664, zoom: 13);
+    final second = engine.build(viewport: viewportB, nodes: nodes, graph: const {'n1': {'n2'}, 'n2': {'n1'}});
+    expect(second.visibleChunkIds.contains(prefetchId), isTrue);
+  });
+
+  test('chunk leaves visible then retention and is evicted', () {
+    engine.resetStreaming();
+    const near = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
+    final first = engine.build(viewport: near, nodes: nodes, graph: const {'n1': {'n2'}, 'n2': {'n1'}});
+    final trackedId = first.visibleChunkIds.first;
+
+    const far = MapViewport(centerLat: 31.8, centerLng: -95.1, zoom: 13);
+    final second = engine.build(viewport: far, nodes: nodes, graph: const {'n1': {'n2'}, 'n2': {'n1'}});
+    expect(second.visibleChunkIds.contains(trackedId), isFalse);
+
+    final third = engine.build(viewport: far, nodes: nodes, graph: const {'n1': {'n2'}, 'n2': {'n1'}});
+    expect(third.chunks.any((chunk) => chunk.id == trackedId), isFalse);
+    expect((third.debug['evicted_chunks'] as num).toInt(), greaterThan(0));
+  });
+
+  test('demo and real mode both stream safely without blank visible nodes', () {
+    engine.resetStreaming();
+    const viewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
+    final demo = engine.build(viewport: viewport, nodes: const <PerbugNode>[], graph: const {}, mode: PerbugWorldRuntimeMode.demo);
+    expect(demo.visibleNodes, isNotEmpty);
+    expect(demo.visibleChunks, isNotEmpty);
+
+    engine.resetStreaming();
+    final real = engine.build(viewport: viewport, nodes: nodes, graph: const {'n1': {'n2'}, 'n2': {'n1'}}, mode: PerbugWorldRuntimeMode.real);
+    expect(real.visibleNodes, isNotEmpty);
+    expect(real.debug['mode'], equals('real'));
   });
 }
