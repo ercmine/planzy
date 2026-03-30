@@ -139,25 +139,26 @@ class _PerbugWorldPainter extends CustomPainter {
     final rect = Offset.zero & size;
     _paintBackdrop(canvas, rect);
     _paintTerrain(canvas, size);
+    _paintFog(canvas, rect);
     _paintGrid(canvas, size);
     _paintConnections(canvas, size);
+    _paintSelectedPath(canvas, size);
     _paintNodes(canvas, size);
+    _paintPlayerPresence(canvas, size);
   }
 
   void _paintBackdrop(Canvas canvas, Rect rect) {
+    final palette = snapshot.regionTheme.palette.map((value) => Color(value)).toList(growable: false);
     final gradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [
-        const Color(0xFF0A1D33),
-        const Color(0xFF132D4C),
-        const Color(0xFF193B5C),
-      ],
+      colors: [palette[0], palette[1], palette[2]],
     );
     canvas.drawRect(rect, Paint()..shader = gradient.createShader(rect));
   }
 
   void _paintTerrain(Canvas canvas, Size size) {
+    final palette = snapshot.regionTheme.palette.map((value) => Color(value)).toList(growable: false);
     for (var i = 0; i < snapshot.terrainBands.length; i++) {
       final band = snapshot.terrainBands[i];
       final path = Path();
@@ -178,9 +179,24 @@ class _PerbugWorldPainter extends CustomPainter {
         path,
         Paint()
           ..style = PaintingStyle.fill
-          ..color = Color.lerp(const Color(0xFF1C3F3B), const Color(0xFF5C4F2D), i / snapshot.terrainBands.length)!.withOpacity(0.23),
+          ..color = Color.lerp(palette[1], palette.last, i / snapshot.terrainBands.length)!.withOpacity(0.24),
       );
     }
+  }
+
+  void _paintFog(Canvas canvas, Rect rect) {
+    final fog = snapshot.regionTheme.fogIntensity;
+    if (fog <= 0) return;
+    final shader = RadialGradient(
+      center: const Alignment(0, -0.3),
+      radius: 1.1,
+      colors: [
+        Colors.transparent,
+        Colors.black.withOpacity((0.18 + fog * 0.4).clamp(0, 0.5)),
+      ],
+      stops: const [0.58, 1],
+    ).createShader(rect);
+    canvas.drawRect(rect, Paint()..shader = shader);
   }
 
   void _paintGrid(Canvas canvas, Size size) {
@@ -212,6 +228,31 @@ class _PerbugWorldPainter extends CustomPainter {
     }
   }
 
+  void _paintSelectedPath(Canvas canvas, Size size) {
+    if (currentNodeId == null || selectedNodeId == null || currentNodeId == selectedNodeId) return;
+    final from = _findNode(currentNodeId!);
+    final to = _findNode(selectedNodeId!);
+    if (from == null || to == null) return;
+    final projection = PerbugGeoProjection(viewport);
+    final start = projection.project(PerbugGeoPoint(lat: from.latitude, lng: from.longitude));
+    final end = projection.project(PerbugGeoPoint(lat: to.latitude, lng: to.longitude));
+    final a = Offset(start.x * size.width, start.y * size.height);
+    final b = Offset(end.x * size.width, end.y * size.height);
+    final mid = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2 - 18);
+
+    final path = Path()
+      ..moveTo(a.dx, a.dy)
+      ..quadraticBezierTo(mid.dx, mid.dy, b.dx, b.dy);
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = const Color(0xFFF6C85F).withOpacity(0.9),
+    );
+  }
+
   void _paintNodes(Canvas canvas, Size size) {
     final projection = PerbugGeoProjection(viewport);
     for (final node in snapshot.visibleNodes) {
@@ -222,6 +263,14 @@ class _PerbugWorldPainter extends CustomPainter {
       final selected = node.id == selectedNodeId;
       final completed = completedNodeIds.contains(node.id);
       final reachable = reachableNodeIds.contains(node.id);
+
+      if (node.nodeType == PerbugNodeType.rare || node.nodeType == PerbugNodeType.event || node.nodeType == PerbugNodeType.boss) {
+        canvas.drawCircle(
+          center,
+          selected ? 26 : 22,
+          Paint()..color = visual.color.withOpacity(0.16),
+        );
+      }
 
       canvas.drawCircle(
         center,
@@ -264,11 +313,52 @@ class _PerbugWorldPainter extends CustomPainter {
     }
   }
 
+  void _paintPlayerPresence(Canvas canvas, Size size) {
+    if (currentNodeId == null) return;
+    final currentNode = _findNode(currentNodeId!);
+    if (currentNode == null) return;
+    final projection = PerbugGeoProjection(viewport);
+    final projected = projection.project(PerbugGeoPoint(lat: currentNode.latitude, lng: currentNode.longitude));
+    final center = Offset(projected.x * size.width, projected.y * size.height);
+
+    canvas.drawCircle(
+      center,
+      42,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = const Color(0xFF9DE4D9).withOpacity(0.45),
+    );
+
+    canvas.drawCircle(
+      center,
+      12,
+      Paint()..color = const Color(0xFFFFF4B5),
+    );
+    canvas.drawCircle(
+      center,
+      18,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..color = const Color(0xFFFFD166),
+    );
+  }
+
+
+  PerbugNode? _findNode(String id) {
+    for (final node in snapshot.visibleNodes) {
+      if (node.id == id) return node;
+    }
+    return null;
+  }
+
   @override
   bool shouldRepaint(covariant _PerbugWorldPainter oldDelegate) {
     return oldDelegate.viewport != viewport ||
         oldDelegate.snapshot.visibleNodes != snapshot.visibleNodes ||
         oldDelegate.snapshot.connections != snapshot.connections ||
+        oldDelegate.snapshot.regionTheme != snapshot.regionTheme ||
         oldDelegate.selectedNodeId != selectedNodeId ||
         oldDelegate.currentNodeId != currentNodeId ||
         oldDelegate.reachableNodeIds != reachableNodeIds ||
