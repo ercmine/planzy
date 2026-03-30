@@ -800,6 +800,16 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                         ],
                       ),
                     ),
+                  if (location == null && _mapReady && _mapLoadError == null)
+                    Positioned(
+                      right: 16,
+                      bottom: 156,
+                      child: FilledButton.icon(
+                        onPressed: () => _handleCenterOnUserLocation(locationState, permissionService),
+                        icon: const Icon(Icons.location_searching_rounded),
+                        label: const Text('Enable location'),
+                      ),
+                    ),
                 ],
               ),
             ),
