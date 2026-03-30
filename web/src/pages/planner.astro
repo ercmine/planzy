@@ -51,6 +51,26 @@ import Container from '../components/Container.astro';
   const status = document.getElementById('planner-status');
   const result = document.getElementById('planner-result');
 
+  const escapeHtml = (value) => String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
+  const buildMapSrc = (itinerary, requestCity) => {
+    const placeQuery = (itinerary.stops ?? [])
+      .slice(0, 5)
+      .map((stop) => stop.address || stop.placeTitle)
+      .filter(Boolean)
+      .join(', ');
+
+    const searchQuery = [placeQuery, itinerary.city, requestCity].filter(Boolean).join(', ');
+    if (!searchQuery) return '';
+
+    return `https://www.google.com/maps?q=${encodeURIComponent(searchQuery)}&output=embed`;
+  };
+
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!status || !result || !form) return;
@@ -72,12 +92,17 @@ import Container from '../components/Container.astro';
       if (!response.ok) throw new Error('Generation failed');
       const itinerary = await response.json();
       status.textContent = `Generated ${itinerary.stops?.length ?? 0} stops.`;
+      const mapSrc = buildMapSrc(itinerary, payload.city);
+      const mapMarkup = mapSrc
+        ? `<div class="mt-4"><h3 class="text-sm font-medium text-slate-300">Map preview</h3><iframe class="mt-2 h-64 w-full rounded-lg border border-slate-700 bg-slate-950" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Map preview of itinerary stops" src="${mapSrc}"></iframe></div>`
+        : '';
       result.innerHTML = `
-        <h2 class="text-lg font-semibold text-slate-100">${itinerary.title}</h2>
-        <p class="mt-2 text-sm text-slate-300">${itinerary.summary}</p>
+        <h2 class="text-lg font-semibold text-slate-100">${escapeHtml(itinerary.title)}</h2>
+        <p class="mt-2 text-sm text-slate-300">${escapeHtml(itinerary.summary)}</p>
         <ol class="mt-4 space-y-3">
-          ${(itinerary.stops ?? []).map((stop) => `<li class=\"rounded-lg border border-slate-700 p-3\"><div class=\"text-slate-100 font-medium\">${stop.sequence}. ${stop.placeTitle}</div><div class=\"text-sm text-slate-400\">${stop.reasonIncluded}</div></li>`).join('')}
+          ${(itinerary.stops ?? []).map((stop) => `<li class=\"rounded-lg border border-slate-700 p-3\"><div class=\"text-slate-100 font-medium\">${escapeHtml(stop.sequence)}. ${escapeHtml(stop.placeTitle)}</div><div class=\"text-sm text-slate-400\">${escapeHtml(stop.reasonIncluded)}</div></li>`).join('')}
         </ol>
+        ${mapMarkup}
       `;
     } catch (error) {
       status.textContent = 'Could not generate itinerary. Try again with broader filters.';
