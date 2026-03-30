@@ -7,7 +7,7 @@ import 'package:dryad/features/home/perbug_world_map_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const worldEngine = PerbugWorldMapEngine();
+  final worldEngine = PerbugWorldMapEngine();
   const renderEngine = PerbugRenderEngine();
 
   const viewport = MapViewport(centerLat: 37.7749, centerLng: -122.4194, zoom: 11.2);
@@ -125,6 +125,26 @@ void main() {
     expect(snapshot.chunks.length, greaterThanOrEqualTo(snapshot.visibleChunks.length));
     expect(frame.nodes.any((node) => node.id == 'n3_far'), isFalse);
     expect(frame.nodes.every((node) => snapshot.visibleChunkIds.contains(node.chunkId)), isTrue);
+  });
+
+  test('renderer paints only ready visible chunks when pending exists', () {
+    final streamingEngine = PerbugWorldMapEngine(
+      streamingConfig: const PerbugChunkStreamingConfig(generationBudgetPerTick: 1, prefetchMarginChunks: 0, retentionMarginChunks: 1),
+    );
+    final snapshot = streamingEngine.build(viewport: viewport, nodes: const <PerbugNode>[], graph: const {}, mode: PerbugWorldRuntimeMode.demo);
+    final frame = renderEngine.composeFrame(
+      viewport: viewport,
+      canvasSize: const Size(1000, 700),
+      snapshot: snapshot,
+      currentNodeId: null,
+      selectedNodeId: null,
+      hoverNodeId: null,
+      reachableNodeIds: const <String>{},
+      completedNodeIds: const <String>{},
+    );
+
+    expect(frame.nodes.every((node) => snapshot.visibleChunkIds.contains(node.chunkId)), isTrue);
+    expect((snapshot.debug['pending_visible_chunks'] as num).toInt(), greaterThanOrEqualTo(0));
   });
 
   test('hit testing returns nearby node id', () {
