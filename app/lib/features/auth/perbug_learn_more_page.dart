@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/app_routes.dart';
+import '../../app/theme/widgets.dart';
 import '../../core/identity/identity_provider.dart';
 import '../dryad/chain/dryad_chain_providers.dart';
 import '../home/perbug_asset_models.dart';
@@ -14,8 +15,9 @@ class PerbugLearnMorePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: const Color(0xFF0E0A18),
+    return AppScaffold(
+      backgroundStyle: PerbugBackgroundStyle.strongerScrim,
+      padding: EdgeInsets.zero,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: const Color(0xFFFFE2A6),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/app_providers.dart';
+import '../../app/theme/widgets.dart';
 import '../../core/widgets/app_back_button.dart';
 
 class SubscriptionPage extends ConsumerWidget {
@@ -12,7 +13,7 @@ class SubscriptionPage extends ConsumerWidget {
     final subscriptionAsync = ref.watch(subscriptionOverviewProvider);
     final entitlementsAsync = ref.watch(entitlementSummaryProvider);
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         leading: const AppBackButton(),
         title: const Text('Subscription & billing')),

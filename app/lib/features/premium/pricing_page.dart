@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/theme/widgets.dart';
 import '../../providers/app_providers.dart';
 import 'premium_copy.dart';
 import 'premium_models.dart';
@@ -33,7 +34,7 @@ class _PricingPageState extends ConsumerState<PricingPage> {
     final plansAsync = ref.watch(premiumPlansProvider(family));
     final entitlementsAsync = ref.watch(entitlementSummaryFamilyProvider(family));
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         leading: const AppBackButton(),
         title: const Text('Premium plans')),

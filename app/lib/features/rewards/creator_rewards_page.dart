@@ -12,7 +12,7 @@ class CreatorRewardsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(rewardDashboardProvider);
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('Creator earnings'),
         actions: [

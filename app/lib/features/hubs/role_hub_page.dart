@@ -14,7 +14,7 @@ class RoleHubPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final normalized = family.toUpperCase();
 
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         leading: const AppBackButton(),
         title: Text(normalized == 'ADMIN' ? 'Creator Community' : '$family Hub'),
