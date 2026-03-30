@@ -97,6 +97,37 @@ enum WorldChunkGenerationStatus { generated, placeholder }
 enum ChunkLifecycleState { uninitialized, queued, generating, ready, visible, coolingDown, evicted }
 enum ChunkStreamingBand { visible, prefetch, retention, outside }
 enum PerbugWorldRuntimeMode { demo, real }
+enum WorldChunkEdge { north, south, east, west }
+
+class WorldChunkEdgeProfile {
+  const WorldChunkEdgeProfile({
+    required this.edge,
+    required this.terrainSamples,
+    required this.biomeWeights,
+    required this.nodeAffinity,
+    required this.connectorFractions,
+    required this.continuityFlags,
+  });
+
+  final WorldChunkEdge edge;
+  final List<double> terrainSamples;
+  final Map<String, double> biomeWeights;
+  final double nodeAffinity;
+  final List<double> connectorFractions;
+  final List<String> continuityFlags;
+}
+
+class WorldChunkSeamProfile {
+  const WorldChunkSeamProfile({
+    required this.edges,
+    required this.landmarkInfluence,
+    required this.ambientBlend,
+  });
+
+  final Map<WorldChunkEdge, WorldChunkEdgeProfile> edges;
+  final double landmarkInfluence;
+  final double ambientBlend;
+}
 
 class WorldChunkCoord {
   const WorldChunkCoord({required this.x, required this.y});
@@ -163,6 +194,7 @@ class WorldChunk {
     required this.localFlavor,
     required this.generatedAtTick,
     required this.lastTouchedTick,
+    required this.seamProfile,
   });
 
   final WorldChunkId id;
@@ -179,6 +211,7 @@ class WorldChunk {
   final String localFlavor;
   final int generatedAtTick;
   final int lastTouchedTick;
+  final WorldChunkSeamProfile seamProfile;
 
   bool get isVisible => visibility == ChunkVisibilityState.visible;
   bool get isReady => lifecycle == ChunkLifecycleState.ready || lifecycle == ChunkLifecycleState.visible;
@@ -293,6 +326,51 @@ class _ChunkRuntimeState {
   int lastTouchedTick = -1;
   int generationMicros = 0;
   bool placeholder = true;
+  WorldChunkSeamProfile seamProfile = const WorldChunkSeamProfile(
+    edges: <WorldChunkEdge, WorldChunkEdgeProfile>{},
+    landmarkInfluence: 0,
+    ambientBlend: 0,
+  );
+}
+
+class _PerbugWorldFieldSampler {
+  const _PerbugWorldFieldSampler(this.seed);
+
+  final int seed;
+
+  double _noise(double x, double y, int channel) {
+    final v = math.sin((x * 12.9898) + (y * 78.233) + (seed * 0.013) + (channel * 37.719));
+    return (v + 1) / 2;
+  }
+
+  double terrainHeight({required double lat, required double lng}) {
+    final low = _noise(lng * 0.7, lat * 0.7, 1);
+    final mid = _noise(lng * 2.3, lat * 2.3, 2);
+    final high = _noise(lng * 6.1, lat * 6.1, 3);
+    return ((low * 0.55) + (mid * 0.3) + (high * 0.15)).clamp(0, 1).toDouble();
+  }
+
+  Map<String, double> biomeWeights({required double lat, required double lng}) {
+    final urban = (_noise(lng * 0.45, lat * 0.45, 4) * 0.9).clamp(0, 1).toDouble();
+    final wilds = (_noise(lng * 0.38, lat * 0.38, 5) * 0.95).clamp(0, 1).toDouble();
+    final rift = (_noise(lng * 0.3, lat * 0.3, 6) * 0.85).clamp(0, 1).toDouble();
+    final total = math.max(0.0001, urban + wilds + rift);
+    return {'urban': urban / total, 'wilds': wilds / total, 'rift': rift / total};
+  }
+
+  double nodeDensity({required double lat, required double lng}) {
+    final base = _noise(lng * 0.95, lat * 0.95, 7);
+    final detail = _noise(lng * 2.9, lat * 2.9, 8);
+    return ((base * 0.7) + (detail * 0.3)).clamp(0, 1).toDouble();
+  }
+
+  double landmarkInfluence({required double lat, required double lng}) {
+    return _noise(lng * 0.2, lat * 0.2, 9);
+  }
+
+  double ambientBlend({required double lat, required double lng}) {
+    return _noise(lng * 0.55, lat * 0.55, 10);
+  }
 }
 
 class PerbugChunkStreamingCoordinator {
@@ -300,11 +378,12 @@ class PerbugChunkStreamingCoordinator {
     this.chunkGrid = const PerbugChunkGrid(),
     this.config = const PerbugChunkStreamingConfig(),
     this.worldSeed = 1337,
-  });
+  }) : _sampler = _PerbugWorldFieldSampler(worldSeed);
 
   final PerbugChunkGrid chunkGrid;
   final PerbugChunkStreamingConfig config;
   final int worldSeed;
+  final _PerbugWorldFieldSampler _sampler;
 
   final Map<WorldChunkCoord, _ChunkRuntimeState> _chunks = <WorldChunkCoord, _ChunkRuntimeState>{};
   int _tick = 0;
@@ -435,6 +514,7 @@ class PerbugChunkStreamingCoordinator {
             localFlavor: state.localFlavor,
             generatedAtTick: state.generatedAtTick,
             lastTouchedTick: state.lastTouchedTick,
+            seamProfile: state.seamProfile,
           ),
         )
         .toList(growable: false);
@@ -452,10 +532,12 @@ class PerbugChunkStreamingCoordinator {
         edges.add((from: node, to: neighbor));
       }
     }
+    edges.addAll(_connectorEdgesForVisibleNodes(worldChunks: worldChunks, visibleChunkIds: visibleChunkIds));
 
     final visibleNodes = [for (final chunk in worldChunks) if (visibleChunkIds.contains(chunk.id)) ...chunk.nodes];
-    final terrainBands = _terrainForViewport(viewport: viewport, nodes: visibleNodes);
-    final theme = _deriveTheme(viewport: viewport, nodes: visibleNodes);
+    final terrainBands = _terrainForViewport(viewport: viewport, sampler: _sampler);
+    final theme = _deriveTheme(viewport: viewport, nodes: visibleNodes, sampler: _sampler);
+    final seamValidation = _validateVisibleChunkSeams(worldChunks: worldChunks, visibleChunkIds: visibleChunkIds);
 
     return PerbugWorldMapSnapshot(
       chunks: List<WorldChunk>.unmodifiable(worldChunks),
@@ -490,6 +572,9 @@ class PerbugChunkStreamingCoordinator {
         'edges': edges.length,
         'region_theme': theme.title,
         'biome': theme.biome,
+        'seam_warnings': seamValidation.warnings,
+        'seam_checks': seamValidation.checks,
+        'seam_warning_count': seamValidation.warnings.length,
       },
     );
   }
@@ -577,13 +662,23 @@ class PerbugChunkStreamingCoordinator {
     state.lifecycle = ChunkLifecycleState.generating;
     final seed = _hashChunk(worldSeed, state.coord.x, state.coord.y, mode.index);
     final rng = math.Random(seed);
+    final seamProfile = _buildSeamProfile(state: state);
 
-    final nodes = nodeBuckets[state.coord] ?? _fallbackNodesForChunk(state: state, seed: seed, mode: mode, context: context);
+    final nodes = nodeBuckets[state.coord] ??
+        _fallbackNodesForChunk(
+          state: state,
+          seed: seed,
+          mode: mode,
+          context: context,
+          seamProfile: seamProfile,
+        );
     final ambientProps = <String>[
       if (mode == PerbugWorldRuntimeMode.demo) 'demo_spores',
-      if (rng.nextDouble() > 0.45) 'windline',
+      if (rng.nextDouble() > 0.45 || seamProfile.ambientBlend > 0.56) 'windline',
       if (rng.nextDouble() > 0.5) 'local_swarm',
-      if (rng.nextDouble() > 0.6) 'relic_echo',
+      if (rng.nextDouble() > 0.6 || seamProfile.landmarkInfluence > 0.68) 'relic_echo',
+      if (seamProfile.landmarkInfluence > 0.72) 'landmark_aura',
+      if (seamProfile.ambientBlend > 0.6) 'seam_fog_blend',
     ];
 
     state.nodes = nodes;
@@ -592,6 +687,7 @@ class PerbugChunkStreamingCoordinator {
     state.placeholder = nodes.every((node) => node.id.startsWith('chunk_fallback_'));
     state.generationOrder = _generationCounter++;
     state.generatedAtTick = _tick;
+    state.seamProfile = seamProfile;
     state.lifecycle = state.band == ChunkStreamingBand.visible ? ChunkLifecycleState.visible : ChunkLifecycleState.ready;
     sw.stop();
     state.generationMicros = sw.elapsedMicroseconds;
@@ -602,18 +698,75 @@ class PerbugChunkStreamingCoordinator {
     required int seed,
     required PerbugWorldRuntimeMode mode,
     required ({String region, String city, String country}) context,
+    required WorldChunkSeamProfile seamProfile,
   }) {
-    final rng = math.Random(seed);
+    final synthetic = <PerbugNode>[];
+    final cellSizeLat = chunkGrid.chunkLatSize / 2;
+    final cellSizeLng = chunkGrid.chunkLngSize / 2;
+    final minCellY = (state.bounds.minLat / cellSizeLat).floor();
+    final maxCellY = (state.bounds.maxLat / cellSizeLat).floor();
+    final minCellX = (state.bounds.minLng / cellSizeLng).floor();
+    final maxCellX = (state.bounds.maxLng / cellSizeLng).floor();
+
+    var index = 0;
+    for (var cellY = minCellY; cellY <= maxCellY; cellY++) {
+      for (var cellX = minCellX; cellX <= maxCellX; cellX++) {
+        final cellSeed = _hashChunk(seed, cellX, cellY, mode.index);
+        final rng = math.Random(cellSeed);
+        final lat = (cellY + rng.nextDouble()) * cellSizeLat;
+        final lng = (cellX + rng.nextDouble()) * cellSizeLng;
+        if (lat < state.bounds.minLat || lat > state.bounds.maxLat || lng < state.bounds.minLng || lng > state.bounds.maxLng) {
+          continue;
+        }
+        final density = _sampler.nodeDensity(lat: lat, lng: lng);
+        if (density < (mode == PerbugWorldRuntimeMode.demo ? 0.28 : 0.38)) continue;
+        final nodeType = PerbugNodeType.values[(cellSeed + index).abs() % PerbugNodeType.values.length];
+        synthetic.add(
+          PerbugNode(
+            id: 'chunk_fallback_${state.coord.x}_${state.coord.y}_${index++}',
+            placeId: 'chunk_fallback_${state.coord.x}_${state.coord.y}_${index}_cell',
+            label: mode == PerbugWorldRuntimeMode.demo ? 'Demo ${nodeType.name}' : 'Waypoint ${nodeType.name}',
+            latitude: lat,
+            longitude: lng,
+            region: context.region,
+            city: context.city,
+            neighborhood: 'Chunk ${state.coord.x}:${state.coord.y}',
+            country: context.country,
+            nodeType: nodeType,
+            difficulty: 1 + (cellSeed + index).abs() % 5,
+            state: PerbugNodeState.available,
+            energyReward: 1 + rng.nextInt(3),
+            movementCost: 1 + rng.nextInt(2),
+            rarityScore: 0.2 + (density * 0.55),
+            tags: {mode.name, 'streamed_chunk', 'worldspace_density'},
+            metadata: {
+              'source': mode == PerbugWorldRuntimeMode.demo ? 'demo_chunk_generator' : 'real_chunk_generator',
+              'seed': seed,
+              'chunk_id': state.id.value,
+              'density': density,
+            },
+          ),
+        );
+      }
+    }
+
+    synthetic.addAll(_connectorNodesForChunk(state: state, mode: mode, context: context, seamProfile: seamProfile, seed: seed));
+    if (synthetic.isNotEmpty) {
+      synthetic.sort((a, b) => a.id.compareTo(b.id));
+      return synthetic;
+    }
+
     final centerLat = (state.bounds.minLat + state.bounds.maxLat) / 2;
     final centerLng = (state.bounds.minLng + state.bounds.maxLng) / 2;
+    final rng = math.Random(seed);
     final count = mode == PerbugWorldRuntimeMode.demo ? 2 : 1;
-    return List<PerbugNode>.generate(count, (index) {
+    return List<PerbugNode>.generate(count, (fallbackIndex) {
       final lat = centerLat + (rng.nextDouble() - 0.5) * chunkGrid.chunkLatSize * 0.55;
       final lng = centerLng + (rng.nextDouble() - 0.5) * chunkGrid.chunkLngSize * 0.55;
-      final nodeType = PerbugNodeType.values[(seed + index).abs() % PerbugNodeType.values.length];
+      final nodeType = PerbugNodeType.values[(seed + fallbackIndex).abs() % PerbugNodeType.values.length];
       return PerbugNode(
-        id: 'chunk_fallback_${state.coord.x}_${state.coord.y}_$index',
-        placeId: 'chunk_fallback_${state.coord.x}_${state.coord.y}_$index',
+        id: 'chunk_fallback_${state.coord.x}_${state.coord.y}_$fallbackIndex',
+        placeId: 'chunk_fallback_${state.coord.x}_${state.coord.y}_$fallbackIndex',
         label: mode == PerbugWorldRuntimeMode.demo ? 'Demo ${nodeType.name}' : 'Waypoint ${nodeType.name}',
         latitude: lat,
         longitude: lng,
@@ -635,6 +788,216 @@ class PerbugChunkStreamingCoordinator {
         },
       );
     }, growable: false);
+  }
+
+  WorldChunkSeamProfile _buildSeamProfile({required _ChunkRuntimeState state}) {
+    WorldChunkEdgeProfile profileFor(WorldChunkEdge edge) {
+      final samples = <double>[];
+      final connectorFractions = <double>[];
+      final biomeAgg = <String, double>{'urban': 0, 'wilds': 0, 'rift': 0};
+      const sampleCount = 5;
+      for (var i = 0; i < sampleCount; i++) {
+        final t = i / (sampleCount - 1);
+        final point = _edgePoint(state.bounds, edge, t);
+        samples.add(_sampler.terrainHeight(lat: point.$1, lng: point.$2));
+        final biome = _sampler.biomeWeights(lat: point.$1, lng: point.$2);
+        for (final key in biome.keys) {
+          biomeAgg[key] = (biomeAgg[key] ?? 0) + (biome[key] ?? 0);
+        }
+      }
+      for (var i = 0; i < 2; i++) {
+        connectorFractions.add(_edgeConnectorFraction(state.coord, edge, i));
+      }
+      return WorldChunkEdgeProfile(
+        edge: edge,
+        terrainSamples: samples,
+        biomeWeights: {
+          for (final entry in biomeAgg.entries) entry.key: entry.value / sampleCount,
+        },
+        nodeAffinity: _sampler.nodeDensity(
+          lat: (state.bounds.minLat + state.bounds.maxLat) / 2,
+          lng: (state.bounds.minLng + state.bounds.maxLng) / 2,
+        ),
+        connectorFractions: connectorFractions..sort(),
+        continuityFlags: const ['terrain', 'paths', 'biome', 'nodes'],
+      );
+    }
+
+    return WorldChunkSeamProfile(
+      edges: {
+        WorldChunkEdge.north: profileFor(WorldChunkEdge.north),
+        WorldChunkEdge.south: profileFor(WorldChunkEdge.south),
+        WorldChunkEdge.east: profileFor(WorldChunkEdge.east),
+        WorldChunkEdge.west: profileFor(WorldChunkEdge.west),
+      },
+      landmarkInfluence: _sampler.landmarkInfluence(
+        lat: (state.bounds.minLat + state.bounds.maxLat) / 2,
+        lng: (state.bounds.minLng + state.bounds.maxLng) / 2,
+      ),
+      ambientBlend: _sampler.ambientBlend(
+        lat: (state.bounds.minLat + state.bounds.maxLat) / 2,
+        lng: (state.bounds.minLng + state.bounds.maxLng) / 2,
+      ),
+    );
+  }
+
+  (double, double) _edgePoint(WorldChunkBounds bounds, WorldChunkEdge edge, double t) {
+    return switch (edge) {
+      WorldChunkEdge.north => (bounds.maxLat, bounds.minLng + ((bounds.maxLng - bounds.minLng) * t)),
+      WorldChunkEdge.south => (bounds.minLat, bounds.minLng + ((bounds.maxLng - bounds.minLng) * t)),
+      WorldChunkEdge.east => (bounds.minLat + ((bounds.maxLat - bounds.minLat) * t), bounds.maxLng),
+      WorldChunkEdge.west => (bounds.minLat + ((bounds.maxLat - bounds.minLat) * t), bounds.minLng),
+    };
+  }
+
+  double _edgeConnectorFraction(WorldChunkCoord coord, WorldChunkEdge edge, int lane) {
+    final canonical = _canonicalEdge(coord, edge);
+    final seed = _hashChunk(worldSeed, canonical.$1.x, canonical.$1.y, canonical.$2.index + lane);
+    final rng = math.Random(seed);
+    return (0.2 + (rng.nextDouble() * 0.6)).clamp(0.05, 0.95).toDouble();
+  }
+
+  (WorldChunkCoord, WorldChunkEdge) _canonicalEdge(WorldChunkCoord coord, WorldChunkEdge edge) {
+    switch (edge) {
+      case WorldChunkEdge.north:
+      case WorldChunkEdge.east:
+        return (coord, edge);
+      case WorldChunkEdge.south:
+        return (WorldChunkCoord(x: coord.x, y: coord.y - 1), WorldChunkEdge.north);
+      case WorldChunkEdge.west:
+        return (WorldChunkCoord(x: coord.x - 1, y: coord.y), WorldChunkEdge.east);
+    }
+  }
+
+  List<PerbugNode> _connectorNodesForChunk({
+    required _ChunkRuntimeState state,
+    required PerbugWorldRuntimeMode mode,
+    required ({String region, String city, String country}) context,
+    required WorldChunkSeamProfile seamProfile,
+    required int seed,
+  }) {
+    final out = <PerbugNode>[];
+    for (final entry in seamProfile.edges.entries) {
+      final edge = entry.key;
+      final profile = entry.value;
+      for (var i = 0; i < profile.connectorFractions.length; i++) {
+        final fraction = profile.connectorFractions[i];
+        final point = _edgePoint(state.bounds, edge, fraction);
+        final connectorKey = _connectorKey(state.coord, edge, i);
+        out.add(
+          PerbugNode(
+            id: 'chunk_fallback_${state.coord.x}_${state.coord.y}_connector_${edge.name}_$i',
+            placeId: 'connector_$connectorKey',
+            label: 'Route ${edge.name} ${i + 1}',
+            latitude: point.$1,
+            longitude: point.$2,
+            region: context.region,
+            city: context.city,
+            neighborhood: 'Edge ${edge.name}',
+            country: context.country,
+            nodeType: PerbugNodeType.mission,
+            difficulty: 1 + ((seed + i + edge.index) % 4).abs(),
+            state: PerbugNodeState.available,
+            energyReward: 1,
+            movementCost: 1,
+            rarityScore: 0.35 + (profile.nodeAffinity * 0.3),
+            tags: {mode.name, 'streamed_chunk', 'path_connector'},
+            metadata: {
+              'source': 'seam_connector',
+              'connector_key': connectorKey,
+              'edge': edge.name,
+              'chunk_id': state.id.value,
+            },
+          ),
+        );
+      }
+    }
+    return out;
+  }
+
+  String _connectorKey(WorldChunkCoord coord, WorldChunkEdge edge, int lane) {
+    final canonical = _canonicalEdge(coord, edge);
+    return '${canonical.$1.x}:${canonical.$1.y}:${canonical.$2.name}:$lane';
+  }
+
+  List<({PerbugNode from, PerbugNode to})> _connectorEdgesForVisibleNodes({
+    required List<WorldChunk> worldChunks,
+    required Set<WorldChunkId> visibleChunkIds,
+  }) {
+    final byConnector = <String, List<PerbugNode>>{};
+    for (final chunk in worldChunks) {
+      if (!visibleChunkIds.contains(chunk.id)) continue;
+      for (final node in chunk.nodes) {
+        final connectorKey = node.metadata['connector_key'];
+        if (connectorKey is! String) continue;
+        byConnector.putIfAbsent(connectorKey, () => <PerbugNode>[]).add(node);
+      }
+    }
+    final result = <({PerbugNode from, PerbugNode to})>[];
+    for (final nodes in byConnector.values) {
+      if (nodes.length < 2) continue;
+      nodes.sort((a, b) => a.id.compareTo(b.id));
+      for (var i = 0; i < nodes.length - 1; i++) {
+        result.add((from: nodes[i], to: nodes[i + 1]));
+      }
+    }
+    return result;
+  }
+
+  ({int checks, List<String> warnings}) _validateVisibleChunkSeams({
+    required List<WorldChunk> worldChunks,
+    required Set<WorldChunkId> visibleChunkIds,
+  }) {
+    final byCoord = <WorldChunkCoord, WorldChunk>{
+      for (final chunk in worldChunks)
+        if (visibleChunkIds.contains(chunk.id)) chunk.coord: chunk,
+    };
+    var checks = 0;
+    final warnings = <String>[];
+    for (final chunk in byCoord.values) {
+      final east = byCoord[WorldChunkCoord(x: chunk.coord.x + 1, y: chunk.coord.y)];
+      if (east != null) {
+        checks += 1;
+        _compareEdgeProfiles(
+          a: chunk.seamProfile.edges[WorldChunkEdge.east],
+          b: east.seamProfile.edges[WorldChunkEdge.west],
+          label: '${chunk.id.value}->${east.id.value}:east/west',
+          warnings: warnings,
+        );
+      }
+      final north = byCoord[WorldChunkCoord(x: chunk.coord.x, y: chunk.coord.y + 1)];
+      if (north != null) {
+        checks += 1;
+        _compareEdgeProfiles(
+          a: chunk.seamProfile.edges[WorldChunkEdge.north],
+          b: north.seamProfile.edges[WorldChunkEdge.south],
+          label: '${chunk.id.value}->${north.id.value}:north/south',
+          warnings: warnings,
+        );
+      }
+    }
+    return (checks: checks, warnings: warnings);
+  }
+
+  void _compareEdgeProfiles({
+    required WorldChunkEdgeProfile? a,
+    required WorldChunkEdgeProfile? b,
+    required String label,
+    required List<String> warnings,
+  }) {
+    if (a == null || b == null) {
+      warnings.add('$label missing edge profile');
+      return;
+    }
+    for (var i = 0; i < math.min(a.terrainSamples.length, b.terrainSamples.length); i++) {
+      if ((a.terrainSamples[i] - b.terrainSamples[i]).abs() > 0.0001) {
+        warnings.add('$label terrain mismatch at $i');
+        break;
+      }
+    }
+    if (a.connectorFractions.length != b.connectorFractions.length) {
+      warnings.add('$label connector count mismatch');
+    }
   }
 
   int _hashChunk(int base, int x, int y, int mode) {
@@ -680,29 +1043,36 @@ extension on _ChunkRuntimeState {
   bool get isReady => lifecycle == ChunkLifecycleState.ready || lifecycle == ChunkLifecycleState.visible;
 }
 
-List<PerbugTerrainBand> _terrainForViewport({required MapViewport viewport, required List<PerbugNode> nodes}) {
-  final seed = (viewport.centerLat * 1000).round() ^ (viewport.centerLng * 1000).round() ^ nodes.length;
-  final base = nodes.isEmpty ? 0.25 : (nodes.map((n) => n.rarityScore).reduce((a, b) => a + b) / nodes.length);
+List<PerbugTerrainBand> _terrainForViewport({required MapViewport viewport, required _PerbugWorldFieldSampler sampler}) {
+  final seed = (viewport.centerLat * 1000).round() ^ (viewport.centerLng * 1000).round();
   return List<PerbugTerrainBand>.generate(4, (index) {
-    final n = (math.sin((seed + index * 17) * 0.11) + 1) / 2;
+    final sampleLat = viewport.south + ((viewport.north - viewport.south) * ((index + 0.5) / 4));
+    final sampleLng = viewport.west + ((viewport.east - viewport.west) * 0.5);
+    final n = sampler.terrainHeight(lat: sampleLat, lng: sampleLng);
     return PerbugTerrainBand(
       id: 'band_$index',
       seed: seed + index,
-      latitudeBias: ((index - 1.5) * 0.14) + ((base - 0.5) * 0.2),
+      latitudeBias: ((index - 1.5) * 0.14) + ((n - 0.5) * 0.2),
       wave: 0.04 + (n * 0.07),
     );
   }, growable: false);
 }
 
-PerbugRegionTheme _deriveTheme({required MapViewport viewport, required List<PerbugNode> nodes}) {
+PerbugRegionTheme _deriveTheme({
+  required MapViewport viewport,
+  required List<PerbugNode> nodes,
+  required _PerbugWorldFieldSampler sampler,
+}) {
   final urbanDensity = nodes.where((n) => n.tags.contains('shop') || n.tags.contains('mission')).length / math.max(1, nodes.length);
   final natureDensity = nodes.where((n) => n.tags.contains('park') || n.tags.contains('resource')).length / math.max(1, nodes.length);
   final rareDensity = nodes.where((n) => n.nodeType == PerbugNodeType.rare || n.nodeType == PerbugNodeType.event).length / math.max(1, nodes.length);
 
-  final seed = ((viewport.centerLat * 10000).round() * 31) ^ (viewport.centerLng * 10000).round();
-  final noise = (math.sin(seed * 0.0003) + 1) / 2;
+  final biomeWeights = sampler.biomeWeights(lat: viewport.centerLat, lng: viewport.centerLng);
+  final riftField = biomeWeights['rift'] ?? 0;
+  final wildField = biomeWeights['wilds'] ?? 0;
+  final urbanField = biomeWeights['urban'] ?? 0;
 
-  if (rareDensity > 0.22 || noise > 0.82) {
+  if (rareDensity > 0.22 || riftField > 0.43) {
     return const PerbugRegionTheme(
       id: 'astral-rift',
       title: 'Astral Rift Frontier',
@@ -712,7 +1082,7 @@ PerbugRegionTheme _deriveTheme({required MapViewport viewport, required List<Per
       biome: 'rift',
     );
   }
-  if (natureDensity >= urbanDensity) {
+  if (natureDensity + wildField >= urbanDensity + urbanField) {
     return const PerbugRegionTheme(
       id: 'verdant-wilds',
       title: 'Verdant Wilds',

@@ -135,4 +135,53 @@ void main() {
     expect(real.visibleNodes, isNotEmpty);
     expect(real.debug['mode'], equals('real'));
   });
+
+  test('adjacent chunks share deterministic seam connector fractions and terrain profiles', () {
+    engine.resetStreaming();
+    const viewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
+    final first = engine.build(viewport: viewport, nodes: const <PerbugNode>[], graph: const {}, mode: PerbugWorldRuntimeMode.demo);
+    final chunksByCoord = {for (final chunk in first.visibleChunks) chunk.coord: chunk};
+    expect(chunksByCoord.length, greaterThan(1));
+
+    final base = chunksByCoord.values.first;
+    final east = chunksByCoord[WorldChunkCoord(x: base.coord.x + 1, y: base.coord.y)];
+    expect(east, isNotNull);
+    final eastProfile = base.seamProfile.edges[WorldChunkEdge.east];
+    final westProfile = east!.seamProfile.edges[WorldChunkEdge.west];
+    expect(eastProfile, isNotNull);
+    expect(westProfile, isNotNull);
+    expect(eastProfile!.connectorFractions, orderedEquals(westProfile!.connectorFractions));
+    expect(eastProfile.terrainSamples, orderedEquals(westProfile.terrainSamples));
+    expect((first.debug['seam_warning_count'] as num).toInt(), equals(0));
+  });
+
+  test('streaming generation order does not affect seam connector keys on shared border', () {
+    const graph = <String, Set<String>>{};
+    const viewportWest = MapViewport(centerLat: 30.2672, centerLng: -97.79, zoom: 13);
+    const viewportEast = MapViewport(centerLat: 30.2672, centerLng: -97.71, zoom: 13);
+
+    engine.resetStreaming();
+    final westThenEastA = engine.build(viewport: viewportWest, nodes: const <PerbugNode>[], graph: graph, mode: PerbugWorldRuntimeMode.demo);
+    final westThenEastB = engine.build(viewport: viewportEast, nodes: const <PerbugNode>[], graph: graph, mode: PerbugWorldRuntimeMode.demo);
+    final keysA = {
+      for (final chunk in westThenEastB.visibleChunks)
+        for (final node in chunk.nodes)
+          if (node.metadata['connector_key'] is String) node.metadata['connector_key'] as String,
+    };
+
+    engine.resetStreaming();
+    final eastThenWestA = engine.build(viewport: viewportEast, nodes: const <PerbugNode>[], graph: graph, mode: PerbugWorldRuntimeMode.demo);
+    final eastThenWestB = engine.build(viewport: viewportWest, nodes: const <PerbugNode>[], graph: graph, mode: PerbugWorldRuntimeMode.demo);
+    final keysB = {
+      for (final chunk in eastThenWestB.visibleChunks)
+        for (final node in chunk.nodes)
+          if (node.metadata['connector_key'] is String) node.metadata['connector_key'] as String,
+    };
+
+    expect(keysA, isNotEmpty);
+    expect(keysB, isNotEmpty);
+    expect(keysA.intersection(keysB), isNotEmpty);
+    expect((westThenEastA.debug['seam_checks'] as num).toInt(), greaterThanOrEqualTo(0));
+    expect((eastThenWestA.debug['seam_checks'] as num).toInt(), greaterThanOrEqualTo(0));
+  });
 }
