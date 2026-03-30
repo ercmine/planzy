@@ -174,7 +174,7 @@ class PerbugWorldMapEngine {
     final natureDensity = nodes.where((n) => n.tags.contains('park') || n.tags.contains('resource')).length / math.max(1, nodes.length);
     final rareDensity = nodes.where((n) => n.nodeType == PerbugNodeType.rare || n.nodeType == PerbugNodeType.event).length / math.max(1, nodes.length);
 
-    final seed = ((viewport.centerLat * 10_000).round() * 31) ^ (viewport.centerLng * 10_000).round();
+    final seed = ((viewport.centerLat * 10000).round() * 31) ^ (viewport.centerLng * 10000).round();
     final noise = ((math.sin(seed * 0.0003) + 1) / 2);
 
     if (rareDensity > 0.22 || noise > 0.82) {

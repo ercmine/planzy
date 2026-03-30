@@ -8,6 +8,7 @@ import '../../app/theme/rpg_bar.dart';
 import '../../app/theme/widgets.dart';
 import '../../app/app_routes.dart';
 import '../../core/navigation/navigation_utils.dart';
+import '../../providers/app_providers.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_state.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';

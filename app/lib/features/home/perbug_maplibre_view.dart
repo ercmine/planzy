@@ -1023,9 +1023,6 @@ class _WebStaticFallbackMap extends StatelessWidget {
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.perbug.app',
                     ),
-                    PolylineLayer(
-                      polylines: const [],
-                    ),
                     MarkerLayer(
                       markers: [
                         if (userLocation != null)
