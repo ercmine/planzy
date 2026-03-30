@@ -1,7 +1,14 @@
 function parseBool(value, fallback) {
-    if (!value)
+    if (value == null)
         return fallback;
-    return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+    const normalized = value.trim().toLowerCase();
+    if (!normalized)
+        return fallback;
+    if (["1", "true", "yes", "on"].includes(normalized))
+        return true;
+    if (["0", "false", "no", "off"].includes(normalized))
+        return false;
+    return fallback;
 }
 function parseNum(value, fallback) {
     const parsed = Number(value);

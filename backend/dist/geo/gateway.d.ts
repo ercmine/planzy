@@ -10,7 +10,10 @@ export interface GeoGateway {
 export interface BackendGeoRuntime {
     gateway: GeoGateway | null;
     mode: "custom" | "nominatim" | "disabled";
+    customGeoServiceEnabled: boolean;
     routesMounted: boolean;
+    customGeoBaseUrl?: string;
+    nominatimBaseUrl?: string;
     upstreamBaseUrl?: string;
     validationErrors: string[];
     validationWarnings: string[];
