@@ -521,18 +521,18 @@ class _EntryHitButton extends StatelessWidget {
       top: rect.top - (minimumSize.height - rect.height) / 2,
       width: minimumSize.width,
       height: minimumSize.height,
-      child: Semantics(
-        button: true,
-        enabled: !isDisabled,
-        label: semanticsLabel,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: isDisabled ? null : onTap,
-            borderRadius: BorderRadius.circular(24),
-            splashFactory: InkSparkle.splashFactory,
-            splashColor: const Color(0x4473D7FF),
-            highlightColor: Colors.transparent,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isDisabled ? null : onTap,
+          borderRadius: BorderRadius.circular(24),
+          splashFactory: InkSparkle.splashFactory,
+          splashColor: const Color(0x4473D7FF),
+          highlightColor: Colors.transparent,
+          child: Semantics(
+            button: true,
+            enabled: !isDisabled,
+            label: semanticsLabel,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               decoration: BoxDecoration(
