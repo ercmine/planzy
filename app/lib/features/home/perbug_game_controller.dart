@@ -35,7 +35,7 @@ class PerbugGameController extends StateNotifier<PerbugGameState> {
   PerbugEconomyStore? _economyStore;
   bool _economyHydrated = false;
 
-  static const MapViewport _fixedGameplayViewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
+  static const MapViewport _fixedGameplayViewport = MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 14.5);
 
   Future<void> initialize({bool requestLocationPermission = false}) async {
     state = state.copyWith(
