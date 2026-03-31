@@ -34,7 +34,7 @@ export class AccountsService {
     const personalProfile: PersonalProfile = {
       id: `pp_${randomUUID()}`,
       userId,
-      displayName: "Dryad User",
+      displayName: "Perbug User",
       visibility: ProfileVisibility.PUBLIC,
       createdAt: now,
       updatedAt: now

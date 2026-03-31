@@ -23,7 +23,7 @@ class RoleHubPage extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.m),
         children: [
           const AppSectionHeader(
-            title: 'Create freely on Dryad',
+            title: 'Create freely on Perbug',
             subtitle: 'Every signed-in user can post reviews, upload media, build guides, and follow creators.',
           ),
           const SizedBox(height: AppSpacing.m),

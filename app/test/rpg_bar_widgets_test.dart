@@ -1,5 +1,5 @@
-import 'package:dryad/app/assets.dart';
-import 'package:dryad/app/theme/rpg_bar.dart';
+import 'package:perbug/app/assets.dart';
+import 'package:perbug/app/theme/rpg_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

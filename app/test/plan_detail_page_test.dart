@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:dryad/api/api_client.dart';
-import 'package:dryad/app/theme/theme.dart';
-import 'package:dryad/core/ads/ads_config.dart';
-import 'package:dryad/core/env/env.dart';
-import 'package:dryad/features/deck/plan_detail_page.dart';
-import 'package:dryad/models/place_review.dart';
-import 'package:dryad/models/place_review_video.dart';
-import 'package:dryad/models/plan.dart';
-import 'package:dryad/providers/app_providers.dart';
-import 'package:dryad/repositories/reviews_repository.dart';
+import 'package:perbug/api/api_client.dart';
+import 'package:perbug/app/theme/theme.dart';
+import 'package:perbug/core/ads/ads_config.dart';
+import 'package:perbug/core/env/env.dart';
+import 'package:perbug/features/deck/plan_detail_page.dart';
+import 'package:perbug/models/place_review.dart';
+import 'package:perbug/models/place_review_video.dart';
+import 'package:perbug/models/plan.dart';
+import 'package:perbug/providers/app_providers.dart';
+import 'package:perbug/repositories/reviews_repository.dart';
 
 class _FakeApiClient extends ApiClient {
   _FakeApiClient({required this.details})
@@ -92,7 +92,7 @@ class _FakeReviewsRepository extends ReviewsRepository {
     final created = PlaceReview(
       id: 'r-new',
       placeId: placeId,
-      author: ReviewAuthor(displayName: displayName.isEmpty ? 'Dryad User' : displayName, profileType: 'PERSONAL', profileId: 'p2'),
+      author: ReviewAuthor(displayName: displayName.isEmpty ? 'Perbug User' : displayName, profileType: 'PERSONAL', profileId: 'p2'),
       body: body,
       rating: rating,
       createdAt: DateTime.utc(2024, 1, 2),

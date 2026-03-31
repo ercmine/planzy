@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:dryad/api/api_client.dart';
-import 'package:dryad/app/theme/app_theme.dart';
-import 'package:dryad/core/ads/ads_config.dart';
-import 'package:dryad/core/cache/local_store.dart';
-import 'package:dryad/core/env/env.dart';
-import 'package:dryad/features/place_review_editor/data/place_review_draft_store.dart';
-import 'package:dryad/features/place_review_editor/place_review_editor_controller.dart';
-import 'package:dryad/features/place_review_editor/place_review_video_editor_screen.dart';
-import 'package:dryad/features/place_review_editor/services/place_review_upload_service.dart';
-import 'package:dryad/features/video_platform/video_models.dart';
-import 'package:dryad/features/video_platform/video_repository.dart';
+import 'package:perbug/api/api_client.dart';
+import 'package:perbug/app/theme/app_theme.dart';
+import 'package:perbug/core/ads/ads_config.dart';
+import 'package:perbug/core/cache/local_store.dart';
+import 'package:perbug/core/env/env.dart';
+import 'package:perbug/features/place_review_editor/data/place_review_draft_store.dart';
+import 'package:perbug/features/place_review_editor/place_review_editor_controller.dart';
+import 'package:perbug/features/place_review_editor/place_review_video_editor_screen.dart';
+import 'package:perbug/features/place_review_editor/services/place_review_upload_service.dart';
+import 'package:perbug/features/video_platform/video_models.dart';
+import 'package:perbug/features/video_platform/video_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Finder _textFieldByLabel(String label) {
@@ -38,9 +38,9 @@ void main() {
           httpClient: http.Client(),
           envConfig: EnvConfig(
             flavor: EnvFlavor.dev,
-            apiBaseUrl: 'https://api.dryad.test',
+            apiBaseUrl: 'https://api.perbug.test',
             enableDebugLogs: false,
-            associatedDomain: 'dryad.test',
+            associatedDomain: 'perbug.test',
             adsConfig: AdsConfig.disabled(),
             fsqApiKey: null,
           ),

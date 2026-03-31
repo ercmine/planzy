@@ -1,4 +1,4 @@
-export class MemoryDryadTipsStore {
+export class MemoryPerbugTipsStore {
     tips = new Map();
     ledger = new Map();
     saveTipIntent(tip) { this.tips.set(tip.id, tip); }

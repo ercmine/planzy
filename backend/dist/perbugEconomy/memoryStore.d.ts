@@ -1,5 +1,5 @@
 import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRewardRecord, CuratorGuide, CuratorGuideAnalytics, EconomyFraudFlag, EconomyLedgerEntry, EconomyStore, ExplorationProgress, Offer, PremiumMembership, QuestCompletion, Redemption, TokenAccount, TokenSplitConfig } from "./types.js";
-export declare class MemoryDryadEconomyStore implements EconomyStore {
+export declare class MemoryPerbugEconomyStore implements EconomyStore {
     private splitConfigs;
     private accounts;
     private ledger;

@@ -11,12 +11,12 @@ import {
   RolloutSafeDiscoveryApi,
   type DiscoveryBackend
 } from "../operations.js";
-import { OSM_CATEGORY_RULES, DRYAD_CATEGORIES } from "../categoryIntelligence.js";
+import { OSM_CATEGORY_RULES, PERBUG_CATEGORIES } from "../categoryIntelligence.js";
 import { CategoryNormalizationService, PlaceImportService } from "../services.js";
 
 describe("open-data operational infrastructure", () => {
   function setupRepo() {
-    const repo = new InMemoryPlacePlatformRepository({ categories: DRYAD_CATEGORIES, rules: OSM_CATEGORY_RULES });
+    const repo = new InMemoryPlacePlatformRepository({ categories: PERBUG_CATEGORIES, rules: OSM_CATEGORY_RULES });
     const importer = new PlaceImportService(repo, repo, repo, repo, new CategoryNormalizationService(repo));
     return { repo, importer };
   }

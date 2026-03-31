@@ -9,7 +9,7 @@ import Container from '@/components/Container.astro';
 import { createSeo } from '@/lib/seo';
 
 const pageDescription =
-  'Dryad is a free creator-first local discovery app where anyone can browse places, post reviews and videos, build guides, and follow creators.';
+  'Perbug is a free creator-first local discovery app where anyone can browse places, post reviews and videos, build guides, and follow creators.';
 
 const seo = createSeo({
   title: 'Free local discovery and creator reviews for everyone',
@@ -23,15 +23,15 @@ const faqSchema = {
   mainEntity: [
     {
       '@type': 'Question',
-      name: 'What is Dryad?',
+      name: 'What is Perbug?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Dryad is a free local discovery platform where people discover places, trust creator and community reviews, and plan outings with smart recommendations.'
+        text: 'Perbug is a free local discovery platform where people discover places, trust creator and community reviews, and plan outings with smart recommendations.'
       }
     },
     {
       '@type': 'Question',
-      name: 'Who can create content on Dryad?',
+      name: 'Who can create content on Perbug?',
       acceptedAnswer: {
         '@type': 'Answer',
         text: 'Any signed-in user can post text, photo, and video reviews, publish guides, and build a creator profile.'
@@ -39,10 +39,10 @@ const faqSchema = {
     },
     {
       '@type': 'Question',
-      name: 'Does Dryad have paid plans?',
+      name: 'Does Perbug have paid plans?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'No. Dryad is free for everyone and supported by ads in discovery.'
+        text: 'No. Perbug is free for everyone and supported by ads in discovery.'
       }
     },
     {
@@ -50,7 +50,7 @@ const faqSchema = {
       name: 'How are ads shown?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Dryad uses an ad-supported discovery model with sponsored cards shown in-feed at a consistent cadence.'
+        text: 'Perbug uses an ad-supported discovery model with sponsored cards shown in-feed at a consistent cadence.'
       }
     }
   ]
@@ -77,7 +77,7 @@ const credibilityPills = ['Free for everyone', 'Creator content', 'Trusted revie
       <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">Sponsored</p>
       <div class="mt-4 grid gap-5 md:grid-cols-[1.2fr_1fr] md:items-center">
         <div>
-          <h2 class="text-2xl font-semibold text-slate-50 md:text-3xl">See Dryad in action</h2>
+          <h2 class="text-2xl font-semibold text-slate-50 md:text-3xl">See Perbug in action</h2>
           <p class="mt-3 text-slate-300">
             Watch our latest app ad to preview creator videos, trusted reviews, and smart local planning in one place.
           </p>
@@ -85,18 +85,18 @@ const credibilityPills = ['Free for everyone', 'Creator content', 'Trusted revie
             href="/downloads/"
             class="mt-5 inline-flex rounded-lg bg-brand-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-brand-400"
           >
-            Download Dryad
+            Download Perbug
           </a>
         </div>
 
         <video
           class="w-full rounded-2xl border border-slate-700 bg-slate-950 shadow-lg"
-          src="/dryad.mp4"
+          src="/perbug.mp4"
           controls
           preload="metadata"
           muted
           playsinline
-          aria-label="Dryad app ad video"
+          aria-label="Perbug app ad video"
         >
           Sorry, your browser does not support embedded videos.
         </video>

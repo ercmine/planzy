@@ -23,7 +23,7 @@ export function createGeocodingServiceFromEnv(): GeocodingService | null {
     geocodeCacheTtlMs,
     reverseCacheTtlMs,
     defaultLimit,
-    userAgent: process.env.NOMINATIM_USER_AGENT ?? "dryad-geocoder/1.0",
+    userAgent: process.env.NOMINATIM_USER_AGENT ?? "perbug-geocoder/1.0",
     fallbackBaseUrl: process.env.NOMINATIM_FALLBACK_BASE_URL,
     enableFallback: process.env.NOMINATIM_ENABLE_FALLBACK === "true",
     env: (process.env.APP_ENV as "dev" | "stage" | "prod" | undefined) ?? "dev"

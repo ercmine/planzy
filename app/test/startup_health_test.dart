@@ -1,10 +1,10 @@
-import 'package:dryad/api/api_client.dart';
-import 'package:dryad/app/startup_health.dart';
-import 'package:dryad/core/ads/ads_config.dart';
-import 'package:dryad/core/env/env.dart';
-import 'package:dryad/core/platform/perbug_platform.dart';
-import 'package:dryad/core/cache/local_store.dart';
-import 'package:dryad/providers/app_providers.dart';
+import 'package:perbug/api/api_client.dart';
+import 'package:perbug/app/startup_health.dart';
+import 'package:perbug/core/ads/ads_config.dart';
+import 'package:perbug/core/env/env.dart';
+import 'package:perbug/core/platform/perbug_platform.dart';
+import 'package:perbug/core/cache/local_store.dart';
+import 'package:perbug/providers/app_providers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

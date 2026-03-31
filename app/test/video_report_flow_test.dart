@@ -5,14 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:dryad/api/api_client.dart';
-import 'package:dryad/core/env/env.dart';
-import 'package:dryad/features/home/place_video_detail_page.dart';
-import 'package:dryad/providers/app_providers.dart';
-import 'package:dryad/features/video_platform/video_models.dart';
-import 'package:dryad/features/video_platform/video_providers.dart';
+import 'package:perbug/api/api_client.dart';
+import 'package:perbug/core/env/env.dart';
+import 'package:perbug/features/home/place_video_detail_page.dart';
+import 'package:perbug/providers/app_providers.dart';
+import 'package:perbug/features/video_platform/video_models.dart';
+import 'package:perbug/features/video_platform/video_providers.dart';
 
-import 'package:dryad/core/ads/ads_config.dart';
+import 'package:perbug/core/ads/ads_config.dart';
 
 void main() {
   testWidgets('report button submits video report', (tester) async {
@@ -27,7 +27,7 @@ void main() {
 
     final apiClient = ApiClient(
       httpClient: client,
-      envConfig: const EnvConfig(flavor: EnvFlavor.dev, apiBaseUrl: 'https://api.dryad.test', enableDebugLogs: false, associatedDomain: 'dryad.dev', adsConfig: AdsConfig.disabled(), fsqApiKey: null),
+      envConfig: const EnvConfig(flavor: EnvFlavor.dev, apiBaseUrl: 'https://api.perbug.test', enableDebugLogs: false, associatedDomain: 'perbug.dev', adsConfig: AdsConfig.disabled(), fsqApiKey: null),
       userIdResolver: () async => 'user_1',
     );
 

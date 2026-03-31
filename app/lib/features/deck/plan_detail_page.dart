@@ -892,7 +892,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     final average = ratings.isEmpty ? null : ratings.reduce((a, b) => a + b) / ratings.length;
 
     return _Section(
-      title: 'Dryad Reviews',
+      title: 'Perbug Reviews',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -904,7 +904,7 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
             const SizedBox(height: AppSpacing.s),
           ],
           if (!_isLoadingReviews && _reviews.isEmpty && _reviewsError == null)
-            const Text('No Dryad Limited reviews yet. Be the first to review.'),
+            const Text('No Perbug Limited reviews yet. Be the first to review.'),
           ..._reviews.map(
             (review) => Card(
               margin: const EdgeInsets.only(bottom: AppSpacing.s),

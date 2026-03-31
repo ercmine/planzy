@@ -3,12 +3,12 @@ import { randomUUID } from "node:crypto";
 import { ValidationError } from "../plans/errors.js";
 import { amountToDisplay } from "../perbugRewards/solana/token.js";
 import { stableIdempotencyKey } from "../perbugRewards/solana/walletAuth.js";
-import type { DryadTipsAdapter, DryadTipsStore, DryadVideoTipIntent, VideoTipSummary } from "./types.js";
+import type { PerbugTipsAdapter, PerbugTipsStore, PerbugVideoTipIntent, VideoTipSummary } from "./types.js";
 
 function nowIso(): string { return new Date().toISOString(); }
 function clone<T>(value: T): T { return structuredClone(value); }
 
-class MockDryadTipsAdapter implements DryadTipsAdapter {
+class MockPerbugTipsAdapter implements PerbugTipsAdapter {
   async submitTransfer(input: { fromWallet: string; toWallet: string; amountWei: bigint; memo: string; idempotencyKey: string }) {
     return { signature: `0x${stableIdempotencyKey([input.fromWallet, input.toWallet, input.idempotencyKey, input.amountWei.toString()]).slice(0, 64)}`, explorerUrl: `https://sepolia.etherscan.io/tx/0x${stableIdempotencyKey([input.memo, input.idempotencyKey]).slice(0, 64)}` };
   }
@@ -19,14 +19,14 @@ export interface VideoTipDependencies {
   getPrimaryWallet(userId: string): { publicKey: string } | undefined;
 }
 
-export class DryadTipsService {
-  constructor(private readonly store: DryadTipsStore, private readonly deps: VideoTipDependencies, private readonly adapter: DryadTipsAdapter = new MockDryadTipsAdapter()) {}
+export class PerbugTipsService {
+  constructor(private readonly store: PerbugTipsStore, private readonly deps: VideoTipDependencies, private readonly adapter: PerbugTipsAdapter = new MockPerbugTipsAdapter()) {}
 
-  createVideoTipIntent(input: { videoId: string; senderUserId: string; senderWalletAddress: string; amountWei: bigint; note?: string; allowSelfTip?: boolean; platformFeeBps?: number; tipKind?: "water_tree" | "direct_eth" }): Promise<DryadVideoTipIntent> {
+  createVideoTipIntent(input: { videoId: string; senderUserId: string; senderWalletAddress: string; amountWei: bigint; note?: string; allowSelfTip?: boolean; platformFeeBps?: number; tipKind?: "water_tree" | "direct_eth" }): Promise<PerbugVideoTipIntent> {
     return this.create(input);
   }
 
-  private async create(input: { videoId: string; senderUserId: string; senderWalletAddress: string; amountWei: bigint; note?: string; allowSelfTip?: boolean; platformFeeBps?: number; tipKind?: "water_tree" | "direct_eth" }): Promise<DryadVideoTipIntent> {
+  private async create(input: { videoId: string; senderUserId: string; senderWalletAddress: string; amountWei: bigint; note?: string; allowSelfTip?: boolean; platformFeeBps?: number; tipKind?: "water_tree" | "direct_eth" }): Promise<PerbugVideoTipIntent> {
     const video = await this.deps.getVideo(input.videoId);
     if (!video) throw new ValidationError(["video not found"]);
     if (!["published", "processed", "publish_pending"].includes(video.status) || ["rejected", "flagged"].includes(video.moderationStatus)) throw new ValidationError(["video cannot receive tips"]);
@@ -35,11 +35,11 @@ export class DryadTipsService {
     if (!recipientWallet) throw new ValidationError(["creator wallet not linked"]);
     if (!input.allowSelfTip && video.authorUserId === input.senderUserId) throw new ValidationError(["self tipping disabled"]);
     if (input.note && input.note.length > 280) throw new ValidationError(["tip note too long"]);
-    const feeBps = Math.max(0, input.platformFeeBps ?? Number.parseInt(process.env.DRYAD_PLATFORM_FEE_BPS ?? "0", 10));
+    const feeBps = Math.max(0, input.platformFeeBps ?? Number.parseInt(process.env.PERBUG_PLATFORM_FEE_BPS ?? "0", 10));
     const platformFeeAtomic = (input.amountWei * BigInt(feeBps)) / 10000n;
     const recipientNetAtomic = input.amountWei - platformFeeAtomic;
     const now = nowIso();
-    const tip: DryadVideoTipIntent = {
+    const tip: PerbugVideoTipIntent = {
       id: `tip_${randomUUID()}`,
       videoId: input.videoId,
       treeId: video.primaryTreeId,
@@ -64,7 +64,7 @@ export class DryadTipsService {
     return clone(tip);
   }
 
-  async submitTip(input: { tipIntentId: string; senderUserId: string }): Promise<DryadVideoTipIntent> {
+  async submitTip(input: { tipIntentId: string; senderUserId: string }): Promise<PerbugVideoTipIntent> {
     const tip = this.requireTip(input.tipIntentId);
     if (tip.senderUserId !== input.senderUserId) throw new ValidationError(["forbidden"]);
     if (tip.status === "confirmed") return clone(tip);
@@ -106,7 +106,7 @@ export class DryadTipsService {
     return this.reduceSummary(recipientUserId, tips);
   }
 
-  private reduceSummary(id: string, tips: DryadVideoTipIntent[]): VideoTipSummary {
+  private reduceSummary(id: string, tips: PerbugVideoTipIntent[]): VideoTipSummary {
     return {
       videoId: id,
       totalTipsCount: tips.length,
@@ -117,5 +117,5 @@ export class DryadTipsService {
     };
   }
 
-  private requireTip(id: string): DryadVideoTipIntent { const tip = this.store.getTipIntent(id); if (!tip) throw new ValidationError(["tip intent not found"]); return tip; }
+  private requireTip(id: string): PerbugVideoTipIntent { const tip = this.store.getTipIntent(id); if (!tip) throw new ValidationError(["tip intent not found"]); return tip; }
 }

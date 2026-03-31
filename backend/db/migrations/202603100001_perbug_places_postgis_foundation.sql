@@ -1,4 +1,4 @@
--- Dryad owned places platform foundation.
+-- Perbug owned places platform foundation.
 -- Adds canonical place storage, source identities, source attribution,
 -- category normalization, and PostGIS nearby-query primitives.
 

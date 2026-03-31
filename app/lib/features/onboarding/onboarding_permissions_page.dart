@@ -30,7 +30,7 @@ class OnboardingPermissionsPage extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Center(child: DryadLogo(size: 56)),
+          const Center(child: PerbugLogo(size: 56)),
           const SizedBox(height: AppSpacing.m),
           Text(
             'Quick setup',

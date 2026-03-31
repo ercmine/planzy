@@ -30,13 +30,13 @@ The CLI accepts configuration from flags and environment variables. Global flags
 Example ATA derivation:
 
 ```bash
-cargo run -p dryad-token-cli -- create-ata --mint <MINT> --owner <OWNER>
+cargo run -p perbug-token-cli -- create-ata --mint <MINT> --owner <OWNER>
 ```
 
 Example minting:
 
 ```bash
-cargo run -p dryad-token-cli -- mint-to --mint <MINT> --recipient <OWNER> --amount 100.5
+cargo run -p perbug-token-cli -- mint-to --mint <MINT> --recipient <OWNER> --amount 100.5
 ```
 
 ## Local validator note

@@ -6,7 +6,7 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
-use dryad_common::{checked_mul_u64, checked_sub_u64, TipRecordedEvent, MAX_BPS};
+use perbug_common::{checked_mul_u64, checked_sub_u64, TipRecordedEvent, MAX_BPS};
 
 use crate::{
     error::TippingError,
@@ -61,7 +61,7 @@ impl Processor {
         let payer = next_account_info(account_info_iter)?;
         let config_ai = next_account_info(account_info_iter)?;
         assert_signer(payer)?;
-        let (expected, _) = dryad_common::derive_config_pda(program_id);
+        let (expected, _) = perbug_common::derive_config_pda(program_id);
         assert_pda(expected, config_ai.key)?;
         if !is_empty(config_ai)? {
             return Err(TippingError::AlreadyInitialized.into());
@@ -91,7 +91,7 @@ impl Processor {
         assert_not_paused(&config)?;
         let fee_bps = fee_override.unwrap_or(config.fee_bps);
         validate_fee_bps(fee_bps)?;
-        let (expected_receipt, _) = dryad_common::derive_tip_receipt_pda(program_id, &tip_id);
+        let (expected_receipt, _) = perbug_common::derive_tip_receipt_pda(program_id, &tip_id);
         assert_pda(expected_receipt, receipt_ai.key)?;
         if !is_empty(receipt_ai)? {
             return Err(TippingError::DuplicateReceipt.into());

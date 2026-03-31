@@ -13,7 +13,7 @@ class AppIconPreviewPage extends StatelessWidget {
     return AppScaffold(
       appBar: AppBar(
         leading: const AppBackButton(),
-        title: const Text('Dryad Logo QA'),
+        title: const Text('Perbug Logo QA'),
       ),
       body: ListView(
         children: const [
@@ -45,8 +45,8 @@ class _PreviewTile extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            DryadLogo(size: size, variant: DryadLogoVariant.markOnly),
-            DryadLogo(size: size * 0.75, variant: DryadLogoVariant.withWordmark),
+            PerbugLogo(size: size, variant: PerbugLogoVariant.markOnly),
+            PerbugLogo(size: size * 0.75, variant: PerbugLogoVariant.withWordmark),
           ],
         ),
       ),

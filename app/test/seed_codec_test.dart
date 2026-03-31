@@ -1,4 +1,4 @@
-import 'package:dryad/features/dryad/chain/seed_codec.dart';
+import 'package:perbug/features/perbug/chain/seed_codec.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

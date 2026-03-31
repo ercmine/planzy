@@ -3,7 +3,7 @@ export type MonetizationStatus = "not_eligible" | "eligible" | "pending_review" 
 export type MonetizationReasonCode = "creator_profile_missing" | "creator_not_active" | "moderation_suspended" | "missing_plan_entitlement" | "pending_admin_review" | "trust_threshold_not_met" | "compliance_not_ready" | "admin_override" | "manual_restriction" | "policy_violation";
 export type PayoutReadinessStatus = "not_started" | "pending" | "ready" | "blocked";
 export type ComplianceReadinessStatus = "not_started" | "pending" | "ready" | "blocked";
-export type MonetizationCapability = "canReceiveTips" | "canReceiveDryadTips" | "canClaimDryadRewards" | "canPublishPremiumContent" | "canBeFeatured" | "canAccessHigherUploadLimits" | "canOfferSubscriptionsFuture" | "canAccessCreatorAnalyticsPremium" | "canUploadExtendedVideo" | "canCreatePremiumGuides";
+export type MonetizationCapability = "canReceiveTips" | "canReceivePerbugTips" | "canClaimPerbugRewards" | "canPublishPremiumContent" | "canBeFeatured" | "canAccessHigherUploadLimits" | "canOfferSubscriptionsFuture" | "canAccessCreatorAnalyticsPremium" | "canUploadExtendedVideo" | "canCreatePremiumGuides";
 export interface CreatorMonetizationProfile {
     id: string;
     creatorProfileId: string;

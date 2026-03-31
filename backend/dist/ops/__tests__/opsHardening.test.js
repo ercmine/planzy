@@ -7,7 +7,7 @@ import { detectMediaAnomalies } from "../mediaIntegrity.js";
 import { validateOperationalConfig } from "../config.js";
 describe("ops hardening foundations", () => {
     it("fails readiness when required dependencies are down and tracks degraded dependencies", async () => {
-        const monitor = new ServiceHealthMonitor("dryad-backend", [
+        const monitor = new ServiceHealthMonitor("perbug-backend", [
             { name: "postgres", requiredForReadiness: true, check: async () => ({ state: "down", detail: "connection_refused" }) },
             { name: "redis", requiredForReadiness: false, check: async () => ({ state: "degraded", detail: "high_latency" }) }
         ]);
@@ -18,16 +18,16 @@ describe("ops hardening foundations", () => {
     });
     it("exposes prometheus metrics for counters, gauges, and histograms", () => {
         const metrics = new OpsMetricsRegistry();
-        metrics.defineCounter("dryad_requests_total", "Total requests");
-        metrics.defineGauge("dryad_queue_depth", "Queue depth");
-        metrics.defineHistogram("dryad_request_latency_ms", "Request latency", [50, 200, 500]);
-        metrics.increment("dryad_requests_total", { route: "health", status: "200" });
-        metrics.setGauge("dryad_queue_depth", 12, { queue: "media" });
-        metrics.observe("dryad_request_latency_ms", 140, { route: "health" });
+        metrics.defineCounter("perbug_requests_total", "Total requests");
+        metrics.defineGauge("perbug_queue_depth", "Queue depth");
+        metrics.defineHistogram("perbug_request_latency_ms", "Request latency", [50, 200, 500]);
+        metrics.increment("perbug_requests_total", { route: "health", status: "200" });
+        metrics.setGauge("perbug_queue_depth", 12, { queue: "media" });
+        metrics.observe("perbug_request_latency_ms", 140, { route: "health" });
         const rendered = metrics.renderPrometheus();
-        expect(rendered).toContain("dryad_requests_total");
-        expect(rendered).toContain("dryad_queue_depth");
-        expect(rendered).toContain("dryad_request_latency_ms_bucket");
+        expect(rendered).toContain("perbug_requests_total");
+        expect(rendered).toContain("perbug_queue_depth");
+        expect(rendered).toContain("perbug_request_latency_ms_bucket");
     });
     it("tracks retention and stale backup detection", () => {
         const records = [

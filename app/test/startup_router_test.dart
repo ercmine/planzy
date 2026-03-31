@@ -1,6 +1,6 @@
-import 'package:dryad/app/router.dart';
-import 'package:dryad/core/identity/identity_provider.dart';
-import 'package:dryad/features/dryad/chain/dryad_chain_providers.dart';
+import 'package:perbug/app/router.dart';
+import 'package:perbug/core/identity/identity_provider.dart';
+import 'package:perbug/features/perbug/chain/perbug_chain_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

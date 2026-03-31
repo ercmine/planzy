@@ -24,7 +24,7 @@ export class GeocodingService {
         this.client = new NominatimClient({
             baseUrl: options.baseUrl,
             timeoutMs: options.timeoutMs ?? 2_000,
-            userAgent: options.userAgent ?? "dryad-geocoder/1.0"
+            userAgent: options.userAgent ?? "perbug-geocoder/1.0"
         });
         this.cache = options.cache ?? new MemoryGeocodingCache();
         this.geocodeCacheTtlMs = options.geocodeCacheTtlMs ?? 60 * 60 * 1_000;
@@ -35,7 +35,7 @@ export class GeocodingService {
             this.fallbackClient = new NominatimClient({
                 baseUrl: options.fallbackBaseUrl,
                 timeoutMs: options.timeoutMs ?? 2_000,
-                userAgent: options.userAgent ?? "dryad-geocoder/1.0"
+                userAgent: options.userAgent ?? "perbug-geocoder/1.0"
             });
         }
     }

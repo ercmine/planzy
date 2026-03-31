@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum DryadLogoVariant { markOnly, withWordmark }
+enum PerbugLogoVariant { markOnly, withWordmark }
 
-class DryadLogo extends StatelessWidget {
-  const DryadLogo({
+class PerbugLogo extends StatelessWidget {
+  const PerbugLogo({
     this.size = 48,
-    this.variant = DryadLogoVariant.markOnly,
+    this.variant = PerbugLogoVariant.markOnly,
     this.brightness,
     super.key,
   });
 
   final double size;
-  final DryadLogoVariant variant;
+  final PerbugLogoVariant variant;
   final Brightness? brightness;
 
   static const _markAsset = 'assets/branding/perbug1.svg';
@@ -21,7 +21,7 @@ class DryadLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bright = brightness ?? Theme.of(context).brightness;
-    final assetName = variant == DryadLogoVariant.markOnly ? _markAsset : _fullAsset;
+    final assetName = variant == PerbugLogoVariant.markOnly ? _markAsset : _fullAsset;
 
     return SvgPicture.asset(
       assetName,

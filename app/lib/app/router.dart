@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/identity/identity_provider.dart';
 import '../features/auth/perbug_learn_more_page.dart';
 import '../features/auth/perbug_wallet_entry_page.dart';
-import '../features/dryad/chain/dryad_chain_providers.dart';
+import '../features/perbug/chain/perbug_chain_providers.dart';
 import '../features/home/home_page.dart';
 import '../features/home/perbug_map_debug_page.dart';
 import '../features/home/perbug_flow_pages.dart';

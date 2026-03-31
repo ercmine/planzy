@@ -64,17 +64,16 @@ import { LeaderboardsService, MemoryLeaderboardsStore } from "../leaderboards/in
 import { CollectionsService, MemoryCollectionStore } from "../collections/index.js";
 import { MemorySocialGamificationStore, SocialGamificationService } from "../socialGamification/index.js";
 import { GamificationControlService, MemoryGamificationControlStore } from "../gamificationControl/index.js";
-import { MemoryDryadRewardsStore, DryadRewardsService } from "../perbugRewards/index.js";
-import { MemoryDryadTipsStore, DryadTipsService } from "../perbugTips/index.js";
+import { MemoryPerbugRewardsStore, PerbugRewardsService } from "../perbugRewards/index.js";
+import { MemoryPerbugTipsStore, PerbugTipsService } from "../perbugTips/index.js";
 import { CompetitionService, MemoryCompetitionStore } from "../competition/index.js";
 import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../sponsoredLocations/index.js";
-import { MemoryDryadEconomyStore, DryadEconomyService } from "../perbugEconomy/index.js";
+import { MemoryPerbugEconomyStore, PerbugEconomyService } from "../perbugEconomy/index.js";
 import { MemoryViewerEngagementStore, ViewerEngagementRewardsService } from "../viewerEngagementRewards/index.js";
-import { DryadMarketplaceService } from "../dryad/service.js";
 import { MemoryWalletAuthStore, WalletAuthService } from "../walletAuth/index.js";
 import { createPerbugWorldHttpHandlers, MemoryPerbugWorldStore, PerbugWorldService } from "../perbugWorld/index.js";
-import { PerbugMarketplaceService, seedMarketplaceListings } from "../perbugMarketplace/index.js";
-import type { DryadTree } from "../dryad/domain.js";
+import { PerbugMarketplaceService as LegacyPerbugMarketplaceService } from "../perbug/service.js";
+import { PerbugMarketplaceService as PerbugStoreMarketplaceService, seedMarketplaceListings } from "../perbugMarketplace/index.js";
 import { createHttpServer } from "./httpServer.js";
 
 export interface CreateServerOptions {
@@ -115,14 +114,14 @@ export function createServer(options?: CreateServerOptions) {
     ? new WebhookModerationAlertDispatcher({
         endpoint: process.env.MODERATION_EMAIL_API_URL,
         apiKey: process.env.MODERATION_EMAIL_API_KEY,
-        fromEmail: process.env.MODERATION_EMAIL_FROM ?? "moderation@dryad.dev",
-        reviewBaseUrl: process.env.MODERATION_REVIEW_BASE_URL ?? "https://admin.dryad.dev"
+        fromEmail: process.env.MODERATION_EMAIL_FROM ?? "moderation@perbug.dev",
+        reviewBaseUrl: process.env.MODERATION_REVIEW_BASE_URL ?? "https://admin.perbug.dev"
       })
     : new MemoryModerationAlertDispatcher();
   const moderationService = new ModerationService({
     enforcement: new ReviewsModerationEnforcementAdapter(reviewsStore),
     alertDispatcher: moderationAlertDispatcher,
-    reportAlertRecipient: process.env.MODERATION_ALERT_EMAIL ?? "dryadtoken@gmail.com",
+    reportAlertRecipient: process.env.MODERATION_ALERT_EMAIL ?? "perbugtoken@gmail.com",
     targetContextLoader: async (target) => {
       if (target.targetType !== "place_review_video") return undefined;
       const video = await videoPlatformService?.getVideoById?.(target.targetId);
@@ -235,8 +234,8 @@ export function createServer(options?: CreateServerOptions) {
     new MemoryVideoPlatformStore(),
     {
       awsRegion: process.env.AWS_REGION ?? "us-east-1",
-      rawBucket: process.env.AWS_S3_VIDEO_RAW_BUCKET ?? "dryad-media-raw-dev",
-      processedBucket: process.env.AWS_S3_VIDEO_PROCESSED_BUCKET ?? "dryad-media-processed-dev",
+      rawBucket: process.env.AWS_S3_VIDEO_RAW_BUCKET ?? "perbug-media-raw-dev",
+      processedBucket: process.env.AWS_S3_VIDEO_PROCESSED_BUCKET ?? "perbug-media-processed-dev",
       cloudFrontBaseUrl: process.env.AWS_CLOUDFRONT_MEDIA_BASE_URL,
       uploadTtlSeconds: Number.parseInt(process.env.VIDEO_UPLOAD_URL_TTL_SECONDS ?? "900", 10),
       maxUploadBytes: Number.parseInt(process.env.VIDEO_MAX_UPLOAD_BYTES ?? String(2 * 1024 * 1024 * 1024), 10),
@@ -258,14 +257,14 @@ export function createServer(options?: CreateServerOptions) {
   const collectionsService = new CollectionsService(new MemoryCollectionStore(), analyticsService, notificationService);
   const socialGamificationService = new SocialGamificationService(new MemorySocialGamificationStore(), analyticsService, notificationService);
   const gamificationControlService = new GamificationControlService(new MemoryGamificationControlStore(), analyticsService);
-  const dryadRewardsService = new DryadRewardsService(new MemoryDryadRewardsStore());
-  dryadRewardsService.createPlace({ id: "place-1", name: "Dryad Test Cafe" });
-  dryadRewardsService.createPlace({ id: "place-2", name: "Dryad Arcade" });
-  const dryadTipsService = new DryadTipsService(new MemoryDryadTipsStore(), {
+  const perbugRewardsService = new PerbugRewardsService(new MemoryPerbugRewardsStore());
+  perbugRewardsService.createPlace({ id: "place-1", name: "Perbug Test Cafe" });
+  perbugRewardsService.createPlace({ id: "place-2", name: "Perbug Arcade" });
+  const perbugTipsService = new PerbugTipsService(new MemoryPerbugTipsStore(), {
     getVideo: (videoId) => videoPlatformService?.getVideoById(videoId),
-    getPrimaryWallet: (userId) => dryadRewardsService.listWallets(userId).find((wallet) => wallet.isPrimary)
+    getPrimaryWallet: (userId) => perbugRewardsService.listWallets(userId).find((wallet) => wallet.isPrimary)
   });
-  const competitionService = new CompetitionService(new MemoryCompetitionStore(), dryadRewardsService);
+  const competitionService = new CompetitionService(new MemoryCompetitionStore(), perbugRewardsService);
   const sponsoredLocationsService = new SponsoredLocationsService(new MemorySponsoredLocationStore(), {
     placeCoordinates: (placeId) => {
       const place = placeService.getCanonicalPlace(placeId);
@@ -277,68 +276,24 @@ export function createServer(options?: CreateServerOptions) {
   competitionService.recordVideoPublished({ videoId: "video_seed_1", reviewId: "review_seed_1", userId: "u1", publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), city: "Bloomington", category: "coffee", canonicalPlaceId: "place-1" });
   competitionService.recordApprovedReview({ id: "review_event_1", reviewId: "review_seed_1", videoId: "video_seed_1", userId: "u1", canonicalPlaceId: "place-1", approvedAt: new Date().toISOString(), city: "Bloomington", category: "coffee", discoveryType: "first_review", approved: true, blocked: false });
   competitionService.recordLike({ id: "like_seed_1", videoId: "video_seed_1", userId: "fan_1", createdAt: new Date().toISOString(), valid: true, bannedUser: false, blockedUser: false, fraudFlagged: false });
-  const seededTrees: DryadTree[] = [
-    {
-      treeId: "tree-001",
-      nftTokenId: "1001",
-      place: { placeId: "place-1", label: "Mission Creek Boardwalk, San Francisco", lat: 37.7701, lng: -122.391 },
-      founder: "0x1111111111111111111111111111111111111111",
-      owner: "0x2222222222222222222222222222222222222222",
-      growthLevel: 8,
-      contributionCount: 42,
-      listedPriceEth: "0.38"
-    },
-    {
-      treeId: "tree-002",
-      nftTokenId: "1002",
-      place: { placeId: "place-2", label: "Dolores Outlook, San Francisco", lat: 37.7597, lng: -122.4269 },
-      founder: "0x1111111111111111111111111111111111111111",
-      owner: "0x1111111111111111111111111111111111111111",
-      growthLevel: 4,
-      contributionCount: 11
-    },
-    {
-      treeId: "tree-003",
-      nftTokenId: "1003",
-      place: { placeId: "place-3", label: "South Congress Plaza, Austin", lat: 30.2492, lng: -97.7502 },
-      founder: "0x3333333333333333333333333333333333333333",
-      owner: "0x4444444444444444444444444444444444444444",
-      growthLevel: 6,
-      contributionCount: 23,
-      listedPriceEth: "0.74"
-    },
-    {
-      treeId: "tree-004",
-      nftTokenId: "1004",
-      place: { placeId: "place-4", label: "Riverside Pocket Park, Austin", lat: 30.265, lng: -97.744 },
-      founder: "0x0000000000000000000000000000000000000000",
-      owner: "0x0000000000000000000000000000000000000000",
-      growthLevel: 0,
-      contributionCount: 0
-    }
-  ];
-  const dryadMarketplaceService = new DryadMarketplaceService(seededTrees, [], [
-    { spotId: "spot-100", placeId: "spot-100", label: "Oracle Meadow, SF", lat: 37.7682, lng: -122.401, claimState: "unclaimed" },
-    { spotId: "spot-101", placeId: "spot-101", label: "Golden Path Grove, SF", lat: 37.7714, lng: -122.4032, claimState: "unclaimed" },
-    { spotId: "spot-102", placeId: "spot-102", label: "South Congress Bloomfield, Austin", lat: 30.248, lng: -97.752, claimState: "unclaimed" },
-  ]);
+  const perbugService = new LegacyPerbugMarketplaceService();
+  const perbugMarketplaceService = new PerbugStoreMarketplaceService(seedMarketplaceListings());
 
   const walletAuthService = new WalletAuthService(new MemoryWalletAuthStore(), accountsService);
-  const dryadEconomyService = new DryadEconomyService(new MemoryDryadEconomyStore());
+  const perbugEconomyService = new PerbugEconomyService(new MemoryPerbugEconomyStore());
   const perbugWorldService = new PerbugWorldService(new MemoryPerbugWorldStore());
-  const perbugMarketplaceService = new PerbugMarketplaceService(seedMarketplaceListings());
   const perbugWorldHandlers = createPerbugWorldHttpHandlers(perbugWorldService);
   const viewerEngagementRewardsService = new ViewerEngagementRewardsService(new MemoryViewerEngagementStore(), {
     getVideoContext: (videoId) => ({ creatorId: `creator_${videoId}`, placeId: `place_${videoId}` }),
     analytics: analyticsService
   });
-  dryadEconomyService.creditUser("u1", 500, "seed");
-  dryadEconomyService.creditUser("u2", 250, "seed");
-  dryadEconomyService.creditUser("u3", 180, "seed");
-  dryadEconomyService.creditBusiness("biz_owner_seed", 1000, "seed");
-  dryadEconomyService.creditUser("creator_seed", 300, "seed");
-  dryadEconomyService.creditUser("curator_seed", 250, "seed");
-  dryadEconomyService.upsertCollection({
+  perbugEconomyService.creditUser("u1", 500, "seed");
+  perbugEconomyService.creditUser("u2", 250, "seed");
+  perbugEconomyService.creditUser("u3", 180, "seed");
+  perbugEconomyService.creditBusiness("biz_owner_seed", 1000, "seed");
+  perbugEconomyService.creditUser("creator_seed", 300, "seed");
+  perbugEconomyService.creditUser("curator_seed", 250, "seed");
+  perbugEconomyService.upsertCollection({
     id: "collection_downtown_coffee",
     title: "Downtown Coffee Circuit",
     placeIds: ["place-1", "place-2"],
@@ -397,16 +352,16 @@ export function createServer(options?: CreateServerOptions) {
     collectionsService,
     socialGamificationService,
     gamificationControlService,
-    dryadRewardsService,
-    dryadTipsService,
+    perbugRewardsService,
+    perbugTipsService,
     competitionService,
     sponsoredLocationsService,
-    dryadEconomyService,
+    perbugEconomyService,
     viewerEngagementRewardsService,
-    dryadMarketplaceService,
+    perbugService,
+    perbugMarketplaceService,
     walletAuthService,
-    perbugWorldHandlers,
-    perbugMarketplaceService
+    perbugWorldHandlers
   });
 }
 

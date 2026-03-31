@@ -16,7 +16,7 @@
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 2500);
-      const response = await fetch('https://api.dryad.dev/health', {
+      const response = await fetch('https://api.perbug.com/health', {
         signal: controller.signal,
         cache: 'no-store'
       });

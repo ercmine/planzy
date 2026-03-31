@@ -1,8 +1,8 @@
-import type { ClaimResult, DryadRewardTier, DryadRewardsStore, PlaceRecord, RewardDashboard, RewardPreview, RewardQualityRating, RewardReviewRecord, SolanaClaimsAdapter, WalletRecord } from "./types.js";
-export declare class DryadRewardsService {
+import type { ClaimResult, PerbugRewardTier, PerbugRewardsStore, PlaceRecord, RewardDashboard, RewardPreview, RewardQualityRating, RewardReviewRecord, SolanaClaimsAdapter, WalletRecord } from "./types.js";
+export declare class PerbugRewardsService {
     private readonly store;
     private readonly claimsAdapter;
-    constructor(store: DryadRewardsStore, claimsAdapter?: SolanaClaimsAdapter);
+    constructor(store: PerbugRewardsStore, claimsAdapter?: SolanaClaimsAdapter);
     createPlace(input: {
         id: string;
         name: string;
@@ -56,7 +56,7 @@ export declare class DryadRewardsService {
         idempotencyKey?: string;
     }): Promise<ClaimResult>;
     listAuditLogs(): import("./types.js").AdminAuditLogRecord[];
-    listRewardTiers(): DryadRewardTier[];
+    listRewardTiers(): PerbugRewardTier[];
     private selectTier;
     private buildOverview;
     private requirePlace;

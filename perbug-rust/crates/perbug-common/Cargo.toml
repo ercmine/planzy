@@ -1,5 +1,5 @@
 [package]
-name = "dryad-common"
+name = "perbug-common"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

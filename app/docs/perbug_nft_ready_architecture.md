@@ -5,8 +5,8 @@
 ### Existing systems
 - **Squad/unit system**: `PerbugUnit`, `SquadState`, and `UnitProgression` power core encounter viability and squad loadouts. Core assignment and progression logic is gameplay-first and chain-independent.
 - **Inventory/resource economy**: `Inventory` and `PerbugEconomyState` store stackable crafting/progression resources and wallet transaction history.
-- **Marketplace surface**: Dryad has marketplace APIs/UI; Perbug strategy map did not yet have a unified owned-asset provenance model for a future hybrid market.
-- **Wallet and chain linkage**: Existing wallet concepts exist in other features (rewards/dryad), but Perbug core loop could not model optional wallet linkage without custom ad-hoc fields.
+- **Marketplace surface**: Perbug has marketplace APIs/UI; Perbug strategy map did not yet have a unified owned-asset provenance model for a future hybrid market.
+- **Wallet and chain linkage**: Existing wallet concepts exist in other features (rewards/perbug), but Perbug core loop could not model optional wallet linkage without custom ad-hoc fields.
 - **NFT-related scaffolding**: `UnitNftLink` existed but was unit-only and not generalized to relics, cosmetics, items, or map assets.
 
 ### Gaps addressed by this change

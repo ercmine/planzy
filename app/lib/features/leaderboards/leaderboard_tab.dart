@@ -31,7 +31,7 @@ class LeaderboardTab extends ConsumerWidget {
             const SizedBox(height: AppSpacing.m),
             _SectionCard(
               title: 'Daily missions',
-              subtitle: 'Complete missions and earn DRYAD with backend-tracked progress.',
+              subtitle: 'Complete missions and earn PERBUG with backend-tracked progress.',
               child: _MissionList(missions: data.missions.take(2).toList(growable: false)),
             ),
             const SizedBox(height: AppSpacing.m),
@@ -62,8 +62,8 @@ class LeaderboardTab extends ConsumerWidget {
               title: 'Claimable competition rewards',
               subtitle: 'Claim your competition rewards once missions and leaderboard payouts are ready.',
               child: data.rewards.isEmpty
-                  ? const ListTile(contentPadding: EdgeInsets.zero, title: Text('No claimable competition rewards yet'), subtitle: Text('Finish missions or place on a leaderboard to earn claimable DRYAD.'))
-                  : Column(children: data.rewards.map((reward) => ListTile(contentPadding: EdgeInsets.zero, title: Text('Earn DRYAD · ${reward.sourceType}'), subtitle: Text('Status: ${reward.status}'), trailing: Text(reward.rewardAtomic))).toList(growable: false)),
+                  ? const ListTile(contentPadding: EdgeInsets.zero, title: Text('No claimable competition rewards yet'), subtitle: Text('Finish missions or place on a leaderboard to earn claimable PERBUG.'))
+                  : Column(children: data.rewards.map((reward) => ListTile(contentPadding: EdgeInsets.zero, title: Text('Earn PERBUG · ${reward.sourceType}'), subtitle: Text('Status: ${reward.status}'), trailing: Text(reward.rewardAtomic))).toList(growable: false)),
             ),
             const SizedBox(height: AppSpacing.m),
             _SectionCard(
@@ -91,7 +91,7 @@ class _HeroCard extends StatelessWidget {
       glow: true,
       gradient: LinearGradient(colors: [scheme.primary.withOpacity(0.16), scheme.surfaceContainerHighest], begin: Alignment.topLeft, end: Alignment.bottomRight),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const AppPill(label: 'Earn DRYAD', icon: Icons.emoji_events_rounded),
+        const AppPill(label: 'Earn PERBUG', icon: Icons.emoji_events_rounded),
         const SizedBox(height: AppSpacing.s),
         Text(data.season?.name ?? 'Competition', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: AppSpacing.xs),

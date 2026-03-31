@@ -7,7 +7,7 @@ use commands::{create_ata, create_mint, inspect, mint_to, treasury};
 use config::CliConfig;
 
 #[derive(Debug, Parser)]
-#[command(name = "dryad-token-cli", about = "Dryad SPL token operations CLI")]
+#[command(name = "perbug-token-cli", about = "Perbug SPL token operations CLI")]
 struct Cli {
     #[arg(long, env = "SOLANA_RPC_URL")]
     rpc_url: Option<String>,

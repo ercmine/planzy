@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:dryad/features/premium/premium_copy.dart';
-import 'package:dryad/features/premium/premium_models.dart';
-import 'package:dryad/models/entitlement_summary.dart';
+import 'package:perbug/features/premium/premium_copy.dart';
+import 'package:perbug/features/premium/premium_models.dart';
+import 'package:perbug/models/entitlement_summary.dart';
 
 void main() {
   test('PremiumPlan parses plan metadata and formats pricing', () {

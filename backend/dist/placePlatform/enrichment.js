@@ -200,7 +200,7 @@ export function buildNormalizedPlaceImage(params) {
 }
 export function selectPrioritizedPlaceImages(images) {
     const priority = {
-        dryad: 0,
+        perbug: 0,
         wikidata: 1,
         opentripmap: 2
     };

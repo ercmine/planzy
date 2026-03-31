@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { DryadEconomyService } from "./service.js";
-export declare function createDryadEconomyHttpHandlers(service: DryadEconomyService): {
+import type { PerbugEconomyService } from "./service.js";
+export declare function createPerbugEconomyHttpHandlers(service: PerbugEconomyService): {
     creditUser: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
     createQuest: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
     completeQuest: (req: IncomingMessage, res: ServerResponse, questId: string) => Promise<void>;

@@ -4,7 +4,7 @@ import { searchCanonicalPlacesInBounds } from "../places/mapDiscovery.js";
 import type { CanonicalPlace } from "../places/types.js";
 import { parseJsonBody, sendJson } from "../venues/claims/http.js";
 import type { GeoGateway } from "./gateway.js";
-import type { GeoBounds, GeoGeocodeRequest, GeoResult, GeoReverseResult, DryadGeoPlace } from "./contracts.js";
+import type { GeoBounds, GeoGeocodeRequest, GeoResult, GeoReverseResult, PerbugGeoPlace } from "./contracts.js";
 import { assertGeoAuth } from "./middleware.js";
 
 interface RateLimitOptions {
@@ -53,7 +53,7 @@ function parseBounds(body: Record<string, unknown>): GeoBounds | undefined {
   return { north: north!, south: south!, east: east!, west: west! };
 }
 
-function normalizePlace(result: GeoResult | GeoReverseResult, index: number): DryadGeoPlace {
+function normalizePlace(result: GeoResult | GeoReverseResult, index: number): PerbugGeoPlace {
   const shortAddress = [result.city, result.state, result.country].filter(Boolean).join(", ") || undefined;
   const boundingBox = "boundingBox" in result ? result.boundingBox : undefined;
   const bounds = boundingBox
@@ -119,7 +119,7 @@ interface NearbyCacheEntry {
   payload: {
     origin: { lat: number; lng: number };
     radiusMeters: number;
-    places: DryadGeoPlace[];
+    places: PerbugGeoPlace[];
     sourceBreakdown: {
       canonicalCount: number;
       geoFallbackCount: number;
@@ -138,7 +138,7 @@ interface NearbyCandidateMeta {
 }
 
 interface NearbyCandidate {
-  place: DryadGeoPlace;
+  place: PerbugGeoPlace;
   distanceMeters: number;
   adminOnly: boolean;
   categoryMatch: number;
@@ -320,7 +320,7 @@ function buildDedupKey(result: GeoResult): string {
   return `fallback:${normalizeNameKey(result.displayName)}:${result.lat.toFixed(4)}:${result.lng.toFixed(4)}`;
 }
 
-function normalizeCanonicalPlace(place: ReturnType<typeof searchCanonicalPlacesInBounds>[number]): DryadGeoPlace {
+function normalizeCanonicalPlace(place: ReturnType<typeof searchCanonicalPlacesInBounds>[number]): PerbugGeoPlace {
   return {
     id: place.canonicalPlaceId,
     name: place.name,
@@ -821,16 +821,16 @@ export function createGeoHttpHandlers(
     },
 
     async version(_req: IncomingMessage, res: ServerResponse): Promise<void> {
-      sendJson(res, 200, { service: "dryad-geo", version: "1.0.0", status: status() });
+      sendJson(res, 200, { service: "perbug-geo", version: "1.0.0", status: status() });
     },
 
     async metrics(_req: IncomingMessage, res: ServerResponse): Promise<void> {
       if (!gateway) {
-        sendJson(res, 503, { service: "dryad-geo", metrics: null, upstream: null, status: status() });
+        sendJson(res, 503, { service: "perbug-geo", metrics: null, upstream: null, status: status() });
         return;
       }
       const payload = await gateway.health();
-      sendJson(res, 200, { service: "dryad-geo", metrics: payload.metrics ?? null, upstream: payload.upstream ?? null, status: status() });
+      sendJson(res, 200, { service: "perbug-geo", metrics: payload.metrics ?? null, upstream: payload.upstream ?? null, status: status() });
     }
   };
 }

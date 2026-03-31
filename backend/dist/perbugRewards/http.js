@@ -6,7 +6,7 @@ function requireUserId(req) {
         throw new ValidationError(["x-user-id header is required"]);
     return userId;
 }
-export function createDryadRewardsHttpHandlers(service) {
+export function createPerbugRewardsHttpHandlers(service) {
     return {
         preview: async (_req, res, placeId) => sendJson(res, 200, service.getRewardPreview(placeId)),
         createWalletNonce: async (req, res) => {

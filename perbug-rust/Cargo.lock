@@ -1901,7 +1901,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dryad-common"
+name = "perbug-common"
 version = "0.1.0"
 dependencies = [
  "borsh 1.6.1",
@@ -1913,35 +1913,35 @@ dependencies = [
 ]
 
 [[package]]
-name = "dryad-rewards-program"
+name = "perbug-rewards-program"
 version = "0.1.0"
 dependencies = [
  "borsh 1.6.1",
- "dryad-common",
+ "perbug-common",
  "solana-program",
  "solana-sdk",
  "thiserror 2.0.18",
 ]
 
 [[package]]
-name = "dryad-tipping-program"
+name = "perbug-tipping-program"
 version = "0.1.0"
 dependencies = [
  "borsh 1.6.1",
- "dryad-common",
+ "perbug-common",
  "solana-program",
  "solana-sdk",
  "thiserror 2.0.18",
 ]
 
 [[package]]
-name = "dryad-token-cli"
+name = "perbug-token-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
  "envy",
- "dryad-common",
+ "perbug-common",
  "serde",
  "serde_json",
  "solana-rpc-client",

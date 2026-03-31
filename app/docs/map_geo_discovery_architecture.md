@@ -12,7 +12,7 @@
 - Geo failures are surfaced as non-blocking UI status (for example, stale/missing area label).
 - Geo is not used as place discovery truth.
 
-### 3) Dryad discovery layer (`PlaceDiscoveryClient`)
+### 3) Perbug discovery layer (`PlaceDiscoveryClient`)
 - Uses backend map discovery endpoint (`/v1/places/map-discovery`) for pins and search-this-area.
 - Returns canonical place IDs and place preview fields.
 - Discovery failures show pin/result failure state while the map viewport remains interactive.

@@ -2,7 +2,7 @@ export type ReviewerTrustStatus = "none" | "candidate" | "trusted" | "suspended"
 export type ReviewerTrustTier = "none" | "emerging" | "core" | "elite";
 export type ReviewTrustDesignation = "standard" | "verified" | "trusted" | "trusted_verified";
 export type VerificationLevel = "none" | "weak" | "probable" | "verified" | "rejected";
-export type TrustBadge = "trusted_reviewer" | "verified_visit" | "trusted_review" | "dryad_limited";
+export type TrustBadge = "trusted_reviewer" | "verified_visit" | "trusted_review" | "perbug_limited";
 export type VerificationEvidenceType =
   | "check_in"
   | "location_proximity"

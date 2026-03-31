@@ -33,7 +33,7 @@
 
 ## Image handling strategy
 - Backend normalizes external enrichment images into source-aware records (`metadata.placeImages`) and app-facing contracts: `primaryImage`, `imageGallery`, and `imageAttributionSummary`.
-- Current image source priority is explicit and conservative: `dryad` first-party > `wikidata` > `opentripmap` > no-image fallback.
+- Current image source priority is explicit and conservative: `perbug` first-party > `wikidata` > `opentripmap` > no-image fallback.
 - OpenTripMap image candidates are used only as fallback when trusted matching passes and images pass basic quality checks (safe URL + tiny-image rejection).
 - Duplicate image candidates are deduped by normalized source+URL key before selection.
 - App never receives raw source response payloads for image rendering.

@@ -1,6 +1,6 @@
 const accountKey = (ownerType, ownerId) => `${ownerType}:${ownerId}`;
 const collectionProgressKey = (collectionId, userId) => `${collectionId}:${userId}`;
-export class MemoryDryadEconomyStore {
+export class MemoryPerbugEconomyStore {
     splitConfigs = new Map();
     accounts = new Map();
     ledger = [];

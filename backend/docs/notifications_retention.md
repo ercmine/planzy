@@ -1,4 +1,4 @@
-# Dryad Notifications + Retention Loop Design
+# Perbug Notifications + Retention Loop Design
 
 This subsystem uses in-app notifications as the source of truth and layers push delivery readiness on top.
 

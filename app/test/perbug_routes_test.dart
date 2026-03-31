@@ -1,5 +1,5 @@
-import 'package:dryad/app/app_routes.dart';
-import 'package:dryad/app/router.dart';
+import 'package:perbug/app/app_routes.dart';
+import 'package:perbug/app/router.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

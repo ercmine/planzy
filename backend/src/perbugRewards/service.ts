@@ -3,19 +3,19 @@ import { randomUUID } from "node:crypto";
 import { PublicKey } from "@solana/web3.js";
 
 import { ValidationError } from "../plans/errors.js";
-import { DEFAULT_DISTINCT_SLOT, DEFAULT_RULE_VERSION, DRYAD_DECIMALS, QUALITY_MULTIPLIERS, defaultRewardTiers } from "./defaults.js";
+import { DEFAULT_DISTINCT_SLOT, DEFAULT_RULE_VERSION, PERBUG_DECIMALS, QUALITY_MULTIPLIERS, defaultRewardTiers } from "./defaults.js";
 import { loadSolanaConfig } from "./solana/config.js";
 import { MockSolanaClaimsAdapter } from "./solana/claims.js";
 import { amountToAtomicUnits, amountToDisplay, isValidSolanaPublicKey } from "./solana/token.js";
 import { createWalletLoginNonce, formatWalletSignInMessage, stableIdempotencyKey, verifyWalletSignature } from "./solana/walletAuth.js";
-import type { ClaimResult, DryadRewardTier, DryadRewardsStore, PlaceRecord, RewardClaimRecord, RewardDashboard, RewardEligibilityRecord, RewardPreview, RewardQualityRating, RewardReviewRecord, SolanaClaimsAdapter, WalletNonce, WalletRecord } from "./types.js";
+import type { ClaimResult, PerbugRewardTier, PerbugRewardsStore, PlaceRecord, RewardClaimRecord, RewardDashboard, RewardEligibilityRecord, RewardPreview, RewardQualityRating, RewardReviewRecord, SolanaClaimsAdapter, WalletNonce, WalletRecord } from "./types.js";
 
 function nowIso(now = new Date()): string { return now.toISOString(); }
 function clone<T>(value: T): T { return structuredClone(value); }
 
-export class DryadRewardsService {
+export class PerbugRewardsService {
   constructor(
-    private readonly store: DryadRewardsStore,
+    private readonly store: PerbugRewardsStore,
     private readonly claimsAdapter: SolanaClaimsAdapter = new MockSolanaClaimsAdapter()
   ) {
     if (!this.store.listRewardTiers().length) {
@@ -219,8 +219,8 @@ export class DryadRewardsService {
       placeId,
       placeName: place.name,
       nextRewardPosition,
-      nextBaseRewardAmount: tier ? Number(amountToDisplay(tier.baseAmountAtomic, DRYAD_DECIMALS)) : 0,
-      rewardText: `This place’s next approved review earns ${tier ? amountToDisplay(tier.baseAmountAtomic, DRYAD_DECIMALS) : "0"} DRYAD`,
+      nextBaseRewardAmount: tier ? Number(amountToDisplay(tier.baseAmountAtomic, PERBUG_DECIMALS)) : 0,
+      rewardText: `This place’s next approved review earns ${tier ? amountToDisplay(tier.baseAmountAtomic, PERBUG_DECIMALS) : "0"} PERBUG`,
       ladder: this.store.listRewardTiers().filter((tierItem) => tierItem.active),
       approvedRewardedReviewCount: state?.approvedRewardedReviewCount ?? 0
     };
@@ -238,8 +238,8 @@ export class DryadRewardsService {
       claimable,
       history,
       totals: {
-        claimableDisplay: amountToDisplay(claimableTotalAtomic, DRYAD_DECIMALS),
-        claimedDisplay: amountToDisplay(claimedTotalAtomic, DRYAD_DECIMALS),
+        claimableDisplay: amountToDisplay(claimableTotalAtomic, PERBUG_DECIMALS),
+        claimedDisplay: amountToDisplay(claimedTotalAtomic, PERBUG_DECIMALS),
         pendingCount: reviews.filter((review) => ["eligible", "claiming"].includes(review.reward.status)).length
       }
     };
@@ -247,7 +247,7 @@ export class DryadRewardsService {
 
   async claimReward(input: { userId: string; reviewId: string; walletPublicKey: string; idempotencyKey?: string }): Promise<ClaimResult> {
     const config = loadSolanaConfig();
-    if (String(process.env.DRYAD_REWARDS_ENABLED ?? "true") === "false") throw new ValidationError(["claims disabled"]);
+    if (String(process.env.PERBUG_REWARDS_ENABLED ?? "true") === "false") throw new ValidationError(["claims disabled"]);
     const review = this.requireReview(input.reviewId);
     if (review.userId !== input.userId) throw new ValidationError(["review does not belong to user"]);
     const wallet = this.store.getWalletByPublicKey(input.walletPublicKey);
@@ -282,7 +282,7 @@ export class DryadRewardsService {
     this.store.saveClaim(claim);
     this.store.saveReview(review);
     try {
-      const transfer = await this.claimsAdapter.transferClaim({ claimantPublicKey: input.walletPublicKey, amountAtomic, idempotencyKey, memo: `DRYAD review ${review.id}` });
+      const transfer = await this.claimsAdapter.transferClaim({ claimantPublicKey: input.walletPublicKey, amountAtomic, idempotencyKey, memo: `PERBUG review ${review.id}` });
       claim.status = "confirmed";
       claim.transactionSignature = transfer.signature;
       claim.associatedTokenAccount = transfer.associatedTokenAccount;
@@ -315,9 +315,9 @@ export class DryadRewardsService {
   }
 
   listAuditLogs() { return this.store.listAuditLogs(); }
-  listRewardTiers(): DryadRewardTier[] { return this.store.listRewardTiers(); }
+  listRewardTiers(): PerbugRewardTier[] { return this.store.listRewardTiers(); }
 
-  private selectTier(position: number): DryadRewardTier | null {
+  private selectTier(position: number): PerbugRewardTier | null {
     return this.store.listRewardTiers().find((tier) => tier.active && position >= tier.startPosition && (tier.endPosition == null || position <= tier.endPosition)) ?? null;
   }
 
@@ -330,4 +330,4 @@ export class DryadRewardsService {
   private audit(actorUserId: string, action: string, targetType: string, targetId: string, payload: Record<string, unknown>) { this.store.addAuditLog({ id: `audit_${randomUUID()}`, actorUserId, action, targetType, targetId, payload, createdAt: nowIso() }); }
 }
 
-export function atomicAmountFromDisplay(amount: number): bigint { return amountToAtomicUnits(amount, DRYAD_DECIMALS); }
+export function atomicAmountFromDisplay(amount: number): bigint { return amountToAtomicUnits(amount, PERBUG_DECIMALS); }

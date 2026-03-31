@@ -99,7 +99,7 @@ export function defaultConfig(env: AppConfig["env"]): AppConfig {
       reverseCacheTtlMs: 86_400_000,
       defaultLimit: 5,
       enableFallback: false,
-      userAgent: "dryad-geocoder/1.0"
+      userAgent: "perbug-geocoder/1.0"
     },
     plans: {
       router: {

@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:dryad/api/api_client.dart';
-import 'package:dryad/core/ads/ads_config.dart';
-import 'package:dryad/core/env/env.dart';
-import 'package:dryad/features/home/review_prompt_service.dart';
+import 'package:perbug/api/api_client.dart';
+import 'package:perbug/core/ads/ads_config.dart';
+import 'package:perbug/core/env/env.dart';
+import 'package:perbug/features/home/review_prompt_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

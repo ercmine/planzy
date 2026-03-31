@@ -1,8 +1,8 @@
 use solana_program::pubkey::Pubkey;
 
-pub const DRYAD_TOKEN_NAME: &str = "Dryad";
-pub const DRYAD_TOKEN_SYMBOL: &str = "DRYAD";
-pub const DRYAD_TOKEN_DECIMALS: u8 = 6;
+pub const PERBUG_TOKEN_NAME: &str = "Perbug";
+pub const PERBUG_TOKEN_SYMBOL: &str = "PERBUG";
+pub const PERBUG_TOKEN_DECIMALS: u8 = 6;
 pub const MAX_BPS: u16 = 10_000;
 pub const MAX_LABEL_LEN: usize = 64;
 pub const MAX_URI_LEN: usize = 256;

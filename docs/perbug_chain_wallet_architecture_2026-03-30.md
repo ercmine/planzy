@@ -15,7 +15,7 @@
 - Backend-side economy uses account balances and ledger entries in `backend/src/perbugEconomy/types.ts` as bigint atomics, with service logic in `backend/src/perbugEconomy/service.ts`.
 
 ### Existing wallet/demo architecture
-- Existing “wallet” flow is EVM browser-wallet connection (`wallet_connector.dart`, `wallet_page.dart`) for legacy Dryad NFT flows, not for a native Perbug chain.
+- Existing “wallet” flow is EVM browser-wallet connection (`wallet_connector.dart`, `wallet_page.dart`) for legacy Perbug NFT flows, not for a native Perbug chain.
 - App supports clear demo-vs-live location runtime mode in the game loop (`PerbugWorldRuntimeMode.demo|real`), which is directly reusable for demo wallet mode rollout.
 
 ### Auth/account model

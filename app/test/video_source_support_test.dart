@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:dryad/features/place_review_editor/video_source_support.dart';
+import 'package:perbug/features/place_review_editor/video_source_support.dart';
 
 void main() {
   group('supportsNativeVideoPicker', () {

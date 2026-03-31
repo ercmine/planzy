@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { PublicKey } from "@solana/web3.js";
 import { ValidationError } from "../plans/errors.js";
-import { DEFAULT_DISTINCT_SLOT, DRYAD_DECIMALS, QUALITY_MULTIPLIERS, defaultRewardTiers } from "./defaults.js";
+import { DEFAULT_DISTINCT_SLOT, PERBUG_DECIMALS, QUALITY_MULTIPLIERS, defaultRewardTiers } from "./defaults.js";
 import { loadSolanaConfig } from "./solana/config.js";
 import { MockSolanaClaimsAdapter } from "./solana/claims.js";
 import { amountToAtomicUnits, amountToDisplay, isValidSolanaPublicKey } from "./solana/token.js";
 import { createWalletLoginNonce, formatWalletSignInMessage, stableIdempotencyKey, verifyWalletSignature } from "./solana/walletAuth.js";
 function nowIso(now = new Date()) { return now.toISOString(); }
 function clone(value) { return structuredClone(value); }
-export class DryadRewardsService {
+export class PerbugRewardsService {
     store;
     claimsAdapter;
     constructor(store, claimsAdapter = new MockSolanaClaimsAdapter()) {
@@ -211,8 +211,8 @@ export class DryadRewardsService {
             placeId,
             placeName: place.name,
             nextRewardPosition,
-            nextBaseRewardAmount: tier ? Number(amountToDisplay(tier.baseAmountAtomic, DRYAD_DECIMALS)) : 0,
-            rewardText: `This place’s next approved review earns ${tier ? amountToDisplay(tier.baseAmountAtomic, DRYAD_DECIMALS) : "0"} DRYAD`,
+            nextBaseRewardAmount: tier ? Number(amountToDisplay(tier.baseAmountAtomic, PERBUG_DECIMALS)) : 0,
+            rewardText: `This place’s next approved review earns ${tier ? amountToDisplay(tier.baseAmountAtomic, PERBUG_DECIMALS) : "0"} PERBUG`,
             ladder: this.store.listRewardTiers().filter((tierItem) => tierItem.active),
             approvedRewardedReviewCount: state?.approvedRewardedReviewCount ?? 0
         };
@@ -229,15 +229,15 @@ export class DryadRewardsService {
             claimable,
             history,
             totals: {
-                claimableDisplay: amountToDisplay(claimableTotalAtomic, DRYAD_DECIMALS),
-                claimedDisplay: amountToDisplay(claimedTotalAtomic, DRYAD_DECIMALS),
+                claimableDisplay: amountToDisplay(claimableTotalAtomic, PERBUG_DECIMALS),
+                claimedDisplay: amountToDisplay(claimedTotalAtomic, PERBUG_DECIMALS),
                 pendingCount: reviews.filter((review) => ["eligible", "claiming"].includes(review.reward.status)).length
             }
         };
     }
     async claimReward(input) {
         const config = loadSolanaConfig();
-        if (String(process.env.DRYAD_REWARDS_ENABLED ?? "true") === "false")
+        if (String(process.env.PERBUG_REWARDS_ENABLED ?? "true") === "false")
             throw new ValidationError(["claims disabled"]);
         const review = this.requireReview(input.reviewId);
         if (review.userId !== input.userId)
@@ -278,7 +278,7 @@ export class DryadRewardsService {
         this.store.saveClaim(claim);
         this.store.saveReview(review);
         try {
-            const transfer = await this.claimsAdapter.transferClaim({ claimantPublicKey: input.walletPublicKey, amountAtomic, idempotencyKey, memo: `DRYAD review ${review.id}` });
+            const transfer = await this.claimsAdapter.transferClaim({ claimantPublicKey: input.walletPublicKey, amountAtomic, idempotencyKey, memo: `PERBUG review ${review.id}` });
             claim.status = "confirmed";
             claim.transactionSignature = transfer.signature;
             claim.associatedTokenAccount = transfer.associatedTokenAccount;
@@ -326,4 +326,4 @@ export class DryadRewardsService {
         throw new ValidationError(["reward eligibility not found"]); return eligibility; }
     audit(actorUserId, action, targetType, targetId, payload) { this.store.addAuditLog({ id: `audit_${randomUUID()}`, actorUserId, action, targetType, targetId, payload, createdAt: nowIso() }); }
 }
-export function atomicAmountFromDisplay(amount) { return amountToAtomicUnits(amount, DRYAD_DECIMALS); }
+export function atomicAmountFromDisplay(amount) { return amountToAtomicUnits(amount, PERBUG_DECIMALS); }

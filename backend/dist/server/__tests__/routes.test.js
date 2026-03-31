@@ -102,14 +102,14 @@ describe("server diagnostic and alias routes", () => {
         const rootResponse = await fetch(`${baseUrl}/`);
         expect(rootResponse.status).toBe(200);
         await expect(rootResponse.json()).resolves.toMatchObject({
-            service: "dryad-api",
+            service: "perbug-api",
             version: "1.0.0"
         });
         const healthResponse = await fetch(`${baseUrl}/health`);
         expect(healthResponse.status).toBe(200);
         await expect(healthResponse.json()).resolves.toMatchObject({
             ok: true,
-            service: "dryad-api",
+            service: "perbug-api",
             version: "1.0.0"
         });
         const geoHealthResponse = await fetch(`${baseUrl}/api/geo/health`);

@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:dryad/core/store/swipes_store.dart';
+import 'package:perbug/core/store/swipes_store.dart';
 
 void main() {
   test('loadSwipes keeps valid entries when one entry is malformed', () async {

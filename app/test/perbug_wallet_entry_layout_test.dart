@@ -1,9 +1,9 @@
-import 'package:dryad/app/assets.dart';
-import 'package:dryad/core/identity/identity_provider.dart';
-import 'package:dryad/core/identity/identity_store.dart';
-import 'package:dryad/features/dryad/chain/dryad_chain_providers.dart';
-import 'package:dryad/features/dryad/chain/wallet_connector.dart';
-import 'package:dryad/features/auth/perbug_wallet_entry_page.dart';
+import 'package:perbug/app/assets.dart';
+import 'package:perbug/core/identity/identity_provider.dart';
+import 'package:perbug/core/identity/identity_store.dart';
+import 'package:perbug/features/perbug/chain/perbug_chain_providers.dart';
+import 'package:perbug/features/perbug/chain/wallet_connector.dart';
+import 'package:perbug/features/auth/perbug_wallet_entry_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/widgets.dart';

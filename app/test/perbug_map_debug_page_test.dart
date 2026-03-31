@@ -1,5 +1,5 @@
-import 'package:dryad/features/home/perbug_map_debug_page.dart';
-import 'package:dryad/features/home/perbug_world_map_view.dart';
+import 'package:perbug/features/home/perbug_map_debug_page.dart';
+import 'package:perbug/features/home/perbug_world_map_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

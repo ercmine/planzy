@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:dryad/core/ads/ad_placement.dart';
+import 'package:perbug/core/ads/ad_placement.dart';
 
 void main() {
   test('resolveHeight clamps responsive value within bounds', () {

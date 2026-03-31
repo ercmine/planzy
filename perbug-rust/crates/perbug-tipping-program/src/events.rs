@@ -1,1 +1,1 @@
-pub use dryad_common::TipRecordedEvent;
+pub use perbug_common::TipRecordedEvent;

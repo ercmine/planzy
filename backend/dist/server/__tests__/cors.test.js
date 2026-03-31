@@ -26,7 +26,7 @@ describe("CORS policy", () => {
         });
     });
     beforeEach(() => {
-        process.env.CORS_ALLOWED_ORIGINS = "https://app.dryad.dev,http://localhost:5173";
+        process.env.CORS_ALLOWED_ORIGINS = "https://app.perbug.com,http://localhost:5173";
         process.env.CORS_ALLOW_CREDENTIALS = "true";
         process.env.CORS_ALLOWED_METHODS = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
         process.env.CORS_ALLOWED_HEADERS = "Content-Type,Authorization,x-user-id,x-request-id,x-acting-profile-type,x-acting-profile-id,x-admin-key";
@@ -35,10 +35,10 @@ describe("CORS policy", () => {
     });
     it("allows approved origins on normal requests", async () => {
         const response = await fetch(`${baseUrl}/api/geo/health`, {
-            headers: { Origin: "https://app.dryad.dev" }
+            headers: { Origin: "https://app.perbug.com" }
         });
         expect([200, 503]).toContain(response.status);
-        expect(response.headers.get("access-control-allow-origin")).toBe("https://app.dryad.dev");
+        expect(response.headers.get("access-control-allow-origin")).toBe("https://app.perbug.com");
         expect(response.headers.get("access-control-allow-credentials")).toBe("true");
         expect(response.headers.get("access-control-expose-headers")).toContain("x-request-id");
         expect(response.headers.get("vary")).toContain("Origin");
@@ -60,13 +60,13 @@ describe("CORS policy", () => {
         const response = await fetch(`${baseUrl}/api/geo/search`, {
             method: "OPTIONS",
             headers: {
-                Origin: "https://app.dryad.dev",
+                Origin: "https://app.perbug.com",
                 "Access-Control-Request-Method": "GET",
                 "Access-Control-Request-Headers": "content-type,x-user-id,x-request-id"
             }
         });
         expect(response.status).toBe(204);
-        expect(response.headers.get("access-control-allow-origin")).toBe("https://app.dryad.dev");
+        expect(response.headers.get("access-control-allow-origin")).toBe("https://app.perbug.com");
         expect(response.headers.get("access-control-allow-methods")).toContain("GET");
         expect(response.headers.get("access-control-allow-headers")).toBe("content-type, x-user-id, x-request-id");
         expect(response.headers.get("access-control-max-age")).toBe("600");
@@ -89,16 +89,16 @@ describe("CORS policy", () => {
     });
     it("keeps CORS headers on error responses for allowed origins", async () => {
         const response = await fetch(`${baseUrl}/v1/admin/promoted`, {
-            headers: { Origin: "https://app.dryad.dev" }
+            headers: { Origin: "https://app.perbug.com" }
         });
         expect(response.status).toBe(401);
-        expect(response.headers.get("access-control-allow-origin")).toBe("https://app.dryad.dev");
+        expect(response.headers.get("access-control-allow-origin")).toBe("https://app.perbug.com");
     });
     it("keeps CORS headers on not-found responses for allowed origins", async () => {
         const response = await fetch(`${baseUrl}/api/this-route-does-not-exist`, {
-            headers: { Origin: "https://app.dryad.dev" }
+            headers: { Origin: "https://app.perbug.com" }
         });
         expect(response.status).toBe(404);
-        expect(response.headers.get("access-control-allow-origin")).toBe("https://app.dryad.dev");
+        expect(response.headers.get("access-control-allow-origin")).toBe("https://app.perbug.com");
     });
 });

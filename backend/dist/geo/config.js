@@ -35,7 +35,7 @@ export function readGeoRuntimeConfig(env) {
             geocodeCacheTtlMs: parseNum(env.NOMINATIM_GEOCODE_CACHE_TTL_MS, 3_600_000),
             reverseCacheTtlMs: parseNum(env.NOMINATIM_REVERSE_CACHE_TTL_MS, 86_400_000),
             defaultLimit: parseNum(env.NOMINATIM_DEFAULT_LIMIT, 5),
-            userAgent: env.NOMINATIM_USER_AGENT ?? "dryad-geocoder/1.0"
+            userAgent: env.NOMINATIM_USER_AGENT ?? "perbug-geocoder/1.0"
         }
     };
 }

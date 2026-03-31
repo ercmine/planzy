@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dryad/features/sessions/create_session/create_session_page.dart';
+import 'package:perbug/features/sessions/create_session/create_session_page.dart';
 
 void main() {
   testWidgets('Create session title field stays single line', (tester) async {

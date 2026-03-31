@@ -1,4 +1,4 @@
-import 'package:dryad/core/platform/perbug_platform.dart';
+import 'package:perbug/core/platform/perbug_platform.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 

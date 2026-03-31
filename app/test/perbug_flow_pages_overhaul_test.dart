@@ -1,5 +1,5 @@
-import 'package:dryad/features/home/perbug_flow_pages.dart';
-import 'package:dryad/providers/test_overrides.dart';
+import 'package:perbug/features/home/perbug_flow_pages.dart';
+import 'package:perbug/providers/test_overrides.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';

@@ -3,7 +3,7 @@ use std::{fmt, str::FromStr};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
-use crate::{constants::DRYAD_TOKEN_DECIMALS, error::DryadError};
+use crate::{constants::PERBUG_TOKEN_DECIMALS, error::PerbugError};
 
 #[derive(
     Debug,
@@ -18,11 +18,11 @@ use crate::{constants::DRYAD_TOKEN_DECIMALS, error::DryadError};
     BorshSerialize,
     BorshDeserialize,
 )]
-pub struct DryadAmount {
+pub struct PerbugAmount {
     atomic: u64,
 }
 
-impl DryadAmount {
+impl PerbugAmount {
     pub const fn from_atomic(atomic: u64) -> Self {
         Self { atomic }
     }
@@ -31,10 +31,10 @@ impl DryadAmount {
         self.atomic
     }
 
-    pub fn from_display_str(value: &str) -> Result<Self, DryadError> {
+    pub fn from_display_str(value: &str) -> Result<Self, PerbugError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err(DryadError::InvalidAmountFormat);
+            return Err(PerbugError::InvalidAmountFormat);
         }
 
         let (whole_part, fractional_part) = match trimmed.split_once('.') {
@@ -42,36 +42,36 @@ impl DryadAmount {
             None => (trimmed, ""),
         };
 
-        let whole = u64::from_str(whole_part).map_err(|_| DryadError::InvalidAmountFormat)?;
-        let factor = 10_u64.pow(DRYAD_TOKEN_DECIMALS as u32);
-        let whole_atomic = whole.checked_mul(factor).ok_or(DryadError::ArithmeticOverflow)?;
+        let whole = u64::from_str(whole_part).map_err(|_| PerbugError::InvalidAmountFormat)?;
+        let factor = 10_u64.pow(PERBUG_TOKEN_DECIMALS as u32);
+        let whole_atomic = whole.checked_mul(factor).ok_or(PerbugError::ArithmeticOverflow)?;
 
-        if fractional_part.len() > DRYAD_TOKEN_DECIMALS as usize {
-            return Err(DryadError::TooManyDecimalPlaces);
+        if fractional_part.len() > PERBUG_TOKEN_DECIMALS as usize {
+            return Err(PerbugError::TooManyDecimalPlaces);
         }
         let mut fraction = fractional_part.to_string();
-        while fraction.len() < DRYAD_TOKEN_DECIMALS as usize {
+        while fraction.len() < PERBUG_TOKEN_DECIMALS as usize {
             fraction.push('0');
         }
         let frac_atomic = if fraction.is_empty() {
             0
         } else {
-            u64::from_str(&fraction).map_err(|_| DryadError::InvalidAmountFormat)?
+            u64::from_str(&fraction).map_err(|_| PerbugError::InvalidAmountFormat)?
         };
 
         Ok(Self {
-            atomic: whole_atomic.checked_add(frac_atomic).ok_or(DryadError::ArithmeticOverflow)?,
+            atomic: whole_atomic.checked_add(frac_atomic).ok_or(PerbugError::ArithmeticOverflow)?,
         })
     }
 
     pub fn format_display(self) -> String {
-        let factor = 10_u64.pow(DRYAD_TOKEN_DECIMALS as u32);
+        let factor = 10_u64.pow(PERBUG_TOKEN_DECIMALS as u32);
         let whole = self.atomic / factor;
         let frac = self.atomic % factor;
         if frac == 0 {
             return whole.to_string();
         }
-        let mut frac_str = format!("{:0width$}", frac, width = DRYAD_TOKEN_DECIMALS as usize);
+        let mut frac_str = format!("{:0width$}", frac, width = PERBUG_TOKEN_DECIMALS as usize);
         while frac_str.ends_with('0') {
             frac_str.pop();
         }
@@ -79,22 +79,22 @@ impl DryadAmount {
     }
 }
 
-impl fmt::Display for DryadAmount {
+impl fmt::Display for PerbugAmount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.format_display())
     }
 }
 
-pub fn checked_add_u64(lhs: u64, rhs: u64) -> Result<u64, DryadError> {
-    lhs.checked_add(rhs).ok_or(DryadError::ArithmeticOverflow)
+pub fn checked_add_u64(lhs: u64, rhs: u64) -> Result<u64, PerbugError> {
+    lhs.checked_add(rhs).ok_or(PerbugError::ArithmeticOverflow)
 }
 
-pub fn checked_sub_u64(lhs: u64, rhs: u64) -> Result<u64, DryadError> {
-    lhs.checked_sub(rhs).ok_or(DryadError::ArithmeticOverflow)
+pub fn checked_sub_u64(lhs: u64, rhs: u64) -> Result<u64, PerbugError> {
+    lhs.checked_sub(rhs).ok_or(PerbugError::ArithmeticOverflow)
 }
 
-pub fn checked_mul_u64(lhs: u64, rhs: u64) -> Result<u64, DryadError> {
-    lhs.checked_mul(rhs).ok_or(DryadError::ArithmeticOverflow)
+pub fn checked_mul_u64(lhs: u64, rhs: u64) -> Result<u64, PerbugError> {
+    lhs.checked_mul(rhs).ok_or(PerbugError::ArithmeticOverflow)
 }
 
 #[cfg(test)]
@@ -103,14 +103,14 @@ mod tests {
 
     #[test]
     fn parses_display_amount() {
-        let amount = DryadAmount::from_display_str("42.1234").expect("amount");
+        let amount = PerbugAmount::from_display_str("42.1234").expect("amount");
         assert_eq!(amount.atomic(), 42_123_400);
         assert_eq!(amount.to_string(), "42.1234");
     }
 
     #[test]
     fn rejects_too_many_decimals() {
-        let err = DryadAmount::from_display_str("1.1234567").expect_err("expected decimal error");
-        assert_eq!(err, DryadError::TooManyDecimalPlaces);
+        let err = PerbugAmount::from_display_str("1.1234567").expect_err("expected decimal error");
+        assert_eq!(err, PerbugError::TooManyDecimalPlaces);
     }
 }

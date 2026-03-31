@@ -1,15 +1,15 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import RewardsClaimConsole from '../../components/rewards/RewardsClaimConsole';
-const apiBaseUrl = import.meta.env.PUBLIC_DRYAD_API_BASE_URL || 'http://localhost:8080';
+const apiBaseUrl = import.meta.env.PUBLIC_PERBUG_API_BASE_URL || 'http://localhost:8080';
 const cluster = import.meta.env.PUBLIC_SOLANA_CLUSTER || 'devnet';
 ---
-<BaseLayout title="Dryad creator rewards" description="Connect Phantom, sign in with your wallet, and claim DRYAD for approved place reviews.">
+<BaseLayout title="Perbug creator rewards" description="Connect Phantom, sign in with your wallet, and claim PERBUG for approved place reviews.">
   <section class="mx-auto max-w-5xl px-6 py-20">
     <div class="mb-8 space-y-3 text-white">
-      <p class="text-sm uppercase tracking-[0.3em] text-cyan-300">Dryad creator rewards</p>
-      <h1 class="text-4xl font-semibold">Transparent, per-place DRYAD rewards.</h1>
-      <p class="max-w-3xl text-slate-300">Earlier approved videos at a place earn more DRYAD. Connect Phantom, sign the Dryad login message, and claim safely to your associated token account.</p>
+      <p class="text-sm uppercase tracking-[0.3em] text-cyan-300">Perbug creator rewards</p>
+      <h1 class="text-4xl font-semibold">Transparent, per-place PERBUG rewards.</h1>
+      <p class="max-w-3xl text-slate-300">Earlier approved videos at a place earn more PERBUG. Connect Phantom, sign the Perbug login message, and claim safely to your associated token account.</p>
     </div>
     <RewardsClaimConsole client:only="react" apiBaseUrl={apiBaseUrl} cluster={cluster} />
   </section>

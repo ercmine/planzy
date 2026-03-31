@@ -36,11 +36,11 @@ export declare class SponsoredLocationsService {
         targetRadiusMeters?: number;
         startsAt: string;
         endsAt: string;
-        dailyBudgetDryad: number;
-        totalBudgetDryad: number;
+        dailyBudgetPerbug: number;
+        totalBudgetPerbug: number;
         rewardRule: {
             type?: SponsoredRewardRule["type"];
-            payoutPerVisitDryad: number;
+            payoutPerVisitPerbug: number;
             decayBps?: number;
             firstXDaily?: number;
             splitWindowDays?: number;
@@ -57,7 +57,7 @@ export declare class SponsoredLocationsService {
     fundCampaign(input: {
         campaignId: string;
         businessId: string;
-        amountDryad: number;
+        amountPerbug: number;
     }): CampaignBudget;
     getSponsoredPlacements(input: {
         lat: number;
@@ -67,7 +67,7 @@ export declare class SponsoredLocationsService {
         campaign: SponsoredCampaign;
         badge: string;
         rewardEnabled: boolean;
-        estimatedRewardDryad: number;
+        estimatedRewardPerbug: number;
         poolRemainingAtomic: bigint;
     }[];
     startVisitSession(input: {

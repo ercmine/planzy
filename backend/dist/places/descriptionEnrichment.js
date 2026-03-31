@@ -55,7 +55,7 @@ function buildStructuredSummary(normalized, canonicalCategory) {
         features.push("contact details");
     if (normalized.photos.length > 0)
         features.push("visitor photos");
-    const lead = location ? `${label} in ${location}` : `${label} on Dryad`;
+    const lead = location ? `${label} in ${location}` : `${label} on Perbug`;
     const short = `${lead} with ${features.slice(0, 2).join(" and ") || "map location and business details"}.`;
     const long = `${lead} with ${features.join(", ") || "map location and basic business details"}. Categories and source records are merged from trusted providers to keep details current.`;
     return { short, long };
@@ -123,7 +123,7 @@ export function enrichPlaceDescriptions(input) {
         sourceType: "structured_synthesis",
         provider: input.normalized.provider,
         sourceRecordId: input.sourceRecord.sourceRecordId,
-        attribution: "Dryad structured enrichment",
+        attribution: "Perbug structured enrichment",
         confidence: 0.7,
         generationMethod: "structured_summary"
     }));
@@ -132,7 +132,7 @@ export function enrichPlaceDescriptions(input) {
         sourceType: "minimal_fallback",
         provider: input.normalized.provider,
         sourceRecordId: input.sourceRecord.sourceRecordId,
-        attribution: "Dryad fallback enrichment",
+        attribution: "Perbug fallback enrichment",
         confidence: 0.45,
         generationMethod: "minimal_summary"
     }));

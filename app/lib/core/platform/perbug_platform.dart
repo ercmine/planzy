@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
-import '../../features/dryad/chain/dryad_chain_providers.dart';
+import '../../features/perbug/chain/perbug_chain_providers.dart';
 
 class PerbugPlatformSnapshot {
   const PerbugPlatformSnapshot({

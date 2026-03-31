@@ -16,11 +16,11 @@
 - Resource/material/relic visuals are represented in economy systems but not consistently surfaced in map loop UI.
 
 ## Old-direction remnants
-- Codebase still has **Dryad/review-platform** surfaces (reviews, places, creator media, legacy economy pages) that are orthogonal to map-native RPG shell.
+- Codebase still has **Perbug/review-platform** surfaces (reviews, places, creator media, legacy economy pages) that are orthogonal to map-native RPG shell.
 - Some discovery UI and supporting repositories retain utility/review vocabulary.
 
 ## Dead or obsolete risk areas
-- Legacy “Dryad Balance” and reward-ledger pages appear disconnected from the core Perbug map loop.
+- Legacy “Perbug Balance” and reward-ledger pages appear disconnected from the core Perbug map loop.
 - Parallel map discovery/review workflows can dilute progression-first UX if exposed as primary navigation.
 
 ## Asset inventory status
@@ -34,11 +34,11 @@
 ## Where immersion currently breaks
 - Tactical map board is solid, but visual identity is still mostly Material icon driven.
 - Node/squad/economy screens are connected logically, but art-system cohesion is incomplete.
-- Legacy screen naming/branding (“Dryad”) breaks Perbug fantasy.
+- Legacy screen naming/branding (“Perbug”) breaks Perbug fantasy.
 
 ## Recommended implementation order (grounded)
 1. Introduce a **single asset registry layer** for node/role/resource/relic/encounter mappings with fallback-safe metadata.
 2. Route map + roster rendering through this registry (even before full sprite extraction).
-3. Continue removing/isolating legacy Dryad/review-first navigation from primary shell.
+3. Continue removing/isolating legacy Perbug/review-first navigation from primary shell.
 4. Expand marketplace UI on top of existing ownership/listing models.
 5. Add integration tests for asset mapping + fallback guarantees, then iterate visual sheet extraction.

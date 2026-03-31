@@ -191,7 +191,7 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
                   const BrandHeroCard(
                     child: AppSectionHeader(
                       title: 'Create a vivid place review',
-                      subtitle: 'Edit, polish, and publish with premium Dryad motion and progress states.',
+                      subtitle: 'Edit, polish, and publish with premium Perbug motion and progress states.',
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -203,7 +203,7 @@ class _PlaceReviewVideoEditorScreenState extends ConsumerState<PlaceReviewVideoE
                       child: ListTile(
                         leading: Icon(Icons.history),
                         title: Text('Recovered your unfinished draft'),
-                        subtitle: Text('Dryad restored your last draft after an interruption.'),
+                        subtitle: Text('Perbug restored your last draft after an interruption.'),
                       ),
                     ),
                   if (state.lastError != null)
