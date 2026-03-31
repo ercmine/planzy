@@ -17,7 +17,10 @@ import '../onboarding/onboarding_state.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_tab.dart' show mapGeoClientProvider;
-import 'perbug_world_map_view.dart';
+import 'world/world_map_scene.dart';
+import 'world/world_map_scene_controller.dart';
+import 'world/world_map_scene_generator.dart';
+import 'world/world_map_scene_models.dart';
 import 'perbug_asset_registry.dart';
 import 'perbug_economy_models.dart';
 import 'perbug_game_controller.dart';
@@ -42,9 +45,13 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
   final TextEditingController _searchController = TextEditingController();
   _MapEntryState _entryState = _MapEntryState.idle;
   String? _entryDetails;
+  late final WorldMapSceneController _sceneController;
+  WorldMapNode? _selectedWorldNode;
+  String? _lastSceneSignature;
 
   @override
   void dispose() {
+    _sceneController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -53,6 +60,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
   void initState() {
     super.initState();
     _mapViewport = const MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
+    _sceneController = WorldMapSceneController(generator: const WorldMapSceneGenerator());
   }
 
   @override
@@ -74,6 +82,16 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     final mapUiState = _mapUiState(state: state, locationState: locationState);
     final showBlockingMapOverlay = _shouldShowBlockingMapOverlay(mapUiState);
     final showDemoLocationCta = _shouldShowDemoLocationCta(state: state, locationState: locationState);
+    final locationForScene = locationState.effectiveLocation;
+    final signature = '${locationForScene?.latitude.toStringAsFixed(3)}:${locationForScene?.longitude.toStringAsFixed(3)}:${state.nodes.length}:${state.progression.level}';
+    if (_lastSceneSignature != signature) {
+      _lastSceneSignature = signature;
+      _sceneController.regenerate(
+        location: locationForScene,
+        demoMode: locationForScene == null,
+        seed: state.nodes.length + state.progression.level,
+      );
+    }
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -232,17 +250,19 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                     borderRadius: BorderRadius.circular(16),
                     child: Stack(
                       children: [
-                        PerbugWorldMapView(
-                          viewport: _mapViewport,
-                          nodes: state.nodes,
-                          connections: state.connections,
-                          currentNodeId: state.currentNodeId,
-                          selectedNodeId: selectedNode?.id,
-                          reachableNodeIds: state.reachableMoves().where((m) => m.isReachable).map((m) => m.node.id).toSet(),
-                          completedNodeIds: state.visitedNodeIds,
-                          onViewportChanged: (viewport, {required hasGesture}) => setState(() => _mapViewport = viewport),
-                          onTapEmpty: () => setState(() => _selectedNodeId = null),
-                          onNodeSelected: (nodeId) => setState(() => _selectedNodeId = nodeId),
+                        WorldMapScene(
+                          controller: _sceneController,
+                          onTapEmpty: () => setState(() {
+                            _selectedNodeId = null;
+                            _selectedWorldNode = null;
+                          }),
+                          onNodeTapped: (node) {
+                            final match = state.nodes.where((candidate) => candidate.nodeType == node.perbugType).toList(growable: false);
+                            setState(() {
+                              _selectedWorldNode = node;
+                              _selectedNodeId = match.isNotEmpty ? match.first.id : _selectedNodeId;
+                            });
+                          },
                         ),
                         Positioned(
                           top: 12,
@@ -268,6 +288,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                             children: [
                               AppPill(label: 'Nodes ${state.nodes.length}', icon: Icons.hub_outlined),
                               AppPill(label: state.areaLabel ?? 'Unknown region', icon: Icons.public),
+                              if (_selectedWorldNode != null) AppPill(label: 'Focus ${_selectedWorldNode!.category.name}', icon: Icons.adjust),
                             ],
                           ),
                         ),
@@ -299,6 +320,12 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                               locationState: locationState,
                               viewport: _mapViewport,
                             ),
+                          ),
+                        if (!showBlockingMapOverlay && _selectedWorldNode != null)
+                          Positioned(
+                            left: 12,
+                            top: 86,
+                            child: _WorldNodeInspectorCard(node: _selectedWorldNode!),
                           ),
                         if (!showBlockingMapOverlay && selectedNode != null)
                           Positioned(
@@ -1333,6 +1360,34 @@ class _OnboardingCoachCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _WorldNodeInspectorCard extends StatelessWidget {
+  const _WorldNodeInspectorCard({required this.node});
+
+  final WorldMapNode node;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xCC111728),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: categoryColor(node.category).withOpacity(0.6)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(node.label, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+            Text('${node.category.name.toUpperCase()} • Tier ${node.difficulty}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
+            Text('Travel ${node.energyCost}⚡', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: const Color(0xFFFFD36E))),
+          ],
+        ),
       ),
     );
   }

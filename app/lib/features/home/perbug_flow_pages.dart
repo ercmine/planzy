@@ -18,26 +18,45 @@ class PerbugNodeDetailsPage extends ConsumerWidget {
     final node = state.currentNode;
     final controller = ref.read(perbugGameControllerProvider.notifier);
 
-    return _PerbugScaffold(
-      title: 'Node Details',
+    return _PerbugGameShell(
+      title: 'Node Intel',
+      subtitle: 'Map-native mission dossier',
       body: node == null
-          ? const Text('No node selected. Return to live map and move to a node first.')
+          ? const _EmptyInfo(message: 'No node selected. Open the map and pick a destination first.')
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(node.label, style: Theme.of(context).textTheme.headlineSmall),
-                Text('${node.neighborhood}, ${node.city}'),
+                _StatStrip(items: [
+                  _StatItem('Type', node.nodeType.name.toUpperCase()),
+                  _StatItem('Difficulty', 'T${node.difficulty}'),
+                  _StatItem('Travel', '${node.movementCost}⚡'),
+                ]),
                 const SizedBox(height: 12),
-                Text('Node type: ${node.nodeType.name}'),
-                Text('State: ${node.state.name}'),
-                const SizedBox(height: 12),
-                RpgBarButton(
-                  onPressed: () {
-                    controller.launchEncounter();
-                    context.go(AppRoutes.encounter);
-                  },
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: 'Enter Encounter',
+                _LorePanel(
+                  title: node.label,
+                  subtitle: '${node.neighborhood}, ${node.city}',
+                  body: 'District signal confirms ${node.nodeType.name} activity. Deploy to resolve and recover node rewards.',
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    RpgBarButton(
+                      onPressed: () {
+                        controller.launchEncounter();
+                        context.go(AppRoutes.encounter);
+                      },
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: 'Enter Encounter',
+                    ),
+                    RpgBarButton(
+                      onPressed: () => context.go(AppRoutes.liveMap),
+                      icon: const Icon(Icons.map_outlined),
+                      label: 'Back to World',
+                      variant: RpgButtonVariant.secondary,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -53,18 +72,29 @@ class PerbugEncounterPage extends ConsumerWidget {
     final state = ref.watch(perbugGameControllerProvider);
     final controller = ref.read(perbugGameControllerProvider.notifier);
     final encounter = state.activeEncounter;
-    return _PerbugScaffold(
-      title: 'Encounter',
+    return _PerbugGameShell(
+      title: 'Encounter Relay',
+      subtitle: 'Resolve tactical outcomes',
       body: encounter == null
-          ? const Text('No active encounter. Open Node Details and launch one first.')
+          ? const _EmptyInfo(message: 'No active encounter. Launch one from Node Intel.')
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Type: ${encounter.type.name} • ${encounter.difficultyTier}'),
-                Text('Status: ${encounter.status.name}'),
+                _StatStrip(items: [
+                  _StatItem('Type', encounter.type.name),
+                  _StatItem('Tier', encounter.difficultyTier),
+                  _StatItem('Status', encounter.status.name),
+                ]),
                 const SizedBox(height: 12),
+                _LorePanel(
+                  title: 'Combat Feed',
+                  subtitle: 'Live tactical packet',
+                  body: 'Resolve the operation to claim XP, Perbug currency, and progression boosts.',
+                ),
+                const SizedBox(height: 14),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
                     RpgBarButton(
                       onPressed: () {
@@ -94,14 +124,19 @@ class PerbugSquadPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(perbugGameControllerProvider);
-    return _PerbugScaffold(
-      title: 'Squad / Roster',
+    final roster = ref.watch(perbugGameControllerProvider).squad.roster;
+    return _PerbugGameShell(
+      title: 'Squad Command',
+      subtitle: 'Operators and specialization',
       body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: state.squad.roster
-            .map((unit) => ListTile(title: Text(unit.name), subtitle: Text('${unit.role.name} • L${unit.progression.level}')))
-            .toList(growable: false),
+        children: [
+          for (final unit in roster)
+            _LorePanel(
+              title: unit.name,
+              subtitle: '${unit.role.name} • ${unit.unitClass.name}',
+              body: 'Lv ${unit.progression.level} • Power ${unit.effectiveStats.powerScore.round()} • ${unit.signatureSkill}',
+            ),
+        ],
       ),
     );
   }
@@ -113,16 +148,28 @@ class PerbugInventoryPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(perbugGameControllerProvider);
-    return _PerbugScaffold(
-      title: 'Inventory',
+    final stacks = state.economy.inventory.stacks.entries.toList(growable: false);
+    return _PerbugGameShell(
+      title: 'Field Inventory',
+      subtitle: 'Resources and collectibles',
       body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...state.economy.inventory.stacks.entries.map((entry) => ListTile(title: Text(entry.key), trailing: Text('${entry.value}'))),
-          const SizedBox(height: 8),
+          _StatStrip(items: [
+            _StatItem('Stacks', '${stacks.length}'),
+            _StatItem('Owned Assets', '${state.economy.ownedAssets.entries.length}'),
+            _StatItem('Perbug', '${state.economy.wallet.balance}'),
+          ]),
+          const SizedBox(height: 12),
+          for (final entry in stacks)
+            _LorePanel(
+              title: perbugResourceDefinitions[entry.key]?.label ?? entry.key,
+              subtitle: 'Stored resource',
+              body: 'Count ${entry.value} • ${perbugResourceDefinitions[entry.key]?.description ?? 'Crafting-grade material.'}',
+            ),
+          const SizedBox(height: 6),
           RpgBarButton(
             onPressed: () => context.go(AppRoutes.crafting),
-            label: 'Craft now',
+            label: 'Open Crafting Deck',
             variant: RpgButtonVariant.secondary,
           ),
         ],
@@ -139,22 +186,23 @@ class PerbugCraftingPage extends ConsumerWidget {
     final state = ref.watch(perbugGameControllerProvider);
     final controller = ref.read(perbugGameControllerProvider.notifier);
 
-    return _PerbugScaffold(
-      title: 'Crafting',
+    return _PerbugGameShell(
+      title: 'Forge & Crafting',
+      subtitle: 'Convert resources into power',
       body: Column(
-        children: perbugCraftingRecipes
-            .map(
-              (recipe) => ListTile(
-                title: Text(recipe.label),
-                subtitle: Text('Cost ${recipe.perbugCost}Ⓟ + ${recipe.energyCost}⚡'),
-                trailing: RpgBarButton(
-                  height: 42,
-                  onPressed: state.progression.level >= recipe.unlockLevel ? () => controller.craftRecipe(recipe.id) : null,
-                  label: 'Craft',
-                ),
+        children: [
+          for (final recipe in perbugCraftingRecipes)
+            _LorePanel(
+              title: recipe.label,
+              subtitle: 'Unlock L${recipe.unlockLevel}',
+              body: 'Cost ${recipe.perbugCost}Ⓟ + ${recipe.energyCost}⚡',
+              trailing: RpgBarButton(
+                height: 42,
+                onPressed: state.progression.level >= recipe.unlockLevel ? () => controller.craftRecipe(recipe.id) : null,
+                label: 'Craft',
               ),
-            )
-            .toList(growable: false),
+            ),
+        ],
       ),
     );
   }
@@ -166,19 +214,23 @@ class PerbugMarketplacePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(perbugGameControllerProvider);
-    return _PerbugScaffold(
-      title: 'Marketplace',
+    return _PerbugGameShell(
+      title: 'Marketplace Ledger',
+      subtitle: 'Economy and transaction history',
       body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Perbug Balance: ${state.economy.wallet.balance}'),
-          const SizedBox(height: 8),
-          ...state.economy.wallet.transactions.take(8).map(
-                (tx) => ListTile(
-                  title: Text('${tx.type.name} ${tx.amount}Ⓟ'),
-                  subtitle: Text(tx.actionId ?? tx.id),
-                ),
-              ),
+          _StatStrip(items: [
+            _StatItem('Balance', '${state.economy.wallet.balance}Ⓟ'),
+            _StatItem('Wallet', state.economy.walletLink.isConnected ? 'Connected' : 'Not linked'),
+            _StatItem('Tx', '${state.economy.wallet.transactions.length}'),
+          ]),
+          const SizedBox(height: 12),
+          for (final tx in state.economy.wallet.transactions.take(10))
+            _LorePanel(
+              title: tx.type.name,
+              subtitle: tx.actionId ?? tx.id,
+              body: '${tx.amount >= 0 ? '+' : ''}${tx.amount}Ⓟ • ${tx.createdAt.toIso8601String().replaceFirst('T', ' ').substring(0, 16)}',
+            ),
         ],
       ),
     );
@@ -191,14 +243,23 @@ class PerbugProgressionPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(perbugGameControllerProvider);
-    return _PerbugScaffold(
-      title: 'Objectives / Progression',
+    return _PerbugGameShell(
+      title: 'Campaign Progression',
+      subtitle: 'Objectives, milestones, and XP',
       body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Commander Level ${state.progression.level} • XP ${state.progression.xp}'),
-          const SizedBox(height: 8),
-          ...state.progressionLayer.daily.objectives.map((o) => ListTile(title: Text(o.title), subtitle: Text('${o.progress.current}/${o.progress.target}'))),
+          _StatStrip(items: [
+            _StatItem('Level', '${state.progression.level}'),
+            _StatItem('XP', '${state.progression.xp}'),
+            _StatItem('Upgrade Marks', '${state.progression.upgradeCurrency}'),
+          ]),
+          const SizedBox(height: 12),
+          for (final objective in state.progressionLayer.daily.objectives)
+            _LorePanel(
+              title: objective.title,
+              subtitle: objective.description,
+              body: 'Progress ${objective.progress.current}/${objective.progress.target} • Reward ${objective.reward.upgradeMarks} marks',
+            ),
         ],
       ),
     );
@@ -210,18 +271,37 @@ class PerbugWalletPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final connected = ref.watch(perbugGameControllerProvider).economy.walletLink.isConnected;
-    return _PerbugScaffold(
-      title: 'Wallet / Login',
-      body: Text(connected ? 'Wallet connected and sync-ready.' : 'Wallet optional and currently disconnected.'),
+    final economy = ref.watch(perbugGameControllerProvider).economy;
+    final connected = economy.walletLink.isConnected;
+    return _PerbugGameShell(
+      title: 'Identity / Wallet',
+      subtitle: 'Account linkage state',
+      body: Column(
+        children: [
+          _LorePanel(
+            title: connected ? 'Wallet linked' : 'Wallet disconnected',
+            subtitle: connected ? (economy.walletLink.walletAddress ?? 'address pending') : 'Demo-compatible mode',
+            body: connected
+                ? 'Identity is connected. Asset-backed systems can sync with live progression.'
+                : 'You can continue in demo mode and connect later from entry or profile.',
+          ),
+          const SizedBox(height: 8),
+          RpgBarButton(
+            onPressed: () => context.go(AppRoutes.liveMap),
+            label: 'Return to World Map',
+            variant: RpgButtonVariant.secondary,
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _PerbugScaffold extends StatelessWidget {
-  const _PerbugScaffold({required this.title, required this.body});
+class _PerbugGameShell extends StatelessWidget {
+  const _PerbugGameShell({required this.title, required this.subtitle, required this.body});
 
   final String title;
+  final String subtitle;
   final Widget body;
 
   @override
@@ -237,9 +317,100 @@ class _PerbugScaffold extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          PremiumHeader(
+            title: title,
+            subtitle: subtitle,
+            badge: const AppPill(label: 'Perbug RPG Ops', icon: Icons.auto_awesome),
+          ),
+          const SizedBox(height: 12),
           body,
         ],
       ),
     );
   }
+}
+
+class _LorePanel extends StatelessWidget {
+  const _LorePanel({
+    required this.title,
+    required this.subtitle,
+    required this.body,
+    this.trailing,
+  });
+
+  final String title;
+  final String subtitle;
+  final String body;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      tone: AppCardTone.muted,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
+          const SizedBox(height: 6),
+          Text(body),
+          if (trailing != null) ...[
+            const SizedBox(height: 10),
+            trailing!,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyInfo extends StatelessWidget {
+  const _EmptyInfo({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      tone: AppCardTone.collection,
+      child: Text(message, style: Theme.of(context).textTheme.bodyLarge),
+    );
+  }
+}
+
+class _StatStrip extends StatelessWidget {
+  const _StatStrip({required this.items});
+
+  final List<_StatItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (final item in items)
+          Expanded(
+            child: AppCard(
+              margin: const EdgeInsets.only(right: 8),
+              tone: AppCardTone.kpi,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Colors.white70)),
+                  const SizedBox(height: 4),
+                  Text(item.value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _StatItem {
+  const _StatItem(this.label, this.value);
+
+  final String label;
+  final String value;
 }
