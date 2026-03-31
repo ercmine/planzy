@@ -33,6 +33,7 @@ export default function MarketplaceExperience() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [detail, setDetail] = useState<ListingDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
 
   const endpoint = useMemo(() => {
     const url = new URL(`${API_BASE}/v1/perbug/marketplace/listings`, window.location.origin);
@@ -64,6 +65,15 @@ export default function MarketplaceExperience() {
     setDetail(payload);
   };
 
+  const handleGetStarted = () => {
+    setHasStarted(true);
+    setCategory("all");
+    setQuery("");
+    window.requestAnimationFrame(() => {
+      document.getElementById("marketplace-listings")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
   return (
     <section className="rounded-3xl border border-emerald-600/40 bg-slate-950/90 p-6 shadow-[0_0_80px_rgba(16,185,129,0.1)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -91,12 +101,12 @@ export default function MarketplaceExperience() {
           </button>
         ))}
         </div>
-        <WalletIdentityPanel />
+        <WalletIdentityPanel onGetStarted={handleGetStarted} />
       </div>
 
       {loading ? <p className="mt-6 text-sm text-slate-400">Opening market ledgers…</p> : null}
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div id="marketplace-listings" className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {listings.map((listing) => (
           <button
             key={listing.listingId}
@@ -119,6 +129,7 @@ export default function MarketplaceExperience() {
           </button>
         ))}
       </div>
+      {hasStarted ? <p className="mt-3 text-xs text-emerald-300">Expedition initialized. Browse live marketplace listings below.</p> : null}
 
       {detail ? (
         <aside className="mt-8 rounded-2xl border border-emerald-500/50 bg-slate-900/70 p-5">
