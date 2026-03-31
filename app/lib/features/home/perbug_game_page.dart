@@ -12,8 +12,6 @@ import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
 import '../../core/navigation/navigation_utils.dart';
 import '../../providers/app_providers.dart';
-import '../onboarding/onboarding_controller.dart';
-import '../onboarding/onboarding_state.dart';
 import '../puzzles/grid_path_puzzle_sheet.dart';
 import 'map_discovery_models.dart';
 import 'map_discovery_tab.dart' show mapGeoClientProvider;
@@ -68,9 +66,6 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     final state = ref.watch(perbugGameControllerProvider);
     final locationState = ref.watch(locationControllerProvider);
     final controller = ref.read(perbugGameControllerProvider.notifier);
-    final onboarding = ref.watch(onboardingControllerProvider);
-    final onboardingController = ref.read(onboardingControllerProvider.notifier);
-    final moves = state.reachableMoves().take(8).toList(growable: false);
     final currentNode = state.currentNode;
     if (currentNode != null && _selectedNodeId == null) _selectedNodeId = currentNode.id;
     if (currentNode != null && _mapAnchoredNodeId != currentNode.id) {
@@ -93,164 +88,29 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        if (_entryState == _MapEntryState.locationGranted) {
-          await controller.requestLocationAndRefresh();
-        } else {
-          await _continueInDemoMode();
-        }
-      },
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        children: [
-          PremiumHeader(
-            title: 'Perbug Tactical Atlas',
-            subtitle: 'Traverse the fixed-zoom world board, deploy your squad, and expand from ${state.areaLabel ?? 'your anchor region'}.',
-            badge: const AppPill(label: 'Map-native strategy RPG', icon: Icons.explore),
-          ),
-          const SizedBox(height: 12),
-
-          AppCard(
-            tone: AppCardTone.muted,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Region targeting // Nominatim search', style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText: 'Search a city, district, or landmark…',
-                          isDense: true,
-                          border: OutlineInputBorder(),
-                        ),
-                        onSubmitted: (_) => _runGeoSearch(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SecondaryButton(label: 'Jump', onPressed: _runGeoSearch),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    AppPill(
-                      label: ref.watch(locationControllerProvider).effectiveLocation == null ? 'Demo mode anchor' : 'Live location anchor',
-                      icon: ref.watch(locationControllerProvider).effectiveLocation == null ? Icons.smart_toy_outlined : Icons.my_location,
-                    ),
-                    AppPill(label: state.areaLabel ?? 'Unknown region', icon: Icons.public),
-                    AppPill(label: 'Nodes ${state.nodes.length}', icon: Icons.hub),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (widget.showTacticalHud)
-            AppCard(
-              tone: AppCardTone.kpi,
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  SizedBox(
-                    width: 176,
-                    child: RpgBarButton(label: 'Node details', onPressed: () => context.go(AppRoutes.nodeDetails), icon: const Icon(Icons.place_outlined), height: 50),
-                  ),
-                  SizedBox(
-                    width: 176,
-                    child: RpgBarButton(label: 'Enter Encounter', onPressed: () => context.go(AppRoutes.encounter), icon: const Icon(Icons.sports_martial_arts), height: 50),
-                  ),
-                  SizedBox(
-                    width: 176,
-                    child: RpgBarButton(label: 'View Squad', onPressed: () => context.go(AppRoutes.squad), icon: const Icon(Icons.groups_2_outlined), height: 50),
-                  ),
-                  SizedBox(
-                    width: 176,
-                    child: RpgBarButton(label: 'Inventory', onPressed: () => context.go(AppRoutes.inventory), icon: const Icon(Icons.inventory_2_outlined), height: 50),
-                  ),
-                  SizedBox(
-                    width: 176,
-                    child: RpgBarButton(label: 'Open Marketplace', onPressed: () => context.go(AppRoutes.marketplace), icon: const Icon(Icons.storefront_outlined), height: 50),
-                  ),
-                  SizedBox(
-                    width: 176,
-                    child: RpgBarButton(label: 'Objectives', onPressed: () => context.go(AppRoutes.progression), icon: const Icon(Icons.flag_outlined), height: 50),
-                  ),
-                  SizedBox(
-                    width: 176,
-                    child: RpgBarButton(
-                      label: 'Wallet/Login',
-                      onPressed: () => context.go(AppRoutes.wallet),
-                      icon: const Icon(Icons.account_balance_wallet_outlined),
-                      variant: RpgButtonVariant.secondary,
-                      height: 50,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          if (!onboarding.hasCompleted && onboarding.step != OnboardingStep.identityIntro) ...[
-            _OnboardingCoachCard(
-              state: onboarding,
-              onContinue: onboardingController.advanceStep,
-              onSkip: onboardingController.skipOnboarding,
-            ),
-            const SizedBox(height: 12),
-          ],
-          AppCard(
-            tone: AppCardTone.featured,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: _EnergyMeter(current: state.energy, max: state.maxEnergy)),
-                    const SizedBox(width: 8),
-                    SecondaryButton(label: '+Energy', onPressed: controller.claimPassiveEnergy),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text('Commander L${state.progression.level} • XP ${state.progression.xp} • Perbug ${state.economy.wallet.balance}'),
-                Text('Arcane Marks ${state.progression.upgradeCurrency} • Squad power ${state.squad.equippedPower} • Active slots ${state.squad.maxSlots}'),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final strategic in ['ore', 'scrap', 'circuit', 'relic_shard', 'field_kit', 'upgrade_module'])
-                      AppPill(label: '${perbugResourceDefinitions[strategic]?.label ?? strategic}: ${state.economy.inventory.quantityOf(strategic)}'),
-                    AppPill(label: 'Owned assets: ${state.economy.ownedAssets.entries.length}', icon: Icons.inventory_2_outlined),
-                    AppPill(
-                      label: state.economy.walletLink.isConnected ? 'Wallet linked' : 'Wallet optional',
-                      icon: state.economy.walletLink.isConnected ? Icons.link : Icons.link_off,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('World board: fixed tactical zoom ${state.fixedZoom.toStringAsFixed(0)}', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 420,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Stack(
-                      children: [
-                        WorldMapScene(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final mapHeight = math.max(420.0, constraints.maxHeight);
+        return RefreshIndicator(
+          onRefresh: () async {
+            if (_entryState == _MapEntryState.locationGranted) {
+              await controller.requestLocationAndRefresh();
+            } else {
+              await _continueInDemoMode();
+            }
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(12),
+            children: [
+              SizedBox(
+                height: mapHeight,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: WorldMapScene(
                           controller: _sceneController,
                           onTapEmpty: () => setState(() {
                             _selectedNodeId = null;
@@ -264,546 +124,153 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                             });
                           },
                         ),
-                        Positioned(
-                          top: 12,
-                          left: 10,
-                          child: AppPill(
-                            label: 'Energy ${state.energy}/${state.maxEnergy}',
-                            icon: Icons.bolt_rounded,
-                          ),
-                        ),
-                        Positioned(
-                          left: 10,
-                          top: 46,
-                          child: AppPill(
-                            label: state.worldDebug['location_mode'] == 'demo' ? 'DEMO WORLD' : 'LIVE WORLD',
-                            icon: state.worldDebug['location_mode'] == 'demo' ? Icons.smart_toy_outlined : Icons.travel_explore,
-                          ),
-                        ),
-                        Positioned(
-                          right: 10,
-                          top: 12,
-                          child: Wrap(
-                            spacing: 8,
+                      ),
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        right: 12,
+                        child: AppCard(
+                          tone: AppCardTone.muted,
+                          child: Row(
                             children: [
-                              AppPill(label: 'Nodes ${state.nodes.length}', icon: Icons.hub_outlined),
-                              AppPill(label: state.areaLabel ?? 'Unknown region', icon: Icons.public),
-                              if (_selectedWorldNode != null) AppPill(label: 'Focus ${_selectedWorldNode!.category.name}', icon: Icons.adjust),
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Search a city, district, or landmark…',
+                                    isDense: true,
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onSubmitted: (_) => _runGeoSearch(),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SecondaryButton(label: 'Jump', onPressed: _runGeoSearch),
                             ],
                           ),
                         ),
-                        if (showBlockingMapOverlay)
-                          Positioned.fill(
-                            child: _MapStatusOverlay(
-                              state: mapUiState,
-                              locationState: locationState,
-                              details: _entryDetails ?? state.error ?? state.worldDebug['fallback_reason']?.toString(),
-                              onRequestLocation: _useMyLocation,
-                              onContinueDemo: _continueInDemoMode,
-                            ),
-                          ),
-                        if (showDemoLocationCta)
-                          Positioned(
-                            top: 10,
-                            right: 10,
-                            child: _DemoModeLocationButton(
-                              requestingLocation: _entryState == _MapEntryState.requestingLocation,
-                              onPressed: _useMyLocation,
-                            ),
-                          ),
-                        if (kDebugMode)
-                          Positioned(
-                            right: 8,
-                            bottom: 8,
-                            child: _DebugMapOverlay(
-                              gameState: state,
-                              locationState: locationState,
-                              viewport: _mapViewport,
-                            ),
-                          ),
-                        if (!showBlockingMapOverlay && _selectedWorldNode != null)
-                          Positioned(
-                            left: 12,
-                            top: 86,
-                            child: _WorldNodeInspectorCard(node: _selectedWorldNode!),
-                          ),
-                        if (!showBlockingMapOverlay && selectedNode != null)
-                          Positioned(
-                            left: 12,
-                            right: 12,
-                            bottom: 12,
-                            child: _NodeTacticalPanel(
-                              node: selectedNode,
-                              move: selectedMove,
-                              onDeploy: selectedMove == null || !selectedMove.isReachable
-                                  ? null
-                                  : () async {
-                                      final ok = await controller.jumpTo(selectedMove);
-                                      if (!mounted || !ok) return;
-                                      setState(() => _selectedNodeId = selectedMove.node.id);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Deployed to ${selectedMove.node.label}.')),
-                                      );
-                                    },
-                              onEnterEncounter: state.currentNodeId == selectedNode.id ? () => context.go(AppRoutes.encounter) : null,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text('Current node: ${state.currentNode?.label ?? '—'} • March range ${(state.maxJumpMeters / 1000).toStringAsFixed(1)}km'),
-                if (state.currentNode != null)
-                  Text(
-                    '${state.currentNode!.neighborhood}, ${state.currentNode!.city}, ${state.currentNode!.region}, ${state.currentNode!.country}',
-                  ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final nodeType in PerbugNodeType.values)
-                      (() {
-                        final visual = PerbugAssetRegistry.nodeVisual(nodeType);
-                        return AppPill(
-                          label: visual.label,
-                          icon: visual.icon,
-                          backgroundColor: visual.color.withOpacity(0.16),
-                          foregroundColor: visual.color,
-                        );
-                      })(),
-                  ],
-                ),
-                if (selectedNode != null) ...[
-                  const SizedBox(height: 12),
-                  AppCard(
-                    tone: AppCardTone.muted,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Selected: ${selectedNode.label}', style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${selectedNode.nodeType.name.toUpperCase()} • Difficulty ${selectedNode.difficulty} • ${selectedMove?.reason ?? 'Current position'}',
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                      ),
+                      Positioned(
+                        left: 12,
+                        top: 92,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (selectedMove != null)
-                              RpgBarButton(
-                                height: 44,
-                                label: selectedMove.isReachable
-                                    ? 'Deploy (-${selectedMove.energyCost} energy)'
-                                    : selectedMove.reason,
-                                onPressed: selectedMove.isReachable
-                                    ? () async {
-                                        final ok = await controller.jumpTo(selectedMove);
-                                        if (!mounted) return;
-                                        if (ok) {
-                                          setState(() => _selectedNodeId = selectedMove.node.id);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('Deployed to ${selectedMove.node.label}.')),
-                                          );
-                                        }
-                                      }
-                                    : null,
+                            AppPill(
+                              label: ref.watch(locationControllerProvider).effectiveLocation == null ? 'Demo mode' : 'Live location',
+                              icon: ref.watch(locationControllerProvider).effectiveLocation == null ? Icons.smart_toy_outlined : Icons.my_location,
+                            ),
+                            const SizedBox(height: 6),
+                            AppPill(label: 'Energy ${state.energy}/${state.maxEnergy}', icon: Icons.bolt_rounded),
+                            const SizedBox(height: 6),
+                            AppPill(label: state.areaLabel ?? 'Unknown region', icon: Icons.public),
+                          ],
+                        ),
+                      ),
+                      Positioned(
+                        right: 12,
+                        top: 92,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            SizedBox(
+                              width: 148,
+                              child: RpgBarButton(
+                                height: 42,
+                                label: 'Node Intel',
+                              icon: const Icon(Icons.place_outlined),
+                                onPressed: () => context.go(AppRoutes.nodeDetails),
                               ),
-                            RpgBarButton(
-                              height: 44,
-                              label: 'Enter encounter',
-                              onPressed: state.currentNodeId == selectedNode.id ? () => context.go(AppRoutes.encounter) : null,
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: 148,
+                              child: RpgBarButton(
+                                height: 42,
+                                label: 'Encounter',
+                              icon: const Icon(Icons.sports_martial_arts),
+                                onPressed: () => context.go(AppRoutes.encounter),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: 148,
+                              child: RpgBarButton(
+                                height: 42,
+                                label: 'Marketplace',
+                              icon: const Icon(Icons.storefront_outlined),
+                              onPressed: () => context.go(AppRoutes.marketplace),
+                                variant: RpgButtonVariant.secondary,
+                              ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (state.loading) const AppCard(child: LinearProgressIndicator()),
-          if (state.error != null) AppCard(child: Text(state.error!)),
-
-          _Section(
-            title: 'Commander return loop',
-            subtitle: 'War table objectives, rare windows, frontier, and next goals.',
-            children: [
-              Text('World tier ${state.progressionLayer.world.worldTier} • Regions unlocked ${state.progressionLayer.world.unlockedRegions.length}'),
-              Text('Rare window resets in ${state.progressionLayer.rareSpawns.nextRollAt.difference(DateTime.now().toUtc()).inMinutes.clamp(0, 999)} min'),
-              if (state.progressionLayer.returnLoop.recommendedActions.isEmpty)
-                const Text('No recommended actions yet. Explore your first node chain.')
-              else
-                ...state.progressionLayer.returnLoop.recommendedActions.take(4).map((tip) => ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: const Icon(Icons.chevron_right), title: Text(tip))),
-            ],
-          ),
-          _Section(
-            title: 'War table objectives',
-            subtitle: 'Resets daily and drives return momentum.',
-            children: [
-              Text('Daily set ${state.progressionLayer.daily.dayKey} • refresh ${state.progressionLayer.daily.refreshAt.toLocal()}'),
-              ...state.progressionLayer.daily.objectives.map(
-                (objective) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(objective.title),
-                  subtitle: Text('${objective.description}\n${objective.progress.current}/${objective.progress.target}'),
-                  trailing: RpgBarButton(
-                    height: 42,
-                    onPressed: objective.progress.isComplete && !objective.progress.claimed
-                        ? () => controller.claimDailyObjective(objective.id)
-                        : null,
-                    label: objective.progress.claimed ? 'Claimed' : 'Claim Reward',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          _Section(
-            title: 'Collections // relic codex',
-            subtitle: 'Track ownership, map mastery, and long-term unlock pacing.',
-            children: [
-              ...state.progressionLayer.collections.map(
-                (collection) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(collection.label),
-                  subtitle: LinearProgressIndicator(value: collection.percent.clamp(0, 1)),
-                  trailing: Text('${collection.discovered}/${collection.total}'),
-                ),
-              ),
-              const Divider(),
-              ...state.progressionLayer.milestones.map(
-                (milestone) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(milestone.title),
-                  subtitle: Text('${milestone.current}/${milestone.target}'),
-                  trailing: RpgBarButton(
-                    height: 42,
-                    onPressed: milestone.isComplete && !milestone.claimed ? () => controller.claimMilestoneReward(milestone.id) : null,
-                    label: milestone.claimed ? 'Claimed' : 'Claim Reward',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          _Section(
-            title: 'Frontier gates + unlock track',
-            subtitle: 'Explicit unlock rules tied to world expansion and milestones.',
-            children: [
-              ...state.progressionLayer.unlockables.map(
-                (unlock) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(unlock.unlocked ? Icons.lock_open : Icons.lock_outline),
-                  title: Text(unlock.label),
-                  subtitle: Text(unlock.unlocked ? unlock.description : 'Locked: ${unlock.requirement}'),
-                ),
-              ),
-              const Divider(),
-              ...state.progressionLayer.world.regionNodeTotals.entries.map((entry) {
-                final cleared = state.progressionLayer.world.regionNodeCompleted[entry.key] ?? 0;
-                final ratio = entry.value == 0 ? 0 : cleared / entry.value;
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(entry.key),
-                  subtitle: LinearProgressIndicator(value: ratio.clamp(0, 1).toDouble()),
-                  trailing: Text('$cleared/${entry.value}'),
-                );
-              }),
-              if (state.progressionLayer.rareSpawns.activeNodeIds.isNotEmpty)
-                Text('Active rare nodes: ${state.progressionLayer.rareSpawns.activeNodeIds.take(3).join(', ')}'),
-            ],
-          ),
-          _Section(
-            title: 'Squad loadout // active formation',
-            subtitle: 'Manage active units used in node encounters. Roster is larger than active slots.',
-            children: [
-              ...List.generate(state.squad.activeSquad.maxSlots, (slotIndex) {
-                final assignedId = state.squad.activeSquad.unitIdsBySlot[slotIndex];
-                final assigned = assignedId == null
-                    ? null
-                    : state.squad.roster.firstWhere((u) => u.id == assignedId, orElse: () => state.squad.roster.first);
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Slot ${slotIndex + 1}'),
-                        if (assigned != null)
-                          Text('${assigned.name} • ${assigned.role.name}/${assigned.unitClass.name} • L${assigned.progression.level}')
-                        else
-                          const Text('Unassigned'),
-                        Wrap(
-                          spacing: 8,
-                          children: [
-                            for (final unit in state.squad.roster)
-                              ChoiceChip(
-                                label: Text(unit.name),
-                                selected: assignedId == unit.id,
-                                onSelected: (_) => controller.assignUnitToSlot(unitId: unit.id, slotIndex: slotIndex),
-                              ),
-                            TextButton(onPressed: () => controller.clearSquadSlot(slotIndex), child: const Text('Clear')),
-                          ],
+                      ),
+                      if (showBlockingMapOverlay)
+                        Positioned.fill(
+                          child: _MapStatusOverlay(
+                            state: mapUiState,
+                            locationState: locationState,
+                            details: _entryDetails ?? state.error ?? state.worldDebug['fallback_reason']?.toString(),
+                            onRequestLocation: _useMyLocation,
+                            onContinueDemo: _continueInDemoMode,
+                          ),
                         ),
-                      ],
-                    ),
+                      if (showDemoLocationCta)
+                        Positioned(
+                          top: 12,
+                          right: 12,
+                          child: _DemoModeLocationButton(
+                            requestingLocation: _entryState == _MapEntryState.requestingLocation,
+                            onPressed: _useMyLocation,
+                          ),
+                        ),
+                      if (kDebugMode)
+                        Positioned(
+                          right: 8,
+                          bottom: 8,
+                          child: _DebugMapOverlay(
+                            gameState: state,
+                            locationState: locationState,
+                            viewport: _mapViewport,
+                          ),
+                        ),
+                      if (!showBlockingMapOverlay && _selectedWorldNode != null)
+                        Positioned(
+                          left: 12,
+                          top: 176,
+                          child: _WorldNodeInspectorCard(node: _selectedWorldNode!),
+                        ),
+                      if (!showBlockingMapOverlay && selectedNode != null)
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          bottom: 12,
+                          child: _NodeTacticalPanel(
+                            node: selectedNode,
+                            move: selectedMove,
+                            onDeploy: selectedMove == null || !selectedMove.isReachable
+                                ? null
+                                : () async {
+                                    final ok = await controller.jumpTo(selectedMove);
+                                    if (!mounted || !ok) return;
+                                    setState(() => _selectedNodeId = selectedMove.node.id);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Deployed to ${selectedMove.node.label}.')),
+                                    );
+                                  },
+                            onEnterEncounter: state.currentNodeId == selectedNode.id ? () => context.go(AppRoutes.encounter) : null,
+                          ),
+                        ),
+                    ],
                   ),
-                );
-              }),
-            ],
-          ),
-          _Section(
-            title: 'Roster vault // collectible units',
-            subtitle: 'Collectible unit identity with rarity, role, class, and progression.',
-            children: [
-              ...state.squad.roster
-                  .map(
-                    (unit) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: _PerbugArtAvatar(
-                        assetPath: PerbugAssetRegistry.roleVisual(unit.role).portraitRef.assetPath,
-                        fallbackIcon: PerbugAssetRegistry.roleVisual(unit.role).icon,
-                      ),
-                      title: Text('${unit.name} • ${PerbugAssetRegistry.roleVisual(unit.role).label}/${unit.unitClass.name}'),
-                      subtitle: Text(
-                        'Lv ${unit.progression.level} • ${unit.rarity.name} • ${unit.resolvedProvenance.source.name} • '
-                        'Power ${unit.power}',
-                      ),
-                      trailing: unit.isChainBacked
-                          ? const Icon(Icons.verified, color: Colors.amber)
-                          : const Text('Core'),
-                    ),
-                  )
-                  .toList(growable: false),
-            ],
-          ),
-          _Section(
-            title: 'Relics, ownership, and provenance',
-            subtitle: 'Chain-backed assets are optional and coexist with normal progression assets.',
-            children: [
-              if (state.economy.ownedAssets.entries.isEmpty)
-                const ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('No optional collectible assets yet'),
-                  subtitle: Text('Core inventory, squad progression, and encounters remain fully playable without wallet linkage.'),
-                ),
-              ...state.economy.ownedAssets.entries.map(
-                (asset) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(child: Text(asset.identity.assetClass.name.substring(0, 1).toUpperCase())),
-                  title: Text('${asset.name} • ${asset.identity.assetClass.name}'),
-                  subtitle: Text(
-                    '${asset.provenance.source.name} • Qty ${asset.quantity} • ${asset.isNftBacked ? 'Chain-backed' : 'Game-native'}',
-                  ),
-                  trailing: asset.isNftBacked ? const Icon(Icons.token_outlined) : const Icon(Icons.videogame_asset_outlined),
                 ),
               ),
-              if (!state.economy.walletLink.isConnected)
-                const AppCard(
-                  tone: AppCardTone.muted,
-                  child: Text('Wallet is not connected. NFT import/sync remains optional and does not block gameplay loops.'),
-                ),
             ],
           ),
-          _Section(
-            title: 'Expedition phase 1: march + positioning',
-            subtitle: 'No free teleporting. Reachability is based on real distance and energy.',
-            children: moves
-                .map(
-                  (move) {
-                    final visual = PerbugAssetRegistry.nodeVisual(move.node.nodeType);
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: _PerbugArtAvatar(
-                        assetPath: visual.tileRef.assetPath,
-                        fallbackIcon: visual.icon,
-                        tint: move.isReachable ? null : Colors.blueGrey.withOpacity(0.45),
-                      ),
-                      title: Text('${move.node.label} • ${visual.label}'),
-                      subtitle: Text(
-                        '${move.node.region} • ${((move.node.distanceFromCurrentMeters ?? 0) / 1000).toStringAsFixed(2)}km • ${move.reason}\n'
-                        'Art ${visual.iconRef.id}/${visual.tileRef.id}',
-                      ),
-                      trailing: RpgBarButton(
-                        height: 42,
-                        onPressed: move.isReachable
-                            ? () => runGuardedUiAction(
-                                context,
-                                actionLabel: 'Move to node',
-                                action: () async {
-                                  final ok = await controller.jumpTo(move);
-                                if (!context.mounted || !ok) return;
-                                await onboardingController.recordFirstMove();
-                                if (onboarding.step == OnboardingStep.firstMove) {
-                                  await onboardingController.advanceTo(OnboardingStep.firstEncounter);
-                                }
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Moved to ${move.node.label}')));
-                                },
-                              )
-                            : null,
-                        label: 'Move (${move.energyCost}⚡ + ${move.totalPerbugCost}Ⓟ)',
-                        variant: RpgButtonVariant.secondary,
-                      ),
-                    );
-                  },
-                )
-                .toList(growable: false),
-          ),
-          _Section(
-            title: 'Expedition phase 2: encounter + payoff',
-            subtitle: 'Encounters are scaffolded for puzzle, tactical, timed, harvest, and boss modules.',
-            children: [
-              if (state.activeEncounter != null)
-                Text('Active encounter: ${state.activeEncounter!.type.name} • ${state.activeEncounter!.difficultyTier}'),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton.tonalIcon(
-                    onPressed: state.activeEncounter == null ? null : controller.rerollCurrentEncounter,
-                    icon: const Icon(Icons.casino_outlined),
-                    label: Text('Reroll (${state.economy.config.actionCosts[PerbugActionType.reroll]?.baseCost ?? 0}Ⓟ)'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: state.currentNode == null ? null : controller.scoutCurrentNode,
-                    icon: const Icon(Icons.travel_explore),
-                    label: Text('Scout (${state.economy.config.actionCosts[PerbugActionType.scouting]?.baseCost ?? 0}Ⓟ)'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: state.currentNode == null ? null : controller.enterEventNode,
-                    icon: const Icon(Icons.event_available),
-                    label: Text('Event entry (${state.economy.config.actionCosts[PerbugActionType.eventEntry]?.baseCost ?? 0}Ⓟ)'),
-                  ),
-                  FilledButton.icon(
-                    onPressed: state.currentNode == null
-                        ? null
-                        : () async {
-                            controller.launchEncounter();
-                            controller.resolveEncounter(succeeded: true);
-                            await onboardingController.recordFirstReward();
-                            if (onboarding.step == OnboardingStep.firstEncounter) {
-                              await onboardingController.advanceTo(OnboardingStep.firstReward);
-                            }
-                          },
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Resolve success'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: state.currentNode == null
-                        ? null
-                        : () {
-                            controller.launchEncounter();
-                            controller.resolveEncounter(succeeded: false);
-                          },
-                    icon: const Icon(Icons.replay_circle_filled_outlined),
-                    label: const Text('Resolve fail'),
-                  ),
-                  FilledButton.icon(
-                    onPressed: state.currentNode == null
-                        ? null
-                        : () {
-                            controller.launchPuzzleForCurrentNode();
-                            _openPuzzleSheet(context);
-                          },
-                    icon: const Icon(Icons.grid_4x4_rounded),
-                    label: const Text('Puzzle encounter'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          _Section(
-            title: 'Expedition phase 3: progression + upgrades',
-            subtitle: 'Rewards feed progression, inventory, and unit upgrades.',
-            children: [
-              Text('Inventory: ${state.progression.inventory.entries.map((e) => '${e.key}:${e.value}').join(' • ')}'),
-              Text('Economy Inventory: ${state.economy.inventory.stacks.entries.map((e) => '${e.key}:${e.value}').join(' • ')}'),
-              Text('Encounter ready: ${state.squad.isEncounterReady ? 'yes' : 'no'} • Role coverage ${state.squad.summarizePower().roleCoverage.entries.map((e) => '${e.key.name}:${e.value}').join(', ')}'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [
-                  FilledButton.icon(
-                    onPressed: controller.upgradePrimaryUnit,
-                    icon: const Icon(Icons.upgrade),
-                    label: const Text('Unlock next primary upgrade'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: controller.unlockPremiumMissionTrack,
-                    icon: const Icon(Icons.workspace_premium_outlined),
-                    label: Text('Premium track (${state.economy.config.actionCosts[PerbugActionType.premiumProgression]?.baseCost ?? 0}Ⓟ)'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          _Section(
-            title: 'Expedition phase 4: crafting + economy',
-            subtitle: 'Crafting consumes resources + Perbug and outputs progression items or consumables.',
-            children: [
-              ...perbugCraftingRecipes.map(
-                (recipe) {
-                  final hasUnlock = state.progression.level >= recipe.unlockLevel;
-                  final canAffordIngredients = state.economy.inventory.canAfford(recipe.inputs.map((e) => e.toStack()).toList(growable: false));
-                  final canAfford = hasUnlock && canAffordIngredients && state.economy.wallet.balance >= recipe.perbugCost && state.energy >= recipe.energyCost;
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('${recipe.label} (${recipe.category.name})'),
-                    subtitle: Text(
-                      'Inputs: ${recipe.inputs.map((i) => '${i.resourceId}x${i.amount}').join(', ')} • '
-                      'Perbug ${recipe.perbugCost} • Energy ${recipe.energyCost} • '
-                      '${hasUnlock ? 'Unlocked' : 'Unlocks at L${recipe.unlockLevel}'}',
-                    ),
-                    trailing: FilledButton(
-                      onPressed: canAfford ? () => controller.craftRecipe(recipe.id) : null,
-                      child: const Text('Craft'),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton.tonalIcon(
-                    onPressed: state.economy.inventory.quantityOf('field_kit') > 0 ? () => controller.useCraftedItem('field_kit') : null,
-                    icon: const Icon(Icons.battery_charging_full),
-                    label: const Text('Use Field Kit'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: state.economy.inventory.quantityOf('upgrade_module') > 0
-                        ? () => controller.useCraftedItem('upgrade_module')
-                        : null,
-                    icon: const Icon(Icons.precision_manufacturing),
-                    label: const Text('Apply Upgrade Module'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          _Section(
-            title: 'Economy ledger // marketplace-ready',
-            subtitle: 'Rewards, sinks, and provenance accounting built for resource economy and trading surfaces.',
-            children: state.economy.wallet.transactions.take(10).map((tx) {
-              final direction = tx.type == PerbugTransactionType.reward ? '+' : '-';
-              final reason = tx.source?.name ?? tx.sink?.name ?? 'system';
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: Text('$direction${tx.amount} Ⓟ • $reason'),
-                subtitle: Text(tx.actionId ?? tx.id),
-                trailing: Text('Bal ${tx.balanceAfter}'),
-              );
-            }).toList(growable: false),
-          ),
-        ],
-      ),
+        );
+      },
     );
-  }
 
   _MapUiState _mapUiState({
     required PerbugGameState state,
