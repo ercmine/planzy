@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
+import '../../providers/app_providers.dart';
 import 'location_claim_models.dart';
 
 final locationClaimControllerProvider = StateNotifierProvider<LocationClaimController, LocationClaimState>((ref) {
