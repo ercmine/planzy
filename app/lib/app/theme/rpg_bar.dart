@@ -56,21 +56,19 @@ class RpgBarSurface extends StatelessWidget {
               ),
             ),
             if (tint != null) Positioned.fill(child: ColoredBox(color: tint!)),
-            Positioned.fill(
-              child: Padding(
-                padding: padding ?? const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.s),
-                child: IconTheme(
-                  data: IconThemeData(color: resolvedTextColor),
-                  child: DefaultTextStyle.merge(
-                    style: TextStyle(
-                      color: resolvedTextColor,
-                      fontWeight: FontWeight.w700,
-                      shadows: const [
-                        Shadow(color: Color(0x99000000), blurRadius: 4, offset: Offset(0, 1)),
-                      ],
-                    ),
-                    child: child,
+            Padding(
+              padding: padding ?? const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.s),
+              child: IconTheme(
+                data: IconThemeData(color: resolvedTextColor),
+                child: DefaultTextStyle.merge(
+                  style: TextStyle(
+                    color: resolvedTextColor,
+                    fontWeight: FontWeight.w700,
+                    shadows: const [
+                      Shadow(color: Color(0x99000000), blurRadius: 4, offset: Offset(0, 1)),
+                    ],
                   ),
+                  child: child,
                 ),
               ),
             ),
