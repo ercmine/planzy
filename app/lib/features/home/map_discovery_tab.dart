@@ -470,18 +470,28 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
     final overlayWidth = min(max(screenSize.width - 24, 0.0), 360.0);
     final overlayMaxHeight = max(screenSize.height - 210, 260.0);
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLowest,
-                border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.35)),
-              ),
-              child: Stack(
-                children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final boundedWidth = constraints.hasBoundedWidth && constraints.maxWidth.isFinite;
+        final boundedHeight = constraints.hasBoundedHeight && constraints.maxHeight.isFinite;
+        final resolvedWidth = boundedWidth ? constraints.maxWidth : screenSize.width;
+        final resolvedHeight = boundedHeight ? constraints.maxHeight : max(screenSize.height - 120, 520.0);
+
+        return SizedBox(
+          width: resolvedWidth,
+          height: resolvedHeight,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerLowest,
+                      border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.35)),
+                    ),
+                    child: Stack(
+                      children: [
                   Positioned.fill(
                     child: DryadMapLibreView(
                       key: ValueKey<String>('map-mode-${_is3dMode ? '3d' : '2d'}-reload-$_mapReloadNonce'),
@@ -810,35 +820,38 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                         label: const Text('Enable location'),
                       ),
                     ),
-                ],
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
+              Positioned(
+                left: 16,
+                bottom: 96,
+                child: IgnorePointer(
+                  ignoring: !_mapReady,
+                  child: PulsingSearchAreaButton(
+                    isLoading: state.loading,
+                    onPressed: () async {
+                      await controller.searchThisArea(mode: 'search_this_area');
+                      await controller.refreshAreaLabel();
+                    },
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                bottom: 48,
+                child: FilterChip(
+                  label: const Text('Can review now'),
+                  selected: state.reviewableOnly,
+                  onSelected: (value) => ref.read(mapDiscoveryControllerProvider.notifier).setReviewableOnly(value),
+                ),
+              ),
+            ],
           ),
-        ),
-        Positioned(
-          left: 16,
-          bottom: 96,
-          child: IgnorePointer(
-            ignoring: !_mapReady,
-            child: PulsingSearchAreaButton(
-              isLoading: state.loading,
-              onPressed: () async {
-                await controller.searchThisArea(mode: 'search_this_area');
-                await controller.refreshAreaLabel();
-              },
-            ),
-          ),
-        ),
-        Positioned(
-          left: 16,
-          bottom: 48,
-          child: FilterChip(
-            label: const Text('Can review now'),
-            selected: state.reviewableOnly,
-            onSelected: (value) => ref.read(mapDiscoveryControllerProvider.notifier).setReviewableOnly(value),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
