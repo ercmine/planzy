@@ -61,7 +61,7 @@ class AppTheme {
         style: FilledButton.styleFrom(
           foregroundColor: colorScheme.onPrimary,
           backgroundColor: colorScheme.primary,
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size(0, 52),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.sm),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
           textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
@@ -71,7 +71,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: colorScheme.onSurface,
           side: BorderSide(color: colorScheme.outlineVariant),
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size(0, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.large)),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
         ),
