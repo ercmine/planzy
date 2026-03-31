@@ -7,14 +7,14 @@ export type SeoInput = {
 };
 
 export const defaultDescription =
-  'Perbug helps you discover the best nearby plans with live results, category filters, and fast swipe decisions.';
+  'Perbug is a SHA-256 coin with Proof of Exploration, connecting blockchain participation to real-world discovery and gameplay.';
 
 export function createSeo({ title, description, path = '/' }: SeoInput) {
   const canonical = new URL(path, publicConfig.PERBUG_SITE_URL).toString();
-  const ogImage = new URL('/perbug.svg', publicConfig.PERBUG_SITE_URL).toString();
+  const ogImage = new URL('/social-card.svg', publicConfig.PERBUG_SITE_URL).toString();
 
   return {
-    title: `${title} | Perbug`,
+    title: typeof title === 'string' && title.includes('Perbug') ? title : `${title} | Perbug`,
     description,
     canonical,
     ogImage

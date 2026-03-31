@@ -1,117 +1,236 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import Hero from '@/components/Hero.astro';
-import HowItWorks from '@/components/HowItWorks.astro';
-import FeatureCards from '@/components/FeatureCards.astro';
-import LiveResultsPreview from '@/components/LiveResultsPreview.astro';
-import FAQAccordion from '@/components/FAQAccordion.astro';
 import Container from '@/components/Container.astro';
 import { createSeo } from '@/lib/seo';
 
 const pageDescription =
-  'Perbug is a free creator-first local discovery app where anyone can browse places, post reviews and videos, build guides, and follow creators.';
+  'Perbug is a SHA-256 coin powered by Proof of Exploration, connecting blockchain rewards to real-world exploration and location-based gameplay.';
 
 const seo = createSeo({
-  title: 'Free local discovery and creator reviews for everyone',
+  title: 'Perbug | SHA-256 Coin + Proof of Exploration',
   description: pageDescription,
   path: '/'
 });
 
+const faqItems = [
+  {
+    q: 'What is Perbug?',
+    a: 'Perbug is a SHA-256 blockchain coin and exploration ecosystem where real-world discovery powers participation, rewards, and gameplay.'
+  },
+  {
+    q: 'What is Proof of Exploration?',
+    a: 'Proof of Exploration is Perbug\'s mechanism for tying location-based activity, map exploration, and world interaction to claims and ecosystem progression.'
+  },
+  {
+    q: 'Is Perbug a real chain coin?',
+    a: 'Yes. Perbug is positioned as a SHA-256 cryptocurrency network, not just in-app points. The website and GitHub focus on open chain development.'
+  },
+  {
+    q: 'How can I contribute as a developer?',
+    a: 'Developers can inspect repositories, follow development, and contribute through the Perbug GitHub organization at github.com/perbugcore.'
+  }
+];
+
 const faqSchema = {
   '@context': 'https://schema.org',
   '@type': 'FAQPage',
-  mainEntity: [
-    {
-      '@type': 'Question',
-      name: 'What is Perbug?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Perbug is a free local discovery platform where people discover places, trust creator and community reviews, and plan outings with smart recommendations.'
-      }
-    },
-    {
-      '@type': 'Question',
-      name: 'Who can create content on Perbug?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Any signed-in user can post text, photo, and video reviews, publish guides, and build a creator profile.'
-      }
-    },
-    {
-      '@type': 'Question',
-      name: 'Does Perbug have paid plans?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'No. Perbug is free for everyone and supported by ads in discovery.'
-      }
-    },
-    {
-      '@type': 'Question',
-      name: 'How are ads shown?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Perbug uses an ad-supported discovery model with sponsored cards shown in-feed at a consistent cadence.'
-      }
+  mainEntity: faqItems.map((item) => ({
+    '@type': 'Question',
+    name: item.q,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: item.a
     }
-  ]
+  }))
 };
 
-const credibilityPills = ['Free for everyone', 'Creator content', 'Trusted reviews', 'AI planner', 'Ad-supported discovery'];
+const steps = [
+  {
+    title: 'Explore the world',
+    description: 'Open the Perbug map and discover active locations, zones, and exploration paths near you.'
+  },
+  {
+    title: 'Visit and interact',
+    description: 'Travel to locations, engage with local gameplay, and participate in exploration-driven activities.'
+  },
+  {
+    title: 'Unlock opportunities',
+    description: 'Trigger claims, progression, and ecosystem opportunities based on verified exploration behavior.'
+  },
+  {
+    title: 'Connect to the chain',
+    description: 'Rewards and ecosystem outcomes map back to Perbug\'s SHA-256 coin network and open infrastructure.'
+  }
+];
 ---
 
 <BaseLayout {...seo} structuredData={faqSchema}>
-  <Hero />
-
-  <Container class="pb-4">
-    <div class="flex flex-wrap gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-300">
-      {credibilityPills.map((pill) => <p class="rounded-full border border-slate-700 px-3 py-1">{pill}</p>)}
-    </div>
-  </Container>
-
-  <HowItWorks />
-  <FeatureCards />
-  <LiveResultsPreview />
-
-  <Container class="pb-8">
-    <section class="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 md:p-8">
-      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">Sponsored</p>
-      <div class="mt-4 grid gap-5 md:grid-cols-[1.2fr_1fr] md:items-center">
-        <div>
-          <h2 class="text-2xl font-semibold text-slate-50 md:text-3xl">See Perbug in action</h2>
-          <p class="mt-3 text-slate-300">
-            Watch our latest app ad to preview creator videos, trusted reviews, and smart local planning in one place.
-          </p>
-          <a
-            href="/downloads/"
-            class="mt-5 inline-flex rounded-lg bg-brand-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-brand-400"
-          >
-            Download Perbug
-          </a>
+  <section class="relative overflow-hidden border-b border-slate-800 py-20 sm:py-24">
+    <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(54,244,160,0.16),transparent_40%),radial-gradient(circle_at_82%_25%,rgba(59,130,246,0.18),transparent_36%),radial-gradient(circle_at_50%_88%,rgba(155,123,255,0.2),transparent_42%)]"></div>
+    <Container class="relative grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-brand-300">Perbug Mainnet Vision</p>
+        <h1 class="mt-4 text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
+          Perbug is a <span class="text-brand-300">SHA-256 coin</span> built around <span class="text-neon-purple">Proof of Exploration</span>.
+        </h1>
+        <p class="mt-6 max-w-2xl text-lg text-slate-200">
+          Perbug combines blockchain infrastructure with real-world location gameplay. Explore places, interact with the map,
+          and participate in an ecosystem where exploration drives meaningful on-chain outcomes.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href="https://github.com/perbugcore/" target="_blank" rel="noreferrer" class="rounded-lg bg-brand-500 px-5 py-3 font-semibold text-slate-950 hover:bg-brand-400">View GitHub</a>
+          <a href="#proof-of-exploration" class="rounded-lg border border-slate-500 px-5 py-3 font-semibold text-slate-100 hover:border-brand-300">Learn Proof of Exploration</a>
+          <a href="#how-it-works" class="rounded-lg border border-slate-500 px-5 py-3 font-semibold text-slate-100 hover:border-neon-purple">How it Works</a>
         </div>
+      </div>
+      <div class="rounded-3xl border border-slate-700 bg-slate-900/70 p-6 shadow-glow">
+        <p class="text-sm font-semibold text-brand-300">Network Snapshot</p>
+        <div class="mt-4 space-y-3 text-sm">
+          <div class="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
+            <p class="text-slate-400">Consensus lineage</p>
+            <p class="font-semibold text-white">SHA-256 blockchain architecture</p>
+          </div>
+          <div class="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
+            <p class="text-slate-400">Participation layer</p>
+            <p class="font-semibold text-white">Proof of Exploration mechanics</p>
+          </div>
+          <div class="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
+            <p class="text-slate-400">Open source hub</p>
+            <a href="https://github.com/perbugcore/" target="_blank" rel="noreferrer" class="font-semibold text-brand-300 hover:text-brand-200">github.com/perbugcore/</a>
+          </div>
+        </div>
+      </div>
+    </Container>
+  </section>
 
-        <video
-          class="w-full rounded-2xl border border-slate-700 bg-slate-950 shadow-lg"
-          src="/perbug.mp4"
-          controls
-          preload="metadata"
-          muted
-          playsinline
-          aria-label="Perbug app ad video"
-        >
-          Sorry, your browser does not support embedded videos.
-        </video>
+  <Container class="space-y-16 py-16">
+    <section id="what-is-perbug" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-7 md:p-10">
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">What is Perbug?</p>
+      <h2 class="mt-3 text-3xl font-semibold text-white">A crypto network designed for exploration, not passive speculation.</h2>
+      <p class="mt-4 max-w-3xl text-slate-300">
+        Perbug is both a coin and an exploration ecosystem. The chain foundation is SHA-256, while the participation model is Proof of Exploration—
+        a design that encourages real movement, local discovery, and world interaction as part of ecosystem progression.
+      </p>
+    </section>
+
+    <section id="why-perbug" class="grid gap-4 md:grid-cols-3">
+      {[
+        {
+          title: 'Real-world participation',
+          body: 'Perbug rewards users for exploration behaviors tied to physical locations and map activity.'
+        },
+        {
+          title: 'Credible chain positioning',
+          body: 'Perbug is presented as a SHA-256 blockchain coin with open, inspectable development practices.'
+        },
+        {
+          title: 'Ecosystem-first design',
+          body: 'Gameplay, discovery, and crypto incentives are designed to reinforce each other over time.'
+        }
+      ].map((card) => (
+        <article class="rounded-2xl border border-slate-800 bg-slate-900/55 p-5">
+          <h3 class="text-xl font-semibold text-white">{card.title}</h3>
+          <p class="mt-2 text-slate-300">{card.body}</p>
+        </article>
+      ))}
+    </section>
+
+    <section id="sha-256" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-7 md:p-10">
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-neon-purple">SHA-256 Coin</p>
+      <h2 class="mt-3 text-3xl font-semibold text-white">Perbug is a blockchain coin, not a points system.</h2>
+      <p class="mt-4 text-slate-300">
+        Perbug is positioned in a Bitcoin-style SHA-256 lineage, giving users and builders a familiar chain model while introducing a new participation primitive.
+        This keeps the project grounded in recognizable crypto infrastructure and makes it legible for wallets, miners, and technical contributors.
+      </p>
+    </section>
+
+    <section id="proof-of-exploration" class="rounded-3xl border border-brand-400/30 bg-slate-900/70 p-7 md:p-10">
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">Proof of Exploration</p>
+      <h2 class="mt-3 text-3xl font-semibold text-white">Perbug\'s signature mechanism for world-driven crypto participation.</h2>
+      <div class="mt-5 grid gap-4 md:grid-cols-3">
+        <article class="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <h3 class="font-semibold text-white">For users</h3>
+          <p class="mt-2 text-sm text-slate-300">Explore locations, unlock opportunities, and engage with map-based gameplay connected to Perbug rewards.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <h3 class="font-semibold text-white">For crypto-native communities</h3>
+          <p class="mt-2 text-sm text-slate-300">Perbug introduces an activity model that values movement and discovery, not only idle holding or speculation.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <h3 class="font-semibold text-white">For developers</h3>
+          <p class="mt-2 text-sm text-slate-300">Build systems around exploration signals, chain integrations, and gameplay logic as the ecosystem expands.</p>
+        </article>
       </div>
     </section>
-  </Container>
 
-  <FAQAccordion />
+    <section id="how-it-works" class="space-y-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">How It Works</p>
+        <h2 class="mt-3 text-3xl font-semibold text-white">From exploration to on-chain ecosystem outcomes.</h2>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2">
+        {steps.map((step, index) => (
+          <article class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+            <p class="text-sm font-semibold text-brand-300">Step {index + 1}</p>
+            <h3 class="mt-2 text-xl font-semibold text-white">{step.title}</h3>
+            <p class="mt-2 text-slate-300">{step.description}</p>
+          </article>
+        ))}
+      </div>
+    </section>
 
-  <Container class="pb-16 text-center">
-    <h2 class="text-3xl font-semibold">Ready to explore and share your local favorites?</h2>
-    <p class="mx-auto mt-3 max-w-2xl text-slate-300">Start discovering places, follow creators, and post your own reviews and guides for free.</p>
-    <div class="mt-6 flex flex-wrap justify-center gap-3">
-      <a href="/downloads/" class="rounded-lg bg-brand-500 px-5 py-3 font-semibold text-slate-950 hover:bg-brand-400">Start exploring</a>
-      <a href="#creators" class="rounded-lg border border-slate-600 px-5 py-3 font-semibold text-slate-100 hover:border-neon-purple">Create your profile</a>
-    </div>
+    <section id="ecosystem" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-7 md:p-10">
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-neon-purple">Ecosystem & Gameplay</p>
+      <h2 class="mt-3 text-3xl font-semibold text-white">A coin network connected to map exploration and game loops.</h2>
+      <p class="mt-4 text-slate-300">
+        Perbug is designed as a full ecosystem: chain, application experiences, location interactions, and community participation. The result is a project
+        that can evolve beyond a single token narrative into a long-term exploration platform.
+      </p>
+    </section>
+
+    <section id="developers" class="rounded-3xl border border-slate-800 bg-slate-900/70 p-7 md:p-10">
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">Developers & Open Source</p>
+      <h2 class="mt-3 text-3xl font-semibold text-white">Build with Perbug in the open.</h2>
+      <p class="mt-4 max-w-3xl text-slate-300">
+        Perbug development is public. Explore chain/core work, app layers, backend services, website improvements, and tooling through the official GitHub organization.
+      </p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a href="https://github.com/perbugcore/" target="_blank" rel="noreferrer" class="rounded-lg bg-brand-500 px-5 py-3 font-semibold text-slate-950 hover:bg-brand-400">Open GitHub Organization</a>
+        <a href="/developers/" class="rounded-lg border border-slate-500 px-5 py-3 font-semibold text-slate-100 hover:border-brand-300">Developer Overview</a>
+      </div>
+    </section>
+
+    <section id="roadmap" class="rounded-3xl border border-slate-800 bg-slate-900/60 p-7 md:p-10">
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">Roadmap & Vision</p>
+      <h2 class="mt-3 text-3xl font-semibold text-white">Scaling the exploration economy.</h2>
+      <ul class="mt-5 grid gap-3 text-slate-300 md:grid-cols-2">
+        <li class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">Expand Proof of Exploration mechanics and gameplay loops.</li>
+        <li class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">Grow developer tools for chain and location-based integrations.</li>
+        <li class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">Support broader ecosystem participation and contributor pathways.</li>
+        <li class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">Strengthen public documentation, onboarding, and transparency.</li>
+      </ul>
+    </section>
+
+    <section id="faq" class="space-y-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">FAQ</p>
+        <h2 class="mt-3 text-3xl font-semibold text-white">Frequently asked questions.</h2>
+      </div>
+      <div class="space-y-3">
+        {faqItems.map((item) => (
+          <details class="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+            <summary class="cursor-pointer list-none text-lg font-semibold text-white">{item.q}</summary>
+            <p class="mt-2 text-slate-300">{item.a}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+
+    <section class="rounded-3xl border border-brand-400/40 bg-slate-900/80 p-8 text-center md:p-10">
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">Join the ecosystem</p>
+      <h2 class="mt-3 text-3xl font-semibold text-white">Follow Perbug development and start exploring.</h2>
+      <p class="mx-auto mt-3 max-w-2xl text-slate-300">The fastest way to track updates, inspect code, and contribute is through the official Perbug GitHub organization.</p>
+      <a href="https://github.com/perbugcore/" target="_blank" rel="noreferrer" class="mt-6 inline-flex rounded-lg bg-brand-500 px-5 py-3 font-semibold text-slate-950 hover:bg-brand-400">View GitHub</a>
+    </section>
   </Container>
 </BaseLayout>

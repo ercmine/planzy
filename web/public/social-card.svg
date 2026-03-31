@@ -2,7 +2,7 @@
   <defs>
     <linearGradient id="socialMarkGradient" x1="140" y1="170" x2="230" y2="260" gradientUnits="userSpaceOnUse">
       <stop stop-color="#27C7FF"/>
-      <stop offset="1" stop-color="#FFAB2E"/>
+      <stop offset="1" stop-color="#36F4A0"/>
     </linearGradient>
   </defs>
   <rect width="1200" height="630" fill="#020617"/>
@@ -14,5 +14,6 @@
   <path d="M165 236V202" stroke="url(#socialMarkGradient)" stroke-width="9" stroke-linecap="round"/>
   <path d="M178 211H188A8 8 0 0 1 188 227H178" stroke="url(#socialMarkGradient)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="260" y="230" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="72" font-weight="700">Perbug</text>
-  <text x="140" y="320" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="34">Plan together. Ship with clarity.</text>
+  <text x="140" y="320" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="34">SHA-256 Coin • Proof of Exploration</text>
+  <text x="140" y="374" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="28">Explore real-world locations. Power a crypto ecosystem.</text>
 </svg>
