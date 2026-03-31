@@ -110,6 +110,7 @@ export * from "./challenges/index.js";
 export * from "./leaderboards/index.js";
 export * from "./competition/index.js";
 export * from "./sponsoredLocations/index.js";
+export * from "./locationClaims/index.js";
 export * from "./viewerEngagementRewards/index.js";
 export * from "./dryad/index.js";
 export * from "./walletAuth/index.js";
