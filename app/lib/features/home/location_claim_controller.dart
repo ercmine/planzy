@@ -22,11 +22,36 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
 
   final Ref _ref;
 
-  final List<ClaimableLocation> _seedLocations = const [
-    ClaimableLocation(id: 'loc-1', lat: 30.2672, lng: -97.7431, displayName: 'Congress Avenue Bat Bridge', category: 'landmark', claimRadiusMeters: 120),
-    ClaimableLocation(id: 'loc-2', lat: 30.2648, lng: -97.7468, displayName: 'Lady Bird Lake Boardwalk', category: 'park', claimRadiusMeters: 90),
-    ClaimableLocation(id: 'loc-3', lat: 30.2707, lng: -97.7501, displayName: 'Downtown Art Wall', category: 'art', claimRadiusMeters: 80),
-  ];
+  List<ClaimableLocation> _seedLocationsForPosition(AppLocation? position) {
+    if (position == null) return const [];
+
+    return [
+      ClaimableLocation(
+        id: 'loc-north',
+        lat: position.lat + 0.0012,
+        lng: position.lng,
+        displayName: 'North claim node',
+        category: 'district',
+        claimRadiusMeters: 120,
+      ),
+      ClaimableLocation(
+        id: 'loc-east',
+        lat: position.lat + 0.0002,
+        lng: position.lng + 0.0015,
+        displayName: 'East claim node',
+        category: 'hub',
+        claimRadiusMeters: 100,
+      ),
+      ClaimableLocation(
+        id: 'loc-southwest',
+        lat: position.lat - 0.0013,
+        lng: position.lng - 0.0011,
+        displayName: 'Southwest claim node',
+        category: 'zone',
+        claimRadiusMeters: 90,
+      ),
+    ];
+  }
 
   Future<void> startTracking() async {
     state = state.copyWith(isTracking: true, clearBanner: true);
@@ -35,7 +60,8 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
 
   void _onLocationState(LocationControllerState locationState) {
     final position = locationState.effectiveLocation;
-    final claimables = _seedLocations.map((location) {
+    final seedLocations = _seedLocationsForPosition(position);
+    final claimables = seedLocations.map((location) {
       final existing = _findExistingClaimable(location.id);
       final distance = position == null ? 999999.0 : _distanceMeters(position.lat, position.lng, location.lat, location.lng);
 
