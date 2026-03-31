@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
 import '../../providers/app_providers.dart';
+import 'map_discovery_clients.dart';
 import 'location_claim_models.dart';
 
 final locationClaimControllerProvider = StateNotifierProvider<LocationClaimController, LocationClaimState>((ref) {
@@ -21,36 +22,76 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   static const double _minimumReward = 0.000001;
 
   final Ref _ref;
+  final Map<String, String> _displayNameCache = <String, String>{};
+  int _locationRevision = 0;
 
-  List<ClaimableLocation> _seedLocationsForPosition(AppLocation? position) {
+  Future<List<ClaimableLocation>> _seedLocationsForPosition(AppLocation? position) async {
     if (position == null) return const [];
 
-    return [
-      ClaimableLocation(
+    final apiClient = await _ref.read(apiClientProvider.future);
+    final geoClient = RemoteMapGeoClient(apiClient);
+
+    final seeds = <({String id, double lat, double lng, String category, double claimRadiusMeters})>[
+      (
         id: 'loc-north',
         lat: position.lat + 0.0012,
         lng: position.lng,
-        displayName: 'North claim node',
         category: 'district',
         claimRadiusMeters: 120,
       ),
-      ClaimableLocation(
+      (
         id: 'loc-east',
         lat: position.lat + 0.0002,
         lng: position.lng + 0.0015,
-        displayName: 'East claim node',
         category: 'hub',
         claimRadiusMeters: 100,
       ),
-      ClaimableLocation(
+      (
         id: 'loc-southwest',
         lat: position.lat - 0.0013,
         lng: position.lng - 0.0011,
-        displayName: 'Southwest claim node',
         category: 'zone',
         claimRadiusMeters: 90,
       ),
     ];
+
+    final resolved = <ClaimableLocation>[];
+    for (final seed in seeds) {
+      final displayName = await _resolveDisplayName(geoClient: geoClient, lat: seed.lat, lng: seed.lng);
+      if (displayName == null || displayName.trim().isEmpty) {
+        continue;
+      }
+      resolved.add(
+        ClaimableLocation(
+          id: seed.id,
+          lat: seed.lat,
+          lng: seed.lng,
+          displayName: displayName,
+          category: seed.category,
+          claimRadiusMeters: seed.claimRadiusMeters,
+        ),
+      );
+    }
+    return resolved;
+  }
+
+  Future<String?> _resolveDisplayName({
+    required RemoteMapGeoClient geoClient,
+    required double lat,
+    required double lng,
+  }) async {
+    final key = '${lat.toStringAsFixed(5)},${lng.toStringAsFixed(5)}';
+    final cached = _displayNameCache[key];
+    if (cached != null) return cached;
+    try {
+      final area = await geoClient.reverseGeocode(lat: lat, lng: lng);
+      final name = area?.displayName.trim();
+      if (name == null || name.isEmpty) return null;
+      _displayNameCache[key] = name;
+      return name;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> startTracking() async {
@@ -58,9 +99,11 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
     await _ref.read(locationControllerProvider.notifier).requestPermissionAndLoad();
   }
 
-  void _onLocationState(LocationControllerState locationState) {
+  Future<void> _onLocationState(LocationControllerState locationState) async {
+    final revision = ++_locationRevision;
     final position = locationState.effectiveLocation;
-    final seedLocations = _seedLocationsForPosition(position);
+    final seedLocations = await _seedLocationsForPosition(position);
+    if (revision != _locationRevision) return;
     final claimables = seedLocations.map((location) {
       final existing = _findExistingClaimable(location.id);
       final distance = position == null ? 999999.0 : _distanceMeters(position.lat, position.lng, location.lat, location.lng);
