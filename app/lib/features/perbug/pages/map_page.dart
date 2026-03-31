@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme/widgets.dart';
 import '../chain/perbug_chain_providers.dart';
@@ -21,6 +22,7 @@ class PerbugMapPage extends ConsumerStatefulWidget {
 
 class _PerbugMapPageState extends ConsumerState<PerbugMapPage> {
   PerbugTree? _selectedTree;
+  bool _showNearest = false;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +85,12 @@ class _PerbugMapPageState extends ConsumerState<PerbugMapPage> {
                     listedCount: listed.length,
                     replantableCount: replantable.length,
                     localCount: local.length,
+                  ),
+                  const SizedBox(height: 12),
+                  _NearestLocationsSection(
+                    nearestTrees: local.take(3).toList(growable: false),
+                    showNearest: _showNearest,
+                    onToggle: () => setState(() => _showNearest = !_showNearest),
                   ),
                   const SizedBox(height: 12),
                   _Section(
@@ -301,6 +309,65 @@ class _StateBuckets extends StatelessWidget {
   }
 }
 
+class _NearestLocationsSection extends StatelessWidget {
+  const _NearestLocationsSection({
+    required this.nearestTrees,
+    required this.showNearest,
+    required this.onToggle,
+  });
+
+  final List<PerbugTree> nearestTrees;
+  final bool showNearest;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Nearest locations',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onToggle,
+                icon: Icon(showNearest ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                label: Text(showNearest ? 'Hide nearest 3' : 'Show nearest 3'),
+              ),
+            ],
+          ),
+          if (showNearest) ...[
+            const SizedBox(height: 6),
+            if (nearestTrees.isEmpty)
+              const Text('No nearby locations available yet.')
+            else
+              ...nearestTrees.map((tree) {
+                final url = Uri.parse(
+                  'https://www.google.com/maps/search/?api=1&query=${tree.latitude},${tree.longitude}',
+                );
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(tree.placeName),
+                  subtitle: Text(tree.locationLabel),
+                  trailing: IconButton(
+                    tooltip: 'Open in Google Maps',
+                    onPressed: () => launchUrl(url, mode: LaunchMode.externalApplication),
+                    icon: const Icon(Icons.open_in_new),
+                  ),
+                );
+              }),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _PlantingCard extends StatelessWidget {
   const _PlantingCard({required this.tree, required this.onOpenTree});
 
@@ -387,7 +454,7 @@ class _TreeAtlasMap extends StatelessWidget {
         child: FlutterMap(
           options: MapOptions(
             initialCenter: LatLng(selectedTree.latitude, selectedTree.longitude),
-            initialZoom: 2.2,
+            initialZoom: 2.6,
             interactionOptions: const InteractionOptions(flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom),
           ),
           children: [
