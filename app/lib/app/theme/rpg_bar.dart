@@ -37,7 +37,7 @@ class RpgBarSurface extends StatelessWidget {
     );
 
     return ConstrainedBox(
-      constraints: BoxConstraints(minHeight: height),
+      constraints: BoxConstraints(minHeight: height, maxHeight: height),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: Stack(
