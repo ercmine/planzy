@@ -9,7 +9,11 @@ type Particle = {
   duration: string;
 };
 
-export default function WalletIdentityPanel() {
+type WalletIdentityPanelProps = {
+  onGetStarted: () => void;
+};
+
+export default function WalletIdentityPanel({ onGetStarted }: WalletIdentityPanelProps) {
   const particles = useMemo<Particle[]>(
     () =>
       Array.from({ length: 22 }, (_, index) => ({
@@ -51,6 +55,13 @@ export default function WalletIdentityPanel() {
         <p className="mt-2 text-sm text-slate-300">
           The wallet gate intro has been removed. Drift through the exchange while ambient particles and soft motion keep the interface alive.
         </p>
+        <button
+          type="button"
+          onClick={onGetStarted}
+          className="mt-4 rounded-lg border border-emerald-300/60 bg-emerald-400/20 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-300/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200/80"
+        >
+          Get started
+        </button>
 
         <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs text-slate-300">
           <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-2 py-2">
