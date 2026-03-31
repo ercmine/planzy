@@ -17,6 +17,10 @@ export interface BackendGeoRuntime {
     upstreamBaseUrl?: string;
     validationErrors: string[];
     validationWarnings: string[];
+    modeReason?: string;
+    effectiveGeoServiceEnabled?: boolean;
+    effectiveGeoServiceBaseUrl?: string;
+    effectiveNominatimBaseUrl?: string;
 }
 export declare function initBackendGeoRuntime(env?: NodeJS.ProcessEnv): BackendGeoRuntime;
 export declare function createBackendGeoGatewayFromEnv(env?: NodeJS.ProcessEnv): GeoGateway | null;

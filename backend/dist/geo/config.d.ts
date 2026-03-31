@@ -1,6 +1,6 @@
 export interface GeoClientConfig {
     enabled: boolean;
-    baseUrl: string;
+    baseUrl?: string;
     timeoutMs: number;
     retries: number;
     authSecret?: string;
@@ -20,6 +20,7 @@ export interface GeoRuntimeConfig {
 }
 export interface GeoRuntimeValidation {
     mode: "custom" | "nominatim" | "disabled";
+    reason: string;
     shouldFailFast: boolean;
     errors: string[];
     warnings: string[];

@@ -67,6 +67,29 @@ describe("readGeoRuntimeConfig", () => {
       GEO_SERVICE_BASE_URL: "https://geo.perbug.com"
     };
     const customConfig = readGeoRuntimeConfig(customEnv);
-    expect(validateGeoRuntimeConfig(customConfig, customEnv).mode).toBe("custom");
+    expect(validateGeoRuntimeConfig(customConfig, customEnv).mode).toBe("disabled");
+  });
+
+  it("chooses nominatim when GEO_SERVICE_ENABLED=false even if GEO_MODE=custom", () => {
+    const env = {
+      GEO_MODE: "custom",
+      GEO_SERVICE_ENABLED: "false",
+      NOMINATIM_BASE_URL: "https://geo.perbug.com"
+    };
+    const config = readGeoRuntimeConfig(env);
+    const validation = validateGeoRuntimeConfig(config, env);
+    expect(validation.mode).toBe("nominatim");
+    expect(validation.warnings).toEqual(expect.arrayContaining([expect.stringContaining("GEO_MODE=\"custom\" is ignored")]));
+  });
+
+  it("requires explicit GEO_SERVICE_BASE_URL for custom mode", () => {
+    const env = {
+      GEO_SERVICE_ENABLED: "true",
+      NOMINATIM_BASE_URL: "https://geo.perbug.com"
+    };
+    const config = readGeoRuntimeConfig(env);
+    const validation = validateGeoRuntimeConfig(config, env);
+    expect(validation.mode).toBe("nominatim");
+    expect(validation.warnings).toEqual(expect.arrayContaining([expect.stringContaining("custom mode not eligible")]));
   });
 });
