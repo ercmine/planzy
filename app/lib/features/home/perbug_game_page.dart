@@ -58,7 +58,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
   @override
   void initState() {
     super.initState();
-    _mapViewport = const MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 13);
+    _mapViewport = const MapViewport(centerLat: 30.2672, centerLng: -97.7431, zoom: 14.5);
     _sceneController = WorldMapSceneController(generator: const WorldMapSceneGenerator());
   }
 

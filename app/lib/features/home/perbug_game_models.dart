@@ -888,7 +888,7 @@ class PerbugGameState {
         energy: 14,
         maxEnergy: 30,
         maxJumpMeters: 2400,
-        fixedZoom: 13,
+        fixedZoom: 14.5,
         loading: false,
         areaLabel: null,
         visitedNodeIds: const {},
