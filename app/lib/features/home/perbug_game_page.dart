@@ -271,6 +271,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
         );
       },
     );
+  }
 
   _MapUiState _mapUiState({
     required PerbugGameState state,
