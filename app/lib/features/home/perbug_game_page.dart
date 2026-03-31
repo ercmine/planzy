@@ -774,65 +774,6 @@ class _DebugMapOverlay extends StatelessWidget {
   }
 }
 
-class _OnboardingCoachCard extends StatelessWidget {
-  const _OnboardingCoachCard({
-    required this.state,
-    required this.onContinue,
-    required this.onSkip,
-  });
-
-  final OnboardingState state;
-  final Future<void> Function() onContinue;
-  final Future<void> Function() onSkip;
-
-  @override
-  Widget build(BuildContext context) {
-    final message = switch (state.step) {
-      OnboardingStep.mapNodes => 'These are real nearby places turned into nodes. Blue links are reachable jumps from your current position.',
-      OnboardingStep.squadIntro => 'Starter squad is live now: Scout, Engineer, and Tank are active. Squad roles drive encounter outcomes.',
-      OnboardingStep.firstMove => 'Tap a reachable node and press Move. Actions spend Energy + Perbug and push your frontier outward.',
-      OnboardingStep.firstEncounter => 'You arrived. Resolve this node encounter to complete the first loop: move → resolve → reward.',
-      OnboardingStep.firstReward => 'Rewards fuel progression: XP levels command, Perbug powers actions, and materials upgrade your squad.',
-      OnboardingStep.progressionCue => 'Next objective: clear 2 connected nodes and apply one squad upgrade to keep expanding.',
-      OnboardingStep.liveLoop => 'You are in the live loop. Keep expanding across real geography and strengthening your squad.',
-      _ => 'Mission briefing active.',
-    };
-
-    final canContinue = state.step != OnboardingStep.firstMove && state.step != OnboardingStep.firstEncounter;
-
-    return AppCard(
-      tone: AppCardTone.featured,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Onboarding // ${state.step.name}', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          Text(message),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (canContinue)
-                RpgBarButton(
-                  onPressed: onContinue,
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: 'Continue',
-                ),
-              TextButton(onPressed: onSkip, child: const Text('Skip tutorial')),
-            ],
-          ),
-          if (state.timeToFirstMoveMs != null || state.timeToFirstRewardMs != null)
-            Text(
-              'Telemetry: first move ${state.timeToFirstMoveMs ?? '-'}ms • first reward ${state.timeToFirstRewardMs ?? '-'}ms',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class _WorldNodeInspectorCard extends StatelessWidget {
   const _WorldNodeInspectorCard({required this.node});
 
