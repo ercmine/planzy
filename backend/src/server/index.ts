@@ -64,7 +64,7 @@ import { LeaderboardsService, MemoryLeaderboardsStore } from "../leaderboards/in
 import { CollectionsService, MemoryCollectionStore } from "../collections/index.js";
 import { MemorySocialGamificationStore, SocialGamificationService } from "../socialGamification/index.js";
 import { GamificationControlService, MemoryGamificationControlStore } from "../gamificationControl/index.js";
-import { MemoryPerbugRewardsStore, PerbugRewardsService } from "../perbugRewards/index.js";
+import { logPerbugRpcStartupDiagnostics, MemoryPerbugRewardsStore, PerbugRewardsService } from "../perbugRewards/index.js";
 import { MemoryPerbugTipsStore, PerbugTipsService } from "../perbugTips/index.js";
 import { CompetitionService, MemoryCompetitionStore } from "../competition/index.js";
 import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../sponsoredLocations/index.js";
@@ -258,6 +258,7 @@ export function createServer(options?: CreateServerOptions) {
   const socialGamificationService = new SocialGamificationService(new MemorySocialGamificationStore(), analyticsService, notificationService);
   const gamificationControlService = new GamificationControlService(new MemoryGamificationControlStore(), analyticsService);
   const perbugRewardsService = new PerbugRewardsService(new MemoryPerbugRewardsStore());
+  void logPerbugRpcStartupDiagnostics();
   perbugRewardsService.createPlace({ id: "place-1", name: "Perbug Test Cafe" });
   perbugRewardsService.createPlace({ id: "place-2", name: "Perbug Arcade" });
   const perbugTipsService = new PerbugTipsService(new MemoryPerbugTipsStore(), {

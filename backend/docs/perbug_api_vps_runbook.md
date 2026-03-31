@@ -72,3 +72,15 @@ proxy_pass http://127.0.0.1:8080;
 ```
 
 Avoid stale upstream targets like `:3001`.
+
+## Perbug node RPC (local only)
+
+Set backend env to the canonical local RPC values:
+
+- `PERBUG_RPC_HOST=127.0.0.1`
+- `PERBUG_RPC_PORT=9332`
+- `PERBUG_NODE_PORT=9333`
+- `PERBUG_RPC_USER=perbugrpc`
+- `PERBUG_RPC_PASSWORD=change_this_to_a_long_random_password`
+
+Do not expose RPC publicly. Keep node RPC bound to localhost (`rpcbind=127.0.0.1`, `rpcallowip=127.0.0.1`).

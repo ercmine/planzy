@@ -1,9 +1,11 @@
-import type { SolanaClaimsAdapter, SolanaTransferResult } from "../types.js";
-export declare class MockSolanaClaimsAdapter implements SolanaClaimsAdapter {
+import type { PerbugClaimsAdapter, PerbugTransferResult } from "../types.js";
+/** @deprecated legacy mock adapter kept for backwards compatibility in tests/imports */
+export declare class MockSolanaClaimsAdapter implements PerbugClaimsAdapter {
     transferClaim(input: {
-        claimantPublicKey: string;
-        amountAtomic: bigint;
+        claimantAddress: string;
+        amountDisplay: string;
         idempotencyKey: string;
         memo: string;
-    }): Promise<SolanaTransferResult>;
+    }): Promise<PerbugTransferResult>;
 }
+export declare function deriveLegacyAssociatedTokenAccount(address: string): string;
