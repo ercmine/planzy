@@ -34,6 +34,10 @@ export interface BackendGeoRuntime {
   upstreamBaseUrl?: string;
   validationErrors: string[];
   validationWarnings: string[];
+  modeReason?: string;
+  effectiveGeoServiceEnabled?: boolean;
+  effectiveGeoServiceBaseUrl?: string;
+  effectiveNominatimBaseUrl?: string;
 }
 
 class RemoteGeoGateway implements GeoGateway {
@@ -129,9 +133,10 @@ export function initBackendGeoRuntime(env: NodeJS.ProcessEnv = process.env): Bac
   let gateway: GeoGateway | null = null;
   let upstreamBaseUrl: string | undefined;
 
-  if (validation.mode === "custom" && validation.errors.length === 0) {
-    upstreamBaseUrl = config.client.baseUrl;
-    gateway = new RemoteGeoGateway(new GeoServiceClient(config.client));
+  if (validation.mode === "custom" && validation.errors.length === 0 && config.client.baseUrl) {
+    const remoteConfig = { ...config.client, baseUrl: config.client.baseUrl };
+    upstreamBaseUrl = remoteConfig.baseUrl;
+    gateway = new RemoteGeoGateway(new GeoServiceClient(remoteConfig));
   }
 
   if (validation.mode === "nominatim" && validation.errors.length === 0 && config.local.nominatimBaseUrl) {
@@ -161,7 +166,11 @@ export function initBackendGeoRuntime(env: NodeJS.ProcessEnv = process.env): Bac
     nominatimBaseUrl: config.local.nominatimBaseUrl,
     upstreamBaseUrl,
     validationErrors: validation.errors,
-    validationWarnings: validation.warnings
+    validationWarnings: validation.warnings,
+    modeReason: validation.reason,
+    effectiveGeoServiceEnabled: config.client.enabled,
+    effectiveGeoServiceBaseUrl: config.client.baseUrl,
+    effectiveNominatimBaseUrl: config.local.nominatimBaseUrl
   };
 }
 

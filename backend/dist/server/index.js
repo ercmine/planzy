@@ -187,10 +187,14 @@ export function createServer(options) {
     const geoRuntime = initBackendGeoRuntime();
     console.info("[geo.startup]", {
         mode: geoRuntime.mode,
+        modeReason: geoRuntime.modeReason,
         customGeoServiceEnabled: geoRuntime.customGeoServiceEnabled,
+        effectiveGeoServiceEnabled: geoRuntime.effectiveGeoServiceEnabled,
         routesMounted: geoRuntime.routesMounted,
         customGeoBaseUrl: geoRuntime.customGeoBaseUrl ?? null,
+        effectiveGeoServiceBaseUrl: geoRuntime.effectiveGeoServiceBaseUrl ?? null,
         nominatimBaseUrl: geoRuntime.nominatimBaseUrl ?? null,
+        effectiveNominatimBaseUrl: geoRuntime.effectiveNominatimBaseUrl ?? null,
         upstreamBaseUrl: geoRuntime.upstreamBaseUrl ?? null,
         validationErrors: geoRuntime.validationErrors,
         validationWarnings: geoRuntime.validationWarnings
