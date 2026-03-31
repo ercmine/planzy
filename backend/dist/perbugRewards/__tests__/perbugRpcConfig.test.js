@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildPerbugRpcUrl, loadPerbugRpcConfig } from "../perbugRpc/config.js";
+import { buildPerbugRpcNodeUrl, buildPerbugRpcWalletUrl, loadPerbugRpcConfig } from "../perbugRpc/config.js";
 import { PerbugRpcClient } from "../perbugRpc/client.js";
 describe("Perbug RPC config", () => {
     it("uses Perbug defaults and localhost ports", () => {
@@ -17,26 +17,58 @@ describe("Perbug RPC config", () => {
         expect(config.rpcPassword).toBe("secret");
     });
     it("builds wallet scoped RPC URL when wallet name is configured", () => {
-        const url = buildPerbugRpcUrl({ host: "127.0.0.1", rpcPort: 9332, nodePort: 9333, rpcUser: "u", rpcPassword: "p", timeoutMs: 1000, walletName: "payout-wallet" });
+        const url = buildPerbugRpcWalletUrl({ host: "127.0.0.1", rpcPort: 9332, nodePort: 9333, rpcUser: "u", rpcPassword: "p", timeoutMs: 1000 }, "payout-wallet");
         expect(url).toBe("http://127.0.0.1:9332/wallet/payout-wallet");
+    });
+    it("builds root URL for node RPC", () => {
+        const url = buildPerbugRpcNodeUrl({ host: "127.0.0.1", rpcPort: 9332, nodePort: 9333, rpcUser: "u", rpcPassword: "p", timeoutMs: 1000 });
+        expect(url).toBe("http://127.0.0.1:9332/");
     });
 });
 describe("PerbugRpcClient", () => {
     it("formats Bitcoin-style JSON-RPC request and auth header", async () => {
-        const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ result: { isvalid: true }, error: null, id: "1" }) }));
+        const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ result: { isvalid: true }, error: null, id: "1" }) }));
         vi.stubGlobal("fetch", fetchMock);
-        const client = new PerbugRpcClient({ host: "127.0.0.1", rpcPort: 9332, nodePort: 9333, rpcUser: "perbugrpc", rpcPassword: "pw", timeoutMs: 1000 });
+        const client = new PerbugRpcClient({ host: "127.0.0.1", rpcPort: 9332, nodePort: 9333, rpcUser: "perbugrpc", rpcPassword: "pw", timeoutMs: 1000, walletName: "wallet-a" });
         await expect(client.validateAddress("addr")).resolves.toBe(true);
-        const [, options] = (fetchMock.mock.calls[0] ?? []);
+        const [requestUrl, options] = (fetchMock.mock.calls[0] ?? []);
+        expect(requestUrl).toContain("/wallet/wallet-a");
         const body = JSON.parse(String(options.body));
         expect(body.jsonrpc).toBe("1.0");
         expect(body.method).toBe("validateaddress");
         expect(String(options.headers && options.headers.authorization)).toContain("Basic");
     });
+    it("classifies auth failures separately", async () => {
+        const fetchMock = vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) }));
+        vi.stubGlobal("fetch", fetchMock);
+        const client = new PerbugRpcClient({ host: "127.0.0.1", rpcPort: 9332, nodePort: 9333, rpcUser: "perbugrpc", rpcPassword: "pw", timeoutMs: 1000 });
+        await expect(client.getBlockchainInfo()).rejects.toMatchObject({ details: { kind: "auth_failure" } });
+    });
     it("throws clear error when node is unreachable", async () => {
         const fetchMock = vi.fn(async () => { throw new Error("connect ECONNREFUSED"); });
         vi.stubGlobal("fetch", fetchMock);
         const client = new PerbugRpcClient({ host: "127.0.0.1", rpcPort: 9332, nodePort: 9333, rpcUser: "perbugrpc", rpcPassword: "pw", timeoutMs: 1000 });
-        await expect(client.getBalance()).rejects.toThrow(/perbug_rpc_unreachable:getbalance/);
+        await expect(client.getBalance()).rejects.toMatchObject({ details: { kind: "node_unreachable" } });
+    });
+    it("auto-detects loaded wallet when wallet name is not configured", async () => {
+        const fetchMock = vi.fn(async (url, options) => {
+            const payload = JSON.parse(String(options?.body ?? "{}"));
+            if (payload.method === "listwallets") {
+                return { ok: true, status: 200, json: async () => ({ result: ["rewards"], error: null, id: "1" }) };
+            }
+            if (payload.method === "getbalance") {
+                return { ok: true, status: 200, json: async () => ({ result: 1.5, error: null, id: "2" }) };
+            }
+            return { ok: true, status: 200, json: async () => ({ result: null, error: null, id: "3" }) };
+        });
+        vi.stubGlobal("fetch", fetchMock);
+        const client = new PerbugRpcClient({ host: "127.0.0.1", rpcPort: 9332, nodePort: 9333, rpcUser: "perbugrpc", rpcPassword: "pw", timeoutMs: 1000 });
+        await expect(client.getBalance()).resolves.toBe(1.5);
+        const calls = fetchMock.mock.calls.map(([url, opts]) => ({
+            url,
+            method: JSON.parse(String(opts.body)).method
+        }));
+        expect(calls[0]).toMatchObject({ url: "http://127.0.0.1:9332/", method: "listwallets" });
+        expect(calls[1]).toMatchObject({ url: "http://127.0.0.1:9332/wallet/rewards", method: "getbalance" });
     });
 });
