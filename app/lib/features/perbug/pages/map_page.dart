@@ -21,6 +21,8 @@ class PerbugMapPage extends ConsumerStatefulWidget {
 }
 
 class _PerbugMapPageState extends ConsumerState<PerbugMapPage> {
+  static const int _nearestLocationsLimit = 10;
+
   PerbugTree? _selectedTree;
   bool _showNearest = false;
 
@@ -88,7 +90,7 @@ class _PerbugMapPageState extends ConsumerState<PerbugMapPage> {
                   ),
                   const SizedBox(height: 12),
                   _NearestLocationsSection(
-                    nearestTrees: local.take(3).toList(growable: false),
+                    nearestTrees: local.take(_nearestLocationsLimit).toList(growable: false),
                     showNearest: _showNearest,
                     onToggle: () => setState(() => _showNearest = !_showNearest),
                   ),
@@ -337,7 +339,7 @@ class _NearestLocationsSection extends StatelessWidget {
               TextButton.icon(
                 onPressed: onToggle,
                 icon: Icon(showNearest ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                label: Text(showNearest ? 'Hide nearest 3' : 'Show nearest 3'),
+                label: Text(showNearest ? 'Hide nearest 10' : 'Show nearest 10'),
               ),
             ],
           ),
