@@ -18,7 +18,7 @@ class WorldMapSceneGenerator {
   }) {
     final anchor = location == null
         ? demoAnchor
-        : GeoCoordinate(lat: location.latitude, lng: location.longitude);
+        : GeoCoordinate(lat: location.lat, lng: location.lng);
     final anchorWorld = const WorldCoordinate(x: 0.5, y: 0.5);
     final chunks = <WorldChunk>[];
 
