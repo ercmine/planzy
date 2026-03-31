@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../app/theme/widgets.dart';
+import '../../../core/identity/identity_provider.dart';
 import '../chain/perbug_chain_providers.dart';
 
 class PerbugWalletPage extends ConsumerStatefulWidget {
@@ -13,230 +13,91 @@ class PerbugWalletPage extends ConsumerStatefulWidget {
 }
 
 class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
-  bool _isConnecting = false;
-  String? _connectionMessage;
+  final TextEditingController _addressController = TextEditingController();
+  String? _message;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _attachWalletListeners();
-    });
+    final wallet = ref.read(walletAddressProvider);
+    _addressController.text = wallet ?? '';
   }
 
   @override
   void dispose() {
-    ref.read(walletConnectorProvider).detachSessionListeners();
+    _addressController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final config = ref.watch(perbugContractConfigProvider);
     final wallet = ref.watch(walletAddressProvider);
-    final snapshot = ref.watch(groveNftSnapshotProvider);
-    final connector = ref.watch(walletConnectorProvider);
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         const PremiumHeader(
-          title: 'Wallet',
-          subtitle: 'Connect mainstream wallets for claim/plant/list/buy signing.',
-          badge: AppPill(label: 'Wallet Connect', icon: Icons.account_balance_wallet_outlined),
+          title: 'Wallet Address',
+          subtitle: 'Store a wallet address for identity and tree ownership lookups only. No wallet connect or signing in-app.',
+          badge: AppPill(label: 'Address storage only', icon: Icons.badge_outlined),
         ),
         const SizedBox(height: 10),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Target network: ${config.networkName} (${config.chainId})'),
+              Text('Saved wallet address', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
+              TextField(
+                controller: _addressController,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: '0x... wallet address',
+                ),
+              ),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  FilledButton(
-                    onPressed: _isConnecting ? null : () => _connectWallet(walletId: 'metamask'),
-                    child: Text(_isConnecting ? 'Connecting…' : 'Connect MetaMask'),
+                  FilledButton.icon(
+                    onPressed: _saveWalletAddress,
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Save address'),
                   ),
-                  OutlinedButton(
-                    onPressed: _isConnecting ? null : () => _connectWallet(walletId: 'phantom'),
-                    child: const Text('Connect Phantom (EVM)'),
-                  ),
-                  OutlinedButton(
-                    onPressed: _isConnecting ? null : () => _connectWallet(walletId: 'coinbase'),
-                    child: const Text('Connect Coinbase Wallet'),
-                  ),
-                  OutlinedButton(
-                    onPressed: _isConnecting ? null : () => _connectWallet(),
-                    child: const Text('Connect detected wallet'),
+                  OutlinedButton.icon(
+                    onPressed: _clearWalletAddress,
+                    icon: const Icon(Icons.clear_outlined),
+                    label: const Text('Clear saved address'),
                   ),
                 ],
               ),
-              if (!connector.isAvailable) ...[
-                const SizedBox(height: 8),
-                Text(_missingWalletMessage()),
-              ],
-              if (_connectionMessage != null) ...[
-                const SizedBox(height: 8),
-                Text(_connectionMessage!),
-              ],
               const SizedBox(height: 8),
-              SelectableText('Connected wallet: ${wallet ?? 'Disconnected'}'),
+              SelectableText('Current value: ${wallet?.trim().isNotEmpty == true ? wallet : 'None saved'}'),
+              if (_message != null) ...[
+                const SizedBox(height: 8),
+                Text(_message!),
+              ],
             ],
           ),
-        ),
-        const SizedBox(height: 12),
-        snapshot.when(
-          data: (value) {
-            if (value == null) return const AppCard(child: Text('Connect wallet from onboarding or paste wallet there to load on-chain tree artwork.'));
-            if (value.tokens.isEmpty) {
-              return AppCard(child: Text(value.hasNft ? 'NFT found but no SVG render path was available.' : 'No NFT owned yet.'));
-            }
-
-            return AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('NFTs in wallet: ${value.tokens.length}'),
-                  const SizedBox(height: 12),
-                  ...value.tokens.map((token) {
-                    final svg = token.artwork?.svgMarkup;
-                    if (svg == null) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text('Token #${token.tokenId} found but no SVG render path was available.'),
-                      );
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Token #${token.tokenId}'),
-                          const SizedBox(height: 8),
-                          Center(child: SvgPicture.string(svg, height: 240)),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            );
-          },
-          error: (error, _) => AppCard(child: Text('Could not read NFT from contract: $error')),
-          loading: () => const AppCard(child: LinearProgressIndicator()),
         ),
       ],
     );
   }
 
-  Future<void> _connectWallet({String? walletId}) async {
-    final connector = ref.read(walletConnectorProvider);
-    if (!connector.isAvailable) {
-      setState(() {
-        _connectionMessage = _missingWalletMessage();
-      });
-      return;
-    }
-
-    if (walletId != null && !connector.isWalletInstalled(walletId)) {
-      if (connector.isMobileBrowser) {
-        await connector.launchWalletApp(walletId: walletId, dappUri: Uri.base);
-      }
-      setState(() {
-        _connectionMessage = _walletNotDetectedMessage(walletId, connector.isMobileBrowser);
-      });
-      return;
-    }
-
+  Future<void> _saveWalletAddress() async {
+    final value = _addressController.text.trim();
+    final store = await ref.read(identityStoreProvider.future);
+    await store.setWalletSessionAddress(value.isEmpty ? null : value);
+    ref.read(walletAddressProvider.notifier).state = value.isEmpty ? null : value;
+    if (!mounted) return;
     setState(() {
-      _isConnecting = true;
-      _connectionMessage = null;
+      _message = value.isEmpty ? 'Cleared wallet address.' : 'Wallet address saved.';
     });
-
-    try {
-      final account = await connector.connectWallet(walletId: walletId);
-      _attachWalletListeners();
-      ref.read(walletAddressProvider.notifier).state = account;
-      final config = ref.read(perbugContractConfigProvider);
-      final activeChain = await connector.readChainId(walletId: walletId);
-      if (activeChain != config.chainId) {
-        final switched = await connector.switchChain(
-          chainId: config.chainId,
-          chainName: config.networkName,
-          rpcUrl: config.rpcUrl,
-          nativeCurrencySymbol: config.nativeSymbol,
-          explorerUrl: config.explorerBaseUrl,
-          walletId: walletId,
-        );
-        final nextChain = await connector.readChainId(walletId: walletId);
-        setState(() {
-          _connectionMessage = switched
-              ? 'Connected: $account • switched to ${config.networkName} (chain $nextChain)'
-              : 'Connected: $account • wrong network (chain $activeChain). Switch to ${config.networkName}.';
-        });
-        return;
-      }
-      setState(() {
-        _connectionMessage = 'Connected: $account • ${config.networkName}';
-      });
-    } catch (error) {
-      setState(() {
-        _connectionMessage = 'Wallet connection failed: $error';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isConnecting = false;
-        });
-      }
-    }
   }
 
-  void _attachWalletListeners() {
-    final connector = ref.read(walletConnectorProvider);
-    connector.attachSessionListeners(
-      onAccountChanged: (account) {
-        ref.read(walletAddressProvider.notifier).state = account;
-        if (!mounted) return;
-        setState(() {
-          _connectionMessage = account == null ? 'Wallet disconnected.' : 'Active account: $account';
-        });
-      },
-      onChainChanged: (chainId) {
-        final expectedChain = ref.read(perbugContractConfigProvider).chainId;
-        if (!mounted) return;
-        setState(() {
-          _connectionMessage = chainId == expectedChain
-              ? 'Connected to expected network (chain $chainId).'
-              : 'Wrong network detected (chain $chainId). Switch to chain $expectedChain.';
-        });
-      },
-      onDisconnected: (reason) {
-        ref.read(walletAddressProvider.notifier).state = null;
-        if (!mounted) return;
-        setState(() {
-          _connectionMessage = 'Wallet disconnected: $reason';
-        });
-      },
-    );
-  }
-
-  String _missingWalletMessage() {
-    final connector = ref.read(walletConnectorProvider);
-    if (connector.isMobileBrowser) {
-      return 'No injected wallet was detected in this mobile browser. Open app.perbug.com inside MetaMask, Phantom, or Coinbase Wallet in-app browser and reconnect.';
-    }
-    return 'No wallet provider detected in this browser. Install MetaMask, Phantom EVM, or Coinbase Wallet extension and refresh.';
-  }
-
-  String _walletNotDetectedMessage(String walletId, bool isMobileBrowser) {
-    if (isMobileBrowser) {
-      return '$walletId is not injected in this mobile browser. If the app is installed, launch app.perbug.com from that wallet app browser.';
-    }
-    return '$walletId is not installed in this browser.';
+  Future<void> _clearWalletAddress() async {
+    _addressController.clear();
+    await _saveWalletAddress();
   }
 }

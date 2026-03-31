@@ -17,7 +17,6 @@ class PerbugCreatorPage extends ConsumerStatefulWidget {
 }
 
 class _PerbugCreatorPageState extends ConsumerState<PerbugCreatorPage> {
-  bool _sendingTip = false;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +35,7 @@ class _PerbugCreatorPageState extends ConsumerState<PerbugCreatorPage> {
         children: [
           const PremiumHeader(
             title: 'Creator',
-            subtitle: 'Creator identity now lives through trees: media, support, and wallet-backed care in one profile.',
+            subtitle: 'Creator identity now lives through trees, media, and a saved wallet address in one profile.',
             badge: AppPill(label: 'Creator tree identity', icon: Icons.person_outline),
           ),
           const SizedBox(height: 12),
@@ -49,28 +48,17 @@ class _PerbugCreatorPageState extends ConsumerState<PerbugCreatorPage> {
                 const SizedBox(height: 4),
                 SelectableText(wallet ?? 'Disconnected'),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _sendingTip ? null : () => _sendDirectTip(wallet),
-                      icon: const Icon(Icons.currency_exchange),
-                      label: Text(_sendingTip ? 'Sending…' : 'Send ETH directly'),
+                OutlinedButton.icon(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    showDragHandle: true,
+                    builder: (_) => const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: PerbugWalletPage(),
                     ),
-                    OutlinedButton.icon(
-                      onPressed: () => showModalBottomSheet<void>(
-                        context: context,
-                        showDragHandle: true,
-                        builder: (_) => const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: PerbugWalletPage(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.account_balance_wallet_outlined),
-                      label: const Text('Wallet + network'),
-                    ),
-                  ],
+                  ),
+                  icon: const Icon(Icons.account_balance_wallet_outlined),
+                  label: const Text('Manage saved address'),
                 ),
               ],
             ),
@@ -145,18 +133,6 @@ class _PerbugCreatorPageState extends ConsumerState<PerbugCreatorPage> {
         ],
       ),
     );
-  }
-
-  Future<void> _sendDirectTip(String? wallet) async {
-    if (wallet == null || wallet.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connect wallet before sending ETH support.')));
-      return;
-    }
-    setState(() => _sendingTip = true);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    setState(() => _sendingTip = false);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Direct ETH support intent prepared. Confirm in your wallet.')));
   }
 
   List<_CreatorSummary> _creatorSummary(List<PerbugTree> trees) {
