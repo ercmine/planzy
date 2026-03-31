@@ -42,7 +42,7 @@ class _LocationClaimMapPageState extends ConsumerState<LocationClaimMapPage> {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final state = ref.watch(locationClaimControllerProvider);
     final controller = ref.read(locationClaimControllerProvider.notifier);
     final center = state.currentPosition == null
