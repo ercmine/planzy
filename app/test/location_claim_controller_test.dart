@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('claim requires ad completion and debits global lifetime pool', () async {
+  test('claim is instant in-range and debits global lifetime pool', () async {
     final container = ProviderContainer(overrides: buildTestOverrides());
     addTearDown(container.dispose);
 
@@ -14,20 +14,18 @@ void main() {
     final state = container.read(locationClaimControllerProvider);
     final inRange = state.claimables.firstWhere((c) => c.flowState == ClaimFlowState.visited);
 
-    controller.prepareClaim(inRange.location.id);
-    final afterPrepare = container.read(locationClaimControllerProvider).claimables.firstWhere((c) => c.location.id == inRange.location.id);
-    expect(afterPrepare.flowState, ClaimFlowState.adRequired);
-
-    controller.completeInterstitialAd(inRange.location.id, success: true);
-    controller.finalizeClaim(inRange.location.id);
+    controller.claimInstantly(inRange.location.id);
 
     final updated = container.read(locationClaimControllerProvider);
     expect(updated.balance, 1);
     expect(updated.globalPool.totalClaimedSupply, 1);
     expect(updated.globalPool.remainingClaimableSupply, 399999999);
+    final claimed = updated.claimables.firstWhere((c) => c.location.id == inRange.location.id);
+    expect(claimed.flowState, ClaimFlowState.cooldown);
+    expect(claimed.cooldownUntil, isNotNull);
   });
 
-  test('location reward halves every successful claim', () async {
+  test('location reward halves every successful claim after cooldown reset', () async {
     final container = ProviderContainer(overrides: buildTestOverrides());
     addTearDown(container.dispose);
 
@@ -41,9 +39,7 @@ void main() {
         .location
         .id;
 
-    controller.prepareClaim(locationId);
-    controller.completeInterstitialAd(locationId, success: true);
-    controller.finalizeClaim(locationId);
+    controller.claimInstantly(locationId);
 
     await controller.startTracking();
 
@@ -52,9 +48,8 @@ void main() {
     expect(afterFirst.currentReward, 0.5);
     expect(afterFirst.totalClaimedAtLocation, 1);
 
-    controller.prepareClaim(locationId);
-    controller.completeInterstitialAd(locationId, success: true);
-    controller.finalizeClaim(locationId);
+    controller.debugExpireCooldownForTesting(locationId);
+    controller.claimInstantly(locationId);
     await controller.startTracking();
 
     final afterSecond = container.read(locationClaimControllerProvider).claimables.firstWhere((c) => c.location.id == locationId);
@@ -79,9 +74,7 @@ void main() {
 
     controller.debugSetGlobalClaimedSupplyForTesting(399999999.25);
 
-    controller.prepareClaim(locationId);
-    controller.completeInterstitialAd(locationId, success: true);
-    controller.finalizeClaim(locationId);
+    controller.claimInstantly(locationId);
 
     final updated = container.read(locationClaimControllerProvider);
     expect(updated.balance, 0.75);
@@ -102,10 +95,8 @@ void main() {
         .location
         .id;
 
-    controller.prepareClaim(locationId);
-    controller.completeInterstitialAd(locationId, success: true);
-    controller.finalizeClaim(locationId);
-    controller.finalizeClaim(locationId);
+    controller.claimInstantly(locationId);
+    controller.claimInstantly(locationId);
 
     final updated = container.read(locationClaimControllerProvider);
     expect(updated.globalPool.totalClaimedSupply, 1);

@@ -20,6 +20,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   }
 
   static const double _minimumReward = 0.000001;
+  static const Duration _claimCooldown = Duration(hours: 24);
 
   final Ref _ref;
   final Map<String, String> _displayNameCache = <String, String>{};
@@ -109,7 +110,13 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       final distance = position == null ? 999999.0 : _distanceMeters(position.lat, position.lng, location.lat, location.lng);
 
       final rangeState = _rangeFlowState(location: location, distance: distance);
-      final flowState = existing == null || existing.flowState == ClaimFlowState.claimSuccess ? rangeState : existing.flowState;
+      final now = DateTime.now().toUtc();
+      final isOnCooldown = existing?.cooldownUntil != null && existing!.cooldownUntil!.isAfter(now);
+      final flowState = isOnCooldown
+          ? ClaimFlowState.cooldown
+          : existing == null || existing.flowState == ClaimFlowState.claimSuccess || existing.flowState == ClaimFlowState.cooldown
+              ? rangeState
+              : existing.flowState;
       return ClaimableLocationView(
         location: location,
         distanceMeters: distance,
@@ -119,6 +126,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         totalClaimedAtLocation: existing?.totalClaimedAtLocation ?? 0,
         uniqueVisitors: existing?.uniqueVisitors ?? 0,
         isDepleted: existing?.isDepleted ?? false,
+        cooldownUntil: existing?.cooldownUntil,
       );
     }).toList(growable: false)
       ..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
@@ -131,7 +139,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       claimables: claimables,
       banner: firstVisited == null
           ? null
-          : 'You visited ${firstVisited.location.displayName}. Watch ad to claim ${firstVisited.currentReward.toStringAsFixed(6)} Perbug.',
+          : 'You visited ${firstVisited.location.displayName}. Tap node to claim ${firstVisited.currentReward.toStringAsFixed(6)} Perbug.',
       clearBanner: firstVisited == null,
     );
   }
@@ -158,7 +166,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       _setFlow(locationId, ClaimFlowState.unavailable, banner: 'Location reward is fully depleted.');
       return;
     }
-    _setFlow(locationId, ClaimFlowState.adRequired, banner: 'Watch ad to claim Perbug.');
+    _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Claim is ready.');
   }
 
   void completeInterstitialAd(String locationId, {required bool success}) {
@@ -172,11 +180,16 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   void finalizeClaim(String locationId) {
     final entry = _findExistingClaimable(locationId);
     if (entry == null) return;
-    if (entry.flowState == ClaimFlowState.claimSuccess || entry.flowState == ClaimFlowState.alreadyClaimed) {
+    if (entry.flowState == ClaimFlowState.claimSuccess || entry.flowState == ClaimFlowState.alreadyClaimed || entry.flowState == ClaimFlowState.cooldown) {
+      final cooldownUntil = entry.cooldownUntil;
+      if (cooldownUntil != null && cooldownUntil.isAfter(DateTime.now().toUtc())) {
+        _setFlow(locationId, ClaimFlowState.cooldown, banner: 'Node cooling down until ${cooldownUntil.toLocal()}.');
+        return;
+      }
       _setFlow(locationId, ClaimFlowState.alreadyClaimed, banner: 'This location was already claimed in this session.');
       return;
     }
-    if (entry.flowState != ClaimFlowState.claimReady) return;
+    if (entry.flowState != ClaimFlowState.claimReady && entry.flowState != ClaimFlowState.visited) return;
 
     final remaining = state.globalPool.remainingClaimableSupply;
     if (remaining <= 0) {
@@ -196,17 +209,19 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
     final nextClaimCount = entry.claimCount + 1;
     final nextReward = _locationReward(nextClaimCount);
     final locationDepleted = nextReward < _minimumReward;
+    final cooldownUntil = DateTime.now().toUtc().add(_claimCooldown);
 
     final updatedClaimables = state.claimables
         .map(
           (c) => c.location.id == locationId
               ? c.copyWith(
-                  flowState: ClaimFlowState.claimSuccess,
+                  flowState: ClaimFlowState.cooldown,
                   claimCount: nextClaimCount,
                   currentReward: nextReward,
                   totalClaimedAtLocation: c.totalClaimedAtLocation + payout,
                   uniqueVisitors: c.uniqueVisitors + 1,
                   isDepleted: locationDepleted,
+                  cooldownUntil: cooldownUntil,
                 )
               : c,
         )
@@ -227,8 +242,27 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         ),
         ...state.claimHistory,
       ],
-      banner: 'Claim successful +${payout.toStringAsFixed(6)} Perbug',
+      banner: 'Claim successful +${payout.toStringAsFixed(6)} Perbug. Next claim in 24h.',
     );
+  }
+
+  void claimInstantly(String locationId) {
+    final entry = _findExistingClaimable(locationId);
+    if (entry == null) return;
+    if (!entry.inRange) {
+      _setFlow(locationId, ClaimFlowState.outOfRange, banner: 'Move closer to claim this node.');
+      return;
+    }
+    if (entry.isOnCooldown) {
+      _setFlow(locationId, ClaimFlowState.cooldown, banner: 'Node is cooling down. Try again later.');
+      return;
+    }
+    if (entry.isDepleted || entry.currentReward < _minimumReward) {
+      _setFlow(locationId, ClaimFlowState.unavailable, banner: 'Location reward is fully depleted.');
+      return;
+    }
+    _setFlow(locationId, ClaimFlowState.claimReady);
+    finalizeClaim(locationId);
   }
 
 
@@ -236,6 +270,20 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
     state = state.copyWith(
       globalPool: state.globalPool.copyWith(totalClaimedSupply: totalClaimedSupply),
     );
+  }
+
+  void debugExpireCooldownForTesting(String locationId) {
+    final next = state.claimables
+        .map(
+          (entry) => entry.location.id == locationId
+              ? entry.copyWith(
+                  flowState: ClaimFlowState.visited,
+                  cooldownUntil: DateTime.now().toUtc().subtract(const Duration(seconds: 1)),
+                )
+              : entry,
+        )
+        .toList(growable: false);
+    state = state.copyWith(claimables: next);
   }
 
   void _setFlow(String locationId, ClaimFlowState flow, {String? banner}) {

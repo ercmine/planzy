@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -48,6 +50,10 @@ class _LocationClaimMapPageState extends ConsumerState<LocationClaimMapPage> {
     final center = state.currentPosition == null
         ? const LatLng(37.7749, -122.4194)
         : LatLng(state.currentPosition!.lat, state.currentPosition!.lng);
+    final latestClaim = state.claimHistory.isEmpty ? null : state.claimHistory.first;
+    final claimFxLocationId = latestClaim != null && DateTime.now().toUtc().difference(latestClaim.createdAt) < const Duration(seconds: 2)
+        ? latestClaim.locationId
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,7 +116,11 @@ class _LocationClaimMapPageState extends ConsumerState<LocationClaimMapPage> {
                           height: 56,
                           child: Tooltip(
                             message: '${item.location.displayName}\nClaimable ${item.currentReward.toStringAsFixed(6)} Ⓟ',
-                            child: _MapNodeMarker(item: item),
+                            child: _MapNodeMarker(
+                              item: item,
+                              showClaimEffect: claimFxLocationId == item.location.id,
+                              onTap: () => controller.claimInstantly(item.location.id),
+                            ),
                           ),
                         ),
                       )
@@ -159,34 +169,123 @@ class _LocationClaimMapPageState extends ConsumerState<LocationClaimMapPage> {
 }
 
 class _MapNodeMarker extends StatelessWidget {
-  const _MapNodeMarker({required this.item});
+  const _MapNodeMarker({
+    required this.item,
+    required this.showClaimEffect,
+    required this.onTap,
+  });
 
   final ClaimableLocationView item;
+  final bool showClaimEffect;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final disabled = item.flowState == ClaimFlowState.unavailable;
-    final color = disabled ? Colors.grey.shade500 : const Color(0xFF34D399);
+    final onCooldown = item.flowState == ClaimFlowState.cooldown && item.isOnCooldown;
+    final color = disabled
+        ? Colors.grey.shade500
+        : onCooldown
+            ? const Color(0xFF94A3B8)
+            : const Color(0xFF34D399);
+    final timerLabel = onCooldown ? _cooldownLabel(item.cooldownUntil!) : '${item.currentReward.toStringAsFixed(4)} Ⓟ';
 
-    return Center(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.72),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: color, width: 1.4),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Text(
-            '${item.currentReward.toStringAsFixed(4)} Ⓟ',
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Center(
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            if (showClaimEffect) const _ClaimParticleBurst(),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.72),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: color, width: 1.4),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Text(
+                  timerLabel,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
+    );
+  }
+
+  String _cooldownLabel(DateTime cooldownUntil) {
+    final remaining = cooldownUntil.difference(DateTime.now().toUtc());
+    if (remaining.isNegative) return '${item.currentReward.toStringAsFixed(4)} Ⓟ';
+    final hours = remaining.inHours;
+    final minutes = remaining.inMinutes.remainder(60);
+    return '${hours}h ${minutes}m';
+  }
+}
+
+class _ClaimParticleBurst extends StatefulWidget {
+  const _ClaimParticleBurst();
+
+  @override
+  State<_ClaimParticleBurst> createState() => _ClaimParticleBurstState();
+}
+
+class _ClaimParticleBurstState extends State<_ClaimParticleBurst> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final progress = Curves.easeOut.transform(_controller.value);
+        final fade = (1 - _controller.value).clamp(0.0, 1.0);
+        return IgnorePointer(
+          child: SizedBox(
+            width: 72,
+            height: 72,
+            child: Stack(
+              alignment: Alignment.center,
+              children: List<Widget>.generate(8, (index) {
+                final angle = (index / 8) * 6.28318530718;
+                final radius = 10 + (18 * progress);
+                return Transform.translate(
+                  offset: Offset(radius * math.cos(angle), radius * math.sin(angle)),
+                  child: Opacity(
+                    opacity: fade,
+                    child: Container(
+                      width: 5,
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF34D399),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        );
+      },
     );
   }
 }

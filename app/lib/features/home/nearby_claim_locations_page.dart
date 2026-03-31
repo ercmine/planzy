@@ -66,12 +66,22 @@ class _ClaimActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cooldownLabel = item.cooldownUntil == null
+        ? null
+        : _formatRemaining(item.cooldownUntil!);
     return switch (item.flowState) {
-      ClaimFlowState.visited => FilledButton(onPressed: () => controller.prepareClaim(item.location.id), child: const Text('Claim')),
-      ClaimFlowState.adRequired => FilledButton(onPressed: () => controller.completeInterstitialAd(item.location.id, success: true), child: const Text('Watch ad')),
-      ClaimFlowState.claimReady => FilledButton(onPressed: () => controller.finalizeClaim(item.location.id), child: const Text('Finalize')),
+      ClaimFlowState.visited || ClaimFlowState.claimReady => FilledButton(onPressed: () => controller.claimInstantly(item.location.id), child: const Text('Claim')),
+      ClaimFlowState.cooldown => Chip(label: Text(cooldownLabel == null ? 'Cooldown' : 'Cooldown $cooldownLabel')),
       ClaimFlowState.claimSuccess => const Chip(label: Text('Claimed')),
       _ => const Chip(label: Text('Move closer')),
     };
+  }
+
+  String _formatRemaining(DateTime cooldownUntil) {
+    final remaining = cooldownUntil.difference(DateTime.now().toUtc());
+    if (remaining.isNegative) return 'done';
+    final h = remaining.inHours;
+    final m = remaining.inMinutes.remainder(60);
+    return '${h}h ${m}m';
   }
 }
