@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PERBUG_CLAIM_RADIUS_METERS } from "../constants.js";
 import { PerbugMarketplaceService } from "../service.js";
 describe("PerbugMarketplaceService", () => {
     it("treats trees without an assigned place as dug up and replantable", () => {
@@ -78,5 +79,23 @@ describe("PerbugMarketplaceService", () => {
         const world = service.worldSnapshot();
         expect(world.trendingTreeIds.length).toBeGreaterThan(0);
         expect(world.creatorProfiles.length).toBeGreaterThan(0);
+    });
+    it("enforces 500m planting eligibility boundary", () => {
+        const service = new PerbugMarketplaceService();
+        const wallet = "0x7777777777777777777777777777777777777777";
+        const placeId = "spot-claim";
+        const inRange = service.evaluatePlantEligibility({
+            wallet,
+            placeId,
+            distanceMeters: PERBUG_CLAIM_RADIUS_METERS,
+        });
+        const outOfRange = service.evaluatePlantEligibility({
+            wallet,
+            placeId,
+            distanceMeters: PERBUG_CLAIM_RADIUS_METERS + 0.01,
+        });
+        expect(inRange.eligible).toBe(true);
+        expect(inRange.maxDistanceMeters).toBe(PERBUG_CLAIM_RADIUS_METERS);
+        expect(outOfRange.eligible).toBe(false);
     });
 });

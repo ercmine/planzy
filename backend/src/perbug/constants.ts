@@ -1,0 +1,1 @@
+export const PERBUG_CLAIM_RADIUS_METERS = 500;

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ValidationError } from "../plans/errors.js";
+import { DEFAULT_CLAIM_RADIUS_METERS } from "./constants.js";
 const YEARLY_ALLOCATION = 10000000n;
 const PERBUG_PRECISION_SCALE = 1000000n;
 const DEFAULT_DEPLETION_THRESHOLD = 1000n; // 0.001 Perbug
@@ -23,8 +24,12 @@ function normalizeLocation(input) {
     const claimCount = 0;
     const currentRewardAtomic = halvedRewardAtomic(claimCount);
     const depletionThresholdAtomic = input.depletionThresholdAtomic ?? DEFAULT_DEPLETION_THRESHOLD;
+    const normalizedClaimRadius = typeof input.claimRadiusMeters === "number" && Number.isFinite(input.claimRadiusMeters) && input.claimRadiusMeters > 0
+        ? input.claimRadiusMeters
+        : DEFAULT_CLAIM_RADIUS_METERS;
     return {
         ...input,
+        claimRadiusMeters: normalizedClaimRadius,
         rewardPerClaim: PERBUG_PRECISION_SCALE,
         claimCount,
         currentRewardAtomic,

@@ -2,7 +2,8 @@ import type { AdGateRecord, AnnualEmissionPool, ClaimableLocation, FinalizedClai
 export declare class LocationClaimsService {
     private readonly store;
     constructor(store: LocationClaimsStore);
-    upsertLocation(input: Omit<ClaimableLocation, "rewardPerClaim" | "claimCount" | "currentRewardAtomic" | "currentReward" | "totalClaimedAtomic" | "totalClaimed" | "uniqueVisitors" | "totalVisitors" | "totalClaims" | "isDepleted" | "depletionThreshold" | "claimHistory" | "visitorUserIds"> & {
+    upsertLocation(input: Omit<ClaimableLocation, "rewardPerClaim" | "claimCount" | "currentRewardAtomic" | "currentReward" | "totalClaimedAtomic" | "totalClaimed" | "uniqueVisitors" | "totalVisitors" | "totalClaims" | "isDepleted" | "depletionThresholdAtomic" | "depletionThreshold" | "claimHistory" | "visitorUserIds" | "claimRadiusMeters"> & {
+        claimRadiusMeters?: number;
         rewardPerClaim?: bigint | number;
         depletionThresholdAtomic?: bigint | number;
     }): ClaimableLocation;

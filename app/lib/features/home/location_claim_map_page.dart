@@ -126,6 +126,20 @@ class _LocationClaimMapPageState extends ConsumerState<LocationClaimMapPage> {
                       )
                       .toList(growable: false),
                 ),
+                CircleLayer(
+                  circles: state.claimables
+                      .map(
+                        (item) => CircleMarker(
+                          point: LatLng(item.location.lat, item.location.lng),
+                          radius: item.location.claimRadiusMeters,
+                          useRadiusInMeter: true,
+                          color: item.inRange ? const Color(0x2234D399) : const Color(0x1F94A3B8),
+                          borderColor: item.inRange ? const Color(0xAA34D399) : const Color(0x8894A3B8),
+                          borderStrokeWidth: 1.2,
+                        ),
+                      )
+                      .toList(growable: false),
+                ),
                 if (state.currentPosition != null)
                   MarkerLayer(
                     markers: [

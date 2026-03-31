@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { DEFAULT_CLAIM_RADIUS_METERS } from "../constants.js";
 import { MemoryLocationClaimsStore } from "../memoryStore.js";
 import { LocationClaimsService } from "../service.js";
 
@@ -10,7 +11,7 @@ function seed(service: LocationClaimsService, depletionThresholdAtomic = 1_000n)
     lng: -97.7431,
     displayName: "Congress Ave",
     category: "landmark",
-    claimRadiusMeters: 120,
+    claimRadiusMeters: DEFAULT_CLAIM_RADIUS_METERS,
     state: "available",
     cooldownSeconds: 3600,
     depletionThresholdAtomic
@@ -135,5 +136,49 @@ describe("LocationClaimsService", () => {
     expect(second.id).toBe(first.id);
 
     expect(() => claim(service, "u1", "new")).toThrow();
+  });
+
+  test("defaults to 500m when claim radius is not provided", () => {
+    const service = new LocationClaimsService(new MemoryLocationClaimsStore());
+    service.upsertLocation({
+      id: "loc_default",
+      lat: 30.2672,
+      lng: -97.7431,
+      displayName: "Default Radius",
+      category: "landmark",
+      state: "available",
+      cooldownSeconds: 3600,
+    });
+
+    const nearby = service.listNearbyClaimables({ userId: "u1", lat: 30.2672, lng: -97.7431 });
+    expect(nearby[0]?.location.claimRadiusMeters).toBe(DEFAULT_CLAIM_RADIUS_METERS);
+    expect(nearby[0]?.inRange).toBe(true);
+  });
+
+  test("uses 500m claim radius boundary for in-range and out-of-range checks", () => {
+    const service = new LocationClaimsService(new MemoryLocationClaimsStore());
+    seed(service);
+
+    const metersToLat = (meters: number) => meters / 111_139;
+    const boundaryLat = 30.2672 + metersToLat(DEFAULT_CLAIM_RADIUS_METERS - 1);
+    const outOfRangeLat = 30.2672 + metersToLat(DEFAULT_CLAIM_RADIUS_METERS + 8);
+
+    const boundaryVisit = service.registerVisit({
+      userId: "u-boundary",
+      locationId: "loc_1",
+      lat: boundaryLat,
+      lng: -97.7431,
+      accuracyMeters: 10,
+    });
+    expect(boundaryVisit.state).toBe("in_range");
+
+    const farVisit = service.registerVisit({
+      userId: "u-far",
+      locationId: "loc_1",
+      lat: outOfRangeLat,
+      lng: -97.7431,
+      accuracyMeters: 10,
+    });
+    expect(farVisit.state).toBe("approaching");
   });
 });
