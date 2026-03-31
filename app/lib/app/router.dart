@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../core/identity/identity_provider.dart';
 import '../features/auth/perbug_learn_more_page.dart';
-import '../features/auth/perbug_wallet_entry_page.dart';
 import '../features/perbug/chain/perbug_chain_providers.dart';
 import '../features/home/home_page.dart';
 import '../features/home/perbug_map_debug_page.dart';
@@ -54,7 +53,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final refreshListenable = ref.watch(authGateProvider);
 
   return GoRouter(
-    initialLocation: AppRoutes.entry,
+    initialLocation: AppRoutes.liveMap,
     errorBuilder: (context, state) => PerbugRecoveryPage(
       title: 'Route recovery mode',
       message: 'Could not open "${state.uri.path}". Use one of the safe routes below.',
@@ -70,7 +69,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       );
     },
     routes: [
-      GoRoute(path: AppRoutes.entry, name: 'entry', builder: (context, state) => const PerbugWalletEntryPage()),
+      GoRoute(path: AppRoutes.entry, name: 'entry', builder: (context, state) => const HomePage(initialTab: HomeTab.world)),
       GoRoute(path: AppRoutes.home, name: 'home', builder: (context, state) => const HomePage(initialTab: HomeTab.world)),
       GoRoute(path: AppRoutes.liveMap, name: 'live-map', builder: (context, state) => const HomePage(initialTab: HomeTab.world)),
       GoRoute(path: AppRoutes.world, name: 'world', builder: (context, state) => const HomePage(initialTab: HomeTab.world)),
