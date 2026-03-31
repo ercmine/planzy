@@ -17,12 +17,14 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
     }, fireImmediately: true);
   }
 
+  static const double _minimumReward = 0.000001;
+
   final Ref _ref;
 
   final List<ClaimableLocation> _seedLocations = const [
-    ClaimableLocation(id: 'loc-1', lat: 30.2672, lng: -97.7431, displayName: 'Congress Avenue Bat Bridge', category: 'landmark', claimRadiusMeters: 120, rewardAmount: 150),
-    ClaimableLocation(id: 'loc-2', lat: 30.2648, lng: -97.7468, displayName: 'Lady Bird Lake Boardwalk', category: 'park', claimRadiusMeters: 90, rewardAmount: 120),
-    ClaimableLocation(id: 'loc-3', lat: 30.2707, lng: -97.7501, displayName: 'Downtown Art Wall', category: 'art', claimRadiusMeters: 80, rewardAmount: 200),
+    ClaimableLocation(id: 'loc-1', lat: 30.2672, lng: -97.7431, displayName: 'Congress Avenue Bat Bridge', category: 'landmark', claimRadiusMeters: 120),
+    ClaimableLocation(id: 'loc-2', lat: 30.2648, lng: -97.7468, displayName: 'Lady Bird Lake Boardwalk', category: 'park', claimRadiusMeters: 90),
+    ClaimableLocation(id: 'loc-3', lat: 30.2707, lng: -97.7501, displayName: 'Downtown Art Wall', category: 'art', claimRadiusMeters: 80),
   ];
 
   Future<void> startTracking() async {
@@ -33,16 +35,21 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   void _onLocationState(LocationControllerState locationState) {
     final position = locationState.effectiveLocation;
     final claimables = _seedLocations.map((location) {
+      final existing = _findExistingClaimable(location.id);
       final distance = position == null ? 999999.0 : _distanceMeters(position.lat, position.lng, location.lat, location.lng);
-      ClaimFlowState flowState;
-      if (distance <= location.claimRadiusMeters) {
-        flowState = ClaimFlowState.visited;
-      } else if (distance <= location.claimRadiusMeters * 2.0) {
-        flowState = ClaimFlowState.approaching;
-      } else {
-        flowState = ClaimFlowState.outOfRange;
-      }
-      return ClaimableLocationView(location: location, distanceMeters: distance, flowState: flowState);
+
+      final rangeState = _rangeFlowState(location: location, distance: distance);
+      final flowState = existing == null || existing.flowState == ClaimFlowState.claimSuccess ? rangeState : existing.flowState;
+      return ClaimableLocationView(
+        location: location,
+        distanceMeters: distance,
+        flowState: flowState,
+        claimCount: existing?.claimCount ?? 0,
+        currentReward: existing?.currentReward ?? 1,
+        totalClaimedAtLocation: existing?.totalClaimedAtLocation ?? 0,
+        uniqueVisitors: existing?.uniqueVisitors ?? 0,
+        isDepleted: existing?.isDepleted ?? false,
+      );
     }).toList(growable: false)
       ..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
 
@@ -52,12 +59,35 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       permissionStatus: locationState.status,
       currentPosition: position,
       claimables: claimables,
-      banner: firstVisited == null ? null : 'You visited ${firstVisited.location.displayName}. Watch ad to claim ${firstVisited.location.rewardAmount} Perbug.',
+      banner: firstVisited == null
+          ? null
+          : 'You visited ${firstVisited.location.displayName}. Watch ad to claim ${firstVisited.currentReward.toStringAsFixed(6)} Perbug.',
       clearBanner: firstVisited == null,
     );
   }
 
+  ClaimableLocationView? _findExistingClaimable(String locationId) {
+    final matches = state.claimables.where((entry) => entry.location.id == locationId);
+    return matches.isEmpty ? null : matches.first;
+  }
+
+  ClaimFlowState _rangeFlowState({required ClaimableLocation location, required double distance}) {
+    if (distance <= location.claimRadiusMeters) {
+      return ClaimFlowState.visited;
+    }
+    if (distance <= location.claimRadiusMeters * 2.0) {
+      return ClaimFlowState.approaching;
+    }
+    return ClaimFlowState.outOfRange;
+  }
+
   void prepareClaim(String locationId) {
+    final entry = _findExistingClaimable(locationId);
+    if (entry == null) return;
+    if (entry.isDepleted || entry.currentReward < _minimumReward) {
+      _setFlow(locationId, ClaimFlowState.unavailable, banner: 'Location reward is fully depleted.');
+      return;
+    }
     _setFlow(locationId, ClaimFlowState.adRequired, banner: 'Watch ad to claim Perbug.');
   }
 
@@ -70,24 +100,71 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   }
 
   void finalizeClaim(String locationId) {
-    final matches = state.claimables.where((c) => c.location.id == locationId);
-    if (matches.isEmpty) return;
-    final entry = matches.first;
-    if (entry.flowState != ClaimFlowState.claimReady) return;
-    if (state.pool.available < entry.location.rewardAmount) {
-      state = state.copyWith(banner: 'Emission pool exhausted. Try again next cycle.');
+    final entry = _findExistingClaimable(locationId);
+    if (entry == null) return;
+    if (entry.flowState == ClaimFlowState.claimSuccess || entry.flowState == ClaimFlowState.alreadyClaimed) {
+      _setFlow(locationId, ClaimFlowState.alreadyClaimed, banner: 'This location was already claimed in this session.');
       return;
     }
-    _setFlow(locationId, ClaimFlowState.claimSuccess);
+    if (entry.flowState != ClaimFlowState.claimReady) return;
+
+    final remaining = state.globalPool.remainingClaimableSupply;
+    if (remaining <= 0) {
+      _setFlow(locationId, ClaimFlowState.unavailable, banner: 'Global claimable Perbug supply is exhausted.');
+      return;
+    }
+
+    _setFlow(locationId, ClaimFlowState.claimProcessing);
+
+    final rawReward = _locationReward(entry.claimCount);
+    final payout = math.min(rawReward, remaining);
+    if (payout < _minimumReward) {
+      _setFlow(locationId, ClaimFlowState.unavailable, banner: 'Remaining supply is below minimum claim precision.');
+      return;
+    }
+
+    final nextClaimCount = entry.claimCount + 1;
+    final nextReward = _locationReward(nextClaimCount);
+    final locationDepleted = nextReward < _minimumReward;
+
+    final updatedClaimables = state.claimables
+        .map(
+          (c) => c.location.id == locationId
+              ? c.copyWith(
+                  flowState: ClaimFlowState.claimSuccess,
+                  claimCount: nextClaimCount,
+                  currentReward: nextReward,
+                  totalClaimedAtLocation: c.totalClaimedAtLocation + payout,
+                  uniqueVisitors: c.uniqueVisitors + 1,
+                  isDepleted: locationDepleted,
+                )
+              : c,
+        )
+        .toList(growable: false);
+
     state = state.copyWith(
-      balance: state.balance + entry.location.rewardAmount,
-      pool: AnnualEmissionPoolView(
-        year: state.pool.year,
-        baseAllocation: state.pool.baseAllocation,
-        rollover: state.pool.rollover,
-        claimed: state.pool.claimed + entry.location.rewardAmount,
+      claimables: updatedClaimables,
+      balance: state.balance + payout,
+      globalPool: state.globalPool.copyWith(
+        totalClaimedSupply: state.globalPool.totalClaimedSupply + payout,
       ),
-      banner: 'Claim successful +${entry.location.rewardAmount} Perbug',
+      claimHistory: [
+        ClaimTransaction(
+          locationId: locationId,
+          reward: payout,
+          claimCountAfter: nextClaimCount,
+          createdAt: DateTime.now().toUtc(),
+        ),
+        ...state.claimHistory,
+      ],
+      banner: 'Claim successful +${payout.toStringAsFixed(6)} Perbug',
+    );
+  }
+
+
+  void debugSetGlobalClaimedSupplyForTesting(double totalClaimedSupply) {
+    state = state.copyWith(
+      globalPool: state.globalPool.copyWith(totalClaimedSupply: totalClaimedSupply),
     );
   }
 
@@ -97,6 +174,8 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         .toList(growable: false);
     state = state.copyWith(claimables: next, banner: banner);
   }
+
+  double _locationReward(int claimCount) => 1 / math.pow(2, claimCount);
 
   double _distanceMeters(double lat1, double lng1, double lat2, double lng2) {
     const radius = 6371000.0;

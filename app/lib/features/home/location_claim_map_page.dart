@@ -42,7 +42,7 @@ class LocationClaimMapPage extends ConsumerWidget {
               return Card(
                 child: ListTile(
                   title: Text(item.location.displayName),
-                  subtitle: Text('${item.location.category} • ${(item.distanceMeters).round()}m away • radius ${item.location.claimRadiusMeters.round()}m'),
+                  subtitle: Text('${item.location.category} • ${(item.distanceMeters).round()}m away • radius ${item.location.claimRadiusMeters.round()}m • reward ${item.currentReward.toStringAsFixed(6)}Ⓟ'),
                   trailing: _ClaimActionButton(item: item, controller: controller),
                 ),
               );
