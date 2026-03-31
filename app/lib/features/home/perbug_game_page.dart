@@ -83,7 +83,7 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
     final showBlockingMapOverlay = _shouldShowBlockingMapOverlay(mapUiState);
     final showDemoLocationCta = _shouldShowDemoLocationCta(state: state, locationState: locationState);
     final locationForScene = locationState.effectiveLocation;
-    final signature = '${locationForScene?.latitude.toStringAsFixed(3)}:${locationForScene?.longitude.toStringAsFixed(3)}:${state.nodes.length}:${state.progression.level}';
+    final signature = '${locationForScene?.lat.toStringAsFixed(3)}:${locationForScene?.lng.toStringAsFixed(3)}:${state.nodes.length}:${state.progression.level}';
     if (_lastSceneSignature != signature) {
       _lastSceneSignature = signature;
       _sceneController.regenerate(

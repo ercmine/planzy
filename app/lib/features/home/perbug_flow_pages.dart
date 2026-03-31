@@ -134,7 +134,7 @@ class PerbugSquadPage extends ConsumerWidget {
             _LorePanel(
               title: unit.name,
               subtitle: '${unit.role.name} • ${unit.unitClass.name}',
-              body: 'Lv ${unit.progression.level} • Power ${unit.effectiveStats.powerScore.round()} • ${unit.signatureSkill}',
+              body: 'Lv ${unit.progression.level} • Power ${unit.effectiveStats.powerScore.round()} • ${unit.rarity.name}',
             ),
         ],
       ),
@@ -258,7 +258,7 @@ class PerbugProgressionPage extends ConsumerWidget {
             _LorePanel(
               title: objective.title,
               subtitle: objective.description,
-              body: 'Progress ${objective.progress.current}/${objective.progress.target} • Reward ${objective.reward.upgradeMarks} marks',
+              body: 'Progress ${objective.progress.current}/${objective.progress.target} • Reward ${objective.reward.upgradeCurrency} marks',
             ),
         ],
       ),
