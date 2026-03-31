@@ -80,6 +80,7 @@ flutter:
     - ../perbug_token_family_1024.png
     - ../perbug_token_hud_1024.png
     - ../perbug_warrior_sheet_1024.png
+    - ../generated_assets/nodes/icons/
     - .env.dev
     - .env.stage
     - .env.prod

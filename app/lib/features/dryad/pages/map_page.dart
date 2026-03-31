@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../app/theme/widgets.dart';
 import '../chain/dryad_chain_providers.dart';
@@ -156,15 +158,11 @@ class _TreeAtlasCard extends StatelessWidget {
           Text('Global tree presence', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           SizedBox(
-            height: 190,
-            child: CustomPaint(
-              painter: _AtlasPainter(trees: trees, selectedTreeId: selectedTree.id),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                ),
-              ),
+            height: 220,
+            child: _TreeAtlasMap(
+              trees: trees,
+              selectedTree: selectedTree,
+              onSelect: onSelect,
             ),
           ),
           const SizedBox(height: 8),
@@ -367,42 +365,78 @@ class _Section extends StatelessWidget {
   }
 }
 
-class _AtlasPainter extends CustomPainter {
-  _AtlasPainter({required this.trees, required this.selectedTreeId});
+class _TreeAtlasMap extends StatelessWidget {
+  const _TreeAtlasMap({
+    required this.trees,
+    required this.selectedTree,
+    required this.onSelect,
+  });
 
   final List<DryadTree> trees;
-  final String selectedTreeId;
+  final DryadTree selectedTree;
+  final ValueChanged<DryadTree> onSelect;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final background = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFF081B26), Color(0xFF14373A), Color(0xFF2D4B36)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ).createShader(Offset.zero & size);
-    canvas.drawRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(12)), background);
-
-    final gridPaint = Paint()..color = Colors.white.withOpacity(0.12);
-    for (var i = 1; i < 6; i++) {
-      final dx = size.width * i / 6;
-      final dy = size.height * i / 6;
-      canvas.drawLine(Offset(dx, 0), Offset(dx, size.height), gridPaint);
-      canvas.drawLine(Offset(0, dy), Offset(size.width, dy), gridPaint);
-    }
-
-    for (final tree in trees) {
-      final x = ((tree.longitude + 180) / 360).clamp(0.0, 1.0) * size.width;
-      final y = ((90 - tree.latitude) / 180).clamp(0.0, 1.0) * size.height;
-      final isSelected = tree.id == selectedTreeId;
-      final radius = isSelected ? 7.0 : 4.5;
-      final paint = Paint()..color = isSelected ? const Color(0xFF94F6A7) : Colors.white.withOpacity(0.72);
-      canvas.drawCircle(Offset(x, y), radius, paint);
-    }
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+        child: FlutterMap(
+          options: MapOptions(
+            initialCenter: LatLng(selectedTree.latitude, selectedTree.longitude),
+            initialZoom: 2.2,
+            interactionOptions: const InteractionOptions(flags: InteractiveFlag.drag | InteractiveFlag.pinchZoom),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.perbug.app',
+            ),
+            MarkerLayer(
+              markers: trees.map((tree) {
+                final selected = tree.id == selectedTree.id;
+                return Marker(
+                  point: LatLng(tree.latitude, tree.longitude),
+                  width: selected ? 52 : 42,
+                  height: selected ? 52 : 42,
+                  alignment: Alignment.center,
+                  child: GestureDetector(
+                    onTap: () => onSelect(tree),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected ? Colors.white.withOpacity(0.85) : Colors.black.withOpacity(0.35),
+                        border: Border.all(
+                          color: selected ? const Color(0xFF94F6A7) : Colors.white.withOpacity(0.5),
+                          width: selected ? 2.2 : 1.2,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Image.asset(_treeMarkerAsset(tree), fit: BoxFit.contain),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(growable: false),
+            ),
+          ],
+        ),
+      ),
+    );
   }
+}
 
-  @override
-  bool shouldRepaint(covariant _AtlasPainter oldDelegate) {
-    return oldDelegate.trees != trees || oldDelegate.selectedTreeId != selectedTreeId;
-  }
+String _treeMarkerAsset(DryadTree tree) {
+  if (tree.isListed) return '../generated_assets/nodes/icons/shop.png';
+  if (tree.readyToReplant) return '../generated_assets/nodes/icons/rest.png';
+  return switch (tree.claimState) {
+    TreeClaimState.claimable => '../generated_assets/nodes/icons/resource.png',
+    TreeClaimState.claimed => '../generated_assets/nodes/icons/mission.png',
+    TreeClaimState.planted => '../generated_assets/nodes/icons/encounter.png',
+    TreeClaimState.unavailable => '../generated_assets/nodes/icons/boss.png',
+  };
 }
