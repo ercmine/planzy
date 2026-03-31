@@ -73,7 +73,7 @@ class _ClaimActionButton extends StatelessWidget {
       ClaimFlowState.visited || ClaimFlowState.claimReady => FilledButton(onPressed: () => controller.claimInstantly(item.location.id), child: const Text('Claim')),
       ClaimFlowState.cooldown => Chip(label: Text(cooldownLabel == null ? 'Cooldown' : 'Cooldown $cooldownLabel')),
       ClaimFlowState.claimSuccess => const Chip(label: Text('Claimed')),
-      _ => const Chip(label: Text('Move closer')),
+      _ => Chip(label: Text('Move within ${item.location.claimRadiusMeters.round()}m')),
     };
   }
 

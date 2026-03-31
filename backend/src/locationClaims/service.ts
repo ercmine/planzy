@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { ValidationError } from "../plans/errors.js";
+import { DEFAULT_CLAIM_RADIUS_METERS } from "./constants.js";
 import type {
   AdGateRecord,
   AnnualEmissionPool,
@@ -37,12 +38,16 @@ function halvedRewardAtomic(claimCount: number): bigint {
   return PERBUG_PRECISION_SCALE / (2n ** BigInt(claimCount));
 }
 
-function normalizeLocation(input: Omit<ClaimableLocation, "claimCount" | "currentRewardAtomic" | "currentReward" | "totalClaimedAtomic" | "totalClaimed" | "uniqueVisitors" | "totalVisitors" | "totalClaims" | "isDepleted" | "depletionThresholdAtomic" | "depletionThreshold" | "claimHistory" | "visitorUserIds"> & { rewardPerClaim: bigint; depletionThresholdAtomic?: bigint }): ClaimableLocation {
+function normalizeLocation(input: Omit<ClaimableLocation, "claimCount" | "currentRewardAtomic" | "currentReward" | "totalClaimedAtomic" | "totalClaimed" | "uniqueVisitors" | "totalVisitors" | "totalClaims" | "isDepleted" | "depletionThresholdAtomic" | "depletionThreshold" | "claimHistory" | "visitorUserIds" | "claimRadiusMeters"> & { claimRadiusMeters?: number; rewardPerClaim: bigint; depletionThresholdAtomic?: bigint }): ClaimableLocation {
   const claimCount = 0;
   const currentRewardAtomic = halvedRewardAtomic(claimCount);
   const depletionThresholdAtomic = input.depletionThresholdAtomic ?? DEFAULT_DEPLETION_THRESHOLD;
+  const normalizedClaimRadius = typeof input.claimRadiusMeters === "number" && Number.isFinite(input.claimRadiusMeters) && input.claimRadiusMeters > 0
+    ? input.claimRadiusMeters
+    : DEFAULT_CLAIM_RADIUS_METERS;
   return {
     ...input,
+    claimRadiusMeters: normalizedClaimRadius,
     rewardPerClaim: PERBUG_PRECISION_SCALE,
     claimCount,
     currentRewardAtomic,
@@ -63,7 +68,7 @@ function normalizeLocation(input: Omit<ClaimableLocation, "claimCount" | "curren
 export class LocationClaimsService {
   constructor(private readonly store: LocationClaimsStore) {}
 
-  upsertLocation(input: Omit<ClaimableLocation, "rewardPerClaim" | "claimCount" | "currentRewardAtomic" | "currentReward" | "totalClaimedAtomic" | "totalClaimed" | "uniqueVisitors" | "totalVisitors" | "totalClaims" | "isDepleted" | "depletionThreshold" | "claimHistory" | "visitorUserIds"> & { rewardPerClaim?: bigint | number; depletionThresholdAtomic?: bigint | number }): ClaimableLocation {
+  upsertLocation(input: Omit<ClaimableLocation, "rewardPerClaim" | "claimCount" | "currentRewardAtomic" | "currentReward" | "totalClaimedAtomic" | "totalClaimed" | "uniqueVisitors" | "totalVisitors" | "totalClaims" | "isDepleted" | "depletionThresholdAtomic" | "depletionThreshold" | "claimHistory" | "visitorUserIds" | "claimRadiusMeters"> & { claimRadiusMeters?: number; rewardPerClaim?: bigint | number; depletionThresholdAtomic?: bigint | number }): ClaimableLocation {
     const location = normalizeLocation({
       ...input,
       rewardPerClaim: PERBUG_PRECISION_SCALE,

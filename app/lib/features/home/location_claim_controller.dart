@@ -6,6 +6,7 @@ import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
 import '../../providers/app_providers.dart';
 import 'map_discovery_clients.dart';
+import 'location_claim_constants.dart';
 import 'location_claim_models.dart';
 
 final locationClaimControllerProvider = StateNotifierProvider<LocationClaimController, LocationClaimState>((ref) {
@@ -38,21 +39,21 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         lat: position.lat + 0.0012,
         lng: position.lng,
         category: 'district',
-        claimRadiusMeters: 120,
+        claimRadiusMeters: defaultClaimRadiusMeters,
       ),
       (
         id: 'loc-east',
         lat: position.lat + 0.0002,
         lng: position.lng + 0.0015,
         category: 'hub',
-        claimRadiusMeters: 100,
+        claimRadiusMeters: defaultClaimRadiusMeters,
       ),
       (
         id: 'loc-southwest',
         lat: position.lat - 0.0013,
         lng: position.lng - 0.0011,
         category: 'zone',
-        claimRadiusMeters: 90,
+        claimRadiusMeters: defaultClaimRadiusMeters,
       ),
     ];
 
@@ -250,7 +251,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
     final entry = _findExistingClaimable(locationId);
     if (entry == null) return;
     if (!entry.inRange) {
-      _setFlow(locationId, ClaimFlowState.outOfRange, banner: 'Move closer to claim this node.');
+      _setFlow(locationId, ClaimFlowState.outOfRange, banner: 'Move within ${entry.location.claimRadiusMeters.round()}m to claim this node.');
       return;
     }
     if (entry.isOnCooldown) {

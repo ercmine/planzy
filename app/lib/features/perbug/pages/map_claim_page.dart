@@ -26,7 +26,7 @@ class PerbugMapClaimPage extends StatelessWidget {
             children: const [
               Text('Plant eligibility'),
               SizedBox(height: 8),
-              Text('Planting unlocks only when GPS verification confirms you are within range of an unclaimed place.'),
+              Text('Planting unlocks only when GPS verification confirms you are within 500m of an unclaimed place.'),
             ],
           ),
         ),

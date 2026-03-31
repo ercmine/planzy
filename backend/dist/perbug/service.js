@@ -1,5 +1,5 @@
 import { PERBUG_CONTRACTS } from "./contracts.js";
-const MAX_PLANT_DISTANCE_METERS = 120;
+import { PERBUG_CLAIM_RADIUS_METERS } from "./constants.js";
 const ZERO_WALLET = "0x0000000000000000000000000000000000000000";
 const DIG_UP_FEE_WEI = "100000000000000000";
 const DIG_UP_FEE_ETH = "0.1";
@@ -289,11 +289,11 @@ export class PerbugMarketplaceService {
         return confirmed;
     }
     evaluatePlantEligibility(input) {
-        const eligible = input.distanceMeters <= MAX_PLANT_DISTANCE_METERS;
+        const eligible = input.distanceMeters <= PERBUG_CLAIM_RADIUS_METERS;
         return {
             ...input,
             eligible,
-            maxDistanceMeters: MAX_PLANT_DISTANCE_METERS,
+            maxDistanceMeters: PERBUG_CLAIM_RADIUS_METERS,
             reason: eligible ? undefined : "User is not close enough to claim this place.",
         };
     }
