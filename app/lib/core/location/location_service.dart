@@ -30,4 +30,22 @@ class LocationService {
       isMocked: position.isMocked,
     );
   }
+
+  Stream<AppLocation> getLocationStream() {
+    return Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 8,
+      ),
+    ).map(
+      (position) => AppLocation(
+        lat: position.latitude,
+        lng: position.longitude,
+        capturedAt: position.timestamp ?? DateTime.now(),
+        accuracyMeters: position.accuracy,
+        speedMps: position.speed,
+        isMocked: position.isMocked,
+      ),
+    );
+  }
 }

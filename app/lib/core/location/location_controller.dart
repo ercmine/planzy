@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'location_models.dart';
@@ -55,6 +57,7 @@ class LocationController extends StateNotifier<LocationControllerState> {
 
   final LocationPermissionService _locationPermissionService;
   final LocationService _locationService;
+  StreamSubscription<AppLocation>? _liveLocationSubscription;
 
   Future<void> requestPermissionAndLoad() async {
     state = state.copyWith(status: LocationStatus.loading, clearError: true);
@@ -103,12 +106,27 @@ class LocationController extends StateNotifier<LocationControllerState> {
         location: liveLocation,
         clearError: true,
       );
+      await _startLiveTracking();
     } catch (error) {
       state = state.copyWith(
         status: LocationStatus.error,
         errorMessage: error.toString(),
       );
     }
+  }
+
+  Future<void> _startLiveTracking() async {
+    await _liveLocationSubscription?.cancel();
+    _liveLocationSubscription = _locationService.getLocationStream().listen(
+      (location) {
+        state = state.copyWith(
+          status: LocationStatus.ready,
+          location: location,
+          clearError: true,
+        );
+      },
+      onError: (_) {},
+    );
   }
 
   void setManualOverride(double lat, double lng) {
@@ -133,6 +151,12 @@ class LocationController extends StateNotifier<LocationControllerState> {
       clearManualOverride: true,
       status: state.location != null ? LocationStatus.ready : state.status,
     );
+  }
+
+  @override
+  void dispose() {
+    _liveLocationSubscription?.cancel();
+    super.dispose();
   }
 
   String _errorForPermission(LocationPermissionResult result) {
