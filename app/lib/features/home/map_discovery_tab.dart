@@ -394,6 +394,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   bool _statsOverlayCollapsed = false;
   bool _searchAreaOverlayCollapsed = false;
   bool _is3dMode = false;
+  DateTime? _lastRealtimeFollowAt;
   ({double lat, double lng})? _lastMapCenter;
   double? _lastMapZoom;
   Timer? _viewportDebounce;
@@ -1099,6 +1100,18 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
         await ref.read(mapDiscoveryControllerProvider.notifier).centerOnUserLocation(nextLocation!);
         if (mounted) await _checkVisitReviewPrompt();
       });
+    } else if (nextLocation != null && previousLocation != null) {
+      final movedMeters = _distanceMeters(previousLocation.lat, previousLocation.lng, nextLocation.lat, nextLocation.lng) ?? 0;
+      final now = DateTime.now();
+      final canFollow = _lastRealtimeFollowAt == null || now.difference(_lastRealtimeFollowAt!) >= const Duration(seconds: 4);
+      if (movedMeters >= 20 && canFollow) {
+        _lastRealtimeFollowAt = now;
+        Future.microtask(() async {
+          await ref.read(mapDiscoveryControllerProvider.notifier).centerOnUserLocation(nextLocation);
+          if (!mounted) return;
+          _moveMap(state: ref.read(mapDiscoveryControllerProvider));
+        });
+      }
     }
     _scheduleViewportRefresh();
   }
