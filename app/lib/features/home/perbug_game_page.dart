@@ -495,7 +495,7 @@ enum _MapEntryState {
   demoMode,
 }
 
-class _MapStatusOverlay extends StatelessWidget {
+class _MapStatusOverlay extends StatefulWidget {
   const _MapStatusOverlay({
     required this.state,
     required this.locationState,
@@ -511,18 +511,50 @@ class _MapStatusOverlay extends StatelessWidget {
   final String? details;
 
   @override
+  State<_MapStatusOverlay> createState() => _MapStatusOverlayState();
+}
+
+class _MapStatusOverlayState extends State<_MapStatusOverlay> with SingleTickerProviderStateMixin {
+  late final AnimationController _logoAnimationController;
+  late final Animation<double> _logoPulse;
+  late final Animation<Offset> _promptSlide;
+  late final Animation<double> _promptOpacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _logoAnimationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))
+      ..repeat(reverse: true);
+    _logoPulse = Tween<double>(begin: 0.96, end: 1.04).animate(
+      CurvedAnimation(parent: _logoAnimationController, curve: Curves.easeInOutCubic),
+    );
+    _promptSlide = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _logoAnimationController, curve: const Interval(0.15, 0.8, curve: Curves.easeOutCubic)),
+    );
+    _promptOpacity = Tween<double>(begin: 0.55, end: 1).animate(
+      CurvedAnimation(parent: _logoAnimationController, curve: const Interval(0.2, 0.95, curve: Curves.easeInOut)),
+    );
+  }
+
+  @override
+  void dispose() {
+    _logoAnimationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (state == _MapUiState.ready) return const SizedBox.shrink();
-    final (title, subtitle) = switch (state) {
+    if (widget.state == _MapUiState.ready) return const SizedBox.shrink();
+    final (title, subtitle) = switch (widget.state) {
       _MapUiState.idle => (
-          'Choose your world anchor',
-          'Use your real location to generate your world. Or continue in Demo Mode.',
+          'Enable location to begin',
+          'Perbug uses your live position to build your tactical world. Enable location and continue to deploy on the real map.',
         ),
       _MapUiState.requestingLocation => ('Requesting location', 'Waiting for browser/device location permission.'),
       _MapUiState.locationGranted => ('Live location active', 'Your tactical world is now generated from your real location.'),
       _MapUiState.permissionDenied => (
           'Location denied',
-          locationState.errorMessage ?? 'Location access was denied. Continue in demo mode immediately.',
+          widget.locationState.errorMessage ?? 'Location access was denied. Continue in demo mode immediately.',
         ),
       _MapUiState.unsupported => ('Location unavailable', 'Location services are disabled or unsupported on this device/browser.'),
       _MapUiState.demoMode => ('Demo map active', 'Using deterministic fallback world so gameplay remains available.'),
@@ -544,12 +576,50 @@ class _MapStatusOverlay extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Center(
+                    child: AnimatedBuilder(
+                      animation: _logoAnimationController,
+                      builder: (context, child) => Transform.scale(scale: _logoPulse.value, child: child),
+                      child: Container(
+                        width: 92,
+                        height: 92,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.24),
+                              blurRadius: 20,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: Image.asset('assets/branding/perbug.png', fit: BoxFit.cover),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   Text(title, style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 6),
                   Text(subtitle),
-                  if (details != null && details!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  SlideTransition(
+                    position: _promptSlide,
+                    child: FadeTransition(
+                      opacity: _promptOpacity,
+                      child: Text(
+                        'Allow location access to continue your map deployment.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  ),
+                  if (widget.details != null && widget.details!.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Text(details!, style: Theme.of(context).textTheme.bodySmall),
+                    Text(widget.details!, style: Theme.of(context).textTheme.bodySmall),
                   ],
                   const SizedBox(height: 10),
                   Wrap(
@@ -557,12 +627,12 @@ class _MapStatusOverlay extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       FilledButton.icon(
-                        onPressed: state == _MapUiState.requestingLocation ? null : onRequestLocation,
+                        onPressed: widget.state == _MapUiState.requestingLocation ? null : widget.onRequestLocation,
                         icon: const Icon(Icons.my_location),
-                        label: const Text('Use My Location'),
+                        label: const Text('Enable Location & Continue'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: onContinueDemo,
+                        onPressed: widget.onContinueDemo,
                         icon: const Icon(Icons.smart_toy_outlined),
                         label: const Text('Continue Demo Mode'),
                       ),
