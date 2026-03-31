@@ -1,6 +1,26 @@
-import type { PerbugRpcConfig } from "./types.js";
+import type { PerbugRpcConfig, PerbugRpcErrorKind, PerbugRpcWalletDiscovery } from "./types.js";
+export declare class PerbugRpcRequestError extends Error {
+    readonly details: {
+        kind: PerbugRpcErrorKind;
+        method: string;
+        status?: number;
+        code?: number;
+        rpcMessage?: string;
+        url: string;
+    };
+    constructor(message: string, details: {
+        kind: PerbugRpcErrorKind;
+        method: string;
+        status?: number;
+        code?: number;
+        rpcMessage?: string;
+        url: string;
+    });
+}
 export declare class PerbugRpcClient {
     private readonly config;
+    private readonly configuredWalletName?;
+    private walletContextPromise?;
     constructor(config?: PerbugRpcConfig);
     getSafeConnectionDetails(): {
         host: string;
@@ -17,5 +37,12 @@ export declare class PerbugRpcClient {
         chain?: string;
         blocks?: number;
     }>;
+    detectWalletSupport(): Promise<PerbugRpcWalletDiscovery>;
+    private ensureWalletContext;
+    private discoverWalletContext;
+    private tryListWallets;
+    private tryListWalletDir;
+    private callNode;
+    private callWallet;
     private call;
 }

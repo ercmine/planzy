@@ -14,7 +14,12 @@ export function loadPerbugRpcConfig(env = process.env) {
         explorerBaseUrl: env.PERBUG_EXPLORER_BASE_URL
     };
 }
-export function buildPerbugRpcUrl(config) {
-    const path = config.walletName ? `/wallet/${encodeURIComponent(config.walletName)}` : "/";
+export function buildPerbugRpcNodeUrl(config) {
+    return `http://${config.host}:${config.rpcPort}/`;
+}
+export function buildPerbugRpcWalletUrl(config, walletName) {
+    const trimmed = walletName?.trim();
+    const path = trimmed ? `/wallet/${encodeURIComponent(trimmed)}` : "/";
     return `http://${config.host}:${config.rpcPort}${path}`;
 }
+export const buildPerbugRpcUrl = buildPerbugRpcWalletUrl;
