@@ -139,9 +139,15 @@ export default function MarketplaceExperience() {
           <p className="mt-3 text-sm text-slate-400">Provenance: {detail.listing.provenance.originLabel}</p>
           <p className="text-sm text-slate-400">Pipeline: {detail.debug.projectedFromModules.join(" → ")} ({detail.debug.schemaVersion})</p>
           <div className="mt-4 flex gap-2">
-            <button className="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-300">Buy (coming soon)</button>
-            <button className="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-300">List Similar (coming soon)</button>
-            <button className="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-300">View on Map (coming soon)</button>
+            <button className="rounded-lg border border-emerald-400/60 bg-emerald-500/20 px-3 py-2 text-xs font-medium text-emerald-100 transition hover:bg-emerald-500/30">
+              Buy (coming soon)
+            </button>
+            <button className="rounded-lg border border-cyan-400/60 bg-cyan-500/20 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-500/30">
+              List Similar (coming soon)
+            </button>
+            <button className="rounded-lg border border-violet-400/60 bg-violet-500/20 px-3 py-2 text-xs font-medium text-violet-100 transition hover:bg-violet-500/30">
+              View on Map (coming soon)
+            </button>
           </div>
         </aside>
       ) : null}
