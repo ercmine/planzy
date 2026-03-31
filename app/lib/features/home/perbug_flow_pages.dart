@@ -134,14 +134,14 @@ class PerbugSquadPage extends ConsumerWidget {
         children: [
           _StatStrip(items: [
             _StatItem('Balance', '${state.balance} Ⓟ'),
-            _StatItem('Year', '${state.pool.year}'),
-            _StatItem('Claimed', '${state.pool.claimed}'),
+            _StatItem('Cap', '${state.globalPool.totalClaimableSupply.toStringAsFixed(0)}'),
+            _StatItem('Claimed', '${state.globalPool.totalClaimedSupply.toStringAsFixed(6)}'),
           ]),
           const SizedBox(height: 12),
           _LorePanel(
-            title: 'Emission pool',
-            subtitle: 'Community distribution cap',
-            body: 'Starting ${state.pool.startingPool} • Available ${state.pool.available} • Rollover ${state.pool.rollover}',
+            title: 'Global claim pool',
+            subtitle: 'Lifetime distribution cap',
+            body: 'Total ${state.globalPool.totalClaimableSupply.toStringAsFixed(0)} • Claimed ${state.globalPool.totalClaimedSupply.toStringAsFixed(6)} • Remaining ${state.globalPool.remainingClaimableSupply.toStringAsFixed(6)}',
           ),
         ],
       ),
@@ -245,19 +245,19 @@ class PerbugProgressionPage extends ConsumerWidget {
     final state = ref.watch(locationClaimControllerProvider);
     return _PerbugGameShell(
       title: 'Global Emission Pool',
-      subtitle: '10,000,000 yearly + rollover',
+      subtitle: '400,000,000 lifetime global cap',
       body: Column(
         children: [
           _StatStrip(items: [
-            _StatItem('Year', '${state.pool.year}'),
-            _StatItem('Starting', '${state.pool.startingPool}'),
-            _StatItem('Available', '${state.pool.available}'),
+            _StatItem('Cap', '${state.globalPool.totalClaimableSupply.toStringAsFixed(0)}'),
+            _StatItem('Claimed', '${state.globalPool.totalClaimedSupply.toStringAsFixed(6)}'),
+            _StatItem('Remaining', '${state.globalPool.remainingClaimableSupply.toStringAsFixed(6)}'),
           ]),
           const SizedBox(height: 12),
           _LorePanel(
-            title: 'Emission accounting',
-            subtitle: 'Deterministic yearly pool',
-            body: 'Base allocation 10,000,000 + rollover ${state.pool.rollover}. Claimed ${state.pool.claimed}. Remaining ${state.pool.available}.',
+            title: 'Global supply accounting',
+            subtitle: 'Deterministic lifetime pool',
+            body: 'Single global cap 400,000,000. Every successful location claim debits remaining supply while local rewards keep halving per location.',
           ),
         ],
       ),

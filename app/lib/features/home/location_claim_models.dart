@@ -21,7 +21,6 @@ class ClaimableLocation {
     required this.displayName,
     required this.category,
     required this.claimRadiusMeters,
-    required this.rewardAmount,
     this.cooldownUntil,
     this.rarity,
   });
@@ -32,7 +31,6 @@ class ClaimableLocation {
   final String displayName;
   final String category;
   final double claimRadiusMeters;
-  final int rewardAmount;
   final DateTime? cooldownUntil;
   final String? rarity;
 }
@@ -42,6 +40,11 @@ class ClaimableLocationView {
     required this.location,
     required this.distanceMeters,
     required this.flowState,
+    required this.claimCount,
+    required this.currentReward,
+    required this.totalClaimedAtLocation,
+    required this.uniqueVisitors,
+    required this.isDepleted,
     this.visitId,
     this.adSessionId,
   });
@@ -49,6 +52,11 @@ class ClaimableLocationView {
   final ClaimableLocation location;
   final double distanceMeters;
   final ClaimFlowState flowState;
+  final int claimCount;
+  final double currentReward;
+  final double totalClaimedAtLocation;
+  final int uniqueVisitors;
+  final bool isDepleted;
   final String? visitId;
   final String? adSessionId;
 
@@ -57,6 +65,11 @@ class ClaimableLocationView {
   ClaimableLocationView copyWith({
     double? distanceMeters,
     ClaimFlowState? flowState,
+    int? claimCount,
+    double? currentReward,
+    double? totalClaimedAtLocation,
+    int? uniqueVisitors,
+    bool? isDepleted,
     String? visitId,
     String? adSessionId,
   }) {
@@ -64,27 +77,37 @@ class ClaimableLocationView {
       location: location,
       distanceMeters: distanceMeters ?? this.distanceMeters,
       flowState: flowState ?? this.flowState,
+      claimCount: claimCount ?? this.claimCount,
+      currentReward: currentReward ?? this.currentReward,
+      totalClaimedAtLocation: totalClaimedAtLocation ?? this.totalClaimedAtLocation,
+      uniqueVisitors: uniqueVisitors ?? this.uniqueVisitors,
+      isDepleted: isDepleted ?? this.isDepleted,
       visitId: visitId ?? this.visitId,
       adSessionId: adSessionId ?? this.adSessionId,
     );
   }
 }
 
-class AnnualEmissionPoolView {
-  const AnnualEmissionPoolView({
-    required this.year,
-    required this.baseAllocation,
-    required this.rollover,
-    required this.claimed,
+class GlobalClaimPoolView {
+  const GlobalClaimPoolView({
+    required this.totalClaimableSupply,
+    required this.totalClaimedSupply,
   });
 
-  final int year;
-  final int baseAllocation;
-  final int rollover;
-  final int claimed;
+  final double totalClaimableSupply;
+  final double totalClaimedSupply;
 
-  int get startingPool => baseAllocation + rollover;
-  int get available => startingPool - claimed;
+  double get remainingClaimableSupply => totalClaimableSupply - totalClaimedSupply;
+
+  GlobalClaimPoolView copyWith({
+    double? totalClaimableSupply,
+    double? totalClaimedSupply,
+  }) {
+    return GlobalClaimPoolView(
+      totalClaimableSupply: totalClaimableSupply ?? this.totalClaimableSupply,
+      totalClaimedSupply: totalClaimedSupply ?? this.totalClaimedSupply,
+    );
+  }
 }
 
 class LocationClaimState {
@@ -94,30 +117,31 @@ class LocationClaimState {
     required this.currentPosition,
     required this.claimables,
     required this.balance,
-    required this.pool,
+    required this.globalPool,
+    required this.claimHistory,
     this.banner,
   });
 
-  factory LocationClaimState.initial() => LocationClaimState(
+  factory LocationClaimState.initial() => const LocationClaimState(
         isTracking: false,
         permissionStatus: LocationStatus.loading,
         currentPosition: null,
-        claimables: const [],
+        claimables: [],
         balance: 0,
-        pool: AnnualEmissionPoolView(
-          year: DateTime.now().year,
-          baseAllocation: 10000000,
-          rollover: 0,
-          claimed: 0,
+        globalPool: GlobalClaimPoolView(
+          totalClaimableSupply: 400000000,
+          totalClaimedSupply: 0,
         ),
+        claimHistory: [],
       );
 
   final bool isTracking;
   final LocationStatus permissionStatus;
   final AppLocation? currentPosition;
   final List<ClaimableLocationView> claimables;
-  final int balance;
-  final AnnualEmissionPoolView pool;
+  final double balance;
+  final GlobalClaimPoolView globalPool;
+  final List<ClaimTransaction> claimHistory;
   final String? banner;
 
   LocationClaimState copyWith({
@@ -125,8 +149,9 @@ class LocationClaimState {
     LocationStatus? permissionStatus,
     AppLocation? currentPosition,
     List<ClaimableLocationView>? claimables,
-    int? balance,
-    AnnualEmissionPoolView? pool,
+    double? balance,
+    GlobalClaimPoolView? globalPool,
+    List<ClaimTransaction>? claimHistory,
     String? banner,
     bool clearBanner = false,
   }) {
@@ -136,8 +161,23 @@ class LocationClaimState {
       currentPosition: currentPosition ?? this.currentPosition,
       claimables: claimables ?? this.claimables,
       balance: balance ?? this.balance,
-      pool: pool ?? this.pool,
+      globalPool: globalPool ?? this.globalPool,
+      claimHistory: claimHistory ?? this.claimHistory,
       banner: clearBanner ? null : (banner ?? this.banner),
     );
   }
+}
+
+class ClaimTransaction {
+  const ClaimTransaction({
+    required this.locationId,
+    required this.reward,
+    required this.claimCountAfter,
+    required this.createdAt,
+  });
+
+  final String locationId;
+  final double reward;
+  final int claimCountAfter;
+  final DateTime createdAt;
 }
