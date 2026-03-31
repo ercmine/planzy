@@ -52,6 +52,8 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
   _PerbugCameraGesture? _gesture;
   String? _hoverNodeId;
   bool _cameraBootstrapped = false;
+  bool _showMapModeLabel = false;
+  bool _showDebugPanel = false;
 
   @override
   void initState() {
@@ -183,58 +185,88 @@ class _PerbugWorldMapViewState extends State<PerbugWorldMapView> with SingleTick
                   const Positioned(
                     left: 12,
                     bottom: 12,
-                    child: _DebugStatusChip(
-                      label: 'WORLD ENGINE LOADING',
+                    child: _CompactStatusDot(
+                      icon: Icons.hourglass_top_rounded,
                       color: Color(0xFFF59E0B),
+                      tooltip: 'World engine loading',
                     ),
                   ),
                 if (hasInvalidSize)
                   const Positioned(
                     left: 12,
                     bottom: 12,
-                    child: _DebugStatusChip(
-                      label: 'MAP ERROR: invalid viewport size',
+                    child: _CompactStatusDot(
+                      icon: Icons.error_outline_rounded,
                       color: Color(0xFFEF4444),
+                      tooltip: 'Map error: invalid viewport size',
                     ),
                   ),
                 Positioned(
                   left: 10,
                   top: 10,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.36),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: Colors.white.withOpacity(0.16)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      child: Text(
-                        hasLiveNodes ? 'Live tactical region' : 'Demo frontier fallback',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _CompactOverlayIconButton(
+                        icon: Icons.layers_outlined,
+                        tooltip: _showMapModeLabel ? 'Hide map status' : 'Show map status',
+                        onTap: () => setState(() => _showMapModeLabel = !_showMapModeLabel),
                       ),
-                    ),
+                      if (_showMapModeLabel) ...[
+                        const SizedBox(width: 6),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.36),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: Colors.white.withOpacity(0.16)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            child: Text(
+                              hasLiveNodes ? 'Live tactical region' : 'Demo frontier fallback',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 if (widget.showDebugOverlay)
                   Positioned(
                     right: 10,
                     bottom: 10,
-                    child: ValueListenableBuilder<int>(
-                      valueListenable: _paintTick,
-                      builder: (context, tick, _) {
-                        return _DebugStatePanel(
-                          size: size,
-                          viewport: cameraViewport,
-                          nodeCount: safeSnapshot.visibleNodes.length,
-                          chunkCount: (safeSnapshot.debug['total_chunks'] as num?)?.toInt() ?? 0,
-                          visibleChunkCount: (safeSnapshot.debug['visible_chunks'] as num?)?.toInt() ?? 0,
-                          mode: renderMode,
-                          painterTick: tick,
-                          routeName: ModalRoute.of(context)?.settings.name ?? '/live-map',
-                          selectedNodeId: widget.selectedNodeId,
-                          seed: safeSnapshot.debug['seed']?.toString() ?? 'n/a',
-                        );
-                      },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (_showDebugPanel)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ValueListenableBuilder<int>(
+                              valueListenable: _paintTick,
+                              builder: (context, tick, _) {
+                                return _DebugStatePanel(
+                                  size: size,
+                                  viewport: cameraViewport,
+                                  nodeCount: safeSnapshot.visibleNodes.length,
+                                  chunkCount: (safeSnapshot.debug['total_chunks'] as num?)?.toInt() ?? 0,
+                                  visibleChunkCount: (safeSnapshot.debug['visible_chunks'] as num?)?.toInt() ?? 0,
+                                  mode: renderMode,
+                                  painterTick: tick,
+                                  routeName: ModalRoute.of(context)?.settings.name ?? '/live-map',
+                                  selectedNodeId: widget.selectedNodeId,
+                                  seed: safeSnapshot.debug['seed']?.toString() ?? 'n/a',
+                                );
+                              },
+                            ),
+                          ),
+                        _CompactOverlayIconButton(
+                          icon: Icons.bug_report_outlined,
+                          tooltip: _showDebugPanel ? 'Hide debug panel' : 'Show debug panel',
+                          onTap: () => setState(() => _showDebugPanel = !_showDebugPanel),
+                        ),
+                      ],
                     ),
                   ),
               ],
@@ -785,19 +817,62 @@ class _PerbugCameraGesture {
   final MapViewport startViewport;
 }
 
-class _DebugStatusChip extends StatelessWidget {
-  const _DebugStatusChip({required this.label, required this.color});
+class _CompactStatusDot extends StatelessWidget {
+  const _CompactStatusDot({
+    required this.icon,
+    required this.color,
+    required this.tooltip,
+  });
 
-  final String label;
+  final IconData icon;
   final Color color;
+  final String tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(color: color.withOpacity(0.92), borderRadius: BorderRadius.circular(8)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11)),
+    return Tooltip(
+      message: tooltip,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.95),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withOpacity(0.45)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(5),
+          child: Icon(icon, size: 13, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactOverlayIconButton extends StatelessWidget {
+  const _CompactOverlayIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.black.withOpacity(0.42),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(7),
+            child: Icon(icon, size: 15, color: Colors.white.withOpacity(0.92)),
+          ),
+        ),
       ),
     );
   }
