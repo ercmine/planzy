@@ -19,6 +19,7 @@ import 'world/world_map_scene.dart';
 import 'world/world_map_scene_controller.dart';
 import 'world/world_map_scene_generator.dart';
 import 'world/world_map_scene_models.dart';
+import 'perbug_maplibre_view.dart';
 import 'perbug_asset_registry.dart';
 import 'perbug_economy_models.dart';
 import 'perbug_game_controller.dart';
@@ -110,20 +111,75 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
                   child: Stack(
                     children: [
                       Positioned.fill(
-                        child: WorldMapScene(
-                          controller: _sceneController,
-                          onTapEmpty: () => setState(() {
-                            _selectedNodeId = null;
-                            _selectedWorldNode = null;
-                          }),
-                          onNodeTapped: (node) {
-                            final match = state.nodes.where((candidate) => candidate.nodeType == node.perbugType).toList(growable: false);
-                            setState(() {
-                              _selectedWorldNode = node;
-                              _selectedNodeId = match.isNotEmpty ? match.first.id : _selectedNodeId;
-                            });
-                          },
-                        ),
+                        child: kIsWeb
+                            ? PerbugMapLibreView(
+                                viewport: _mapViewport,
+                                pins: const <MapPin>[],
+                                selectedPlaceId: null,
+                                userLocation: locationForScene == null
+                                    ? null
+                                    : (lat: locationForScene.lat, lng: locationForScene.lng),
+                                world: const MapWorldState(
+                                  districts: <DistrictZone>[],
+                                  collectibles: <CollectibleItem>[],
+                                  loadout: PlayerLoadout(
+                                    title: 'Web fallback',
+                                    level: 1,
+                                    archetype: PlayerArchetype.explorer,
+                                    bodyColor: Color(0xFF334155),
+                                    auraColor: Color(0xFF64748B),
+                                    accentColor: Color(0xFF94A3B8),
+                                    ringAsset: 'fallback',
+                                    trailLabel: 'fallback',
+                                    unlockedCosmetics: <String>[],
+                                  ),
+                                  summary: InventorySummary(
+                                    totalCollected: 0,
+                                    totalVisible: 0,
+                                    districtProgress: 0,
+                                    rareFinds: 0,
+                                    cosmeticUnlocks: 0,
+                                  ),
+                                  analytics: <String, Object>{},
+                                  tuning: <String, Object>{},
+                                ),
+                                sponsoredPlaceIds: const <String>{},
+                                questPlaceIds: const <String>{},
+                                collectionPlaceIds: const <String>{},
+                                is3dMode: false,
+                                config: ref.watch(envConfigProvider).mapStack,
+                                tacticalNodes: state.nodes,
+                                tacticalConnections: state.connections,
+                                currentNodeId: state.currentNodeId,
+                                selectedNodeId: _selectedNodeId,
+                                reachableNodeIds: state.reachableMoves.map((m) => m.node.id).toSet(),
+                                onMapLoadStarted: () {},
+                                onMapReady: () {},
+                                onMapLoadError: (_) {},
+                                onTapEmpty: () => setState(() => _selectedNodeId = null),
+                                onLongPress: (lat, lng) => setState(
+                                  () => _mapViewport = MapViewport(centerLat: lat, centerLng: lng, zoom: _mapViewport.zoom),
+                                ),
+                                onViewportChanged: (nextViewport, {required hasGesture}) => setState(() => _mapViewport = nextViewport),
+                                onPlaceSelected: (_) {},
+                                onNodeSelected: (nodeId) => _handleNodeTap(controller, state, nodeId),
+                              )
+                            : WorldMapScene(
+                                controller: _sceneController,
+                                onTapEmpty: () => setState(() {
+                                  _selectedNodeId = null;
+                                  _selectedWorldNode = null;
+                                }),
+                                onNodeTapped: (node) {
+                                  final match = state.nodes
+                                      .where((candidate) => candidate.nodeType == node.perbugType)
+                                      .toList(growable: false);
+                                  setState(() {
+                                    _selectedWorldNode = node;
+                                    _selectedNodeId = match.isNotEmpty ? match.first.id : _selectedNodeId;
+                                  });
+                                },
+                              ),
                       ),
                       Positioned(
                         top: 12,
@@ -383,6 +439,22 @@ class _PerbugGamePageState extends ConsumerState<PerbugGamePage> {
           ? 'Live position was unavailable. Demo frontier loaded so your run continues.'
           : 'Could not confirm live location. You can continue in demo mode.';
     });
+  }
+
+  Future<void> _handleNodeTap(
+    PerbugGameController controller,
+    PerbugGameState state,
+    String nodeId,
+  ) async {
+    setState(() => _selectedNodeId = nodeId);
+    final move = _moveForNode(state, nodeId);
+    if (move == null || !move.isReachable) return;
+    final ok = await controller.jumpTo(move);
+    if (!mounted || !ok) return;
+    setState(() => _selectedNodeId = move.node.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Claimed node ${move.node.label} (+Perbug progression).')),
+    );
   }
 
   Future<void> _continueInDemoMode() async {
