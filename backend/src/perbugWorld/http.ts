@@ -167,10 +167,18 @@ function buildSeedNodes(lat: number, lng: number, mode: "demo" | "real"): Perbug
     landmarkInfluence: context.influenceField.landmarkFrequency
   });
 
+  const buildNodeLabel = (
+    context: ReturnType<typeof buildChunkRegionContext>,
+    suffix: "Hub" | "Garden" | "Tower" | "Frontier"
+  ) => `${context.district.name} ${suffix}`;
+
+  const transitContext = buildChunkRegionContext(lat + 0.009, lng + 0.012, worldSeed);
+  const rareContext = buildChunkRegionContext(lat - 0.011, lng + 0.008, worldSeed);
+
   return [
     attachContext({
       id: `hub-${lat.toFixed(3)}-${lng.toFixed(3)}`,
-      label: "Anchor Hub",
+      label: buildNodeLabel(anchorContext, "Hub"),
       lat,
       lng,
       region: "Anchor",
@@ -181,7 +189,7 @@ function buildSeedNodes(lat: number, lng: number, mode: "demo" | "real"): Perbug
     }, anchorContext),
     attachContext({
       id: `resource-${lat.toFixed(3)}-${(lng + 0.012).toFixed(3)}`,
-      label: "Transit Garden",
+      label: buildNodeLabel(transitContext, "Garden"),
       lat: lat + 0.009,
       lng: lng + 0.012,
       region: "District",
@@ -189,10 +197,10 @@ function buildSeedNodes(lat: number, lng: number, mode: "demo" | "real"): Perbug
       difficulty: 3,
       state: "available",
       energyReward: 4
-    }, buildChunkRegionContext(lat + 0.009, lng + 0.012, worldSeed)),
+    }, transitContext),
     attachContext({
       id: `rare-${(lat - 0.011).toFixed(3)}-${(lng + 0.008).toFixed(3)}`,
-      label: "Signal Tower",
+      label: buildNodeLabel(rareContext, "Tower"),
       lat: lat - 0.011,
       lng: lng + 0.008,
       region: "District",
@@ -201,10 +209,10 @@ function buildSeedNodes(lat: number, lng: number, mode: "demo" | "real"): Perbug
       difficulty: 4,
       state: "special",
       energyReward: 4
-    }, buildChunkRegionContext(lat - 0.011, lng + 0.008, worldSeed)),
+    }, rareContext),
     attachContext({
       id: `far-${(lat + 0.081).toFixed(3)}-${(lng + 0.081).toFixed(3)}`,
-      label: "Far Frontier",
+      label: buildNodeLabel(farContext, "Frontier"),
       lat: lat + 0.081,
       lng: lng + 0.081,
       region: "Outlands",
