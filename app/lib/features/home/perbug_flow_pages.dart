@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_routes.dart';
 import '../../app/theme/rpg_bar.dart';
 import '../../app/theme/widgets.dart';
+import 'location_claim_controller.dart';
+import 'location_claim_models.dart';
 import 'perbug_economy_models.dart';
 import 'perbug_game_controller.dart';
 import 'perbug_game_models.dart';
@@ -124,18 +126,23 @@ class PerbugSquadPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final roster = ref.watch(perbugGameControllerProvider).squad.roster;
+    final state = ref.watch(locationClaimControllerProvider);
     return _PerbugGameShell(
-      title: 'Squad Command',
-      subtitle: 'Operators and specialization',
+      title: 'Perbug Wallet',
+      subtitle: 'Your live claim balance',
       body: Column(
         children: [
-          for (final unit in roster)
-            _LorePanel(
-              title: unit.name,
-              subtitle: '${unit.role.name} • ${unit.unitClass.name}',
-              body: 'Lv ${unit.progression.level} • Power ${unit.effectiveStats.powerScore.round()} • ${unit.rarity.name}',
-            ),
+          _StatStrip(items: [
+            _StatItem('Balance', '${state.balance} Ⓟ'),
+            _StatItem('Year', '${state.pool.year}'),
+            _StatItem('Claimed', '${state.pool.claimed}'),
+          ]),
+          const SizedBox(height: 12),
+          _LorePanel(
+            title: 'Emission pool',
+            subtitle: 'Community distribution cap',
+            body: 'Starting ${state.pool.startingPool} • Available ${state.pool.available} • Rollover ${state.pool.rollover}',
+          ),
         ],
       ),
     );
@@ -147,31 +154,24 @@ class PerbugInventoryPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(perbugGameControllerProvider);
-    final stacks = state.economy.inventory.stacks.entries.toList(growable: false);
+    final state = ref.watch(locationClaimControllerProvider);
     return _PerbugGameShell(
-      title: 'Field Inventory',
-      subtitle: 'Resources and collectibles',
+      title: 'Claim History',
+      subtitle: 'Visited and claimed locations',
       body: Column(
         children: [
           _StatStrip(items: [
-            _StatItem('Stacks', '${stacks.length}'),
-            _StatItem('Owned Assets', '${state.economy.ownedAssets.entries.length}'),
-            _StatItem('Perbug', '${state.economy.wallet.balance}'),
+            _StatItem('Visited', '${state.claimables.where((e) => e.flowState == ClaimFlowState.visited || e.flowState == ClaimFlowState.claimSuccess).length}'),
+            _StatItem('Claimed', '${state.claimables.where((e) => e.flowState == ClaimFlowState.claimSuccess).length}'),
+            _StatItem('Balance', '${state.balance}Ⓟ'),
           ]),
           const SizedBox(height: 12),
-          for (final entry in stacks)
+          for (final entry in state.claimables)
             _LorePanel(
-              title: perbugResourceDefinitions[entry.key]?.label ?? entry.key,
-              subtitle: 'Stored resource',
-              body: 'Count ${entry.value} • ${perbugResourceDefinitions[entry.key]?.description ?? 'Crafting-grade material.'}',
+              title: entry.location.displayName,
+              subtitle: '${entry.location.category} • ${(entry.distanceMeters).round()}m',
+              body: 'Status ${entry.flowState.name}',
             ),
-          const SizedBox(height: 6),
-          RpgBarButton(
-            onPressed: () => context.go(AppRoutes.crafting),
-            label: 'Open Crafting Deck',
-            variant: RpgButtonVariant.secondary,
-          ),
         ],
       ),
     );
@@ -242,24 +242,23 @@ class PerbugProgressionPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(perbugGameControllerProvider);
+    final state = ref.watch(locationClaimControllerProvider);
     return _PerbugGameShell(
-      title: 'Campaign Progression',
-      subtitle: 'Objectives, milestones, and XP',
+      title: 'Global Emission Pool',
+      subtitle: '10,000,000 yearly + rollover',
       body: Column(
         children: [
           _StatStrip(items: [
-            _StatItem('Level', '${state.progression.level}'),
-            _StatItem('XP', '${state.progression.xp}'),
-            _StatItem('Upgrade Marks', '${state.progression.upgradeCurrency}'),
+            _StatItem('Year', '${state.pool.year}'),
+            _StatItem('Starting', '${state.pool.startingPool}'),
+            _StatItem('Available', '${state.pool.available}'),
           ]),
           const SizedBox(height: 12),
-          for (final objective in state.progressionLayer.daily.objectives)
-            _LorePanel(
-              title: objective.title,
-              subtitle: objective.description,
-              body: 'Progress ${objective.progress.current}/${objective.progress.target} • Reward ${objective.reward.upgradeCurrency} marks',
-            ),
+          _LorePanel(
+            title: 'Emission accounting',
+            subtitle: 'Deterministic yearly pool',
+            body: 'Base allocation 10,000,000 + rollover ${state.pool.rollover}. Claimed ${state.pool.claimed}. Remaining ${state.pool.available}.',
+          ),
         ],
       ),
     );

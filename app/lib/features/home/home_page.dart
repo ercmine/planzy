@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_routes.dart';
 import '../../app/theme/widgets.dart';
 import '../settings/settings_page.dart';
+import 'location_claim_map_page.dart';
 import 'perbug_flow_pages.dart';
-import 'perbug_game_page.dart';
 
 enum HomeTab { world, squad, inventory, progression, profile }
 
@@ -27,14 +27,12 @@ class _HomePageState extends State<HomePage> {
     HomeTab.profile,
   ];
 
-  bool _showTacticalHud = true;
-
   @override
   Widget build(BuildContext context) {
     final selectedIndex = _tabs.indexOf(widget.initialTab).clamp(0, _tabs.length - 1);
 
     final pages = <Widget>[
-      PerbugGamePage(showTacticalHud: _showTacticalHud),
+      const LocationClaimMapPage(),
       const PerbugSquadPage(),
       const PerbugInventoryPage(),
       const PerbugProgressionPage(),
@@ -45,20 +43,7 @@ class _HomePageState extends State<HomePage> {
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       appBar: AppBar(
         titleSpacing: 12,
-        title: const Text('Perbug // World Command'),
-        actions: [
-          IconButton(
-            tooltip: _showTacticalHud ? 'Hide tactical HUD' : 'Show tactical HUD',
-            onPressed: () => setState(() => _showTacticalHud = !_showTacticalHud),
-            icon: Icon(_showTacticalHud ? Icons.layers : Icons.layers_clear_outlined),
-          ),
-          IconButton(
-            tooltip: 'Open marketplace',
-            onPressed: () => context.go(AppRoutes.marketplace),
-            icon: const Icon(Icons.storefront_outlined),
-          ),
-          const SizedBox(width: 4),
-        ],
+        title: const Text('Perbug // Explore & Claim'),
       ),
       body: SafeArea(
         top: false,
@@ -92,10 +77,10 @@ class _HomePageState extends State<HomePage> {
           },
           destinations: const [
             NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: 'Map'),
-            NavigationDestination(icon: Icon(Icons.groups_2_outlined), selectedIcon: Icon(Icons.groups_2), label: 'Squad'),
-            NavigationDestination(icon: Icon(Icons.backpack_outlined), selectedIcon: Icon(Icons.backpack), label: 'Inventory'),
-            NavigationDestination(icon: Icon(Icons.flag_outlined), selectedIcon: Icon(Icons.flag), label: 'Objectives'),
-            NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
+            NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
+            NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history), label: 'History'),
+            NavigationDestination(icon: Icon(Icons.public_outlined), selectedIcon: Icon(Icons.public), label: 'Pool'),
+            NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
           ],
         ),
       ),
