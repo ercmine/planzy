@@ -45,7 +45,7 @@ class _HomePageState extends State<HomePage> {
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       appBar: AppBar(
         titleSpacing: 12,
-        title: const Text('Perbug // Command'),
+        title: const Text('Perbug // World Command'),
         actions: [
           IconButton(
             tooltip: _showTacticalHud ? 'Hide tactical HUD' : 'Show tactical HUD',
@@ -67,6 +67,7 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: SafeArea(
         top: false,
         child: NavigationBar(
+          backgroundColor: const Color(0xFF121A2B),
           height: 72,
           selectedIndex: selectedIndex,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,

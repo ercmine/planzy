@@ -21,49 +21,65 @@ class PerbugLearnMorePage extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: const Color(0xFFFFE2A6),
-        title: const Text('What is Perbug?'),
+        title: const Text('Perbug World Primer'),
       ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
+            PremiumHeader(
+              title: 'The map is the game',
+              subtitle: 'Perbug turns your world into an RPG strategy board with districts, nodes, events, and progression loops.',
+              badge: const AppPill(label: 'Web + Mobile world map', icon: Icons.public),
+            ),
+            const SizedBox(height: 12),
             Text(
-              'A fantasy strategy RPG layered over the real world map.',
+              'Command Loop',
               style: theme.textTheme.titleLarge?.copyWith(
                 color: const Color(0xFFFFE2A6),
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 14),
-            _LoreCard(
-              title: 'World Loop',
-              body:
-                  'Scout nearby regions, jump node-to-node, and resolve encounters to earn Perbug, materials, and squad XP.',
-              icon: Icons.public,
+            const SizedBox(height: 10),
+            const _LoreCard(
+              title: '1) Launch + Identity',
+              body: 'Connect wallet or continue in demo mode. Both paths keep the map playable and unlock a stable game entry.',
+              icon: Icons.login,
             ),
-            _LoreCard(
-              title: 'Squad Tactics',
-              body:
-                  'Build a team of specialized units, upgrade them over time, and route around rare, boss, and resource nodes.',
-              icon: Icons.shield_moon,
+            const _LoreCard(
+              title: '2) Enter World Map',
+              body: 'Inspect districts, routes, and categorized nodes. Choose where to travel based on energy and mission priorities.',
+              icon: Icons.map,
             ),
-            _LoreCard(
-              title: 'Wallet Link',
-              body:
-                  'Your wallet ties your identity to live progression and asset-linked systems so your campaign can travel with you.',
-              icon: Icons.account_balance_wallet,
+            const _LoreCard(
+              title: '3) Resolve Encounters',
+              body: 'Launch encounters, harvest resources, and complete objectives. Rewards feed inventory, crafting, and squad power.',
+              icon: Icons.sports_martial_arts,
             ),
-            _LoreCard(
-              title: 'Demo Mode',
-              body:
-                  'No wallet available yet? Enter Demo Mode to open the live map, try squad systems, and explore progression offline.',
-              icon: Icons.videogame_asset,
+            const _LoreCard(
+              title: '4) Progress Campaign',
+              body: 'Upgrade your squad, craft gear, and push into tougher routes. Return to map for the next tactical decision.',
+              icon: Icons.trending_up,
+            ),
+            const SizedBox(height: 8),
+            AppCard(
+              tone: AppCardTone.collection,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text('Mode Support', style: TextStyle(fontWeight: FontWeight.w700)),
+                  SizedBox(height: 8),
+                  Text('• Real-world anchored mode via location permission.'),
+                  Text('• Demo region fallback if location is denied/unavailable.'),
+                  Text('• Switch to location mode anytime from the world map CTA.'),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: () => _enterDemoMode(context, ref),
               icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('Try Demo Mode'),
+              label: const Text('Continue in Demo Mode'),
             ),
             const SizedBox(height: 10),
             FilledButton.icon(
@@ -103,37 +119,34 @@ class _LoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return AppCard(
       margin: const EdgeInsets.only(bottom: 12),
-      color: const Color(0xCC1E1631),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: const Color(0xFF7FD9FF)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFFFFE2A6),
-                      fontWeight: FontWeight.w700,
-                    ),
+      tone: AppCardTone.muted,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFF7FD9FF)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: const Color(0xFFFFE2A6),
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    body,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70, height: 1.35),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  body,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70, height: 1.35),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
