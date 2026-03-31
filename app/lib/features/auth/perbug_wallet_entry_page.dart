@@ -262,6 +262,7 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
               AppAssets.perbugLoginBackdrop,
               fit: BoxFit.contain,
               alignment: Alignment.center,
+              excludeFromSemantics: true,
               errorBuilder: (_, __, ___) => _EntryFallbackScreen(
                 restoring: _restoring,
                 connecting: _connecting,
@@ -281,9 +282,11 @@ class _PerbugWalletEntryPageState extends ConsumerState<PerbugWalletEntryPage> {
           ),
           if (artRect != Rect.zero)
             Positioned.fill(
-              child: IgnorePointer(
-                child: RepaintBoundary(
-                  child: _EntryParticlesLayer(imageRect: artRect),
+              child: ExcludeSemantics(
+                child: IgnorePointer(
+                  child: RepaintBoundary(
+                    child: _EntryParticlesLayer(imageRect: artRect),
+                  ),
                 ),
               ),
             ),
