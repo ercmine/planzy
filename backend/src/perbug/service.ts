@@ -21,7 +21,7 @@ import type {
   WalletAddress,
 } from "./domain.js";
 
-const MAX_PLANT_DISTANCE_METERS = 120;
+const MAX_PLANT_DISTANCE_METERS = 500;
 const ZERO_WALLET = "0x0000000000000000000000000000000000000000" as WalletAddress;
 const DIG_UP_FEE_WEI = "100000000000000000";
 const DIG_UP_FEE_ETH = "0.1";
