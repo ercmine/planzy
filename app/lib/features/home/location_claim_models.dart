@@ -45,6 +45,7 @@ class ClaimableLocationView {
     required this.totalClaimedAtLocation,
     required this.uniqueVisitors,
     required this.isDepleted,
+    this.cooldownUntil,
     this.visitId,
     this.adSessionId,
   });
@@ -57,10 +58,12 @@ class ClaimableLocationView {
   final double totalClaimedAtLocation;
   final int uniqueVisitors;
   final bool isDepleted;
+  final DateTime? cooldownUntil;
   final String? visitId;
   final String? adSessionId;
 
   bool get inRange => distanceMeters <= location.claimRadiusMeters;
+  bool get isOnCooldown => cooldownUntil != null && cooldownUntil!.isAfter(DateTime.now().toUtc());
 
   ClaimableLocationView copyWith({
     double? distanceMeters,
@@ -70,6 +73,7 @@ class ClaimableLocationView {
     double? totalClaimedAtLocation,
     int? uniqueVisitors,
     bool? isDepleted,
+    DateTime? cooldownUntil,
     String? visitId,
     String? adSessionId,
   }) {
@@ -82,6 +86,7 @@ class ClaimableLocationView {
       totalClaimedAtLocation: totalClaimedAtLocation ?? this.totalClaimedAtLocation,
       uniqueVisitors: uniqueVisitors ?? this.uniqueVisitors,
       isDepleted: isDepleted ?? this.isDepleted,
+      cooldownUntil: cooldownUntil ?? this.cooldownUntil,
       visitId: visitId ?? this.visitId,
       adSessionId: adSessionId ?? this.adSessionId,
     );
