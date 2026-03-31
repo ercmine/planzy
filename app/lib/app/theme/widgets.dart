@@ -212,6 +212,7 @@ class AppCard extends StatelessWidget {
   const AppCard({
     required this.child,
     this.padding,
+    this.margin,
     this.glow = false,
     this.gradient,
     this.tone = AppCardTone.standard,
@@ -220,6 +221,7 @@ class AppCard extends StatelessWidget {
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
+  final EdgeInsetsGeometry? margin;
   final bool glow;
   final Gradient? gradient;
   final AppCardTone tone;
@@ -231,6 +233,7 @@ class AppCard extends StatelessWidget {
     final resolvedBorder = _borderForTone(colorScheme, tone);
     final resolvedGlow = glow || tone == AppCardTone.reward || tone == AppCardTone.featured;
     return Container(
+      margin: margin,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.large),
         gradient: resolvedGradient,
