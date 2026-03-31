@@ -9,7 +9,7 @@ export default defineConfig({
   output: 'static',
   vite: {
     server: {
-      allowedHosts: ['perbug.dev']
+      allowedHosts: ['perbug.dev', 'perbug.com']
     }
   },
   integrations: [mdx(), react(), tailwind({ applyBaseStyles: false }), sitemap()],
