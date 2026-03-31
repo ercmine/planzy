@@ -5,11 +5,12 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryPerbugRewardsStore } from "../memoryStore.js";
 import { PerbugRewardsService } from "../service.js";
-import { amountToAtomicUnits, deriveAssociatedTokenAddress, isValidSolanaPublicKey } from "../solana/token.js";
+import type { PerbugClaimsAdapter } from "../types.js";
+import { amountToAtomicUnits, isValidSolanaPublicKey } from "../solana/token.js";
 import { formatWalletSignInMessage, stableIdempotencyKey } from "../solana/walletAuth.js";
 
-function setup() {
-  const service = new PerbugRewardsService(new MemoryPerbugRewardsStore());
+function setup(claimsAdapter?: PerbugClaimsAdapter) {
+  const service = new PerbugRewardsService(new MemoryPerbugRewardsStore(), claimsAdapter);
   service.createPlace({ id: "place-1", name: "Cafe One" });
   return service;
 }
@@ -80,8 +81,11 @@ describe("PerbugRewardsService", () => {
     expect(formatWalletSignInMessage({ publicKey, nonce: nonce.nonce, timestamp: nonce.message.split("\n")[3]!.replace("Timestamp: ", "") })).toContain(`Wallet: ${publicKey}`);
   });
 
-  it("claim flow is idempotent and derives ATA deterministically", async () => {
-    const service = setup();
+  it("claim flow is idempotent and uses Perbug RPC payout adapter", async () => {
+    const claimsAdapter: PerbugClaimsAdapter = {
+      transferClaim: async ({ claimantAddress, idempotencyKey }) => ({ txid: `tx-${idempotencyKey}`, explorerUrl: `https://explorer.perbug.test/tx/${claimantAddress}` })
+    };
+    const service = setup(claimsAdapter);
     const keypair = Keypair.generate();
     const publicKey = keypair.publicKey.toBase58();
     const nonce = service.createWalletNonce(publicKey);
@@ -95,7 +99,8 @@ describe("PerbugRewardsService", () => {
     const claimB = await service.claimReward({ userId: "u1", reviewId: review.id, walletPublicKey: publicKey, idempotencyKey: idem });
     expect(claimA.claim.transactionSignature).toBeDefined();
     expect(claimA.claim.transactionSignature).toBe(claimB.claim.transactionSignature);
-    expect(claimA.claim.associatedTokenAccount).toBe(deriveAssociatedTokenAddress(publicKey, claimA.claim.tokenMint));
+    expect(claimA.claim.associatedTokenAccount).toBe(publicKey);
+    expect(claimA.claim.cluster).toContain("perbug-rpc-");
   });
 
   it("exposes helper utilities for validation and atomic conversions", () => {

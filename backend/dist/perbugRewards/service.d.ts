@@ -1,8 +1,8 @@
-import type { ClaimResult, PerbugRewardTier, PerbugRewardsStore, PlaceRecord, RewardDashboard, RewardPreview, RewardQualityRating, RewardReviewRecord, SolanaClaimsAdapter, WalletRecord } from "./types.js";
+import type { ClaimResult, PerbugClaimsAdapter, PerbugRewardTier, PerbugRewardsStore, PlaceRecord, RewardDashboard, RewardPreview, RewardQualityRating, RewardReviewRecord, WalletRecord } from "./types.js";
 export declare class PerbugRewardsService {
     private readonly store;
     private readonly claimsAdapter;
-    constructor(store: PerbugRewardsStore, claimsAdapter?: SolanaClaimsAdapter);
+    constructor(store: PerbugRewardsStore, claimsAdapter?: PerbugClaimsAdapter);
     createPlace(input: {
         id: string;
         name: string;

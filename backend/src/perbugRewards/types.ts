@@ -181,19 +181,18 @@ export interface RewardPreview {
   approvedRewardedReviewCount: number;
 }
 
-export interface SolanaTransferResult {
-  signature: string;
-  associatedTokenAccount: string;
-  explorerUrl: string;
+export interface PerbugTransferResult {
+  txid: string;
+  explorerUrl?: string;
 }
 
-export interface SolanaClaimsAdapter {
+export interface PerbugClaimsAdapter {
   transferClaim(input: {
-    claimantPublicKey: string;
-    amountAtomic: bigint;
+    claimantAddress: string;
+    amountDisplay: string;
     idempotencyKey: string;
     memo: string;
-  }): Promise<SolanaTransferResult>;
+  }): Promise<PerbugTransferResult>;
 }
 
 export interface PerbugRewardsStore {

@@ -7,3 +7,7 @@ export * from "./solana/config.js";
 export * from "./solana/token.js";
 export * from "./solana/walletAuth.js";
 export * from "./solana/claims.js";
+export * from "./perbugRpc/config.js";
+export * from "./perbugRpc/client.js";
+export * from "./perbugRpc/claims.js";
+export * from "./perbugRpc/diagnostics.js";

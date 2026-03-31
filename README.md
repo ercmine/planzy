@@ -156,3 +156,17 @@ curl -i -X OPTIONS https://api.perbug.com/api/geo/search \
 curl -i "https://api.perbug.com/api/geo/search?q=Berlin" \
   -H "Origin: https://app.perbug.com"
 ```
+
+
+## Backend Perbug node RPC configuration
+
+Perbug payout and node integration now uses a local Bitcoin-style JSON-RPC endpoint on localhost only.
+
+- `PERBUG_RPC_HOST=127.0.0.1`
+- `PERBUG_RPC_PORT=9332`
+- `PERBUG_NODE_PORT=9333`
+- `PERBUG_RPC_USER=perbugrpc`
+- `PERBUG_RPC_PASSWORD=change_this_to_a_long_random_password`
+
+The backend expects `rpcbind=127.0.0.1` and `rpcallowip=127.0.0.1` in the node config.
+

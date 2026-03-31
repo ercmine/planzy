@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { PublicKey } from "@solana/web3.js";
 import { ValidationError } from "../plans/errors.js";
 import { DEFAULT_DISTINCT_SLOT, PERBUG_DECIMALS, QUALITY_MULTIPLIERS, defaultRewardTiers } from "./defaults.js";
-import { loadSolanaConfig } from "./solana/config.js";
-import { MockSolanaClaimsAdapter } from "./solana/claims.js";
+import { loadPerbugRpcConfig } from "./perbugRpc/config.js";
+import { PerbugRpcClaimsAdapter } from "./perbugRpc/claims.js";
 import { amountToAtomicUnits, amountToDisplay, isValidSolanaPublicKey } from "./solana/token.js";
 import { createWalletLoginNonce, formatWalletSignInMessage, stableIdempotencyKey, verifyWalletSignature } from "./solana/walletAuth.js";
 function nowIso(now = new Date()) { return now.toISOString(); }
@@ -11,7 +11,7 @@ function clone(value) { return structuredClone(value); }
 export class PerbugRewardsService {
     store;
     claimsAdapter;
-    constructor(store, claimsAdapter = new MockSolanaClaimsAdapter()) {
+    constructor(store, claimsAdapter = new PerbugRpcClaimsAdapter()) {
         this.store = store;
         this.claimsAdapter = claimsAdapter;
         if (!this.store.listRewardTiers().length) {
@@ -160,15 +160,15 @@ export class PerbugRewardsService {
         return clone(review);
     }
     createWalletNonce(publicKey) {
-        const config = loadSolanaConfig();
-        const ttlSeconds = Number.parseInt(process.env.SOLANA_WALLET_NONCE_TTL_SECONDS ?? "600", 10);
+        const config = loadPerbugRpcConfig();
+        const ttlSeconds = Number.parseInt(process.env.PERBUG_WALLET_NONCE_TTL_SECONDS ?? "600", 10);
         if (!isValidSolanaPublicKey(publicKey))
             throw new ValidationError(["invalid Solana public key"]);
         const nonce = createWalletLoginNonce();
         const issuedAt = nowIso();
         const message = formatWalletSignInMessage({ publicKey, nonce, timestamp: issuedAt });
         const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
-        const record = { id: randomUUID(), publicKey, nonce, message, issuedAt, expiresAt, cluster: config.cluster };
+        const record = { id: randomUUID(), publicKey, nonce, message, issuedAt, expiresAt, cluster: `perbug-${config.rpcPort}` };
         this.store.saveWalletNonce(record);
         return { nonce, message, expiresAt };
     }
@@ -236,7 +236,7 @@ export class PerbugRewardsService {
         };
     }
     async claimReward(input) {
-        const config = loadSolanaConfig();
+        const config = loadPerbugRpcConfig();
         if (String(process.env.PERBUG_REWARDS_ENABLED ?? "true") === "false")
             throw new ValidationError(["claims disabled"]);
         const review = this.requireReview(input.reviewId);
@@ -264,11 +264,11 @@ export class PerbugRewardsService {
             walletPublicKey: input.walletPublicKey,
             reviewId: review.id,
             placeId: review.placeId,
-            tokenMint: config.mintAddress,
+            tokenMint: "PERBUG",
             amountAtomic,
-            amountDisplay: amountToDisplay(amountAtomic, config.decimals),
+            amountDisplay: amountToDisplay(amountAtomic, PERBUG_DECIMALS),
             status: "pending",
-            cluster: config.cluster,
+            cluster: `perbug-rpc-${config.host}:${config.rpcPort}`,
             idempotencyKey,
             createdAt: nowIso(),
             updatedAt: nowIso()
@@ -278,10 +278,10 @@ export class PerbugRewardsService {
         this.store.saveClaim(claim);
         this.store.saveReview(review);
         try {
-            const transfer = await this.claimsAdapter.transferClaim({ claimantPublicKey: input.walletPublicKey, amountAtomic, idempotencyKey, memo: `PERBUG review ${review.id}` });
+            const transfer = await this.claimsAdapter.transferClaim({ claimantAddress: input.walletPublicKey, amountDisplay: claim.amountDisplay, idempotencyKey, memo: `PERBUG review ${review.id}` });
             claim.status = "confirmed";
-            claim.transactionSignature = transfer.signature;
-            claim.associatedTokenAccount = transfer.associatedTokenAccount;
+            claim.transactionSignature = transfer.txid;
+            claim.associatedTokenAccount = input.walletPublicKey;
             claim.explorerUrl = transfer.explorerUrl;
             claim.claimedAt = nowIso();
             claim.updatedAt = nowIso();
@@ -290,7 +290,7 @@ export class PerbugRewardsService {
             review.rewardStatus = review.reward.status;
             review.rewardPosition = review.reward.rewardPosition;
             review.finalRewardAmount = review.reward.finalAmountAtomic?.toString();
-            review.reward.claimTransactionSignature = transfer.signature;
+            review.reward.claimTransactionSignature = transfer.txid;
             review.reward.claimedAt = claim.claimedAt;
             review.reward.updatedAt = claim.updatedAt;
             this.store.saveClaim(claim);
