@@ -3,11 +3,13 @@ import Container from './Container.astro';
 import PixelBugIcon from './PixelBugIcon.astro';
 
 const links = [
-  { href: '#how-it-works', label: 'How it works' },
-  { href: '#features', label: 'Features' },
-  { href: '#audiences', label: 'For everyone' },
-  { href: '#faq', label: 'FAQ' },
-  { href: '/marketplace/', label: 'Marketplace' }
+  { href: '/#what-is-perbug', label: 'What is Perbug' },
+  { href: '/#sha-256', label: 'SHA-256 Coin' },
+  { href: '/#proof-of-exploration', label: 'Proof of Exploration' },
+  { href: '/#how-it-works', label: 'How It Works' },
+  { href: '/developers/', label: 'Developers' },
+  { href: '/roadmap/', label: 'Roadmap' },
+  { href: '/faq/', label: 'FAQ' }
 ];
 ---
 
@@ -18,8 +20,8 @@ const links = [
         <PixelBugIcon class="h-6 w-6" src="/perbug1.svg" alt="Perbug logo" />
         <span class="text-base font-semibold tracking-wide text-slate-100">Perbug</span>
       </a>
-      <a href="/downloads/" class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-400">
-        Get the App
+      <a href="https://github.com/perbugcore/" target="_blank" rel="noreferrer" class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-400">
+        View GitHub
       </a>
     </div>
     <nav class="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-300 sm:mt-2 sm:justify-end">

@@ -11,7 +11,7 @@ interface Props {
   structuredData?: Record<string, unknown> | Record<string, unknown>[];
 }
 
-const { title, description, canonical, ogImage = '/perbug.svg', structuredData } = Astro.props;
+const { title, description, canonical, ogImage = '/social-card.svg', structuredData } = Astro.props;
 ---
 
 <!doctype html>
@@ -22,6 +22,10 @@ const { title, description, canonical, ogImage = '/perbug.svg', structuredData }
     <link rel="icon" type="image/svg+xml" href="/perbug1.svg" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta
+      name="keywords"
+      content="Perbug, SHA-256 coin, Proof of Exploration, crypto exploration, location-based blockchain, perbugcore"
+    />
     <link rel="canonical" href={canonical} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />

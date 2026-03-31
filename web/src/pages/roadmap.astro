@@ -1,0 +1,24 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import { createSeo } from '@/lib/seo';
+
+const seo = createSeo({
+  title: 'Roadmap',
+  description: 'Perbug roadmap and long-term vision for SHA-256 chain development and Proof of Exploration expansion.',
+  path: '/roadmap/'
+});
+---
+
+<BaseLayout {...seo}>
+  <Container class="py-16">
+    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">Vision</p>
+    <h1 class="mt-3 text-4xl font-bold text-white">Perbug roadmap</h1>
+    <ol class="mt-6 space-y-3 text-slate-300">
+      <li class="rounded-xl border border-slate-800 bg-slate-900/60 p-4"><strong class="text-white">Phase 1:</strong> Strengthen core chain and project foundations.</li>
+      <li class="rounded-xl border border-slate-800 bg-slate-900/60 p-4"><strong class="text-white">Phase 2:</strong> Expand Proof of Exploration gameplay mechanics.</li>
+      <li class="rounded-xl border border-slate-800 bg-slate-900/60 p-4"><strong class="text-white">Phase 3:</strong> Grow developer tooling and integration pathways.</li>
+      <li class="rounded-xl border border-slate-800 bg-slate-900/60 p-4"><strong class="text-white">Phase 4:</strong> Scale ecosystem participation and public documentation.</li>
+    </ol>
+  </Container>
+</BaseLayout>

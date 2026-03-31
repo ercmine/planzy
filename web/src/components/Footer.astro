@@ -1,7 +1,6 @@
 ---
 import Container from './Container.astro';
 import PixelBugIcon from './PixelBugIcon.astro';
-import { publicConfig } from '@/env/public';
 ---
 
 <footer class="mt-20 border-t border-slate-800 py-10">
@@ -11,36 +10,33 @@ import { publicConfig } from '@/env/public';
         <PixelBugIcon class="h-5 w-5" src="/perbug1.svg" alt="Perbug logo" />
         <p class="font-semibold text-slate-100">Perbug</p>
       </div>
-      <p class="mt-3 max-w-xs">A smarter local discovery platform for users, creators, and businesses.</p>
+      <p class="mt-3 max-w-xs">Perbug is a SHA-256 coin and exploration ecosystem powered by Proof of Exploration.</p>
     </div>
     <div>
-      <p class="font-semibold text-slate-200">Product</p>
+      <p class="font-semibold text-slate-200">Explore</p>
       <div class="mt-3 grid gap-2">
-        <a href="/downloads/" class="hover:text-brand-400">Get the App</a>
-        <a href="/demo/" class="hover:text-brand-400">Product Preview</a>
-        <a href="/planner/" class="hover:text-brand-400">Outing Planner</a>
-        <a href="#premium" class="hover:text-brand-400">Premium</a>
+        <a href="/about/" class="hover:text-brand-400">About Perbug</a>
+        <a href="/proof-of-exploration/" class="hover:text-brand-400">Proof of Exploration</a>
+        <a href="/roadmap/" class="hover:text-brand-400">Roadmap</a>
+        <a href="/faq/" class="hover:text-brand-400">FAQ</a>
       </div>
     </div>
     <div>
-      <p class="font-semibold text-slate-200">Creators & Businesses</p>
+      <p class="font-semibold text-slate-200">Developers</p>
       <div class="mt-3 grid gap-2">
-        <a href="#creators" class="hover:text-brand-400">Creator onboarding</a>
-        <a href="#business" class="hover:text-brand-400">Business tools</a>
-        <a href="/support/" class="hover:text-brand-400">Contact growth team</a>
+        <a href="/developers/" class="hover:text-brand-400">Developer hub</a>
+        <a href="https://github.com/perbugcore/" target="_blank" rel="noreferrer" class="hover:text-brand-400">GitHub Organization</a>
+        <a href="https://github.com/perbugcore/" target="_blank" rel="noreferrer" class="hover:text-brand-400">Follow development</a>
       </div>
     </div>
     <div>
-      <p class="font-semibold text-slate-200">Company</p>
+      <p class="font-semibold text-slate-200">Project</p>
       <div class="mt-3 grid gap-2">
-        <a href="/privacy/" class="hover:text-brand-400">Privacy</a>
-        <a href="/terms/" class="hover:text-brand-400">Terms</a>
-        <a href="/support/" class="hover:text-brand-400">Support</a>
-        {publicConfig.PERBUG_SUPPORT_EMAIL && (
-          <a href={`mailto:${publicConfig.PERBUG_SUPPORT_EMAIL}`} class="hover:text-brand-400">{publicConfig.PERBUG_SUPPORT_EMAIL}</a>
-        )}
+        <a href="/#sha-256" class="hover:text-brand-400">SHA-256 Coin</a>
+        <a href="/#how-it-works" class="hover:text-brand-400">How It Works</a>
+        <a href="/#ecosystem" class="hover:text-brand-400">Ecosystem</a>
       </div>
     </div>
   </Container>
-  <Container class="mt-8 border-t border-slate-800 pt-6 text-xs text-slate-500">© {new Date().getFullYear()} Perbug. All rights reserved.</Container>
+  <Container class="mt-8 border-t border-slate-800 pt-6 text-xs text-slate-500">© {new Date().getFullYear()} Perbug. Open ecosystem, open development.</Container>
 </footer>

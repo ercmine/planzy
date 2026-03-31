@@ -1,0 +1,26 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Container from '@/components/Container.astro';
+import { createSeo } from '@/lib/seo';
+
+const seo = createSeo({
+  title: 'Developers',
+  description: 'Build with Perbug. Explore repositories, follow development, and contribute to the SHA-256 and Proof of Exploration ecosystem.',
+  path: '/developers/'
+});
+---
+
+<BaseLayout {...seo}>
+  <Container class="py-16">
+    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">Open Source</p>
+    <h1 class="mt-3 text-4xl font-bold text-white">Developer hub</h1>
+    <p class="mt-5 max-w-3xl text-slate-300">Perbug is developed in public. Builders can inspect code, open issues, propose improvements, and create ecosystem tooling.</p>
+    <div class="mt-6 grid gap-3 md:grid-cols-2">
+      <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">Chain & core infrastructure</div>
+      <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">App and gameplay layers</div>
+      <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">Backend and services</div>
+      <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">Website and docs</div>
+    </div>
+    <a href="https://github.com/perbugcore/" target="_blank" rel="noreferrer" class="mt-8 inline-flex rounded-lg bg-brand-500 px-5 py-3 font-semibold text-slate-950 hover:bg-brand-400">Open GitHub Organization</a>
+  </Container>
+</BaseLayout>
