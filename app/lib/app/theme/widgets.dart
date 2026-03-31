@@ -167,11 +167,13 @@ class _SurfaceAccent extends StatelessWidget {
         alignment: alignment,
         child: FractionallySizedBox(
           widthFactor: 0.72,
-          heightFactor: 0.36,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(120),
+          child: AspectRatio(
+            aspectRatio: 2,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(120),
+              ),
             ),
           ),
         ),
