@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { ValidationError } from "../plans/errors.js";
 const YEARLY_ALLOCATION = 10000000n;
+const PERBUG_PRECISION_SCALE = 1000000n;
+const DEFAULT_DEPLETION_THRESHOLD = 1000n; // 0.001 Perbug
 function nowIso() { return new Date().toISOString(); }
 function distanceMeters(lat1, lng1, lat2, lng2) {
     const toRad = (n) => (n * Math.PI) / 180;
@@ -9,13 +11,47 @@ function distanceMeters(lat1, lng1, lat2, lng2) {
     const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
     return 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+function formatPerbugAtomic(amount) {
+    const whole = amount / PERBUG_PRECISION_SCALE;
+    const fractional = (amount % PERBUG_PRECISION_SCALE).toString().padStart(6, "0").replace(/0+$/, "");
+    return fractional.length > 0 ? `${whole}.${fractional}` : `${whole}.0`;
+}
+function halvedRewardAtomic(claimCount) {
+    return PERBUG_PRECISION_SCALE / (2n ** BigInt(claimCount));
+}
+function normalizeLocation(input) {
+    const claimCount = 0;
+    const currentRewardAtomic = halvedRewardAtomic(claimCount);
+    const depletionThresholdAtomic = input.depletionThresholdAtomic ?? DEFAULT_DEPLETION_THRESHOLD;
+    return {
+        ...input,
+        rewardPerClaim: PERBUG_PRECISION_SCALE,
+        claimCount,
+        currentRewardAtomic,
+        currentReward: formatPerbugAtomic(currentRewardAtomic),
+        totalClaimedAtomic: 0n,
+        totalClaimed: "0.0",
+        uniqueVisitors: 0,
+        totalVisitors: 0,
+        totalClaims: 0,
+        isDepleted: currentRewardAtomic < depletionThresholdAtomic,
+        depletionThresholdAtomic,
+        depletionThreshold: formatPerbugAtomic(depletionThresholdAtomic),
+        claimHistory: [],
+        visitorUserIds: []
+    };
+}
 export class LocationClaimsService {
     store;
     constructor(store) {
         this.store = store;
     }
     upsertLocation(input) {
-        const location = { ...input, rewardPerClaim: BigInt(input.rewardPerClaim) };
+        const location = normalizeLocation({
+            ...input,
+            rewardPerClaim: PERBUG_PRECISION_SCALE,
+            depletionThresholdAtomic: input.depletionThresholdAtomic != null ? BigInt(input.depletionThresholdAtomic) : undefined
+        });
         this.store.upsertLocation(location);
         return location;
     }
@@ -69,6 +105,12 @@ export class LocationClaimsService {
             state
         };
         this.store.saveVisit(visit);
+        if (!location.visitorUserIds.includes(input.userId)) {
+            location.visitorUserIds = [...location.visitorUserIds, input.userId];
+            location.uniqueVisitors = location.visitorUserIds.length;
+        }
+        location.totalVisitors += 1;
+        this.store.upsertLocation(location);
         return visit;
     }
     prepareAdGate(input) {
@@ -78,6 +120,8 @@ export class LocationClaimsService {
             throw new ValidationError(["visit ownership mismatch"]);
         if (visit.state !== "in_range")
             throw new ValidationError(["visit is not within claim radius"]);
+        if (location.isDepleted)
+            throw new ValidationError(["location depleted"]);
         const record = {
             id: `ad_${randomUUID()}`,
             userId: input.userId,
@@ -102,6 +146,8 @@ export class LocationClaimsService {
         if (existing)
             return existing;
         const location = this.requireLocation(input.locationId);
+        if (location.isDepleted)
+            throw new ValidationError(["location depleted"]);
         const visit = this.requireVisit(input.visitId);
         if (visit.userId !== input.userId || visit.locationId !== input.locationId)
             throw new ValidationError(["visit mismatch"]);
@@ -115,18 +161,25 @@ export class LocationClaimsService {
         const adRecord = this.store.getAdGate(input.adSessionId);
         if (!adRecord || adRecord.status !== "completed")
             throw new ValidationError(["interstitial ad completion required"]);
+        const rewardAtomic = halvedRewardAtomic(location.claimCount);
+        if (rewardAtomic <= location.depletionThresholdAtomic) {
+            location.isDepleted = true;
+            location.state = "exhausted";
+            this.store.upsertLocation(location);
+            throw new ValidationError(["location depleted"]);
+        }
         const attempt = {
             id: `attempt_${randomUUID()}`,
             userId: input.userId,
             locationId: input.locationId,
             visitId: input.visitId,
             adSessionId: input.adSessionId,
-            requestedReward: location.rewardPerClaim,
+            requestedReward: rewardAtomic,
             status: "pending",
             createdAt: nowIso()
         };
         const pool = this.getOrCreateAnnualPool(input.year);
-        if (pool.available < location.rewardPerClaim) {
+        if (pool.available < rewardAtomic) {
             attempt.status = "rejected";
             attempt.rejectionReason = "emission_pool_exhausted";
             this.store.saveAttempt(attempt);
@@ -135,8 +188,8 @@ export class LocationClaimsService {
         }
         attempt.status = "approved";
         this.store.saveAttempt(attempt);
-        pool.claimedTotal += location.rewardPerClaim;
-        pool.available -= location.rewardPerClaim;
+        pool.claimedTotal += rewardAtomic;
+        pool.available -= rewardAtomic;
         pool.updatedAt = nowIso();
         this.store.upsertAnnualPool(pool);
         const claim = {
@@ -146,17 +199,31 @@ export class LocationClaimsService {
             visitId: input.visitId,
             attemptId: attempt.id,
             adSessionId: input.adSessionId,
-            rewardIssued: location.rewardPerClaim,
+            rewardIssued: rewardAtomic,
+            rewardIssuedDisplay: formatPerbugAtomic(rewardAtomic),
             finalizedAt: nowIso(),
             idempotencyKey: input.idempotencyKey
         };
         this.store.saveFinalizedClaim(claim);
-        this.store.addLedgerEntry({ id: `ledger_${randomUUID()}`, type: "claim", userId: input.userId, locationId: input.locationId, attemptId: attempt.id, claimId: claim.id, amount: claim.rewardIssued, metadata: { year: pool.year }, createdAt: nowIso() });
-        location.state = location.cooldownSeconds > 0 ? "cooldown" : location.state;
-        if (location.cooldownSeconds > 0) {
-            location.cooldownUntil = new Date(Date.now() + location.cooldownSeconds * 1000).toISOString();
-            this.store.upsertLocation(location);
+        this.store.addLedgerEntry({ id: `ledger_${randomUUID()}`, type: "claim", userId: input.userId, locationId: input.locationId, attemptId: attempt.id, claimId: claim.id, amount: claim.rewardIssued, metadata: { year: pool.year, reward: claim.rewardIssuedDisplay }, createdAt: nowIso() });
+        location.claimCount += 1;
+        location.totalClaims = location.claimCount;
+        location.totalClaimedAtomic += rewardAtomic;
+        location.totalClaimed = formatPerbugAtomic(location.totalClaimedAtomic);
+        location.claimHistory = [{ claimId: claim.id, userId: input.userId, rewardAtomic, reward: claim.rewardIssuedDisplay, finalizedAt: claim.finalizedAt }, ...location.claimHistory];
+        const nextReward = halvedRewardAtomic(location.claimCount);
+        location.currentRewardAtomic = nextReward;
+        location.currentReward = formatPerbugAtomic(nextReward);
+        if (nextReward <= location.depletionThresholdAtomic) {
+            location.isDepleted = true;
+            location.state = "exhausted";
+            location.cooldownUntil = undefined;
         }
+        else if (location.cooldownSeconds > 0) {
+            location.state = "cooldown";
+            location.cooldownUntil = new Date(Date.now() + location.cooldownSeconds * 1000).toISOString();
+        }
+        this.store.upsertLocation(location);
         return claim;
     }
     getUserHistory(userId) { return this.store.listClaimsByUser(userId); }
@@ -165,6 +232,9 @@ export class LocationClaimsService {
     flowStateFor(userId, locationId, inRange) {
         if (!inRange)
             return "approaching";
+        const location = this.requireLocation(locationId);
+        if (location.isDepleted)
+            return "unavailable";
         const alreadyClaimed = this.store.listClaimsByLocation(locationId).some((claim) => claim.userId === userId);
         return alreadyClaimed ? "already_claimed" : "visited";
     }

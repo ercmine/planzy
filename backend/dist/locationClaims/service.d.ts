@@ -2,8 +2,9 @@ import type { AdGateRecord, AnnualEmissionPool, ClaimableLocation, FinalizedClai
 export declare class LocationClaimsService {
     private readonly store;
     constructor(store: LocationClaimsStore);
-    upsertLocation(input: Omit<ClaimableLocation, "rewardPerClaim"> & {
-        rewardPerClaim: bigint | number;
+    upsertLocation(input: Omit<ClaimableLocation, "rewardPerClaim" | "claimCount" | "currentRewardAtomic" | "currentReward" | "totalClaimedAtomic" | "totalClaimed" | "uniqueVisitors" | "totalVisitors" | "totalClaims" | "isDepleted" | "depletionThreshold" | "claimHistory" | "visitorUserIds"> & {
+        rewardPerClaim?: bigint | number;
+        depletionThresholdAtomic?: bigint | number;
     }): ClaimableLocation;
     getOrCreateAnnualPool(year?: number): AnnualEmissionPool;
     listNearbyClaimables(input: {

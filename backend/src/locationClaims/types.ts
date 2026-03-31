@@ -2,6 +2,14 @@ export type ClaimableLocationState = "available" | "cooldown" | "exhausted";
 export type VisitProximityState = "out_of_range" | "approaching" | "in_range";
 export type ClaimFlowState = "out_of_range" | "approaching" | "visited" | "ad_required" | "claim_ready" | "claim_processing" | "claim_success" | "cooldown" | "already_claimed" | "unavailable";
 
+export interface LocationClaimHistoryEntry {
+  claimId: string;
+  userId: string;
+  rewardAtomic: bigint;
+  reward: string;
+  finalizedAt: string;
+}
+
 export interface ClaimableLocation {
   id: string;
   lat: number;
@@ -16,6 +24,19 @@ export interface ClaimableLocation {
   rarity?: "common" | "rare" | "epic" | "legendary";
   multiplier?: number;
   regionTag?: string;
+  claimCount: number;
+  currentRewardAtomic: bigint;
+  currentReward: string;
+  totalClaimedAtomic: bigint;
+  totalClaimed: string;
+  uniqueVisitors: number;
+  totalVisitors: number;
+  totalClaims: number;
+  isDepleted: boolean;
+  depletionThresholdAtomic: bigint;
+  depletionThreshold: string;
+  claimHistory: LocationClaimHistoryEntry[];
+  visitorUserIds: string[];
 }
 
 export interface AnnualEmissionPool {
@@ -59,6 +80,7 @@ export interface FinalizedClaim {
   attemptId: string;
   adSessionId: string;
   rewardIssued: bigint;
+  rewardIssuedDisplay: string;
   finalizedAt: string;
   idempotencyKey: string;
 }
