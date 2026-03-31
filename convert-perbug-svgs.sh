@@ -23,9 +23,9 @@ if importlib.util.find_spec('cairosvg') is None:
 import cairosvg
 
 root = Path.cwd()
-svg_files = sorted(root.rglob('dryad*.svg'))
+svg_files = sorted(root.rglob('perbug*.svg'))
 if not svg_files:
-    print('No dryad SVG files found.')
+    print('No perbug SVG files found.')
     raise SystemExit(0)
 
 for svg_path in svg_files:

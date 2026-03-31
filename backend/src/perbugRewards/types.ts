@@ -3,7 +3,7 @@ export type ReviewRewardStatus = "ineligible" | "eligible" | "claimable" | "clai
 export type ReviewLifecycleStatus = "pending" | "approved" | "rejected" | "removed";
 export type ClaimStatus = "pending" | "submitted" | "confirmed" | "failed" | "canceled";
 
-export interface DryadRewardTier {
+export interface PerbugRewardTier {
   id: string;
   startPosition: number;
   endPosition: number | null;
@@ -92,7 +92,7 @@ export interface RewardClaimRecord {
   updatedAt: string;
 }
 
-export interface DryadReviewReward {
+export interface PerbugReviewReward {
   id: string;
   reviewId: string;
   videoId?: string;
@@ -123,7 +123,7 @@ export interface RewardReviewRecord {
   status: ReviewLifecycleStatus;
   moderationStatus: "pending" | "approved" | "rejected" | "blocked";
   qualityRating: RewardQualityRating;
-  reward: DryadReviewReward;
+  reward: PerbugReviewReward;
   approvalTimestamp?: string;
   distinctRewardSlot: string;
   adminDistinctRewardSlotEnabled: boolean;
@@ -177,7 +177,7 @@ export interface RewardPreview {
   nextRewardPosition: number;
   nextBaseRewardAmount: number;
   rewardText: string;
-  ladder: DryadRewardTier[];
+  ladder: PerbugRewardTier[];
   approvedRewardedReviewCount: number;
 }
 
@@ -196,9 +196,9 @@ export interface SolanaClaimsAdapter {
   }): Promise<SolanaTransferResult>;
 }
 
-export interface DryadRewardsStore {
-  listRewardTiers(): DryadRewardTier[];
-  saveRewardTier(tier: DryadRewardTier): void;
+export interface PerbugRewardsStore {
+  listRewardTiers(): PerbugRewardTier[];
+  saveRewardTier(tier: PerbugRewardTier): void;
   listPlaces(): PlaceRecord[];
   getPlace(placeId: string): PlaceRecord | null;
   savePlace(place: PlaceRecord): void;

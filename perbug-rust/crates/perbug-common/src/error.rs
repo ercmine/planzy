@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
-pub enum DryadError {
+pub enum PerbugError {
     #[error("arithmetic overflow")]
     ArithmeticOverflow,
     #[error("invalid amount format")]

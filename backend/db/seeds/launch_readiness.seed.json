@@ -3,15 +3,15 @@
   "environment": "non-production",
   "description": "Deterministic launch-readiness fixtures for local/staging QA and demos.",
   "users": [
-    { "id": "user_free_local", "email": "free+local@dryad.test", "roles": ["USER"], "plan": "user-free", "state": "active", "savedPlaces": 0 },
-    { "id": "user_plus_local", "email": "plus+local@dryad.test", "roles": ["USER"], "plan": "user-plus", "state": "active", "savedPlaces": 18 },
-    { "id": "user_trial_local", "email": "trial+local@dryad.test", "roles": ["USER"], "plan": "user-pro", "state": "trialing", "trialDaysRemaining": 9 },
-    { "id": "user_canceled_active", "email": "cancel+local@dryad.test", "roles": ["USER"], "plan": "user-plus", "state": "canceled_active", "graceUntil": "2026-06-30T00:00:00.000Z" },
-    { "id": "user_past_due", "email": "pastdue+local@dryad.test", "roles": ["USER"], "plan": "user-plus", "state": "past_due", "adsMode": "reduced" },
-    { "id": "creator_basic", "email": "creator.basic@dryad.test", "roles": ["USER", "CREATOR"], "plan": "creator-free", "state": "active" },
-    { "id": "creator_premium", "email": "creator.pro@dryad.test", "roles": ["USER", "CREATOR"], "plan": "creator-elite", "state": "active", "mediaCount": 15 },
-    { "id": "business_owner", "email": "owner@dryad.test", "roles": ["USER", "BUSINESS_OWNER"], "plan": "business-plus", "state": "active", "claimedPlaces": 2 },
-    { "id": "admin_mod", "email": "ops.admin@dryad.test", "roles": ["ADMIN", "MODERATOR"], "plan": "user-pro", "state": "active" }
+    { "id": "user_free_local", "email": "free+local@perbug.test", "roles": ["USER"], "plan": "user-free", "state": "active", "savedPlaces": 0 },
+    { "id": "user_plus_local", "email": "plus+local@perbug.test", "roles": ["USER"], "plan": "user-plus", "state": "active", "savedPlaces": 18 },
+    { "id": "user_trial_local", "email": "trial+local@perbug.test", "roles": ["USER"], "plan": "user-pro", "state": "trialing", "trialDaysRemaining": 9 },
+    { "id": "user_canceled_active", "email": "cancel+local@perbug.test", "roles": ["USER"], "plan": "user-plus", "state": "canceled_active", "graceUntil": "2026-06-30T00:00:00.000Z" },
+    { "id": "user_past_due", "email": "pastdue+local@perbug.test", "roles": ["USER"], "plan": "user-plus", "state": "past_due", "adsMode": "reduced" },
+    { "id": "creator_basic", "email": "creator.basic@perbug.test", "roles": ["USER", "CREATOR"], "plan": "creator-free", "state": "active" },
+    { "id": "creator_premium", "email": "creator.pro@perbug.test", "roles": ["USER", "CREATOR"], "plan": "creator-elite", "state": "active", "mediaCount": 15 },
+    { "id": "business_owner", "email": "owner@perbug.test", "roles": ["USER", "BUSINESS_OWNER"], "plan": "business-plus", "state": "active", "claimedPlaces": 2 },
+    { "id": "admin_mod", "email": "ops.admin@perbug.test", "roles": ["ADMIN", "MODERATOR"], "plan": "user-pro", "state": "active" }
   ],
   "places": [
     { "id": "place_media_rich", "title": "Mission Garden Bistro", "category": "food", "reviewCount": 22, "photoCount": 34, "videoCount": 6 },

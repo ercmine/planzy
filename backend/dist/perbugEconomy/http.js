@@ -6,11 +6,11 @@ const requireHeader = (req, key) => {
         throw new ValidationError([`${key} is required`]);
     return value;
 };
-export function createDryadEconomyHttpHandlers(service) {
+export function createPerbugEconomyHttpHandlers(service) {
     return {
         creditUser: async (req, res) => {
             const body = await parseJsonBody(req);
-            sendJson(res, 200, { wallet: service.creditUser(String(body.userId ?? ""), Number(body.amountDryad ?? 0), requireHeader(req, "x-admin-id")) });
+            sendJson(res, 200, { wallet: service.creditUser(String(body.userId ?? ""), Number(body.amountPerbug ?? 0), requireHeader(req, "x-admin-id")) });
         },
         createQuest: async (req, res) => {
             const body = await parseJsonBody(req);
@@ -20,8 +20,8 @@ export function createDryadEconomyHttpHandlers(service) {
                     placeId: String(body.placeId ?? ""),
                     title: String(body.title ?? ""),
                     actionType: String(body.actionType ?? "visit_checkin"),
-                    rewardDryad: Number(body.rewardDryad ?? 0),
-                    budgetDryad: Number(body.budgetDryad ?? 0),
+                    rewardPerbug: Number(body.rewardPerbug ?? 0),
+                    budgetPerbug: Number(body.budgetPerbug ?? 0),
                     dailyCap: Number(body.dailyCap ?? 100),
                     totalCap: Number(body.totalCap ?? 1000),
                     startsAt: String(body.startsAt ?? new Date().toISOString()),
@@ -49,8 +49,8 @@ export function createDryadEconomyHttpHandlers(service) {
                     id: String(body.id ?? ""),
                     title: String(body.title ?? ""),
                     placeIds: Array.isArray(body.placeIds) ? body.placeIds.map(String) : [],
-                    milestoneRewardsAtomic: Array.isArray(body.milestoneRewardsDryad) ? body.milestoneRewardsDryad.map((value) => BigInt(Math.round(Number(value) * 1_000_000))) : [],
-                    completionRewardAtomic: BigInt(Math.round(Number(body.completionRewardDryad ?? 0) * 1_000_000)),
+                    milestoneRewardsAtomic: Array.isArray(body.milestoneRewardsPerbug) ? body.milestoneRewardsPerbug.map((value) => BigInt(Math.round(Number(value) * 1_000_000))) : [],
+                    completionRewardAtomic: BigInt(Math.round(Number(body.completionRewardPerbug ?? 0) * 1_000_000)),
                     sponsoredByBusinessId: typeof body.sponsoredByBusinessId === "string" ? body.sponsoredByBusinessId : undefined,
                     startsAt: typeof body.startsAt === "string" ? body.startsAt : undefined,
                     endsAt: typeof body.endsAt === "string" ? body.endsAt : undefined,
@@ -108,7 +108,7 @@ export function createDryadEconomyHttpHandlers(service) {
                     businessId: requireHeader(req, "x-business-id"),
                     placeId: String(body.placeId ?? ""),
                     title: String(body.title ?? ""),
-                    costDryad: Number(body.costDryad ?? 0),
+                    costPerbug: Number(body.costPerbug ?? 0),
                     inventory: Number(body.inventory ?? 0),
                     startsAt: String(body.startsAt ?? new Date().toISOString()),
                     endsAt: String(body.endsAt ?? new Date(Date.now() + 30 * 86400000).toISOString()),

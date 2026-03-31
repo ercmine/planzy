@@ -8,8 +8,8 @@ import { publicConfig } from '@/env/public';
   <Container class="grid gap-8 text-sm text-slate-400 md:grid-cols-4">
     <div>
       <div class="flex items-center gap-2 text-brand-400">
-        <PixelBugIcon class="h-5 w-5" src="/dryad1.svg" alt="Dryad logo" />
-        <p class="font-semibold text-slate-100">Dryad</p>
+        <PixelBugIcon class="h-5 w-5" src="/perbug1.svg" alt="Perbug logo" />
+        <p class="font-semibold text-slate-100">Perbug</p>
       </div>
       <p class="mt-3 max-w-xs">A smarter local discovery platform for users, creators, and businesses.</p>
     </div>
@@ -36,11 +36,11 @@ import { publicConfig } from '@/env/public';
         <a href="/privacy/" class="hover:text-brand-400">Privacy</a>
         <a href="/terms/" class="hover:text-brand-400">Terms</a>
         <a href="/support/" class="hover:text-brand-400">Support</a>
-        {publicConfig.DRYAD_SUPPORT_EMAIL && (
-          <a href={`mailto:${publicConfig.DRYAD_SUPPORT_EMAIL}`} class="hover:text-brand-400">{publicConfig.DRYAD_SUPPORT_EMAIL}</a>
+        {publicConfig.PERBUG_SUPPORT_EMAIL && (
+          <a href={`mailto:${publicConfig.PERBUG_SUPPORT_EMAIL}`} class="hover:text-brand-400">{publicConfig.PERBUG_SUPPORT_EMAIL}</a>
         )}
       </div>
     </div>
   </Container>
-  <Container class="mt-8 border-t border-slate-800 pt-6 text-xs text-slate-500">© {new Date().getFullYear()} Dryad. All rights reserved.</Container>
+  <Container class="mt-8 border-t border-slate-800 pt-6 text-xs text-slate-500">© {new Date().getFullYear()} Perbug. All rights reserved.</Container>
 </footer>

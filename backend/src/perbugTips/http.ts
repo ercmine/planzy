@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { ValidationError } from "../plans/errors.js";
 import { parseJsonBody, readHeader, sendJson } from "../venues/claims/http.js";
-import { DryadTipsService } from "./service.js";
+import { PerbugTipsService } from "./service.js";
 
 function requireUserId(req: IncomingMessage): string {
   const userId = readHeader(req, "x-user-id");
@@ -10,7 +10,7 @@ function requireUserId(req: IncomingMessage): string {
   return userId;
 }
 
-export function createDryadTipsHttpHandlers(service: DryadTipsService) {
+export function createPerbugTipsHttpHandlers(service: PerbugTipsService) {
   return {
     createIntent: async (req: IncomingMessage, res: ServerResponse, videoId: string) => {
       const body = await parseJsonBody(req) as { senderWalletAddress?: string; amountWei?: string; note?: string; tipKind?: "water_tree" | "direct_eth" };
@@ -22,7 +22,7 @@ export function createDryadTipsHttpHandlers(service: DryadTipsService) {
         amountWei: BigInt(body.amountWei),
         note: body.note,
         tipKind: body.tipKind ?? "water_tree",
-        allowSelfTip: String(process.env.DRYAD_ALLOW_SELF_TIP ?? "false") === "true"
+        allowSelfTip: String(process.env.PERBUG_ALLOW_SELF_TIP ?? "false") === "true"
       });
       sendJson(res, 201, { tipIntent: tip });
     },

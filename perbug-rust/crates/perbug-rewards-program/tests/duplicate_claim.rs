@@ -1,13 +1,13 @@
 use borsh::to_vec;
-use dryad_common::{derive_config_pda, derive_place_pda, derive_reward_receipt_pda};
-use dryad_rewards_program::{
+use perbug_common::{derive_config_pda, derive_place_pda, derive_reward_receipt_pda};
+use perbug_rewards_program::{
     error::RewardsError, instruction::RewardsInstruction, processor::Processor,
 };
 use solana_program::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
 
 fn account<'a>(key: Pubkey, is_signer: bool, data_len: usize) -> AccountInfo<'a> {
     let key_ref = Box::leak(Box::new(key));
-    let owner_ref = Box::leak(Box::new(dryad_rewards_program::id()));
+    let owner_ref = Box::leak(Box::new(perbug_rewards_program::id()));
     let lamports = Box::leak(Box::new(0_u64));
     let data = Box::leak(vec![0_u8; data_len].into_boxed_slice());
     AccountInfo::new(key_ref, is_signer, true, lamports, data, owner_ref, false, 0)
@@ -15,7 +15,7 @@ fn account<'a>(key: Pubkey, is_signer: bool, data_len: usize) -> AccountInfo<'a>
 
 #[test]
 fn duplicate_receipt_creation_fails() {
-    let program_id = dryad_rewards_program::id();
+    let program_id = perbug_rewards_program::id();
     let admin = Pubkey::new_unique();
     let recipient = Pubkey::new_unique();
     let place_id = "place-dup".to_string();

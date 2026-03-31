@@ -7,14 +7,14 @@ export type SeoInput = {
 };
 
 export const defaultDescription =
-  'Dryad helps you discover the best nearby plans with live results, category filters, and fast swipe decisions.';
+  'Perbug helps you discover the best nearby plans with live results, category filters, and fast swipe decisions.';
 
 export function createSeo({ title, description, path = '/' }: SeoInput) {
-  const canonical = new URL(path, publicConfig.DRYAD_SITE_URL).toString();
-  const ogImage = new URL('/dryad.svg', publicConfig.DRYAD_SITE_URL).toString();
+  const canonical = new URL(path, publicConfig.PERBUG_SITE_URL).toString();
+  const ogImage = new URL('/perbug.svg', publicConfig.PERBUG_SITE_URL).toString();
 
   return {
-    title: `${title} | Dryad`,
+    title: `${title} | Perbug`,
     description,
     canonical,
     ogImage

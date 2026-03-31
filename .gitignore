@@ -31,5 +31,5 @@ app/.flutter-plugins-dependencies
 app/.pub-cache/
 app/.pub/
 app/build/
-# Generated Dryad logo PNGs
-**/dryad*.png
+# Generated Perbug logo PNGs
+**/perbug*.png

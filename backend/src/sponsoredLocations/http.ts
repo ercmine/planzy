@@ -45,11 +45,11 @@ export function createSponsoredLocationsHttpHandlers(service: SponsoredLocations
         targetRadiusMeters: Number(body.targetRadiusMeters ?? 250),
         startsAt: String(body.startsAt),
         endsAt: String(body.endsAt),
-        dailyBudgetDryad: Number(body.dailyBudgetDryad ?? 0),
-        totalBudgetDryad: Number(body.totalBudgetDryad ?? 0),
+        dailyBudgetPerbug: Number(body.dailyBudgetPerbug ?? 0),
+        totalBudgetPerbug: Number(body.totalBudgetPerbug ?? 0),
         rewardRule: {
           type: body.rewardRule && typeof body.rewardRule === "object" ? String((body.rewardRule as Record<string, unknown>).type ?? "fixed_per_visit") as never : "fixed_per_visit",
-          payoutPerVisitDryad: Number(((body.rewardRule as Record<string, unknown> | undefined)?.payoutPerVisitDryad) ?? 0),
+          payoutPerVisitPerbug: Number(((body.rewardRule as Record<string, unknown> | undefined)?.payoutPerVisitPerbug) ?? 0),
           decayBps: Number(((body.rewardRule as Record<string, unknown> | undefined)?.decayBps) ?? 0),
           firstXDaily: Number(((body.rewardRule as Record<string, unknown> | undefined)?.firstXDaily) ?? 0),
           splitWindowDays: Number(((body.rewardRule as Record<string, unknown> | undefined)?.splitWindowDays) ?? 0),
@@ -61,8 +61,8 @@ export function createSponsoredLocationsHttpHandlers(service: SponsoredLocations
       }));
     },
     fundCampaign: async (req: IncomingMessage, res: ServerResponse, campaignId: string) => {
-      const body = await parseJsonBody(req) as { amountDryad?: number };
-      sendJson(res, 200, { budget: service.fundCampaign({ campaignId, businessId: requireBusiness(req), amountDryad: Number(body.amountDryad ?? 0) }) });
+      const body = await parseJsonBody(req) as { amountPerbug?: number };
+      sendJson(res, 200, { budget: service.fundCampaign({ campaignId, businessId: requireBusiness(req), amountPerbug: Number(body.amountPerbug ?? 0) }) });
     },
     listBusinessCampaigns: async (req: IncomingMessage, res: ServerResponse) => sendJson(res, 200, { campaigns: service.listBusinessCampaigns(requireBusiness(req)) }),
     placements: async (_req: IncomingMessage, res: ServerResponse, url: URL) => {

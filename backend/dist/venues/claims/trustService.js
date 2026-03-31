@@ -175,7 +175,7 @@ export class BusinessTrustService {
             badges.push({
                 key: "claimed",
                 label: "Claimed",
-                description: "This business profile has been claimed by the business owner on Dryad.",
+                description: "This business profile has been claimed by the business owner on Perbug.",
                 priority: 1
             });
         }
@@ -183,7 +183,7 @@ export class BusinessTrustService {
             badges.push({
                 key: "verified_contact",
                 label: "Verified Contact",
-                description: "Dryad verified at least one contact method for this business.",
+                description: "Perbug verified at least one contact method for this business.",
                 priority: 2
             });
         }
@@ -199,7 +199,7 @@ export class BusinessTrustService {
             badges.push({
                 key: "trusted_business",
                 label: "Trusted Business",
-                description: "This business meets Dryad standards for claim status, verified contact, and profile completeness.",
+                description: "This business meets Perbug standards for claim status, verified contact, and profile completeness.",
                 priority: 4
             });
         }

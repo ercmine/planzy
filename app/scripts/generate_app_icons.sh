@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP_DIR="$ROOT_DIR/app"
-SOURCE_SVG="${1:-$ROOT_DIR/dryad1.svg}"
-TARGET_SVG="$APP_DIR/assets/branding/dryad1.svg"
+SOURCE_SVG="${1:-$ROOT_DIR/perbug1.svg}"
+TARGET_SVG="$APP_DIR/assets/branding/perbug1.svg"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then

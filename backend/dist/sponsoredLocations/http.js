@@ -42,11 +42,11 @@ export function createSponsoredLocationsHttpHandlers(service) {
                 targetRadiusMeters: Number(body.targetRadiusMeters ?? 250),
                 startsAt: String(body.startsAt),
                 endsAt: String(body.endsAt),
-                dailyBudgetDryad: Number(body.dailyBudgetDryad ?? 0),
-                totalBudgetDryad: Number(body.totalBudgetDryad ?? 0),
+                dailyBudgetPerbug: Number(body.dailyBudgetPerbug ?? 0),
+                totalBudgetPerbug: Number(body.totalBudgetPerbug ?? 0),
                 rewardRule: {
                     type: body.rewardRule && typeof body.rewardRule === "object" ? String(body.rewardRule.type ?? "fixed_per_visit") : "fixed_per_visit",
-                    payoutPerVisitDryad: Number((body.rewardRule?.payoutPerVisitDryad) ?? 0),
+                    payoutPerVisitPerbug: Number((body.rewardRule?.payoutPerVisitPerbug) ?? 0),
                     decayBps: Number((body.rewardRule?.decayBps) ?? 0),
                     firstXDaily: Number((body.rewardRule?.firstXDaily) ?? 0),
                     splitWindowDays: Number((body.rewardRule?.splitWindowDays) ?? 0),
@@ -59,7 +59,7 @@ export function createSponsoredLocationsHttpHandlers(service) {
         },
         fundCampaign: async (req, res, campaignId) => {
             const body = await parseJsonBody(req);
-            sendJson(res, 200, { budget: service.fundCampaign({ campaignId, businessId: requireBusiness(req), amountDryad: Number(body.amountDryad ?? 0) }) });
+            sendJson(res, 200, { budget: service.fundCampaign({ campaignId, businessId: requireBusiness(req), amountPerbug: Number(body.amountPerbug ?? 0) }) });
         },
         listBusinessCampaigns: async (req, res) => sendJson(res, 200, { campaigns: service.listBusinessCampaigns(requireBusiness(req)) }),
         placements: async (_req, res, url) => {

@@ -5,7 +5,7 @@ use crate::config::CliConfig;
 
 #[derive(Debug, Args)]
 pub struct CreateMintArgs {
-    #[arg(long, default_value_t = dryad_common::DRYAD_TOKEN_DECIMALS)]
+    #[arg(long, default_value_t = perbug_common::PERBUG_TOKEN_DECIMALS)]
     pub decimals: u8,
     #[arg(long)]
     pub token_2022: bool,

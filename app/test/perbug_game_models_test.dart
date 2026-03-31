@@ -1,6 +1,6 @@
-import 'package:dryad/features/home/perbug_economy_models.dart';
-import 'package:dryad/features/home/perbug_game_models.dart';
-import 'package:dryad/features/home/perbug_progression_models.dart';
+import 'package:perbug/features/home/perbug_economy_models.dart';
+import 'package:perbug/features/home/perbug_game_models.dart';
+import 'package:perbug/features/home/perbug_progression_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

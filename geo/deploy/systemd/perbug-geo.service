@@ -1,16 +1,16 @@
 [Unit]
-Description=Dryad Geo API Service
+Description=Perbug Geo API Service
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/srv/dryad/backend
-EnvironmentFile=/etc/dryad/geo.env
+WorkingDirectory=/srv/perbug/backend
+EnvironmentFile=/etc/perbug/geo.env
 ExecStart=/usr/bin/node dist/server/index.js
 Restart=always
 RestartSec=2
-StandardOutput=append:/var/log/dryad/geo-api.log
-StandardError=append:/var/log/dryad/geo-api.error.log
+StandardOutput=append:/var/log/perbug/geo-api.log
+StandardError=append:/var/log/perbug/geo-api.error.log
 
 [Install]
 WantedBy=multi-user.target

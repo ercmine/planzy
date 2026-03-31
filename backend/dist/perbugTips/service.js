@@ -4,16 +4,16 @@ import { amountToDisplay } from "../perbugRewards/solana/token.js";
 import { stableIdempotencyKey } from "../perbugRewards/solana/walletAuth.js";
 function nowIso() { return new Date().toISOString(); }
 function clone(value) { return structuredClone(value); }
-class MockDryadTipsAdapter {
+class MockPerbugTipsAdapter {
     async submitTransfer(input) {
         return { signature: `0x${stableIdempotencyKey([input.fromWallet, input.toWallet, input.idempotencyKey, input.amountWei.toString()]).slice(0, 64)}`, explorerUrl: `https://sepolia.etherscan.io/tx/0x${stableIdempotencyKey([input.memo, input.idempotencyKey]).slice(0, 64)}` };
     }
 }
-export class DryadTipsService {
+export class PerbugTipsService {
     store;
     deps;
     adapter;
-    constructor(store, deps, adapter = new MockDryadTipsAdapter()) {
+    constructor(store, deps, adapter = new MockPerbugTipsAdapter()) {
         this.store = store;
         this.deps = deps;
         this.adapter = adapter;
@@ -36,7 +36,7 @@ export class DryadTipsService {
             throw new ValidationError(["self tipping disabled"]);
         if (input.note && input.note.length > 280)
             throw new ValidationError(["tip note too long"]);
-        const feeBps = Math.max(0, input.platformFeeBps ?? Number.parseInt(process.env.DRYAD_PLATFORM_FEE_BPS ?? "0", 10));
+        const feeBps = Math.max(0, input.platformFeeBps ?? Number.parseInt(process.env.PERBUG_PLATFORM_FEE_BPS ?? "0", 10));
         const platformFeeAtomic = (input.amountWei * BigInt(feeBps)) / 10000n;
         const recipientNetAtomic = input.amountWei - platformFeeAtomic;
         const now = nowIso();

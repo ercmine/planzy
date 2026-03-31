@@ -1,4 +1,4 @@
-import type { DryadRewardsService } from "../perbugRewards/service.js";
+import type { PerbugRewardsService } from "../perbugRewards/service.js";
 import type { CompetitionStore } from "./store.js";
 import type { CompetitionAuditLog, CompetitionHomeView, CompetitionLeaderboard, CompetitionLeaderboardEntry, CompetitionLikeEvent, CompetitionMission, CompetitionMissionProgress, CompetitionReward, CompetitionReviewEvent, CompetitionScoringConfig, CompetitionSeason, CompetitionTipEvent, CompetitionUserProfile, CompetitionVideoQualitySnapshot } from "./types.js";
 export declare class CompetitionService {
@@ -6,7 +6,7 @@ export declare class CompetitionService {
     private readonly rewardsService?;
     private readonly nowProvider;
     private readonly config;
-    constructor(store: CompetitionStore, rewardsService?: DryadRewardsService | undefined, nowProvider?: () => Date, config?: CompetitionScoringConfig);
+    constructor(store: CompetitionStore, rewardsService?: PerbugRewardsService | undefined, nowProvider?: () => Date, config?: CompetitionScoringConfig);
     getCurrentSeason(): CompetitionSeason | null;
     listMissions(): CompetitionMission[];
     listLeaderboards(): CompetitionLeaderboard[];

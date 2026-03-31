@@ -1,4 +1,4 @@
-# Dryad progression system
+# Perbug progression system
 
 This module introduces a backend-driven progression engine with two coordinated tracks:
 

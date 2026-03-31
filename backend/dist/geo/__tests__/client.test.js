@@ -6,7 +6,7 @@ describe("GeoServiceClient", () => {
     });
     it("attaches auth header and parses result", async () => {
         const fetchMock = vi.fn(async (_url, init) => {
-            expect((init?.headers)["x-dryad-geo-service"]).toBe("shh");
+            expect((init?.headers)["x-perbug-geo-service"]).toBe("shh");
             return new Response(JSON.stringify({ results: [{ displayName: "x", lat: 1, lng: 2, source: "nominatim" }] }), { status: 200 });
         });
         vi.stubGlobal("fetch", fetchMock);

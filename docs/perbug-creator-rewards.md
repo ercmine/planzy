@@ -1,24 +1,24 @@
-# DRYAD Creator Rewards Architecture
+# PERBUG Creator Rewards Architecture
 
 ## Overview
 
-Dryad now includes a typed creator-rewards domain in `backend/src/dryadRewards/` that models:
+Perbug now includes a typed creator-rewards domain in `backend/src/perbugRewards/` that models:
 
 - Per-place decreasing reward ladders.
 - Reward eligibility separated from review approval and claimability.
 - Solana wallet auth using signed messages and single-use nonces.
-- Idempotent DRYAD SPL-token claims paid to the creator ATA.
+- Idempotent PERBUG SPL-token claims paid to the creator ATA.
 - Audit logging for admin-sensitive changes.
 
 ## Reward model
 
 Default seeded tiers:
 
-1. Position 1 => 200 DRYAD
-2. Positions 2-5 => 100 DRYAD
-3. Positions 6-10 => 50 DRYAD
-4. Positions 11-20 => 20 DRYAD
-5. Positions 21+ => 5 DRYAD
+1. Position 1 => 200 PERBUG
+2. Positions 2-5 => 100 PERBUG
+3. Positions 6-10 => 50 PERBUG
+4. Positions 11-20 => 20 PERBUG
+5. Positions 21+ => 5 PERBUG
 
 Quality multipliers:
 
@@ -48,7 +48,7 @@ Replay attacks are prevented because each nonce is single-use and expires after 
 1. Creator opens the dashboard and sees claimable reviews.
 2. Frontend submits `POST /v1/rewards/reviews/:reviewId/claim` with the connected wallet public key.
 3. Backend verifies ownership, wallet linkage, claimability, and idempotency.
-4. Solana adapter derives or creates the ATA, submits the DRYAD transfer, and returns the explorer link.
+4. Solana adapter derives or creates the ATA, submits the PERBUG transfer, and returns the explorer link.
 5. Claim record becomes `confirmed`; review reward state becomes `claimed`.
 
 Repeated clicks with the same idempotency key return the existing claim record and do not double-pay.
@@ -68,26 +68,26 @@ Backend:
 
 - `SOLANA_CLUSTER`
 - `SOLANA_RPC_URL`
-- `DRYAD_MINT_ADDRESS`
-- `DRYAD_TREASURY_PUBLIC_KEY`
-- `DRYAD_TREASURY_SECRET`
+- `PERBUG_MINT_ADDRESS`
+- `PERBUG_TREASURY_PUBLIC_KEY`
+- `PERBUG_TREASURY_SECRET`
 - `SOLANA_COMMITMENT`
 - `CLAIMS_ENABLED`
 - `REWARD_TIERS_JSON`
 - `ADMIN_WALLET_ALLOWLIST`
 - `EXPLORER_BASE_URL`
-- `DRYAD_TOKEN_DECIMALS`
+- `PERBUG_TOKEN_DECIMALS`
 
 Website:
 
-- `PUBLIC_DRYAD_API_BASE_URL`
+- `PUBLIC_PERBUG_API_BASE_URL`
 - `PUBLIC_SOLANA_CLUSTER`
 
 ## Devnet setup
 
-1. Create or reuse a DRYAD mint on devnet.
+1. Create or reuse a PERBUG mint on devnet.
 2. Fund the treasury keypair with devnet SOL.
-3. Mint DRYAD into the treasury ATA.
+3. Mint PERBUG into the treasury ATA.
 4. Set the environment variables above.
 5. Run backend tests and the Astro creator rewards page.
 

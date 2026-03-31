@@ -1,5 +1,5 @@
-import 'package:dryad/app/assets.dart';
-import 'package:dryad/app/theme/widgets.dart';
+import 'package:perbug/app/assets.dart';
+import 'package:perbug/app/theme/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -408,7 +408,7 @@ export function buildNormalizedPlaceImage(params: {
 
 export function selectPrioritizedPlaceImages(images: PlaceImageDTO[]): { primaryImage?: PlaceImageDTO; imageGallery: PlaceImageDTO[] } {
   const priority: Record<string, number> = {
-    dryad: 0,
+    perbug: 0,
     wikidata: 1,
     opentripmap: 2
   };

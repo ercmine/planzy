@@ -14,7 +14,7 @@ export interface CategoryNormalizationResult {
     version: string;
 }
 export declare const CATEGORY_NORMALIZATION_VERSION = "v1";
-export declare const DRYAD_CATEGORIES: PlaceCategory[];
+export declare const PERBUG_CATEGORIES: PlaceCategory[];
 export declare const OSM_CATEGORY_RULES: SourceCategoryMappingRule[];
 export declare class OsmCategoryNormalizationEngine {
     private readonly rules;

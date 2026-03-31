@@ -2,16 +2,16 @@ import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 import nacl from "tweetnacl";
 import { describe, expect, it } from "vitest";
-import { MemoryDryadRewardsStore } from "../memoryStore.js";
-import { DryadRewardsService } from "../service.js";
+import { MemoryPerbugRewardsStore } from "../memoryStore.js";
+import { PerbugRewardsService } from "../service.js";
 import { amountToAtomicUnits, deriveAssociatedTokenAddress, isValidSolanaPublicKey } from "../solana/token.js";
 import { formatWalletSignInMessage, stableIdempotencyKey } from "../solana/walletAuth.js";
 function setup() {
-    const service = new DryadRewardsService(new MemoryDryadRewardsStore());
+    const service = new PerbugRewardsService(new MemoryPerbugRewardsStore());
     service.createPlace({ id: "place-1", name: "Cafe One" });
     return service;
 }
-describe("DryadRewardsService", () => {
+describe("PerbugRewardsService", () => {
     it("selects reward tiers by approved order and applies quality multipliers", () => {
         const service = setup();
         const first = service.submitReview({ userId: "u1", placeId: "place-1", videoUrl: "https://cdn/rev1.mp4", contentHash: "hash-1" });

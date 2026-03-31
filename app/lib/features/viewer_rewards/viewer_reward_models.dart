@@ -1,9 +1,9 @@
 class ViewerRewardHint {
   const ViewerRewardHint({
     this.isEligible = false,
-    this.watchRewardDryad,
-    this.ratingBonusDryad,
-    this.commentBonusDryad,
+    this.watchRewardPerbug,
+    this.ratingBonusPerbug,
+    this.commentBonusPerbug,
     this.watchThresholdPercent,
     this.sponsorName,
     this.fundingLabel,
@@ -11,9 +11,9 @@ class ViewerRewardHint {
   });
 
   final bool isEligible;
-  final double? watchRewardDryad;
-  final double? ratingBonusDryad;
-  final double? commentBonusDryad;
+  final double? watchRewardPerbug;
+  final double? ratingBonusPerbug;
+  final double? commentBonusPerbug;
   final int? watchThresholdPercent;
   final String? sponsorName;
   final String? fundingLabel;
@@ -24,9 +24,9 @@ class ViewerRewardHint {
   factory ViewerRewardHint.fromJson(Map<String, dynamic> json) {
     return ViewerRewardHint(
       isEligible: json['isEligible'] == true,
-      watchRewardDryad: (json['watchRewardDryad'] as num?)?.toDouble() ?? (json['watchReward'] as num?)?.toDouble(),
-      ratingBonusDryad: (json['ratingBonusDryad'] as num?)?.toDouble(),
-      commentBonusDryad: (json['commentBonusDryad'] as num?)?.toDouble(),
+      watchRewardPerbug: (json['watchRewardPerbug'] as num?)?.toDouble() ?? (json['watchReward'] as num?)?.toDouble(),
+      ratingBonusPerbug: (json['ratingBonusPerbug'] as num?)?.toDouble(),
+      commentBonusPerbug: (json['commentBonusPerbug'] as num?)?.toDouble(),
       watchThresholdPercent: (json['watchThresholdPercent'] as num?)?.toInt(),
       sponsorName: json['sponsorName']?.toString(),
       fundingLabel: json['fundingLabel']?.toString(),
@@ -43,9 +43,9 @@ class ViewerRewardVideoStatus {
     required this.status,
     required this.progressPercent,
     required this.remainingSeconds,
-    this.watchRewardDryad,
-    this.ratingRewardDryad,
-    this.commentRewardDryad,
+    this.watchRewardPerbug,
+    this.ratingRewardPerbug,
+    this.commentRewardPerbug,
     this.reason,
     this.sponsorName,
     this.fundingLabel,
@@ -55,9 +55,9 @@ class ViewerRewardVideoStatus {
   final ViewerRewardStatusType status;
   final double progressPercent;
   final int remainingSeconds;
-  final double? watchRewardDryad;
-  final double? ratingRewardDryad;
-  final double? commentRewardDryad;
+  final double? watchRewardPerbug;
+  final double? ratingRewardPerbug;
+  final double? commentRewardPerbug;
   final String? reason;
   final String? sponsorName;
   final String? fundingLabel;
@@ -109,9 +109,9 @@ class ViewerRewardVideoStatus {
       status: status,
       progressPercent: ((json['progressPercent'] as num?)?.toDouble() ?? 0).clamp(0, 100),
       remainingSeconds: (json['remainingSeconds'] as num?)?.toInt() ?? 0,
-      watchRewardDryad: (json['watchRewardDryad'] as num?)?.toDouble(),
-      ratingRewardDryad: (json['ratingRewardDryad'] as num?)?.toDouble(),
-      commentRewardDryad: (json['commentRewardDryad'] as num?)?.toDouble(),
+      watchRewardPerbug: (json['watchRewardPerbug'] as num?)?.toDouble(),
+      ratingRewardPerbug: (json['ratingRewardPerbug'] as num?)?.toDouble(),
+      commentRewardPerbug: (json['commentRewardPerbug'] as num?)?.toDouble(),
       reason: json['reason']?.toString(),
       sponsorName: json['sponsorName']?.toString(),
       fundingLabel: json['fundingLabel']?.toString(),
@@ -167,7 +167,7 @@ class ViewerRewardHistoryItem {
     required this.id,
     required this.videoTitle,
     required this.action,
-    required this.dryad,
+    required this.perbug,
     required this.status,
     required this.occurredAt,
     this.videoId,
@@ -180,7 +180,7 @@ class ViewerRewardHistoryItem {
   final String? videoId;
   final String videoTitle;
   final String action;
-  final double dryad;
+  final double perbug;
   final ViewerRewardStatusType status;
   final DateTime occurredAt;
   final String? placeName;
@@ -193,7 +193,7 @@ class ViewerRewardHistoryItem {
       videoId: json['videoId']?.toString(),
       videoTitle: (json['videoTitle'] ?? 'Video engagement').toString(),
       action: (json['action'] ?? 'watch').toString(),
-      dryad: (json['dryad'] as num?)?.toDouble() ?? 0,
+      perbug: (json['perbug'] as num?)?.toDouble() ?? 0,
       status: ViewerRewardVideoStatus.fromJson({'status': json['status']}).status,
       occurredAt: DateTime.tryParse((json['occurredAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0),
       placeName: json['placeName']?.toString(),

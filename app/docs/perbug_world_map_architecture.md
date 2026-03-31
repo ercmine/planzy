@@ -3,9 +3,9 @@
 ## 1) Current map stack audit
 
 ### Existing dependencies and flow
-- `maplibre_gl` is currently included in Flutter app dependencies (`pubspec.lock`) and used by `DryadMapLibreView` for native map rendering with a web fallback path. 
-- `DryadMapLibreView` integrates camera lifecycle, style loading, pin sync, and click handling, but on web it falls back to a simplified static layer (`_WebStaticFallbackMap`) because full plugin behavior is constrained. 
-- Tactical game mode (`PerbugGamePage`) previously used `DryadMapLibreView` as the core world board renderer.
+- `maplibre_gl` is currently included in Flutter app dependencies (`pubspec.lock`) and used by `PerbugMapLibreView` for native map rendering with a web fallback path. 
+- `PerbugMapLibreView` integrates camera lifecycle, style loading, pin sync, and click handling, but on web it falls back to a simplified static layer (`_WebStaticFallbackMap`) because full plugin behavior is constrained. 
+- Tactical game mode (`PerbugGamePage`) previously used `PerbugMapLibreView` as the core world board renderer.
 - Gameplay map state is already mostly map-engine agnostic through data models:
   - `MapViewport`, `MapPin` (`map_discovery_models.dart`)
   - `PerbugNode`, `PerbugMoveCandidate`, graph semantics (`perbug_game_models.dart`)

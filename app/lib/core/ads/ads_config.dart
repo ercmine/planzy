@@ -22,7 +22,7 @@ class AdsConfig {
 
   factory AdsConfig.fromEnv({required EnvFlavor flavor}) {
     final disableAdsForDebug =
-        kDebugMode && _parseBool(dotenv.maybeGet(EnvKeys.dryadDisableAds), fallback: false);
+        kDebugMode && _parseBool(dotenv.maybeGet(EnvKeys.perbugDisableAds), fallback: false);
 
     return AdsConfig(
       enabled: !disableAdsForDebug && _parseBool(dotenv.maybeGet(EnvKeys.adsEnabled), fallback: true),

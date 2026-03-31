@@ -1,13 +1,13 @@
 use borsh::{to_vec, BorshDeserialize};
-use dryad_common::{derive_config_pda, derive_tip_receipt_pda};
-use dryad_tipping_program::{
+use perbug_common::{derive_config_pda, derive_tip_receipt_pda};
+use perbug_tipping_program::{
     error::TippingError, instruction::TippingInstruction, processor::Processor, state::TipReceipt,
 };
 use solana_program::{account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey};
 
 fn account<'a>(key: Pubkey, is_signer: bool, data_len: usize) -> AccountInfo<'a> {
     let key_ref = Box::leak(Box::new(key));
-    let owner_ref = Box::leak(Box::new(dryad_tipping_program::id()));
+    let owner_ref = Box::leak(Box::new(perbug_tipping_program::id()));
     let lamports = Box::leak(Box::new(0_u64));
     let data = Box::leak(vec![0_u8; data_len].into_boxed_slice());
     AccountInfo::new(key_ref, is_signer, true, lamports, data, owner_ref, false, 0)
@@ -15,7 +15,7 @@ fn account<'a>(key: Pubkey, is_signer: bool, data_len: usize) -> AccountInfo<'a>
 
 #[test]
 fn fee_override_and_duplicates_are_validated() {
-    let program_id = dryad_tipping_program::id();
+    let program_id = perbug_tipping_program::id();
     let admin = Pubkey::new_unique();
     let from = Pubkey::new_unique();
     let to = Pubkey::new_unique();

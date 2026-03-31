@@ -1,7 +1,7 @@
 # Geo Architecture
 
 ## Service boundaries
-- `geo.dryad.dev` is a dedicated service consumed by the main backend over internal APIs.
+- `geo.perbug.dev` is a dedicated service consumed by the main backend over internal APIs.
 - Frontends should use backend APIs; geo is backend-facing by default.
 - Canonical place IDs remain backend-owned; geo provides candidate generation and normalized geographic context.
 
@@ -14,7 +14,7 @@
 - `POST /v1/area-context`
 
 ## Internal flow
-1. Backend sends signed request with `x-dryad-geo-service`.
+1. Backend sends signed request with `x-perbug-geo-service`.
 2. Geo validates auth middleware.
 3. Geo service applies normalization + cache key normalization.
 4. Nominatim is called through provider abstraction (timeouts, translated errors, no raw leakage).

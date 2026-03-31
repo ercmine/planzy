@@ -1,6 +1,6 @@
-import 'package:dryad/features/home/perbug_game_controller.dart';
-import 'package:dryad/features/home/perbug_economy_models.dart';
-import 'package:dryad/features/home/perbug_game_models.dart';
+import 'package:perbug/features/home/perbug_game_controller.dart';
+import 'package:perbug/features/home/perbug_economy_models.dart';
+import 'package:perbug/features/home/perbug_game_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

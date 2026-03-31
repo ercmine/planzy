@@ -72,8 +72,8 @@ export class CreatorMonetizationService {
     const active = ["active", "eligible", "limited"].includes(profile.monetizationStatus) && eligibility.eligible;
     const caps = {
       canReceiveTips: active && Boolean(ent.creator_tips_enabled),
-      canReceiveDryadTips: active && Boolean(ent.creator_tips_enabled),
-      canClaimDryadRewards: active && Boolean(ent.creator_monetization_tools),
+      canReceivePerbugTips: active && Boolean(ent.creator_tips_enabled),
+      canClaimPerbugRewards: active && Boolean(ent.creator_monetization_tools),
       canPublishPremiumContent: active && Boolean(ent.creator_premium_content_enabled),
       canBeFeatured: active && (profile.adminFeaturedOverride ?? (Boolean(ent.creator_featured_eligibility) && profile.featuredPlacementOptIn && profile.featuredPlacementEligible)),
       canAccessHigherUploadLimits: active && Boolean(ent.creator_extended_upload_limits),

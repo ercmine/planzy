@@ -6,7 +6,7 @@ function requireUserId(req) {
         throw new ValidationError(["x-user-id header is required"]);
     return userId;
 }
-export function createDryadTipsHttpHandlers(service) {
+export function createPerbugTipsHttpHandlers(service) {
     return {
         createIntent: async (req, res, videoId) => {
             const body = await parseJsonBody(req);
@@ -19,7 +19,7 @@ export function createDryadTipsHttpHandlers(service) {
                 amountWei: BigInt(body.amountWei),
                 note: body.note,
                 tipKind: body.tipKind ?? "water_tree",
-                allowSelfTip: String(process.env.DRYAD_ALLOW_SELF_TIP ?? "false") === "true"
+                allowSelfTip: String(process.env.PERBUG_ALLOW_SELF_TIP ?? "false") === "true"
             });
             sendJson(res, 201, { tipIntent: tip });
         },

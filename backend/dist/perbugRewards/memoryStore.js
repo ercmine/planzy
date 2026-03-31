@@ -1,4 +1,4 @@
-export class MemoryDryadRewardsStore {
+export class MemoryPerbugRewardsStore {
     tiers = new Map();
     places = new Map();
     placeRewardStates = new Map();

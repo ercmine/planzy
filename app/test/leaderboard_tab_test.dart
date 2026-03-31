@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:dryad/features/leaderboards/leaderboard_models.dart';
-import 'package:dryad/features/leaderboards/leaderboard_providers.dart';
-import 'package:dryad/features/leaderboards/leaderboard_tab.dart';
+import 'package:perbug/features/leaderboards/leaderboard_models.dart';
+import 'package:perbug/features/leaderboards/leaderboard_providers.dart';
+import 'package:perbug/features/leaderboards/leaderboard_tab.dart';
 
 void main() {
   const hub = CompetitionHubModel(
-    season: CompetitionSeasonModel(name: 'Season 1 · Dryad Competition', endsAtLabel: '2026-03-29T23:59:59Z', rewardPoolAtomic: '2500000000'),
+    season: CompetitionSeasonModel(name: 'Season 1 · Perbug Competition', endsAtLabel: '2026-03-29T23:59:59Z', rewardPoolAtomic: '2500000000'),
     score: 84.5,
     streakDays: 3,
     cityRank: 4,
@@ -48,7 +48,7 @@ void main() {
   testWidgets('renders mission cards, leaderboard cards, and reward sections', (tester) async {
     await pumpHub(tester, const AsyncData(hub));
 
-    expect(find.text('Earn DRYAD'), findsOneWidget);
+    expect(find.text('Earn PERBUG'), findsOneWidget);
     expect(find.text('Daily missions'), findsOneWidget);
     expect(find.text('Weekly missions'), findsOneWidget);
     expect(find.text('Leaderboards'), findsOneWidget);

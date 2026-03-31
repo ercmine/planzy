@@ -1,13 +1,13 @@
 import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRewardRecord, CuratorGuide, CuratorGuideAnalytics, EconomyFraudFlag, EconomyStore, ExplorationProgress, Offer, PremiumMembership, QuestCompletion, TokenAccount, TokenSplitConfig } from "./types.js";
-export declare class DryadEconomyService {
+export declare class PerbugEconomyService {
     private readonly store;
     constructor(store: EconomyStore);
     seedSplitConfig(actor: string): void;
-    creditUser(userId: string, amountDryad: number, actor?: string): TokenAccount;
-    creditBusiness(businessId: string, amountDryad: number, actor?: string): TokenAccount;
+    creditUser(userId: string, amountPerbug: number, actor?: string): TokenAccount;
+    creditBusiness(businessId: string, amountPerbug: number, actor?: string): TokenAccount;
     createBusinessQuest(input: Omit<BusinessQuest, "id" | "status" | "paidAtomic" | "createdAt" | "updatedAt" | "rewardAtomic" | "budgetAtomic"> & {
-        rewardDryad: number;
-        budgetDryad: number;
+        rewardPerbug: number;
+        budgetPerbug: number;
     }): BusinessQuest;
     completeQuest(input: {
         questId: string;
@@ -74,7 +74,7 @@ export declare class DryadEconomyService {
         actor: string;
     }): PremiumMembership;
     createOffer(input: Omit<Offer, "id" | "redeemed" | "status" | "costAtomic" | "createdAt" | "updatedAt"> & {
-        costDryad: number;
+        costPerbug: number;
     }): Offer;
     redeemOffer(input: {
         offerId: string;

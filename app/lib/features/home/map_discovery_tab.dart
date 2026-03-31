@@ -27,7 +27,7 @@ import 'place_detail_page.dart';
 import 'place_preview_card.dart';
 import '../../api/api_error.dart';
 import '../../core/env/env.dart';
-import 'dryad_maplibre_view.dart';
+import 'perbug_maplibre_view.dart';
 
 class MapViewportState {
   const MapViewportState({
@@ -493,7 +493,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                     child: Stack(
                       children: [
                   Positioned.fill(
-                    child: DryadMapLibreView(
+                    child: PerbugMapLibreView(
                       key: ValueKey<String>('map-mode-${_is3dMode ? '3d' : '2d'}-reload-$_mapReloadNonce'),
                       viewport: state.viewport,
                       pins: visiblePlaces,
@@ -771,7 +771,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
                       child: DiscoveryStateCard(
                         icon: locationState.status == LocationStatus.serviceDisabled ? Icons.location_disabled : Icons.location_searching,
                         title: locationState.status == LocationStatus.serviceDisabled ? 'Turn on location services' : 'Allow location access',
-                        body: locationState.errorMessage ?? 'Dryad uses your location to center the map, surface what is close, and power recenter + nearby discovery.',
+                        body: locationState.errorMessage ?? 'Perbug uses your location to center the map, surface what is close, and power recenter + nearby discovery.',
                         actions: [
                           FilledButton(
                             onPressed: () => _handleCenterOnUserLocation(locationState, permissionService),
@@ -1255,7 +1255,7 @@ class _MapDiscoveryTabState extends ConsumerState<MapDiscoveryTab> {
   }
 
   Future<void> _sharePlace(MapPin place) async {
-    await Share.share('Check out ${place.name} on Dryad: https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}');
+    await Share.share('Check out ${place.name} on Perbug: https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}');
   }
 
   Future<void> _openSortSheet() async {

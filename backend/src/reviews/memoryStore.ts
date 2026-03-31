@@ -1007,7 +1007,7 @@ export class MemoryReviewsStore implements ReviewsStore {
       ? (verificationSummary.verificationLevel === "verified" || verificationSummary.verificationLevel === "probable" ? "trusted_verified" : "trusted")
       : (verificationSummary.verificationLevel === "verified" || verificationSummary.verificationLevel === "probable" ? "verified" : "standard");
     const badgeIds = [
-      ...(reviewerStatus === "trusted" ? ["trusted_reviewer", "dryad_limited"] as const : []),
+      ...(reviewerStatus === "trusted" ? ["trusted_reviewer", "perbug_limited"] as const : []),
       ...((verificationSummary.verificationLevel === "verified" || verificationSummary.verificationLevel === "probable") ? ["verified_visit"] as const : []),
       ...(reviewTrustDesignation === "trusted" || reviewTrustDesignation === "trusted_verified" ? ["trusted_review"] as const : [])
     ];

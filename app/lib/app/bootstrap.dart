@@ -9,7 +9,7 @@ import '../core/env/env.dart';
 import '../core/logging/log.dart';
 import 'app.dart';
 
-Future<void> runDryadApp(EnvFlavor flavor) async {
+Future<void> runPerbugApp(EnvFlavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   if (kIsWeb) {
@@ -35,7 +35,7 @@ Future<void> runDryadApp(EnvFlavor flavor) async {
       overrides: [
         envConfigProvider.overrideWithValue(envConfig),
       ],
-      child: const DryadApp(),
+      child: const PerbugApp(),
     ),
   );
 }

@@ -101,7 +101,7 @@ describe("createGeoHttpHandlers", () => {
             listCanonicalPlaces: () => [{
                     canonicalPlaceId: "pl_1",
                     status: "active",
-                    primaryDisplayName: "Dryad Cafe",
+                    primaryDisplayName: "Perbug Cafe",
                     canonicalCategory: "coffee",
                     latitude: 30.2673,
                     longitude: -97.7432,
@@ -122,7 +122,7 @@ describe("createGeoHttpHandlers", () => {
         const res = createMockResponse();
         await handlers.apiNearby({ method: "GET", headers: {}, url: "/api/geo/nearby?lat=30.2672&lng=-97.7431&radius=1500" }, res);
         expect(res.statusCode).toBe(200);
-        expect(String(res.body)).toContain("Dryad Cafe");
+        expect(String(res.body)).toContain("Perbug Cafe");
     });
     it("fans out fallback nearby queries and filters broad admin rows", async () => {
         const geocode = vi.fn(async ({ query }) => {

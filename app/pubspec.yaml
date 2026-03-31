@@ -1,7 +1,7 @@
-name: dryad
+name: perbug
 publish_to: none
 
-description: Dryad Flutter app foundation.
+description: Perbug Flutter app foundation.
 
 version: 1.0.0+1
 

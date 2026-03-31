@@ -1,9 +1,9 @@
 [workspace]
 members = [
-  "crates/dryad-common",
-  "crates/dryad-token-cli",
-  "crates/dryad-rewards-program",
-  "crates/dryad-tipping-program",
+  "crates/perbug-common",
+  "crates/perbug-token-cli",
+  "crates/perbug-rewards-program",
+  "crates/perbug-tipping-program",
 ]
 resolver = "2"
 

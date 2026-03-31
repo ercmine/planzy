@@ -1,12 +1,12 @@
-import type { DryadTipLedgerEvent, DryadTipsStore, DryadVideoTipIntent } from "./types.js";
-export declare class MemoryDryadTipsStore implements DryadTipsStore {
+import type { PerbugTipLedgerEvent, PerbugTipsStore, PerbugVideoTipIntent } from "./types.js";
+export declare class MemoryPerbugTipsStore implements PerbugTipsStore {
     private readonly tips;
     private readonly ledger;
-    saveTipIntent(tip: DryadVideoTipIntent): void;
-    getTipIntent(id: string): DryadVideoTipIntent | null;
-    listTipsByVideo(videoId: string): DryadVideoTipIntent[];
-    listTipsBySender(userId: string): DryadVideoTipIntent[];
-    listTipsByRecipient(recipientUserId: string): DryadVideoTipIntent[];
-    saveLedgerEvent(event: DryadTipLedgerEvent): void;
-    listLedgerEvents(tipIntentId: string): DryadTipLedgerEvent[];
+    saveTipIntent(tip: PerbugVideoTipIntent): void;
+    getTipIntent(id: string): PerbugVideoTipIntent | null;
+    listTipsByVideo(videoId: string): PerbugVideoTipIntent[];
+    listTipsBySender(userId: string): PerbugVideoTipIntent[];
+    listTipsByRecipient(recipientUserId: string): PerbugVideoTipIntent[];
+    saveLedgerEvent(event: PerbugTipLedgerEvent): void;
+    listLedgerEvents(tipIntentId: string): PerbugTipLedgerEvent[];
 }

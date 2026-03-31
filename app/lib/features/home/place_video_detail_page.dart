@@ -83,7 +83,7 @@ class _RewardAwareVideoTile extends ConsumerWidget {
           children: [
             Text(video.creatorHandle),
             if (video.viewerRewardHint?.isEligible == true)
-              Text('Earn ${(video.viewerRewardHint?.watchRewardDryad ?? 0).toStringAsFixed(1)} DRYAD by watching'),
+              Text('Earn ${(video.viewerRewardHint?.watchRewardPerbug ?? 0).toStringAsFixed(1)} PERBUG by watching'),
             rewardStatus.maybeWhen(
               data: (status) => Text(status.statusLabel),
               orElse: () => const SizedBox.shrink(),

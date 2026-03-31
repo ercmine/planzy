@@ -66,7 +66,7 @@ class IdentityStore {
   })  : _prefs = sharedPreferences,
         _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
-  static const userIdKey = 'dryad_user_id';
+  static const userIdKey = 'perbug_user_id';
   static const onboardingCompletedKey = 'onboarding_completed';
   static const onboardingCategoriesKey = 'onboarding_categories';
   static const onboardingStepKey = 'onboarding_step';
@@ -195,7 +195,7 @@ class IdentityStore {
 
     final profile = LocalUserProfile(
       userId: userId,
-      displayName: displayName.isEmpty ? 'Dryad Explorer' : displayName,
+      displayName: displayName.isEmpty ? 'Perbug Explorer' : displayName,
       username: username.isEmpty ? 'local_$fallbackSuffix' : _sanitizeUsername(username),
       bio: bio.isEmpty ? 'Tracking honest reviews, saved places, and what to try next around town.' : bio,
     );

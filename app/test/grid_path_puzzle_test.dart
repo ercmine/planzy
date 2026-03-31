@@ -1,5 +1,5 @@
-import 'package:dryad/features/puzzles/grid_path_puzzle.dart';
-import 'package:dryad/features/puzzles/puzzle_framework.dart';
+import 'package:perbug/features/puzzles/grid_path_puzzle.dart';
+import 'package:perbug/features/puzzles/puzzle_framework.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

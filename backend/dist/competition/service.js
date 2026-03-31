@@ -13,7 +13,7 @@ const DEFAULT_CONFIG = {
     approvedReviewPoints: Number(process.env.COMPETITION_APPROVED_REVIEW_POINTS ?? "10"),
     discoveryBonusPoints: { first_review: 12, first_five: 7, under_covered: 5, standard: 0 },
     streakPointPerDay: Number(process.env.COMPETITION_STREAK_POINTS_PER_DAY ?? "2"),
-    tipPointsPerDryad: Number(process.env.COMPETITION_TIP_POINTS_PER_DRYAD ?? "1"),
+    tipPointsPerPerbug: Number(process.env.COMPETITION_TIP_POINTS_PER_PERBUG ?? "1"),
     missionCompletionPoints: Number(process.env.COMPETITION_MISSION_COMPLETION_POINTS ?? "6"),
     engagementBonusPoints: Number(process.env.COMPETITION_ENGAGEMENT_BONUS_POINTS ?? "0"),
     rewardClaimPrefix: process.env.COMPETITION_REWARD_CLAIM_PREFIX ?? "competition"
@@ -380,13 +380,13 @@ export class CompetitionService {
         const seasonEnd = new Date(now);
         seasonEnd.setUTCDate(now.getUTCDate() + Number.parseInt(process.env.COMPETITION_DEFAULT_SEASON_LENGTH_DAYS ?? "30", 10));
         const timestamp = nowIso(now);
-        this.store.saveSeason({ id: "season_current", name: "Season 1 · Dryad Competition", status: "active", startsAt: timestamp, endsAt: seasonEnd.toISOString(), rewardPoolAtomic: 2500000000n, createdAt: timestamp, updatedAt: timestamp });
+        this.store.saveSeason({ id: "season_current", name: "Season 1 · Perbug Competition", status: "active", startsAt: timestamp, endsAt: seasonEnd.toISOString(), rewardPoolAtomic: 2500000000n, createdAt: timestamp, updatedAt: timestamp });
         const missions = [
-            { id: "daily_approved_review", type: "first_approved_review_of_day", title: "Earn DRYAD", description: "Upload 1 approved place review today to earn a fixed DRYAD drop.", rewardAtomic: 25000000n, startsAt: weekStart.toISOString(), endsAt: weekEnd.toISOString(), repeatMode: "daily", goalType: "approved_reviews", goalValue: 1, active: true, createdAt: timestamp, updatedAt: timestamp },
+            { id: "daily_approved_review", type: "first_approved_review_of_day", title: "Earn PERBUG", description: "Upload 1 approved place review today to earn a fixed PERBUG drop.", rewardAtomic: 25000000n, startsAt: weekStart.toISOString(), endsAt: weekEnd.toISOString(), repeatMode: "daily", goalType: "approved_reviews", goalValue: 1, active: true, createdAt: timestamp, updatedAt: timestamp },
             { id: "weekly_coffee_reviews", type: "review_category", title: "Complete missions", description: "Review 3 new coffee shops this week for a city discovery bonus.", rewardAtomic: 75000000n, startsAt: weekStart.toISOString(), endsAt: weekEnd.toISOString(), repeatMode: "weekly", goalType: "category_reviews", goalValue: 3, category: "coffee", active: true, createdAt: timestamp, updatedAt: timestamp },
             { id: "quality_likes_10", type: "likes_in_48h", title: "Get 10 likes in the first 48 hours to earn a bonus", description: "Likes in the first 48 hours boost your quality score and complete this mission at 10 likes.", rewardAtomic: 90000000n, startsAt: weekStart.toISOString(), endsAt: weekEnd.toISOString(), repeatMode: "weekly", goalType: "early_likes", goalValue: 10, active: true, createdAt: timestamp, updatedAt: timestamp },
             { id: "featured_quality", type: "featured_quality_band", title: "Featured challenge", description: "Hit the FEATURED quality band on one video within the 48h quality window.", rewardAtomic: 150000000n, startsAt: weekStart.toISOString(), endsAt: weekEnd.toISOString(), repeatMode: "weekly", goalType: "featured_quality", goalValue: 1, active: true, createdAt: timestamp, updatedAt: timestamp },
-            { id: "streak_3", type: "streak_days", title: "Post 3 days in a row", description: "Keep your streak alive to earn consistency DRYAD.", rewardAtomic: 60000000n, startsAt: weekStart.toISOString(), endsAt: weekEnd.toISOString(), repeatMode: "weekly", goalType: "streak_days", goalValue: 3, active: true, createdAt: timestamp, updatedAt: timestamp }
+            { id: "streak_3", type: "streak_days", title: "Post 3 days in a row", description: "Keep your streak alive to earn consistency PERBUG.", rewardAtomic: 60000000n, startsAt: weekStart.toISOString(), endsAt: weekEnd.toISOString(), repeatMode: "weekly", goalType: "streak_days", goalValue: 3, active: true, createdAt: timestamp, updatedAt: timestamp }
         ];
         missions.forEach((mission) => this.store.saveMission(mission));
         const boards = [

@@ -959,7 +959,7 @@ export class MemoryReviewsStore {
             ? (verificationSummary.verificationLevel === "verified" || verificationSummary.verificationLevel === "probable" ? "trusted_verified" : "trusted")
             : (verificationSummary.verificationLevel === "verified" || verificationSummary.verificationLevel === "probable" ? "verified" : "standard");
         const badgeIds = [
-            ...(reviewerStatus === "trusted" ? ["trusted_reviewer", "dryad_limited"] : []),
+            ...(reviewerStatus === "trusted" ? ["trusted_reviewer", "perbug_limited"] : []),
             ...((verificationSummary.verificationLevel === "verified" || verificationSummary.verificationLevel === "probable") ? ["verified_visit"] : []),
             ...(reviewTrustDesignation === "trusted" || reviewTrustDesignation === "trusted_verified" ? ["trusted_review"] : [])
         ];

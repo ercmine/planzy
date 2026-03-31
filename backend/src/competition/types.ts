@@ -64,7 +64,7 @@ export interface CompetitionScoringConfig {
   approvedReviewPoints: number;
   discoveryBonusPoints: Record<CompetitionReviewEvent["discoveryType"], number>;
   streakPointPerDay: number;
-  tipPointsPerDryad: number;
+  tipPointsPerPerbug: number;
   missionCompletionPoints: number;
   engagementBonusPoints: number;
   rewardClaimPrefix: string;

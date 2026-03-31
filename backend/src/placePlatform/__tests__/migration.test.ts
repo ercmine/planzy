@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("places postgis migration", () => {
   it("declares required foundation tables and geospatial indexes", () => {
-    const file = resolve(process.cwd(), "db/migrations/202603100001_dryad_places_postgis_foundation.sql");
+    const file = resolve(process.cwd(), "db/migrations/202603100001_perbug_places_postgis_foundation.sql");
     const sql = readFileSync(file, "utf8");
 
     expect(sql).toContain("CREATE EXTENSION IF NOT EXISTS postgis");

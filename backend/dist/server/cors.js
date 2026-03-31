@@ -1,5 +1,5 @@
 const DEFAULT_ALLOWED_ORIGINS = [
-    "https://app.dryad.dev",
+    "https://app.perbug.com",
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:8080"

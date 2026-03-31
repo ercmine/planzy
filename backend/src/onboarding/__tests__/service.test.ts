@@ -12,7 +12,7 @@ function videoService() {
       awsRegion: 'us-east-1',
       rawBucket: 'raw',
       processedBucket: 'processed',
-      cloudFrontBaseUrl: 'https://cdn.dryad.dev',
+      cloudFrontBaseUrl: 'https://cdn.perbug.dev',
       uploadTtlSeconds: 900,
       maxUploadBytes: 1024,
       multipartThresholdBytes: 100,

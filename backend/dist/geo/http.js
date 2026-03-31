@@ -739,15 +739,15 @@ export function createGeoHttpHandlers(gateway, options = {}) {
             sendJson(res, payload.ok ? 200 : 503, { ok: payload.ok, ready: payload.ok, mode: payload.mode, status: status() });
         },
         async version(_req, res) {
-            sendJson(res, 200, { service: "dryad-geo", version: "1.0.0", status: status() });
+            sendJson(res, 200, { service: "perbug-geo", version: "1.0.0", status: status() });
         },
         async metrics(_req, res) {
             if (!gateway) {
-                sendJson(res, 503, { service: "dryad-geo", metrics: null, upstream: null, status: status() });
+                sendJson(res, 503, { service: "perbug-geo", metrics: null, upstream: null, status: status() });
                 return;
             }
             const payload = await gateway.health();
-            sendJson(res, 200, { service: "dryad-geo", metrics: payload.metrics ?? null, upstream: payload.upstream ?? null, status: status() });
+            sendJson(res, 200, { service: "perbug-geo", metrics: payload.metrics ?? null, upstream: payload.upstream ?? null, status: status() });
         }
     };
 }

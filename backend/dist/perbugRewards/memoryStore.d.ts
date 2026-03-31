@@ -1,5 +1,5 @@
-import type { AdminAuditLogRecord, DryadRewardsStore, DryadRewardTier, PlaceRecord, PlaceRewardState, RewardClaimRecord, RewardEligibilityRecord, RewardReviewRecord, WalletNonce, WalletRecord } from "./types.js";
-export declare class MemoryDryadRewardsStore implements DryadRewardsStore {
+import type { AdminAuditLogRecord, PerbugRewardsStore, PerbugRewardTier, PlaceRecord, PlaceRewardState, RewardClaimRecord, RewardEligibilityRecord, RewardReviewRecord, WalletNonce, WalletRecord } from "./types.js";
+export declare class MemoryPerbugRewardsStore implements PerbugRewardsStore {
     private readonly tiers;
     private readonly places;
     private readonly placeRewardStates;
@@ -10,8 +10,8 @@ export declare class MemoryDryadRewardsStore implements DryadRewardsStore {
     private readonly wallets;
     private readonly walletNonces;
     private readonly auditLogs;
-    listRewardTiers(): DryadRewardTier[];
-    saveRewardTier(tier: DryadRewardTier): void;
+    listRewardTiers(): PerbugRewardTier[];
+    saveRewardTier(tier: PerbugRewardTier): void;
     listPlaces(): PlaceRecord[];
     getPlace(placeId: string): PlaceRecord | null;
     savePlace(place: PlaceRecord): void;

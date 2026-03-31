@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:dryad/features/home/world/world_map_scene_generator.dart';
-import 'package:dryad/features/home/world/world_map_scene_models.dart';
+import 'package:perbug/features/home/world/world_map_scene_generator.dart';
+import 'package:perbug/features/home/world/world_map_scene_models.dart';
 
 void main() {
   test('generates coherent chunked scene data in demo mode', () {

@@ -1,4 +1,4 @@
-import 'package:dryad/features/dryad/chain/evm_abi.dart';
+import 'package:perbug/features/perbug/chain/evm_abi.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:web3dart/crypto.dart' as web3_crypto;
 

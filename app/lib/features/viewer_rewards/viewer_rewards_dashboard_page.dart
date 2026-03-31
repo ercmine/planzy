@@ -34,7 +34,7 @@ class ViewerRewardsDashboardPage extends ConsumerWidget {
                     tone: AppCardTone.reward,
                     glow: true,
                     child: ListTile(
-                      title: Text('${data.totalEarned.toStringAsFixed(1)} DRYAD earned'),
+                      title: Text('${data.totalEarned.toStringAsFixed(1)} PERBUG earned'),
                       subtitle: Text('Watch ${data.watchEarned.toStringAsFixed(1)} · Rating ${data.ratingEarned.toStringAsFixed(1)} · Comment ${data.commentEarned.toStringAsFixed(1)}'),
                       trailing: Text('Pending ${data.pending.toStringAsFixed(1)}'),
                     ),
@@ -116,8 +116,8 @@ String _subtitle(ViewerRewardHistoryItem item) {
 }
 
 String _amount(ViewerRewardHistoryItem item) {
-  final sign = item.dryad > 0 ? '+' : '';
-  return '$sign${item.dryad.toStringAsFixed(1)}';
+  final sign = item.perbug > 0 ? '+' : '';
+  return '$sign${item.perbug.toStringAsFixed(1)}';
 }
 
 IconData _icon(String action) {

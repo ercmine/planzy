@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/env/env.dart';
 
-class DryadMapCameraPreset {
-  const DryadMapCameraPreset({
+class PerbugMapCameraPreset {
+  const PerbugMapCameraPreset({
     required this.idleTilt,
     required this.idleBearing,
     required this.selectedTilt,
@@ -20,8 +20,8 @@ class DryadMapCameraPreset {
   final double selectedZoomBoost;
 }
 
-class DryadMapTheme {
-  const DryadMapTheme({
+class PerbugMapTheme {
+  const PerbugMapTheme({
     required this.isDark,
     required this.styleUrl,
     required this.base,
@@ -36,29 +36,29 @@ class DryadMapTheme {
 
   final bool isDark;
   final String styleUrl;
-  final DryadBasePalette base;
-  final DryadRoadPalette road;
-  final DryadLabelPalette label;
-  final DryadMarkerPalette marker;
-  final DryadOverlayPalette overlay;
-  final DryadBuildingPalette building;
-  final DryadTerrainPalette terrain;
-  final DryadMapCameraPreset camera;
+  final PerbugBasePalette base;
+  final PerbugRoadPalette road;
+  final PerbugLabelPalette label;
+  final PerbugMarkerPalette marker;
+  final PerbugOverlayPalette overlay;
+  final PerbugBuildingPalette building;
+  final PerbugTerrainPalette terrain;
+  final PerbugMapCameraPreset camera;
 
-  static DryadMapTheme resolve({required Brightness brightness, required MapStackConfig config}) {
+  static PerbugMapTheme resolve({required Brightness brightness, required MapStackConfig config}) {
     final isDark = brightness == Brightness.dark;
-    return DryadMapTheme(
+    return PerbugMapTheme(
       isDark: isDark,
       styleUrl: isDark ? config.darkStyleUrl : config.styleUrl,
       base: isDark
-          ? const DryadBasePalette(
+          ? const PerbugBasePalette(
               land: '#090F20',
               landAccent: '#131D36',
               water: '#132F58',
               park: '#17362F',
               boundary: '#33456A',
             )
-          : const DryadBasePalette(
+          : const PerbugBasePalette(
               land: '#F4F6FA',
               landAccent: '#E9EEF7',
               water: '#BFD8FF',
@@ -66,23 +66,23 @@ class DryadMapTheme {
               boundary: '#C8D1E4',
             ),
       road: isDark
-          ? const DryadRoadPalette(
+          ? const PerbugRoadPalette(
               minor: '#2A334A',
               major: '#3A4764',
               highway: '#596A91',
               casing: '#111625',
             )
-          : const DryadRoadPalette(
+          : const PerbugRoadPalette(
               minor: '#FFFFFF',
               major: '#F8FBFF',
               highway: '#FFE6D5',
               casing: '#D9E0EE',
             ),
       label: isDark
-          ? const DryadLabelPalette(primary: '#E8EEFF', secondary: '#A7B4D3', halo: '#0A1020')
-          : const DryadLabelPalette(primary: '#1A2742', secondary: '#5C6C8E', halo: '#FFFFFF'),
+          ? const PerbugLabelPalette(primary: '#E8EEFF', secondary: '#A7B4D3', halo: '#0A1020')
+          : const PerbugLabelPalette(primary: '#1A2742', secondary: '#5C6C8E', halo: '#FFFFFF'),
       marker: isDark
-          ? const DryadMarkerPalette(
+          ? const PerbugMarkerPalette(
               normal: '#5E8BFF',
               selected: '#92A6FF',
               sponsored: '#FFCA74',
@@ -94,7 +94,7 @@ class DryadMapTheme {
               text: '#F7F9FF',
               outline: '#091124',
             )
-          : const DryadMarkerPalette(
+          : const PerbugMarkerPalette(
               normal: '#2563EB',
               selected: '#1D4ED8',
               sponsored: '#F59E0B',
@@ -107,26 +107,26 @@ class DryadMapTheme {
               outline: '#F7FAFF',
             ),
       overlay: isDark
-          ? const DryadOverlayPalette(
+          ? const PerbugOverlayPalette(
               district: '#617BFF',
               districtEdge: '#95ACFF',
               selectionHalo: '#6A7AFF',
               focusRing: '#FFD36E',
             )
-          : const DryadOverlayPalette(
+          : const PerbugOverlayPalette(
               district: '#4C66FF',
               districtEdge: '#7D8FFF',
               selectionHalo: '#3F5BFF',
               focusRing: '#FF8A4A',
             ),
       building: isDark
-          ? const DryadBuildingPalette(wall: '#2A3A5F', roof: '#3A4F7C', edge: '#8AA3D6')
-          : const DryadBuildingPalette(wall: '#B9C9E8', roof: '#D1DCF2', edge: '#8DA6CF'),
+          ? const PerbugBuildingPalette(wall: '#2A3A5F', roof: '#3A4F7C', edge: '#8AA3D6')
+          : const PerbugBuildingPalette(wall: '#B9C9E8', roof: '#D1DCF2', edge: '#8DA6CF'),
       terrain: isDark
-          ? const DryadTerrainPalette(exaggeration: 1.16)
-          : const DryadTerrainPalette(exaggeration: 1.1),
+          ? const PerbugTerrainPalette(exaggeration: 1.16)
+          : const PerbugTerrainPalette(exaggeration: 1.1),
       camera: isDark
-          ? const DryadMapCameraPreset(
+          ? const PerbugMapCameraPreset(
               idleTilt: 44,
               idleBearing: 12,
               selectedTilt: 56,
@@ -134,7 +134,7 @@ class DryadMapTheme {
               idleZoomBoost: 0,
               selectedZoomBoost: 0.35,
             )
-          : const DryadMapCameraPreset(
+          : const PerbugMapCameraPreset(
               idleTilt: 40,
               idleBearing: 10,
               selectedTilt: 52,
@@ -146,8 +146,8 @@ class DryadMapTheme {
   }
 }
 
-class DryadBasePalette {
-  const DryadBasePalette({required this.land, required this.landAccent, required this.water, required this.park, required this.boundary});
+class PerbugBasePalette {
+  const PerbugBasePalette({required this.land, required this.landAccent, required this.water, required this.park, required this.boundary});
 
   final String land;
   final String landAccent;
@@ -156,8 +156,8 @@ class DryadBasePalette {
   final String boundary;
 }
 
-class DryadRoadPalette {
-  const DryadRoadPalette({required this.minor, required this.major, required this.highway, required this.casing});
+class PerbugRoadPalette {
+  const PerbugRoadPalette({required this.minor, required this.major, required this.highway, required this.casing});
 
   final String minor;
   final String major;
@@ -165,16 +165,16 @@ class DryadRoadPalette {
   final String casing;
 }
 
-class DryadLabelPalette {
-  const DryadLabelPalette({required this.primary, required this.secondary, required this.halo});
+class PerbugLabelPalette {
+  const PerbugLabelPalette({required this.primary, required this.secondary, required this.halo});
 
   final String primary;
   final String secondary;
   final String halo;
 }
 
-class DryadMarkerPalette {
-  const DryadMarkerPalette({
+class PerbugMarkerPalette {
+  const PerbugMarkerPalette({
     required this.normal,
     required this.selected,
     required this.sponsored,
@@ -199,8 +199,8 @@ class DryadMarkerPalette {
   final String outline;
 }
 
-class DryadOverlayPalette {
-  const DryadOverlayPalette({required this.district, required this.districtEdge, required this.selectionHalo, required this.focusRing});
+class PerbugOverlayPalette {
+  const PerbugOverlayPalette({required this.district, required this.districtEdge, required this.selectionHalo, required this.focusRing});
 
   final String district;
   final String districtEdge;
@@ -208,16 +208,16 @@ class DryadOverlayPalette {
   final String focusRing;
 }
 
-class DryadBuildingPalette {
-  const DryadBuildingPalette({required this.wall, required this.roof, required this.edge});
+class PerbugBuildingPalette {
+  const PerbugBuildingPalette({required this.wall, required this.roof, required this.edge});
 
   final String wall;
   final String roof;
   final String edge;
 }
 
-class DryadTerrainPalette {
-  const DryadTerrainPalette({required this.exaggeration});
+class PerbugTerrainPalette {
+  const PerbugTerrainPalette({required this.exaggeration});
 
   final double exaggeration;
 }

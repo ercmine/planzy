@@ -1,6 +1,6 @@
 # Open-data operational infrastructure
 
-This document defines the production operations foundation for Dryad's open-data stack.
+This document defines the production operations foundation for Perbug's open-data stack.
 
 ## Job types and queues
 

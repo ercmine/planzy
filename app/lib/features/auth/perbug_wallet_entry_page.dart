@@ -10,7 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_routes.dart';
 import '../../app/assets.dart';
 import '../../core/identity/identity_provider.dart';
-import '../dryad/chain/dryad_chain_providers.dart';
+import '../perbug/chain/perbug_chain_providers.dart';
 import '../home/perbug_asset_models.dart';
 import '../home/perbug_game_controller.dart';
 

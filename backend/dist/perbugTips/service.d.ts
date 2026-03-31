@@ -1,4 +1,4 @@
-import type { DryadTipsAdapter, DryadTipsStore, DryadVideoTipIntent, VideoTipSummary } from "./types.js";
+import type { PerbugTipsAdapter, PerbugTipsStore, PerbugVideoTipIntent, VideoTipSummary } from "./types.js";
 export interface VideoTipDependencies {
     getVideo(videoId: string): Promise<{
         id: string;
@@ -13,11 +13,11 @@ export interface VideoTipDependencies {
         publicKey: string;
     } | undefined;
 }
-export declare class DryadTipsService {
+export declare class PerbugTipsService {
     private readonly store;
     private readonly deps;
     private readonly adapter;
-    constructor(store: DryadTipsStore, deps: VideoTipDependencies, adapter?: DryadTipsAdapter);
+    constructor(store: PerbugTipsStore, deps: VideoTipDependencies, adapter?: PerbugTipsAdapter);
     createVideoTipIntent(input: {
         videoId: string;
         senderUserId: string;
@@ -27,15 +27,15 @@ export declare class DryadTipsService {
         allowSelfTip?: boolean;
         platformFeeBps?: number;
         tipKind?: "water_tree" | "direct_eth";
-    }): Promise<DryadVideoTipIntent>;
+    }): Promise<PerbugVideoTipIntent>;
     private create;
     submitTip(input: {
         tipIntentId: string;
         senderUserId: string;
-    }): Promise<DryadVideoTipIntent>;
-    listTipsByVideo(videoId: string): DryadVideoTipIntent[];
-    listSentTips(userId: string): DryadVideoTipIntent[];
-    listReceivedTips(userId: string): DryadVideoTipIntent[];
+    }): Promise<PerbugVideoTipIntent>;
+    listTipsByVideo(videoId: string): PerbugVideoTipIntent[];
+    listSentTips(userId: string): PerbugVideoTipIntent[];
+    listReceivedTips(userId: string): PerbugVideoTipIntent[];
     summarizeVideo(videoId: string): VideoTipSummary;
     summarizeCreator(recipientUserId: string): VideoTipSummary;
     private reduceSummary;

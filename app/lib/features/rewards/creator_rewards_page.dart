@@ -17,7 +17,7 @@ class CreatorRewardsPage extends ConsumerWidget {
         title: const Text('Creator earnings'),
         actions: [
           IconButton(
-            tooltip: 'Dryad balance hub',
+            tooltip: 'Perbug balance hub',
             onPressed: () => context.push('/economy'),
             icon: const Icon(Icons.account_balance_wallet_outlined),
           ),
@@ -44,7 +44,7 @@ class CreatorRewardsPage extends ConsumerWidget {
               child: ListTile(
                 title: AnimatedCountText(
                   value: _asDouble(data.claimableDisplay),
-                  suffix: ' DRYAD claimable',
+                  suffix: ' PERBUG claimable',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 subtitle: Text('Claimed ${data.claimedDisplay} · Pending ${data.pendingCount}'),
