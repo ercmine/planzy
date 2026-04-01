@@ -576,7 +576,7 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
 
       if (!mounted) return;
       setState(() {
-        _statusMessage = 'Payout wallet address saved. Future claims and withdrawals will be sent here.';
+        _statusMessage = 'Payout wallet address saved. Claims first land in your in-app balance, and you can withdraw to this wallet anytime from this tab.';
       });
     } catch (error) {
       if (!mounted) return;
@@ -666,7 +666,7 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                 Text('Perbug Wallet Address', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
                 Text(
-                  'Enter the Perbug wallet address where your rewards should be sent. Claims and withdrawals send real Perbug to this address. This app is not a wallet and does not hold your private keys.',
+                  'Perbug payouts are a 2-step flow: (1) claims are credited to your in-app balance on this device, then (2) you withdraw from this Wallet tab to your external wallet. This app is not a wallet and does not hold your private keys.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
@@ -682,7 +682,7 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                     border: const OutlineInputBorder(),
                     errorText: _fieldMessage,
                     helperText: hasSavedAddress
-                        ? 'Current destination is shown below. Update this before your next claim/withdraw.'
+                        ? 'Current destination is shown below. Claims still credit your in-app balance first, then withdrawals use this destination.'
                         : 'Required before claiming or withdrawing Perbug.',
                   ),
                 ),
@@ -712,7 +712,7 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                   )
                 else
                   const Text(
-                    'Setup required: add your payout wallet address to enable claims and withdrawals.',
+                    'Setup required: add your payout wallet address to enable step 2 withdrawals from your in-app balance.',
                     key: Key('wallet-empty-state-message'),
                   ),
               ],
@@ -721,11 +721,11 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
           const SizedBox(height: 12),
           _LorePanel(
             key: const Key('wallet-claim-withdraw-panel'),
-            title: 'Claim and Withdraw to Destination Wallet',
+            title: '2-Step Claim & Withdraw Flow',
             subtitle: hasSavedAddress ? 'Destination: ${_prettyAddress(savedAddress!)}' : 'Address required before payout actions',
             body: hasSavedAddress
-                ? 'Claimed Perbug and withdrawals will be sent to your saved payout address. Changing it updates future payouts only.'
-                : 'Add and save a payout wallet address above first. Claim and withdraw controls remain secondary until setup is complete.',
+                ? 'Step 1: claims credit your in-app balance on this device. Step 2: use Withdraw here to send Perbug to your saved external wallet. Changing the wallet updates future withdrawals only.'
+                : 'Add and save a payout wallet address above to enable step 2 withdrawals. Claims can accrue locally, but sending out requires a saved destination.',
             trailing: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
