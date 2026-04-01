@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -325,6 +327,7 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
             ? 'Withdrawal submitted to backend for $toAddress.'
             : 'Withdrawal completed to $toAddress.';
       });
+      unawaited(ref.read(postActionAdCoordinatorProvider).onWithdrawSuccess());
     } catch (error) {
       if (!mounted) return;
       setState(() => _statusMessage = 'Withdrawal failed: $error');

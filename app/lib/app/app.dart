@@ -92,6 +92,7 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
     }
     _adsInitialized = true;
     ref.read(adsServiceProvider).initialize();
+    ref.read(actionInterstitialAdServiceProvider).initialize();
   }
 
   void _syncDispatcherRegistration() {
