@@ -306,6 +306,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         banner: '${payout.toStringAsFixed(6)} Perbug payout submitted to wallet ${_maskAddress(payoutAddress)}.',
       );
       _persistState();
+      unawaited(_ref.read(postActionAdCoordinatorProvider).onClaimSuccess());
     } catch (error) {
       _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Payout submission failed: $error');
     }

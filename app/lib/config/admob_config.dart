@@ -10,8 +10,10 @@ class AdMobConfig {
 
   static const String androidAppId = 'ca-app-pub-9929942639121200~8708144199';
   static const String androidNativeUnitId = 'ca-app-pub-9929942639121200/7339222206';
+  static const String androidInterstitialUnitId = 'ca-app-pub-9929942639121200/4672085828';
   static const String iosAppId = 'ca-app-pub-9929942639121200~6500929043';
   static const String iosNativeUnitId = 'ca-app-pub-9929942639121200/9298482776';
+  static const String iosInterstitialUnitId = 'ca-app-pub-9929942639121200/9747281120';
 
   static const String nativeFactoryId = 'perbugNativeAdFactory';
 
@@ -36,6 +38,24 @@ class AdMobConfig {
     }
     if (Platform.isIOS) {
       return iosAppId;
+    }
+    return '';
+  }
+
+
+  static String get interstitialUnitId {
+    if (kDebugMode) {
+      return AdMobTestIds.interstitial;
+    }
+    if (kIsWeb) {
+      return '';
+    }
+
+    if (Platform.isAndroid) {
+      return androidInterstitialUnitId;
+    }
+    if (Platform.isIOS) {
+      return iosInterstitialUnitId;
     }
     return '';
   }

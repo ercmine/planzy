@@ -19,6 +19,19 @@ class AdMobTestIds {
   static const String iosRewarded = 'ca-app-pub-3940256099942544/1712485313';
   static const String iosNative = 'ca-app-pub-3940256099942544/3986624511';
 
+  static String get interstitial {
+    if (kIsWeb) {
+      return '';
+    }
+    if (Platform.isAndroid) {
+      return androidInterstitial;
+    }
+    if (Platform.isIOS) {
+      return iosInterstitial;
+    }
+    return '';
+  }
+
   static String get native {
     if (kIsWeb) {
       return '';

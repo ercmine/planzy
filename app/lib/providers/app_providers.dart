@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/api_client.dart';
+import '../core/ads/action_interstitial_ad_service.dart';
 import '../core/ads/ad_deck_injector.dart';
 import '../core/ads/ad_policy.dart';
 import '../core/ads/ads_config.dart';
@@ -10,6 +11,7 @@ import '../core/ads/ads_diagnostics.dart';
 import '../core/ads/ads_manager.dart';
 import '../core/ads/ads_service.dart';
 import '../core/ads/ads_visibility.dart';
+import '../core/ads/post_action_ad_coordinator.dart';
 import '../core/cache/local_store.dart';
 import '../core/connectivity/connectivity_controller.dart';
 import '../core/connectivity/connectivity_state.dart';
@@ -67,6 +69,17 @@ final adsConfigProvider = Provider<AdsConfig>((ref) {
 
 final adsServiceProvider = Provider<AdsService>((ref) {
   return AdsService();
+});
+
+final actionInterstitialAdServiceProvider = Provider<ActionInterstitialAdService>((ref) {
+  if (ref.watch(adsConfigProvider).isUsable) {
+    return GoogleActionInterstitialAdService();
+  }
+  return NoopActionInterstitialAdService();
+});
+
+final postActionAdCoordinatorProvider = Provider<PostActionAdCoordinator>((ref) {
+  return PostActionAdCoordinator(adService: ref.watch(actionInterstitialAdServiceProvider));
 });
 
 final adDeckInjectorProvider = Provider<AdDeckInjector>((ref) {
