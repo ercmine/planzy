@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_error.dart';
 import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
+import '../../models/error_payload.dart';
 import '../perbug/chain/perbug_chain_providers.dart';
 import '../../providers/app_providers.dart';
 import 'map_discovery_clients.dart';
