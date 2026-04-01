@@ -48,8 +48,10 @@ function normalizeLocation(input) {
 }
 export class LocationClaimsService {
     store;
-    constructor(store) {
+    payoutRpcClient;
+    constructor(store, payoutRpcClient) {
         this.store = store;
+        this.payoutRpcClient = payoutRpcClient;
     }
     upsertLocation(input) {
         const location = normalizeLocation({
@@ -146,10 +148,18 @@ export class LocationClaimsService {
         this.store.addLedgerEntry({ id: `ledger_${randomUUID()}`, type: "ad_gate", userId: record.userId, locationId: record.locationId, metadata: { adSessionId, status: "completed" }, createdAt: nowIso() });
         return record;
     }
-    finalizeClaim(input) {
+    async finalizeClaim(input) {
         const existing = this.store.getFinalizedClaimByIdempotencyKey(input.idempotencyKey);
         if (existing)
             return existing;
+        const payoutAddress = input.payoutAddress.trim();
+        if (!payoutAddress)
+            throw new ValidationError(["payoutAddress is required"]);
+        if (!this.payoutRpcClient)
+            throw new ValidationError(["location claim payouts unavailable: rpc client not configured"]);
+        const validPayoutAddress = await this.payoutRpcClient.validateAddress(payoutAddress);
+        if (!validPayoutAddress)
+            throw new ValidationError(["invalid Perbug payout address"]);
         const location = this.requireLocation(input.locationId);
         if (location.isDepleted)
             throw new ValidationError(["location depleted"]);
@@ -193,10 +203,6 @@ export class LocationClaimsService {
         }
         attempt.status = "approved";
         this.store.saveAttempt(attempt);
-        pool.claimedTotal += rewardAtomic;
-        pool.available -= rewardAtomic;
-        pool.updatedAt = nowIso();
-        this.store.upsertAnnualPool(pool);
         const claim = {
             id: `claim_${randomUUID()}`,
             userId: input.userId,
@@ -206,9 +212,24 @@ export class LocationClaimsService {
             adSessionId: input.adSessionId,
             rewardIssued: rewardAtomic,
             rewardIssuedDisplay: formatPerbugAtomic(rewardAtomic),
+            payoutAddress,
+            payoutStatus: "submitted",
             finalizedAt: nowIso(),
             idempotencyKey: input.idempotencyKey
         };
+        try {
+            const txid = await this.payoutRpcClient.sendToAddress(payoutAddress, Number(claim.rewardIssuedDisplay), `location_claim:${claim.id}`);
+            claim.payoutTxid = txid;
+            claim.payoutStatus = "confirmed";
+        }
+        catch (error) {
+            claim.payoutStatus = "failed";
+            throw new ValidationError([`location payout failed: ${error instanceof Error ? error.message : "sendtoaddress_failed"}`]);
+        }
+        pool.claimedTotal += rewardAtomic;
+        pool.available -= rewardAtomic;
+        pool.updatedAt = nowIso();
+        this.store.upsertAnnualPool(pool);
         this.store.saveFinalizedClaim(claim);
         this.store.addLedgerEntry({ id: `ledger_${randomUUID()}`, type: "claim", userId: input.userId, locationId: input.locationId, attemptId: attempt.id, claimId: claim.id, amount: claim.rewardIssued, metadata: { year: pool.year, reward: claim.rewardIssuedDisplay }, createdAt: nowIso() });
         location.claimCount += 1;

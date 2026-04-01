@@ -14,7 +14,7 @@ void main() {
     final state = container.read(locationClaimControllerProvider);
     final inRange = state.claimables.firstWhere((c) => c.flowState == ClaimFlowState.visited);
 
-    controller.claimInstantly(inRange.location.id);
+    await controller.claimInstantly(inRange.location.id);
 
     final updated = container.read(locationClaimControllerProvider);
     expect(updated.balance, 1);
@@ -39,7 +39,7 @@ void main() {
         .location
         .id;
 
-    controller.claimInstantly(locationId);
+    await controller.claimInstantly(locationId);
 
     await controller.startTracking();
 
@@ -49,7 +49,7 @@ void main() {
     expect(afterFirst.totalClaimedAtLocation, 1);
 
     controller.debugExpireCooldownForTesting(locationId);
-    controller.claimInstantly(locationId);
+    await controller.claimInstantly(locationId);
     await controller.startTracking();
 
     final afterSecond = container.read(locationClaimControllerProvider).claimables.firstWhere((c) => c.location.id == locationId);
@@ -74,7 +74,7 @@ void main() {
 
     controller.debugSetGlobalClaimedSupplyForTesting(399999999.25);
 
-    controller.claimInstantly(locationId);
+    await controller.claimInstantly(locationId);
 
     final updated = container.read(locationClaimControllerProvider);
     expect(updated.balance, 0.75);
@@ -95,8 +95,8 @@ void main() {
         .location
         .id;
 
-    controller.claimInstantly(locationId);
-    controller.claimInstantly(locationId);
+    await controller.claimInstantly(locationId);
+    await controller.claimInstantly(locationId);
 
     final updated = container.read(locationClaimControllerProvider);
     expect(updated.globalPool.totalClaimedSupply, 1);

@@ -74,4 +74,31 @@ describe("PerbugEconomyService", () => {
         expect(membership.active).toBe(true);
         expect(new Date(membership.expiresAt).getTime()).toBeGreaterThan(Date.now());
     });
+    it("persists payout address and processes withdraw with idempotency", async () => {
+        const rpc = {
+            validateAddress: async () => true,
+            sendToAddress: async () => "txid_123"
+        };
+        const service = new PerbugEconomyService(new MemoryPerbugEconomyStore(), rpc);
+        service.creditUser("user-2", 25, "seed");
+        const payout = service.upsertPayoutAddress("user-2", "PBUG_ADDR_1");
+        expect(payout.payoutAddress).toBe("PBUG_ADDR_1");
+        const first = await service.requestWithdrawal({
+            userId: "user-2",
+            amountPerbug: 5,
+            idempotencyKey: "wd-1"
+        });
+        const second = await service.requestWithdrawal({
+            userId: "user-2",
+            amountPerbug: 5,
+            idempotencyKey: "wd-1"
+        });
+        expect(first.id).toBe(second.id);
+        expect(first.txid).toBe("txid_123");
+        expect(first.status).toBe("completed");
+        const dashboard = service.consumerDashboard("user-2");
+        expect(dashboard.balances.withdrawnAtomic).toBe(5000000n);
+        expect(dashboard.payoutProfile?.payoutAddress).toBe("PBUG_ADDR_1");
+        expect(dashboard.withdrawals).toHaveLength(1);
+    });
 });

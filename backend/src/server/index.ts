@@ -69,6 +69,7 @@ import { MemoryPerbugTipsStore, PerbugTipsService } from "../perbugTips/index.js
 import { CompetitionService, MemoryCompetitionStore } from "../competition/index.js";
 import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../sponsoredLocations/index.js";
 import { MemoryPerbugEconomyStore, PerbugEconomyService } from "../perbugEconomy/index.js";
+import { LocationClaimsService, MemoryLocationClaimsStore } from "../locationClaims/index.js";
 import { MemoryViewerEngagementStore, ViewerEngagementRewardsService } from "../viewerEngagementRewards/index.js";
 import { MemoryWalletAuthStore, WalletAuthService } from "../walletAuth/index.js";
 import { createPerbugWorldHttpHandlers, MemoryPerbugWorldStore, PerbugWorldService } from "../perbugWorld/index.js";
@@ -282,6 +283,7 @@ export function createServer(options?: CreateServerOptions) {
 
   const walletAuthService = new WalletAuthService(new MemoryWalletAuthStore(), accountsService);
   const perbugEconomyService = new PerbugEconomyService(new MemoryPerbugEconomyStore(), new PerbugRpcClient());
+  const locationClaimsService = new LocationClaimsService(new MemoryLocationClaimsStore(), new PerbugRpcClient());
   const perbugWorldService = new PerbugWorldService(new MemoryPerbugWorldStore());
   const perbugWorldHandlers = createPerbugWorldHttpHandlers(perbugWorldService);
   const viewerEngagementRewardsService = new ViewerEngagementRewardsService(new MemoryViewerEngagementStore(), {
@@ -302,6 +304,15 @@ export function createServer(options?: CreateServerOptions) {
     completionRewardAtomic: 2500000n,
     active: true
   }, "seed");
+  locationClaimsService.upsertLocation({
+    id: "loc_seed_1",
+    lat: 37.7749,
+    lng: -122.4194,
+    displayName: "Perbug Wharf Node",
+    category: "district",
+    state: "available",
+    cooldownSeconds: 3600
+  });
   gamificationControlService.seedInitialRules("system");
 
   return createHttpServer(service, merchantService, {
@@ -358,6 +369,7 @@ export function createServer(options?: CreateServerOptions) {
     competitionService,
     sponsoredLocationsService,
     perbugEconomyService,
+    locationClaimsService,
     viewerEngagementRewardsService,
     perbugService,
     perbugMarketplaceService,

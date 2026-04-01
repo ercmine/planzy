@@ -75,6 +75,9 @@ export interface FinalizedClaim {
     adSessionId: string;
     rewardIssued: bigint;
     rewardIssuedDisplay: string;
+    payoutAddress: string;
+    payoutTxid?: string;
+    payoutStatus: "submitted" | "confirmed" | "failed";
     finalizedAt: string;
     idempotencyKey: string;
 }

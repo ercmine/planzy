@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
+import '../perbug/chain/perbug_chain_providers.dart';
 import '../../providers/app_providers.dart';
 import 'map_discovery_clients.dart';
 import 'location_claim_constants.dart';
@@ -216,7 +217,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
     _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Ad completed. Claim is ready.');
   }
 
-  void finalizeClaim(String locationId) {
+  Future<void> finalizeClaim(String locationId) async {
     final entry = _findExistingClaimable(locationId);
     if (entry == null) return;
     if (entry.flowState == ClaimFlowState.claimSuccess || entry.flowState == ClaimFlowState.alreadyClaimed || entry.flowState == ClaimFlowState.cooldown) {
@@ -229,6 +230,11 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       return;
     }
     if (entry.flowState != ClaimFlowState.claimReady && entry.flowState != ClaimFlowState.visited) return;
+    final payoutAddress = (_ref.read(walletAddressProvider) ?? '').trim();
+    if (payoutAddress.isEmpty) {
+      _setFlow(locationId, ClaimFlowState.adRequired, banner: 'Add your Perbug wallet address before claiming payout.');
+      return;
+    }
 
     final remaining = state.globalPool.remainingClaimableSupply;
     if (remaining <= 0) {
@@ -266,27 +272,46 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         )
         .toList(growable: false);
 
-    state = state.copyWith(
-      claimables: updatedClaimables,
-      balance: state.balance + payout,
-      globalPool: state.globalPool.copyWith(
-        totalClaimedSupply: state.globalPool.totalClaimedSupply + payout,
-      ),
-      claimHistory: [
-        ClaimTransaction(
-          locationId: locationId,
-          reward: payout,
-          claimCountAfter: nextClaimCount,
-          createdAt: DateTime.now().toUtc(),
+    try {
+      final apiClient = await _ref.read(apiClientProvider.future);
+      final response = await apiClient.postJson('/v1/location-claims/finalize', body: {
+        'locationId': locationId,
+        'visitId': entry.visitId ?? 'visit-local-${DateTime.now().millisecondsSinceEpoch}',
+        'adSessionId': entry.adSessionId ?? 'ad-local-${DateTime.now().millisecondsSinceEpoch}',
+        'idempotencyKey': 'claim-${DateTime.now().microsecondsSinceEpoch}',
+        'payoutAddress': payoutAddress,
+      });
+      final claim = ((response['claim'] as Map?) ?? const {}).cast<String, dynamic>();
+      final txid = claim['payoutTxid']?.toString();
+      final payoutStatus = claim['payoutStatus']?.toString() ?? 'submitted';
+      state = state.copyWith(
+        claimables: updatedClaimables,
+        balance: state.balance + payout,
+        globalPool: state.globalPool.copyWith(
+          totalClaimedSupply: state.globalPool.totalClaimedSupply + payout,
         ),
-        ...state.claimHistory,
-      ],
-      banner: 'Claim successful +${payout.toStringAsFixed(6)} Perbug. Next claim in 24h.',
-    );
-    _persistState();
+        claimHistory: [
+          ClaimTransaction(
+            locationId: locationId,
+            locationName: entry.location.displayName,
+            reward: payout,
+            destinationAddress: payoutAddress,
+            payoutStatus: payoutStatus,
+            txid: txid,
+            claimCountAfter: nextClaimCount,
+            createdAt: DateTime.now().toUtc(),
+          ),
+          ...state.claimHistory,
+        ],
+        banner: '${payout.toStringAsFixed(6)} Perbug payout submitted to wallet ${_maskAddress(payoutAddress)}.',
+      );
+      _persistState();
+    } catch (error) {
+      _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Payout submission failed: $error');
+    }
   }
 
-  void claimInstantly(String locationId) {
+  Future<void> claimInstantly(String locationId) async {
     final entry = _findExistingClaimable(locationId);
     if (entry == null) return;
     if (!entry.inRange) {
@@ -302,7 +327,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       return;
     }
     _setFlow(locationId, ClaimFlowState.claimReady);
-    finalizeClaim(locationId);
+    await finalizeClaim(locationId);
   }
 
 
@@ -336,6 +361,10 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   }
 
   double _locationReward(int claimCount) => 1 / math.pow(2, claimCount);
+  String _maskAddress(String value) {
+    if (value.length <= 12) return value;
+    return '${value.substring(0, 6)}…${value.substring(value.length - 4)}';
+  }
 
   double _distanceMeters(double lat1, double lng1, double lat2, double lng2) {
     const radius = 6371000.0;

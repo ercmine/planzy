@@ -18,6 +18,10 @@ export class MemoryPerbugEconomyStore {
     offers = new Map();
     redemptionsByUser = new Map();
     fraudFlags = [];
+    payoutProfiles = new Map();
+    withdrawals = new Map();
+    withdrawalsByUser = new Map();
+    withdrawalsByIdempotency = new Map();
     listSplitConfigs() { return [...this.splitConfigs.values()].map((v) => structuredClone(v)); }
     saveSplitConfig(config) { this.splitConfigs.set(config.feature, structuredClone(config)); }
     getTokenAccount(ownerType, ownerId) {
@@ -82,4 +86,29 @@ export class MemoryPerbugEconomyStore {
     listRedemptions(userId) { return (this.redemptionsByUser.get(userId) ?? []).map((redemption) => structuredClone(redemption)); }
     addFraudFlag(flag) { this.fraudFlags.unshift(structuredClone(flag)); }
     listFraudFlags() { return this.fraudFlags.map((f) => structuredClone(f)); }
+    savePayoutProfile(profile) {
+        this.payoutProfiles.set(profile.userId, structuredClone(profile));
+    }
+    getPayoutProfile(userId) {
+        return this.payoutProfiles.has(userId) ? structuredClone(this.payoutProfiles.get(userId)) : null;
+    }
+    saveWithdrawal(record) {
+        this.withdrawals.set(record.id, structuredClone(record));
+        const existing = (this.withdrawalsByUser.get(record.userId) ?? []).filter((item) => item.id !== record.id);
+        this.withdrawalsByUser.set(record.userId, [structuredClone(record), ...existing]);
+        this.withdrawalsByIdempotency.set(`${record.userId}:${record.idempotencyKey}`, record.id);
+    }
+    getWithdrawal(withdrawalId) {
+        return this.withdrawals.has(withdrawalId) ? structuredClone(this.withdrawals.get(withdrawalId)) : null;
+    }
+    getWithdrawalByIdempotency(userId, idempotencyKey) {
+        const key = `${userId}:${idempotencyKey}`;
+        const id = this.withdrawalsByIdempotency.get(key);
+        if (!id)
+            return null;
+        return this.getWithdrawal(id);
+    }
+    listWithdrawalsByUser(userId) {
+        return (this.withdrawalsByUser.get(userId) ?? []).map((item) => structuredClone(item));
+    }
 }

@@ -4,6 +4,11 @@ import { DEFAULT_CLAIM_RADIUS_METERS } from "../constants.js";
 import { MemoryLocationClaimsStore } from "../memoryStore.js";
 import { LocationClaimsService } from "../service.js";
 
+const rpcClient = {
+  validateAddress: async () => true,
+  sendToAddress: async () => "tx_location_claim_123"
+};
+
 function seed(service: LocationClaimsService, depletionThresholdAtomic = 1_000n) {
   service.upsertLocation({
     id: "loc_1",
@@ -18,11 +23,11 @@ function seed(service: LocationClaimsService, depletionThresholdAtomic = 1_000n)
   });
 }
 
-function claim(service: LocationClaimsService, userId: string, idempotencyKey: string) {
+async function claim(service: LocationClaimsService, userId: string, idempotencyKey: string) {
   const visit = service.registerVisit({ userId, locationId: "loc_1", lat: 30.2672, lng: -97.7431, accuracyMeters: 10 });
   const gate = service.prepareAdGate({ userId, locationId: "loc_1", visitId: visit.id });
   service.markAdCompleted(gate.id);
-  return service.finalizeClaim({ userId, locationId: "loc_1", visitId: visit.id, adSessionId: gate.id, idempotencyKey });
+  return await service.finalizeClaim({ userId, locationId: "loc_1", visitId: visit.id, adSessionId: gate.id, idempotencyKey, payoutAddress: "PBUG_ADDR_1" });
 }
 
 describe("LocationClaimsService", () => {
@@ -36,27 +41,28 @@ describe("LocationClaimsService", () => {
     expect(nearby[0]?.location.currentReward).toBe("1.0");
   });
 
-  test("requires ad completion before claim finalization", () => {
-    const service = new LocationClaimsService(new MemoryLocationClaimsStore());
+  test("requires ad completion before claim finalization", async () => {
+    const service = new LocationClaimsService(new MemoryLocationClaimsStore(), rpcClient);
     seed(service);
     const visit = service.registerVisit({ userId: "u1", locationId: "loc_1", lat: 30.2672, lng: -97.7431, accuracyMeters: 10 });
     const gate = service.prepareAdGate({ userId: "u1", locationId: "loc_1", visitId: visit.id });
 
-    expect(() => service.finalizeClaim({ userId: "u1", locationId: "loc_1", visitId: visit.id, adSessionId: gate.id, idempotencyKey: "abc" })).toThrow();
+    await expect(service.finalizeClaim({ userId: "u1", locationId: "loc_1", visitId: visit.id, adSessionId: gate.id, idempotencyKey: "abc", payoutAddress: "PBUG_ADDR_1" })).rejects.toThrow();
 
     service.markAdCompleted(gate.id);
-    const finalized = service.finalizeClaim({ userId: "u1", locationId: "loc_1", visitId: visit.id, adSessionId: gate.id, idempotencyKey: "abc" });
+    const finalized = await service.finalizeClaim({ userId: "u1", locationId: "loc_1", visitId: visit.id, adSessionId: gate.id, idempotencyKey: "abc", payoutAddress: "PBUG_ADDR_1" });
     expect(finalized.rewardIssuedDisplay).toBe("1.0");
+    expect(finalized.payoutTxid).toBe("tx_location_claim_123");
   });
 
-  test("applies halving reward progression and claim history", () => {
-    const service = new LocationClaimsService(new MemoryLocationClaimsStore());
+  test("applies halving reward progression and claim history", async () => {
+    const service = new LocationClaimsService(new MemoryLocationClaimsStore(), rpcClient);
     seed(service);
 
-    const c1 = claim(service, "u1", "k1");
-    const c2 = claim(service, "u2", "k2");
-    const c3 = claim(service, "u3", "k3");
-    const c4 = claim(service, "u4", "k4");
+    const c1 = await claim(service, "u1", "k1");
+    const c2 = await claim(service, "u2", "k2");
+    const c3 = await claim(service, "u3", "k3");
+    const c4 = await claim(service, "u4", "k4");
 
     expect(c1.rewardIssuedDisplay).toBe("1.0");
     expect(c2.rewardIssuedDisplay).toBe("0.5");
@@ -71,13 +77,13 @@ describe("LocationClaimsService", () => {
     expect(location?.claimHistory).toHaveLength(4);
   });
 
-  test("tracks visitors separately from successful claims", () => {
-    const service = new LocationClaimsService(new MemoryLocationClaimsStore());
+  test("tracks visitors separately from successful claims", async () => {
+    const service = new LocationClaimsService(new MemoryLocationClaimsStore(), rpcClient);
     seed(service);
 
     service.registerVisit({ userId: "viewer", locationId: "loc_1", lat: 30.2672, lng: -97.7431, accuracyMeters: 10 });
     service.registerVisit({ userId: "viewer", locationId: "loc_1", lat: 30.2672, lng: -97.7431, accuracyMeters: 10 });
-    claim(service, "claimer", "claim-key");
+    await claim(service, "claimer", "claim-key");
 
     const location = service.listNearbyClaimables({ userId: "observer", lat: 30.2672, lng: -97.7431 })[0]?.location;
     expect(location?.uniqueVisitors).toBe(2);
@@ -85,9 +91,9 @@ describe("LocationClaimsService", () => {
     expect(location?.totalClaims).toBe(1);
   });
 
-  test("enforces yearly cap and rollover with decimal atomic rewards", () => {
+  test("enforces yearly cap and rollover with decimal atomic rewards", async () => {
     const store = new MemoryLocationClaimsStore();
-    const service = new LocationClaimsService(store);
+    const service = new LocationClaimsService(store, rpcClient);
     const y2025 = service.getPoolStats(2025);
     expect(y2025.startingPool).toBe(10_000_000n);
 
@@ -102,40 +108,41 @@ describe("LocationClaimsService", () => {
     y2026.available = 500n;
     store.upsertAnnualPool(y2026);
     seed(service);
-    expect(() => claim(service, "u1", "pool-low")).toThrow();
+    await expect(claim(service, "u1", "pool-low")).rejects.toThrow();
   });
 
-  test("depletes location once next reward drops below minimum threshold", () => {
-    const service = new LocationClaimsService(new MemoryLocationClaimsStore());
+  test("depletes location once next reward drops below minimum threshold", async () => {
+    const service = new LocationClaimsService(new MemoryLocationClaimsStore(), rpcClient);
     seed(service, 125_000n);
 
-    claim(service, "u1", "d1");
-    claim(service, "u2", "d2");
-    claim(service, "u3", "d3");
+    await claim(service, "u1", "d1");
+    await claim(service, "u2", "d2");
+    await claim(service, "u3", "d3");
 
     const location = service.listNearbyClaimables({ userId: "u9", lat: 30.2672, lng: -97.7431 })[0]?.location;
     expect(location?.isDepleted).toBe(true);
     expect(location?.state).toBe("exhausted");
     expect(location?.currentReward).toBe("0.125");
 
-    expect(() => claim(service, "u4", "d4")).toThrow();
+    await expect(claim(service, "u4", "d4")).rejects.toThrow();
   });
 
-  test("prevents duplicate claims per user per location and supports idempotency", () => {
-    const service = new LocationClaimsService(new MemoryLocationClaimsStore());
+  test("prevents duplicate claims per user per location and supports idempotency", async () => {
+    const service = new LocationClaimsService(new MemoryLocationClaimsStore(), rpcClient);
     seed(service);
 
-    const first = claim(service, "u1", "same");
-    const second = service.finalizeClaim({
+    const first = await claim(service, "u1", "same");
+    const second = await service.finalizeClaim({
       userId: "u1",
       locationId: "loc_1",
       visitId: first.visitId,
       adSessionId: first.adSessionId,
-      idempotencyKey: "same"
+      idempotencyKey: "same",
+      payoutAddress: "PBUG_ADDR_1"
     });
     expect(second.id).toBe(first.id);
 
-    expect(() => claim(service, "u1", "new")).toThrow();
+    await expect(claim(service, "u1", "new")).rejects.toThrow();
   });
 
   test("defaults to 500m when claim radius is not provided", () => {
