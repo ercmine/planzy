@@ -1,0 +1,23 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import RewardsClaimConsole from '../../components/rewards/RewardsClaimConsole';
+
+const apiBaseUrl = import.meta.env.PUBLIC_PERBUG_API_BASE_URL || 'http://localhost:8080';
+const cluster = import.meta.env.PUBLIC_SOLANA_CLUSTER || 'devnet';
+---
+
+<BaseLayout
+  title="Wallet claim | Perbug"
+  description="Connect your Solana wallet, verify ownership with a one-time signature, and claim available PERBUG rewards."
+>
+  <section class="mx-auto max-w-5xl px-6 py-20">
+    <div class="mb-8 space-y-3 text-white">
+      <p class="text-sm uppercase tracking-[0.3em] text-cyan-300">Wallet rewards</p>
+      <h1 class="text-4xl font-semibold">Claim PERBUG from your wallet.</h1>
+      <p class="max-w-3xl text-slate-300">
+        Connect Phantom, complete wallet verification, and claim rewards from approved creator activity.
+      </p>
+    </div>
+    <RewardsClaimConsole client:only="react" apiBaseUrl={apiBaseUrl} cluster={cluster} />
+  </section>
+</BaseLayout>
