@@ -38,6 +38,19 @@ class NearbyClaimLocationsPage extends ConsumerWidget {
                   : 'Claim payouts will be sent to: $maskedWallet',
             ),
           ),
+          if (state.banner != null && state.banner!.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(state.banner!),
+              ),
+            ),
           Expanded(
             child: ListView.builder(
               itemCount: state.claimables.length,
@@ -88,8 +101,12 @@ class _ClaimActionButton extends StatelessWidget {
           onPressed: hasWalletAddress ? () => controller.claimInstantly(item.location.id) : null,
           child: Text(hasWalletAddress ? 'Claim Perbug to Wallet' : 'Add Wallet Address to Claim'),
         ),
+      ClaimFlowState.claimProcessing => const Chip(label: Text('Submitting payout...')),
       ClaimFlowState.cooldown => Chip(label: Text(cooldownLabel == null ? 'Cooldown' : 'Cooldown $cooldownLabel')),
       ClaimFlowState.claimSuccess => const Chip(label: Text('Payout Submitted')),
+      ClaimFlowState.unavailable => const Chip(label: Text('Reward unavailable')),
+      ClaimFlowState.adRequired => const Chip(label: Text('Wallet required')),
+      ClaimFlowState.alreadyClaimed => const Chip(label: Text('Already claimed')),
       _ => Chip(label: Text('Move within ${item.location.claimRadiusMeters.round()}m')),
     };
   }
