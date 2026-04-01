@@ -7,7 +7,9 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_routes.dart';
 import '../../app/theme/rpg_bar.dart';
 import '../../app/theme/widgets.dart';
+import '../../core/identity/identity_provider.dart';
 import '../../providers/app_providers.dart';
+import '../perbug/chain/perbug_chain_providers.dart';
 import 'location_claim_controller.dart';
 import 'location_claim_models.dart';
 import 'perbug_economy_models.dart';
@@ -276,6 +278,7 @@ class PerbugWalletPage extends ConsumerStatefulWidget {
 }
 
 class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
+  final _walletLinkController = TextEditingController();
   final _addressController = TextEditingController();
   final _amountController = TextEditingController();
   bool _withdrawing = false;
@@ -283,10 +286,38 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
   String? _txid;
 
   @override
+  void initState() {
+    super.initState();
+    final walletAddress = ref.read(walletAddressProvider);
+    if (walletAddress != null && walletAddress.trim().isNotEmpty) {
+      _walletLinkController.text = walletAddress;
+    }
+  }
+
+  @override
   void dispose() {
+    _walletLinkController.dispose();
     _addressController.dispose();
     _amountController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveWalletAddress() async {
+    final walletAddress = _walletLinkController.text.trim();
+    final normalized = walletAddress.isEmpty ? null : walletAddress;
+    final store = await ref.read(identityStoreProvider.future);
+    await store.setWalletSessionAddress(normalized);
+    ref.read(walletAddressProvider.notifier).state = normalized;
+    await ref.read(perbugGameControllerProvider.notifier).setWalletLink(walletAddress: normalized);
+    if (!mounted) return;
+    setState(() {
+      _statusMessage = normalized == null ? 'Wallet address cleared.' : 'Wallet address saved and linked.';
+    });
+  }
+
+  Future<void> _clearWalletAddress() async {
+    _walletLinkController.clear();
+    await _saveWalletAddress();
   }
 
   Future<void> _withdraw({required int balance}) async {
@@ -353,6 +384,35 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
             body: connected
                 ? 'Identity is connected. Asset-backed systems can sync with live progression.'
                 : 'You can continue in demo mode and connect later from entry or profile.',
+            trailing: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _walletLinkController,
+                  decoration: const InputDecoration(
+                    labelText: 'Saved wallet address',
+                    hintText: '0x...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    RpgBarButton(
+                      onPressed: _saveWalletAddress,
+                      label: 'Save Address',
+                    ),
+                    RpgBarButton(
+                      onPressed: _clearWalletAddress,
+                      label: 'Clear',
+                      variant: RpgButtonVariant.secondary,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           _LorePanel(
             title: 'Withdraw Perbug',
