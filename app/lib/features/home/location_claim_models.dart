@@ -185,4 +185,28 @@ class ClaimTransaction {
   final double reward;
   final int claimCountAfter;
   final DateTime createdAt;
+
+  Map<String, dynamic> toJson() => {
+        'locationId': locationId,
+        'reward': reward,
+        'claimCountAfter': claimCountAfter,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+      };
+
+  static ClaimTransaction fromJson(Map<String, dynamic> json) => ClaimTransaction(
+        locationId: (json['locationId'] as String?) ?? '',
+        reward: (json['reward'] as num?)?.toDouble() ?? 0,
+        claimCountAfter: (json['claimCountAfter'] as num?)?.toInt() ?? 0,
+        createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '')?.toUtc() ?? DateTime.now().toUtc(),
+      );
+}
+
+extension ClaimFlowStateCodec on ClaimFlowState {
+  String get wire => name;
+  static ClaimFlowState fromWire(String value) {
+    return ClaimFlowState.values.firstWhere(
+      (entry) => entry.name == value,
+      orElse: () => ClaimFlowState.outOfRange,
+    );
+  }
 }

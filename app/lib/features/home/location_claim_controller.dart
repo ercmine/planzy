@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import '../../providers/app_providers.dart';
 import 'map_discovery_clients.dart';
 import 'location_claim_constants.dart';
 import 'location_claim_models.dart';
+import 'location_claim_persistence_store.dart';
 
 final locationClaimControllerProvider = StateNotifierProvider<LocationClaimController, LocationClaimState>((ref) {
   return LocationClaimController(ref);
@@ -15,6 +17,7 @@ final locationClaimControllerProvider = StateNotifierProvider<LocationClaimContr
 
 class LocationClaimController extends StateNotifier<LocationClaimState> {
   LocationClaimController(this._ref) : super(LocationClaimState.initial()) {
+    _restoreFromDisk();
     _ref.listen<LocationControllerState>(locationControllerProvider, (_, next) {
       _onLocationState(next);
     }, fireImmediately: true);
@@ -25,7 +28,33 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
 
   final Ref _ref;
   final Map<String, String> _displayNameCache = <String, String>{};
+  Map<String, Map<String, dynamic>> _persistedClaimablesById = const {};
+  LocationClaimPersistenceStore? _persistence;
   int _locationRevision = 0;
+
+  Future<void> _restoreFromDisk() async {
+    final prefs = await _ref.read(sharedPreferencesProvider.future);
+    _persistence = LocationClaimPersistenceStore(prefs);
+    final persisted = _persistence?.load();
+    if (persisted == null) return;
+    state = state.copyWith(
+      balance: persisted.balance,
+      globalPool: state.globalPool.copyWith(
+        totalClaimableSupply: persisted.totalClaimableSupply ?? state.globalPool.totalClaimableSupply,
+        totalClaimedSupply: persisted.totalClaimedSupply ?? state.globalPool.totalClaimedSupply,
+      ),
+      claimHistory: persisted.claimHistory,
+    );
+    _persistedClaimablesById = {
+      for (final item in persisted.claimables) (item['id'] as String? ?? ''): item,
+    };
+  }
+
+  void _persistState() {
+    final store = _persistence;
+    if (store == null) return;
+    unawaited(store.save(state));
+  }
 
   Future<List<ClaimableLocation>> _seedLocationsForPosition(AppLocation? position) async {
     if (position == null) return const [];
@@ -108,26 +137,34 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
     if (revision != _locationRevision) return;
     final claimables = seedLocations.map((location) {
       final existing = _findExistingClaimable(location.id);
+      final persisted = _persistedClaimablesById[location.id];
       final distance = position == null ? 999999.0 : _distanceMeters(position.lat, position.lng, location.lat, location.lng);
 
       final rangeState = _rangeFlowState(location: location, distance: distance);
       final now = DateTime.now().toUtc();
-      final isOnCooldown = existing?.cooldownUntil != null && existing!.cooldownUntil!.isAfter(now);
+      final cooldownFromPersisted = DateTime.tryParse((persisted?['cooldownUntil'] as String?) ?? '')?.toUtc();
+      final isOnCooldown = (existing?.cooldownUntil ?? cooldownFromPersisted) != null && (existing?.cooldownUntil ?? cooldownFromPersisted)!.isAfter(now);
+      final existingClaimCount = existing?.claimCount ?? (persisted?['claimCount'] as num?)?.toInt() ?? 0;
+      final existingReward = existing?.currentReward ?? (persisted?['currentReward'] as num?)?.toDouble() ?? 1;
+      final existingTotalClaimed = existing?.totalClaimedAtLocation ?? (persisted?['totalClaimedAtLocation'] as num?)?.toDouble() ?? 0;
+      final existingVisitors = existing?.uniqueVisitors ?? (persisted?['uniqueVisitors'] as num?)?.toInt() ?? 0;
+      final existingDepleted = existing?.isDepleted ?? (persisted?['isDepleted'] as bool?) ?? false;
+      final existingFlow = existing?.flowState ?? ClaimFlowStateCodec.fromWire((persisted?['flowState'] as String?) ?? '');
       final flowState = isOnCooldown
           ? ClaimFlowState.cooldown
-          : existing == null || existing.flowState == ClaimFlowState.claimSuccess || existing.flowState == ClaimFlowState.cooldown
+          : existing == null || existingFlow == ClaimFlowState.claimSuccess || existingFlow == ClaimFlowState.cooldown
               ? rangeState
-              : existing.flowState;
+              : existingFlow;
       return ClaimableLocationView(
         location: location,
         distanceMeters: distance,
         flowState: flowState,
-        claimCount: existing?.claimCount ?? 0,
-        currentReward: existing?.currentReward ?? 1,
-        totalClaimedAtLocation: existing?.totalClaimedAtLocation ?? 0,
-        uniqueVisitors: existing?.uniqueVisitors ?? 0,
-        isDepleted: existing?.isDepleted ?? false,
-        cooldownUntil: existing?.cooldownUntil,
+        claimCount: existingClaimCount,
+        currentReward: existingReward,
+        totalClaimedAtLocation: existingTotalClaimed,
+        uniqueVisitors: existingVisitors,
+        isDepleted: existingDepleted,
+        cooldownUntil: existing?.cooldownUntil ?? cooldownFromPersisted,
       );
     }).toList(growable: false)
       ..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
@@ -143,6 +180,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
           : 'You visited ${firstVisited.location.displayName}. Tap node to claim ${firstVisited.currentReward.toStringAsFixed(6)} Perbug.',
       clearBanner: firstVisited == null,
     );
+    _persistState();
   }
 
   ClaimableLocationView? _findExistingClaimable(String locationId) {
@@ -245,6 +283,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       ],
       banner: 'Claim successful +${payout.toStringAsFixed(6)} Perbug. Next claim in 24h.',
     );
+    _persistState();
   }
 
   void claimInstantly(String locationId) {
@@ -285,6 +324,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         )
         .toList(growable: false);
     state = state.copyWith(claimables: next);
+    _persistState();
   }
 
   void _setFlow(String locationId, ClaimFlowState flow, {String? banner}) {
@@ -292,6 +332,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         .map((entry) => entry.location.id == locationId ? entry.copyWith(flowState: flow) : entry)
         .toList(growable: false);
     state = state.copyWith(claimables: next, banner: banner);
+    _persistState();
   }
 
   double _locationReward(int claimCount) => 1 / math.pow(2, claimCount);

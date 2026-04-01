@@ -275,39 +275,56 @@ class PerbugWalletPage extends ConsumerStatefulWidget {
 
 class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
   final _addressController = TextEditingController();
+  final _amountController = TextEditingController();
   bool _withdrawing = false;
   String? _statusMessage;
+  String? _txid;
 
   @override
   void dispose() {
     _addressController.dispose();
+    _amountController.dispose();
     super.dispose();
   }
 
   Future<void> _withdraw({required int balance}) async {
     final toAddress = _addressController.text.trim();
+    final requestedAmount = int.tryParse(_amountController.text.trim()) ?? balance;
     if (toAddress.isEmpty) {
       setState(() => _statusMessage = 'Enter a Perbug address before withdrawing.');
       return;
     }
-    if (balance <= 0) {
+    if (requestedAmount <= 0 || balance <= 0) {
       setState(() => _statusMessage = 'No Perbug balance available to withdraw.');
+      return;
+    }
+    if (requestedAmount > balance) {
+      setState(() => _statusMessage = 'Amount exceeds your available balance.');
       return;
     }
 
     setState(() {
       _withdrawing = true;
       _statusMessage = null;
+      _txid = null;
     });
 
     try {
       final apiClient = await ref.read(apiClientProvider.future);
-      await apiClient.postJson('/v1/perbug-economy/withdraw', body: {
+      final response = await apiClient.postJson('/v1/perbug-economy/withdraw', body: {
         'toAddress': toAddress,
-        'amountPerbug': balance,
+        'amountPerbug': requestedAmount,
+        'idempotencyKey': 'wd_${DateTime.now().microsecondsSinceEpoch}',
       });
+      final withdrawal = (response['withdrawal'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+      final txid = withdrawal['txid'] as String?;
       if (!mounted) return;
-      setState(() => _statusMessage = 'Withdrawal submitted to backend for $toAddress.');
+      setState(() {
+        _txid = txid;
+        _statusMessage = txid == null
+            ? 'Withdrawal submitted to backend for $toAddress.'
+            : 'Withdrawal completed to $toAddress.';
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() => _statusMessage = 'Withdrawal failed: $error');
@@ -349,6 +366,16 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Amount',
+                    hintText: '$balance',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 RpgBarButton(
                   onPressed: _withdrawing ? null : () => _withdraw(balance: economy.wallet.balance),
@@ -358,6 +385,10 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                   const SizedBox(height: 8),
                   Text(_statusMessage!, style: Theme.of(context).textTheme.bodySmall),
                 ],
+                if (_txid != null) ...[
+                  const SizedBox(height: 6),
+                  SelectableText('txid: $_txid'),
+                ]
               ],
             ),
           ),

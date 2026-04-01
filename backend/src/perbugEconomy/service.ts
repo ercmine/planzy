@@ -1,18 +1,27 @@
 import { randomUUID } from "node:crypto";
 
 import { ValidationError } from "../plans/errors.js";
-import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRewardRecord, CuratorGuide, CuratorGuideAnalytics, EconomyFeatureType, EconomyFraudFlag, EconomyLedgerEntryType, EconomyStore, ExplorationProgress, Offer, PremiumMembership, QuestCompletion, TokenAccount, TokenSplitConfig } from "./types.js";
+import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRewardRecord, CuratorGuide, CuratorGuideAnalytics, EconomyFeatureType, EconomyFraudFlag, EconomyLedgerEntryType, EconomyStore, ExplorationProgress, Offer, PremiumMembership, QuestCompletion, TokenAccount, TokenSplitConfig, UserPayoutProfile, WithdrawalRecord } from "./types.js";
 
 const DECIMALS = 6;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const atomic = (v: number) => BigInt(Math.round(v * (10 ** DECIMALS)));
 const nowIso = () => new Date().toISOString();
 const toDateKey = (iso: string) => iso.slice(0, 10);
+const perbugFromAtomic = (value: bigint) => Number(value) / (10 ** DECIMALS);
 
 const ALL_FEATURES: EconomyFeatureType[] = ["business_sponsorship", "business_quest", "premium_membership", "ad_marketplace", "offer_redemption", "creator_reward", "curator_reward", "exploration_reward", "collection_reward"];
 
+export interface PerbugWithdrawalRpcClient {
+  validateAddress(address: string): Promise<boolean>;
+  sendToAddress(address: string, amount: number, comment?: string): Promise<string>;
+}
+
 export class PerbugEconomyService {
-  constructor(private readonly store: EconomyStore) {
+  constructor(
+    private readonly store: EconomyStore,
+    private readonly rpcClient?: PerbugWithdrawalRpcClient
+  ) {
     this.seedSplitConfig("system");
     this.getOrCreateAccount("platform", "treasury");
     this.getOrCreateAccount("platform", "burn");
@@ -48,6 +57,78 @@ export class PerbugEconomyService {
     const amountAtomic = atomic(amountPerbug);
     this.adjustBalance({ ownerType: "business", ownerId: businessId, delta: amountAtomic, actor, feature: "business_quest", type: "admin_adjustment", referenceType: "credit_business", referenceId: businessId });
     return this.getOrCreateAccount("business", businessId);
+  }
+
+  upsertPayoutAddress(userId: string, payoutAddress: string): UserPayoutProfile {
+    const cleaned = payoutAddress.trim();
+    if (!cleaned) throw new ValidationError(["payoutAddress is required"]);
+    const profile: UserPayoutProfile = { userId, payoutAddress: cleaned, updatedAt: nowIso() };
+    this.store.savePayoutProfile(profile);
+    return profile;
+  }
+
+  getPayoutProfile(userId: string): UserPayoutProfile | null {
+    return this.store.getPayoutProfile(userId);
+  }
+
+  async requestWithdrawal(input: { userId: string; amountPerbug: number; toAddress?: string; idempotencyKey: string }): Promise<WithdrawalRecord> {
+    const amountPerbug = Number(input.amountPerbug ?? 0);
+    if (!Number.isFinite(amountPerbug) || amountPerbug <= 0) throw new ValidationError(["amountPerbug must be positive"]);
+    if (!input.idempotencyKey.trim()) throw new ValidationError(["idempotencyKey is required"]);
+
+    const existing = this.store.getWithdrawalByIdempotency(input.userId, input.idempotencyKey.trim());
+    if (existing) return existing;
+
+    const payoutProfile = this.store.getPayoutProfile(input.userId);
+    const toAddress = (input.toAddress?.trim() || payoutProfile?.payoutAddress || "").trim();
+    if (!toAddress) throw new ValidationError(["toAddress is required"]);
+    if (!this.rpcClient) throw new ValidationError(["withdrawals unavailable: rpc client not configured"]);
+    const valid = await this.rpcClient.validateAddress(toAddress);
+    if (!valid) throw new ValidationError(["invalid Perbug payout address"]);
+
+    const amountAtomic = atomic(amountPerbug);
+    const wallet = this.getOrCreateAccount("user", input.userId);
+    const pendingAtomic = this.store
+      .listWithdrawalsByUser(input.userId)
+      .filter((item) => item.status === "pending" || item.status === "processing")
+      .reduce((acc, item) => acc + item.amountAtomic, 0n);
+    const withdrawableAtomic = wallet.balanceAtomic - pendingAtomic;
+    if (withdrawableAtomic < amountAtomic) throw new ValidationError(["insufficient withdrawable balance"]);
+
+    const withdrawal: WithdrawalRecord = {
+      id: `wd_${randomUUID()}`,
+      userId: input.userId,
+      amountAtomic,
+      toAddress,
+      status: "processing",
+      idempotencyKey: input.idempotencyKey.trim(),
+      createdAt: nowIso(),
+      updatedAt: nowIso()
+    };
+    this.store.saveWithdrawal(withdrawal);
+
+    try {
+      const txid = await this.rpcClient.sendToAddress(toAddress, amountPerbug, `perbug_withdrawal:${withdrawal.id}`);
+      withdrawal.status = "completed";
+      withdrawal.txid = txid;
+      withdrawal.completedAt = nowIso();
+      withdrawal.updatedAt = withdrawal.completedAt;
+      this.store.saveWithdrawal(withdrawal);
+      this.adjustBalance({ ownerType: "user", ownerId: input.userId, delta: -amountAtomic, actor: input.userId, feature: "exploration_reward", type: "spend", referenceType: "withdrawal", referenceId: withdrawal.id });
+      this.addLedger("exploration_reward", "reward_payout", amountAtomic, input.userId, "withdrawal_txid", withdrawal.id, { txid, toAddress });
+      return withdrawal;
+    } catch (error) {
+      withdrawal.status = "failed";
+      withdrawal.failedAt = nowIso();
+      withdrawal.updatedAt = withdrawal.failedAt;
+      withdrawal.failureReason = error instanceof Error ? error.message : "sendtoaddress_failed";
+      this.store.saveWithdrawal(withdrawal);
+      throw new ValidationError([`withdrawal failed: ${withdrawal.failureReason}`]);
+    }
+  }
+
+  listWithdrawals(userId: string): WithdrawalRecord[] {
+    return this.store.listWithdrawalsByUser(userId);
   }
 
   createBusinessQuest(input: Omit<BusinessQuest, "id" | "status" | "paidAtomic" | "createdAt" | "updatedAt" | "rewardAtomic" | "budgetAtomic"> & { rewardPerbug: number; budgetPerbug: number }) {
@@ -346,14 +427,28 @@ export class PerbugEconomyService {
   }
 
   consumerDashboard(userId: string) {
+    const wallet = this.getOrCreateAccount("user", userId);
+    const withdrawals = this.store.listWithdrawalsByUser(userId);
+    const completedWithdrawnAtomic = withdrawals.filter((item) => item.status === "completed").reduce((acc, item) => acc + item.amountAtomic, 0n);
+    const pendingWithdrawAtomic = withdrawals.filter((item) => item.status === "pending" || item.status === "processing").reduce((acc, item) => acc + item.amountAtomic, 0n);
+    const withdrawableAtomic = wallet.balanceAtomic - pendingWithdrawAtomic;
     return {
-      wallet: this.getOrCreateAccount("user", userId),
+      wallet,
       exploration: this.store.getExplorationProgress(userId),
       questCompletions: this.store.listQuestCompletionsForUser(userId),
       memberships: this.store.getMembership(userId),
       redemptions: this.store.listRedemptions(userId),
       activeQuests: this.store.listQuests().filter((quest) => quest.status === "active"),
-      collections: this.store.listCollections().filter((collection) => collection.active)
+      collections: this.store.listCollections().filter((collection) => collection.active),
+      payoutProfile: this.store.getPayoutProfile(userId),
+      withdrawals,
+      balances: {
+        earnedAtomic: wallet.balanceAtomic + completedWithdrawnAtomic,
+        withdrawnAtomic: completedWithdrawnAtomic,
+        pendingWithdrawAtomic,
+        withdrawableAtomic,
+        withdrawablePerbug: perbugFromAtomic(withdrawableAtomic)
+      }
     };
   }
 

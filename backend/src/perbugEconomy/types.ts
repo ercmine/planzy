@@ -198,6 +198,29 @@ export interface EconomyFraudFlag {
   createdAt: string;
 }
 
+export interface UserPayoutProfile {
+  userId: string;
+  payoutAddress: string;
+  updatedAt: string;
+}
+
+export type WithdrawalStatus = "pending" | "processing" | "completed" | "failed";
+
+export interface WithdrawalRecord {
+  id: string;
+  userId: string;
+  amountAtomic: bigint;
+  toAddress: string;
+  status: WithdrawalStatus;
+  idempotencyKey: string;
+  txid?: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  failedAt?: string;
+  failureReason?: string;
+}
+
 export interface EconomyStore {
   listSplitConfigs(): TokenSplitConfig[];
   saveSplitConfig(config: TokenSplitConfig): void;
@@ -247,4 +270,12 @@ export interface EconomyStore {
 
   addFraudFlag(flag: EconomyFraudFlag): void;
   listFraudFlags(): EconomyFraudFlag[];
+
+  savePayoutProfile(profile: UserPayoutProfile): void;
+  getPayoutProfile(userId: string): UserPayoutProfile | null;
+
+  saveWithdrawal(record: WithdrawalRecord): void;
+  getWithdrawal(withdrawalId: string): WithdrawalRecord | null;
+  getWithdrawalByIdempotency(userId: string, idempotencyKey: string): WithdrawalRecord | null;
+  listWithdrawalsByUser(userId: string): WithdrawalRecord[];
 }
