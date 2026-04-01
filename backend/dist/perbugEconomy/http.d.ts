@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { PerbugEconomyService } from "./service.js";
 export declare function createPerbugEconomyHttpHandlers(service: PerbugEconomyService): {
+    withdraw: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
     creditUser: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
     createQuest: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
     completeQuest: (req: IncomingMessage, res: ServerResponse, questId: string) => Promise<void>;

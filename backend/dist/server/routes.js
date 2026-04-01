@@ -535,6 +535,10 @@ export function createRoutes(service, merchantService, deps) {
                 await economyHandlers.creditUser(req, res);
                 return;
             }
+            if (req.method === "POST" && normalizedPath === "/v1/perbug-economy/withdraw" && economyHandlers) {
+                await economyHandlers.withdraw(req, res);
+                return;
+            }
             if (req.method === "POST" && normalizedPath === "/v1/business/quests" && economyHandlers) {
                 await economyHandlers.createQuest(req, res);
                 return;
