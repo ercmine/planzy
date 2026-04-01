@@ -43,6 +43,21 @@ class AdMobConfig {
   }
 
 
+
+  static String get productionInterstitialUnitId {
+    if (kIsWeb) {
+      return '';
+    }
+
+    if (Platform.isAndroid) {
+      return androidInterstitialUnitId;
+    }
+    if (Platform.isIOS) {
+      return iosInterstitialUnitId;
+    }
+    return '';
+  }
+
   static String get interstitialUnitId {
     if (kDebugMode) {
       return AdMobTestIds.interstitial;

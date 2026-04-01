@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../../config/admob_config.dart';
+import '../../config/admob_test_ids.dart';
 import '../logging/log.dart';
 
 enum InterstitialAdTrigger { claimSuccess, withdrawSuccess }
@@ -43,27 +44,43 @@ class GoogleActionInterstitialAdService implements ActionInterstitialAdService {
     }
     _loading = true;
 
-    final completer = Completer<void>();
-    final adUnitId = AdMobConfig.interstitialUnitId;
+    try {
+      final productionUnitId = AdMobConfig.productionInterstitialUnitId;
+      final loadedProduction = await _loadInterstitial(productionUnitId, source: 'production');
+      if (loadedProduction || !kDebugMode) {
+        return;
+      }
+
+      final testUnitId = AdMobTestIds.interstitial;
+      await _loadInterstitial(testUnitId, source: 'test_fallback');
+    } finally {
+      _loading = false;
+    }
+  }
+
+  Future<bool> _loadInterstitial(String adUnitId, {required String source}) async {
+    if (adUnitId.isEmpty) {
+      return false;
+    }
+
+    final completer = Completer<bool>();
     InterstitialAd.load(
       adUnitId: adUnitId,
       request: const AdRequest(nonPersonalizedAds: true),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
-          _loading = false;
           _interstitialAd = ad;
-          Log.info('[AdMob][Interstitial] loaded unitId=$adUnitId');
-          completer.complete();
+          Log.info('[AdMob][Interstitial] loaded unitId=$adUnitId source=$source');
+          completer.complete(true);
         },
         onAdFailedToLoad: (error) {
-          _loading = false;
-          Log.warn('[AdMob][Interstitial] failed to load unitId=$adUnitId code=${error.code} message=${error.message}');
-          completer.complete();
+          Log.warn('[AdMob][Interstitial] failed to load unitId=$adUnitId source=$source code=${error.code} message=${error.message}');
+          completer.complete(false);
         },
       ),
     );
 
-    await completer.future;
+    return completer.future;
   }
 
   @override
