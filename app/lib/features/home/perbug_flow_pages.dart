@@ -372,7 +372,7 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'Amount',
-                    hintText: '$balance',
+                    hintText: '${economy.wallet.balance}',
                     border: const OutlineInputBorder(),
                   ),
                 ),
