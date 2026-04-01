@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/location/location_models.dart';
+import '../perbug/chain/perbug_chain_providers.dart';
 import 'location_claim_controller.dart';
 import 'location_claim_models.dart';
 
@@ -12,6 +13,10 @@ class NearbyClaimLocationsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(locationClaimControllerProvider);
     final controller = ref.read(locationClaimControllerProvider.notifier);
+    final walletAddress = ref.watch(walletAddressProvider);
+    final maskedWallet = walletAddress == null || walletAddress.isEmpty
+        ? null
+        : '${walletAddress.substring(0, walletAddress.length > 7 ? 7 : walletAddress.length)}…${walletAddress.substring(walletAddress.length > 4 ? walletAddress.length - 4 : 0)}';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Nearby claimable locations')),
@@ -25,6 +30,14 @@ class NearbyClaimLocationsPage extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              maskedWallet == null
+                  ? 'Add your Perbug wallet address to claim payouts.'
+                  : 'Claim payouts will be sent to: $maskedWallet',
+            ),
+          ),
           Expanded(
             child: ListView.builder(
               itemCount: state.claimables.length,
@@ -36,9 +49,9 @@ class NearbyClaimLocationsPage extends ConsumerWidget {
                     subtitle: Text(
                       '${item.location.category} • ${item.distanceMeters.round()}m away • '
                       'claim radius ${item.location.claimRadiusMeters.round()}m • '
-                      'claimable ${item.currentReward.toStringAsFixed(6)}Ⓟ',
+                      'Reward: ${item.currentReward.toStringAsFixed(6)} Perbug to wallet',
                     ),
-                    trailing: _ClaimActionButton(item: item, controller: controller),
+                    trailing: _ClaimActionButton(item: item, controller: controller, hasWalletAddress: maskedWallet != null),
                   ),
                 );
               },
@@ -59,10 +72,11 @@ class NearbyClaimLocationsPage extends ConsumerWidget {
 }
 
 class _ClaimActionButton extends StatelessWidget {
-  const _ClaimActionButton({required this.item, required this.controller});
+  const _ClaimActionButton({required this.item, required this.controller, required this.hasWalletAddress});
 
   final ClaimableLocationView item;
   final LocationClaimController controller;
+  final bool hasWalletAddress;
 
   @override
   Widget build(BuildContext context) {
@@ -70,9 +84,12 @@ class _ClaimActionButton extends StatelessWidget {
         ? null
         : _formatRemaining(item.cooldownUntil!);
     return switch (item.flowState) {
-      ClaimFlowState.visited || ClaimFlowState.claimReady => FilledButton(onPressed: () => controller.claimInstantly(item.location.id), child: const Text('Claim')),
+      ClaimFlowState.visited || ClaimFlowState.claimReady => FilledButton(
+          onPressed: hasWalletAddress ? () => controller.claimInstantly(item.location.id) : null,
+          child: Text(hasWalletAddress ? 'Claim Perbug to Wallet' : 'Add Wallet Address to Claim'),
+        ),
       ClaimFlowState.cooldown => Chip(label: Text(cooldownLabel == null ? 'Cooldown' : 'Cooldown $cooldownLabel')),
-      ClaimFlowState.claimSuccess => const Chip(label: Text('Claimed')),
+      ClaimFlowState.claimSuccess => const Chip(label: Text('Payout Submitted')),
       _ => Chip(label: Text('Move within ${item.location.claimRadiusMeters.round()}m')),
     };
   }

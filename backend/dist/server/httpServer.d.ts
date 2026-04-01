@@ -44,6 +44,7 @@ import type { PerbugTipsService } from "../perbugTips/service.js";
 import type { CompetitionService } from "../competition/service.js";
 import type { SponsoredLocationsService } from "../sponsoredLocations/service.js";
 import type { PerbugEconomyService } from "../perbugEconomy/service.js";
+import type { LocationClaimsService } from "../locationClaims/service.js";
 import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
 import type { createPerbugWorldHttpHandlers } from "../perbugWorld/http.js";
 import type { PerbugMarketplaceService } from "../perbugMarketplace/service.js";
@@ -96,6 +97,7 @@ export declare function createHttpServer(service: VenueClaimsService, merchantSe
     competitionService?: CompetitionService;
     sponsoredLocationsService?: SponsoredLocationsService;
     perbugEconomyService?: PerbugEconomyService;
+    locationClaimsService?: LocationClaimsService;
     viewerEngagementRewardsService?: ViewerEngagementRewardsService;
     perbugService?: import("../perbug/service.js").PerbugMarketplaceService;
     perbugMarketplaceService?: PerbugMarketplaceService;

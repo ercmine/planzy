@@ -157,21 +157,21 @@ class PerbugInventoryPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(locationClaimControllerProvider);
     return _PerbugGameShell(
-      title: 'Claim History',
-      subtitle: 'Visited and claimed locations',
+      title: 'Wallet Payout History',
+      subtitle: 'Real Perbug payouts sent to wallet addresses',
       body: Column(
         children: [
           _StatStrip(items: [
-            _StatItem('Visited', '${state.claimables.where((e) => e.flowState == ClaimFlowState.visited || e.flowState == ClaimFlowState.claimSuccess).length}'),
-            _StatItem('Claimed', '${state.claimables.where((e) => e.flowState == ClaimFlowState.claimSuccess).length}'),
+            _StatItem('Visited', '${state.claimables.where((e) => e.flowState == ClaimFlowState.visited || e.flowState == ClaimFlowState.cooldown).length}'),
+            _StatItem('Payouts', '${state.claimHistory.length}'),
             _StatItem('Balance', '${state.balance}Ⓟ'),
           ]),
           const SizedBox(height: 12),
-          for (final entry in state.claimables)
+          for (final entry in state.claimHistory)
             _LorePanel(
-              title: entry.location.displayName,
-              subtitle: '${entry.location.category} • ${(entry.distanceMeters).round()}m',
-              body: 'Status ${entry.flowState.name}',
+              title: '${entry.reward.toStringAsFixed(6)} Perbug sent',
+              subtitle: '${entry.locationName} • ${entry.createdAt.toLocal().toIso8601String().replaceFirst('T', ' ').substring(0, 16)}',
+              body: 'To ${entry.destinationAddress} • Status ${entry.payoutStatus}${entry.txid == null ? '' : ' • txid ${entry.txid}'}',
             ),
         ],
       ),

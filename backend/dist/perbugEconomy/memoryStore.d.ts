@@ -1,4 +1,4 @@
-import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRewardRecord, CuratorGuide, CuratorGuideAnalytics, EconomyFraudFlag, EconomyLedgerEntry, EconomyStore, ExplorationProgress, Offer, PremiumMembership, QuestCompletion, Redemption, TokenAccount, TokenSplitConfig } from "./types.js";
+import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRewardRecord, CuratorGuide, CuratorGuideAnalytics, EconomyFraudFlag, EconomyLedgerEntry, EconomyStore, ExplorationProgress, Offer, PremiumMembership, QuestCompletion, Redemption, TokenAccount, TokenSplitConfig, UserPayoutProfile, WithdrawalRecord } from "./types.js";
 export declare class MemoryPerbugEconomyStore implements EconomyStore {
     private splitConfigs;
     private accounts;
@@ -17,6 +17,10 @@ export declare class MemoryPerbugEconomyStore implements EconomyStore {
     private offers;
     private redemptionsByUser;
     private fraudFlags;
+    private payoutProfiles;
+    private withdrawals;
+    private withdrawalsByUser;
+    private withdrawalsByIdempotency;
     listSplitConfigs(): TokenSplitConfig[];
     saveSplitConfig(config: TokenSplitConfig): void;
     getTokenAccount(ownerType: TokenAccount["ownerType"], ownerId: string): TokenAccount | null;
@@ -54,4 +58,10 @@ export declare class MemoryPerbugEconomyStore implements EconomyStore {
     listRedemptions(userId: string): Redemption[];
     addFraudFlag(flag: EconomyFraudFlag): void;
     listFraudFlags(): EconomyFraudFlag[];
+    savePayoutProfile(profile: UserPayoutProfile): void;
+    getPayoutProfile(userId: string): UserPayoutProfile | null;
+    saveWithdrawal(record: WithdrawalRecord): void;
+    getWithdrawal(withdrawalId: string): WithdrawalRecord | null;
+    getWithdrawalByIdempotency(userId: string, idempotencyKey: string): WithdrawalRecord | null;
+    listWithdrawalsByUser(userId: string): WithdrawalRecord[];
 }

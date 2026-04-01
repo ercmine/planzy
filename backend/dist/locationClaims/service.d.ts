@@ -1,7 +1,12 @@
 import type { AdGateRecord, AnnualEmissionPool, ClaimableLocation, FinalizedClaim, LocationClaimLedgerEntry, LocationClaimsStore, NearbyLocationResult, UserVisit } from "./types.js";
+export interface LocationClaimPayoutRpcClient {
+    validateAddress(address: string): Promise<boolean>;
+    sendToAddress(address: string, amount: number, comment?: string): Promise<string>;
+}
 export declare class LocationClaimsService {
     private readonly store;
-    constructor(store: LocationClaimsStore);
+    private readonly payoutRpcClient?;
+    constructor(store: LocationClaimsStore, payoutRpcClient?: LocationClaimPayoutRpcClient | undefined);
     upsertLocation(input: Omit<ClaimableLocation, "rewardPerClaim" | "claimCount" | "currentRewardAtomic" | "currentReward" | "totalClaimedAtomic" | "totalClaimed" | "uniqueVisitors" | "totalVisitors" | "totalClaims" | "isDepleted" | "depletionThresholdAtomic" | "depletionThreshold" | "claimHistory" | "visitorUserIds" | "claimRadiusMeters"> & {
         claimRadiusMeters?: number;
         rewardPerClaim?: bigint | number;
@@ -33,8 +38,9 @@ export declare class LocationClaimsService {
         visitId: string;
         adSessionId: string;
         idempotencyKey: string;
+        payoutAddress: string;
         year?: number;
-    }): FinalizedClaim;
+    }): Promise<FinalizedClaim>;
     getUserHistory(userId: string): FinalizedClaim[];
     getPoolStats(year?: number): AnnualEmissionPool;
     listLedger(): LocationClaimLedgerEntry[];

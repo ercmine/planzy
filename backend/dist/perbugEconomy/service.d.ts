@@ -1,10 +1,24 @@
-import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRewardRecord, CuratorGuide, CuratorGuideAnalytics, EconomyFraudFlag, EconomyStore, ExplorationProgress, Offer, PremiumMembership, QuestCompletion, TokenAccount, TokenSplitConfig } from "./types.js";
+import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRewardRecord, CuratorGuide, CuratorGuideAnalytics, EconomyFraudFlag, EconomyStore, ExplorationProgress, Offer, PremiumMembership, QuestCompletion, TokenAccount, TokenSplitConfig, UserPayoutProfile, WithdrawalRecord } from "./types.js";
+export interface PerbugWithdrawalRpcClient {
+    validateAddress(address: string): Promise<boolean>;
+    sendToAddress(address: string, amount: number, comment?: string): Promise<string>;
+}
 export declare class PerbugEconomyService {
     private readonly store;
-    constructor(store: EconomyStore);
+    private readonly rpcClient?;
+    constructor(store: EconomyStore, rpcClient?: PerbugWithdrawalRpcClient | undefined);
     seedSplitConfig(actor: string): void;
     creditUser(userId: string, amountPerbug: number, actor?: string): TokenAccount;
     creditBusiness(businessId: string, amountPerbug: number, actor?: string): TokenAccount;
+    upsertPayoutAddress(userId: string, payoutAddress: string): UserPayoutProfile;
+    getPayoutProfile(userId: string): UserPayoutProfile | null;
+    requestWithdrawal(input: {
+        userId: string;
+        amountPerbug: number;
+        toAddress?: string;
+        idempotencyKey: string;
+    }): Promise<WithdrawalRecord>;
+    listWithdrawals(userId: string): WithdrawalRecord[];
     createBusinessQuest(input: Omit<BusinessQuest, "id" | "status" | "paidAtomic" | "createdAt" | "updatedAt" | "rewardAtomic" | "budgetAtomic"> & {
         rewardPerbug: number;
         budgetPerbug: number;
@@ -120,6 +134,15 @@ export declare class PerbugEconomyService {
         redemptions: import("./types.js").Redemption[];
         activeQuests: BusinessQuest[];
         collections: CollectionDefinition[];
+        payoutProfile: UserPayoutProfile | null;
+        withdrawals: WithdrawalRecord[];
+        balances: {
+            earnedAtomic: bigint;
+            withdrawnAtomic: bigint;
+            pendingWithdrawAtomic: bigint;
+            withdrawableAtomic: bigint;
+            withdrawablePerbug: number;
+        };
     };
     businessDashboard(businessId: string): {
         wallet: TokenAccount;

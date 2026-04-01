@@ -101,6 +101,8 @@ import { createSponsoredLocationsHttpHandlers } from "../sponsoredLocations/http
 import type { SponsoredLocationsService } from "../sponsoredLocations/service.js";
 import { createPerbugEconomyHttpHandlers } from "../perbugEconomy/http.js";
 import type { PerbugEconomyService } from "../perbugEconomy/service.js";
+import { createLocationClaimsHttpHandlers } from "../locationClaims/http.js";
+import type { LocationClaimsService } from "../locationClaims/service.js";
 import { createViewerEngagementRewardsHttpHandlers } from "../viewerEngagementRewards/http.js";
 import type { ViewerEngagementRewardsService } from "../viewerEngagementRewards/service.js";
 import type { createPerbugWorldHttpHandlers } from "../perbugWorld/http.js";
@@ -209,6 +211,7 @@ export function createRoutes(
     competitionService?: CompetitionService;
     sponsoredLocationsService?: SponsoredLocationsService;
     perbugEconomyService?: PerbugEconomyService;
+    locationClaimsService?: LocationClaimsService;
     viewerEngagementRewardsService?: ViewerEngagementRewardsService;
     perbugService?: LegacyPerbugMarketplaceService;
     perbugMarketplaceService?: PerbugMarketplaceService;
@@ -264,6 +267,7 @@ export function createRoutes(
   const competitionHandlers = deps?.competitionService ? createCompetitionHttpHandlers(deps.competitionService) : null;
   const sponsoredLocationHandlers = deps?.sponsoredLocationsService ? createSponsoredLocationsHttpHandlers(deps.sponsoredLocationsService) : null;
   const economyHandlers = deps?.perbugEconomyService ? createPerbugEconomyHttpHandlers(deps.perbugEconomyService) : null;
+  const locationClaimHandlers = deps?.locationClaimsService ? createLocationClaimsHttpHandlers(deps.locationClaimsService) : null;
   const viewerRewardsHandlers = deps?.viewerEngagementRewardsService ? createViewerEngagementRewardsHttpHandlers(deps.viewerEngagementRewardsService) : null;
   const perbugHandlers = deps?.perbugService ? createPerbugLegacyHttpHandlers(deps.perbugService) : null;
   const perbugWorldHandlers = deps?.perbugWorldHandlers ?? null;
@@ -757,6 +761,31 @@ export function createRoutes(
       }
       if (req.method === "GET" && normalizedPath === "/v1/perbug-economy/me" && economyHandlers) {
         await economyHandlers.consumerDashboard(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/location-claims/nearby" && locationClaimHandlers) {
+        await locationClaimHandlers.nearby(req, res, url);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/location-claims/visits" && locationClaimHandlers) {
+        await locationClaimHandlers.registerVisit(req, res);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/location-claims/prepare" && locationClaimHandlers) {
+        await locationClaimHandlers.prepareClaim(req, res);
+        return;
+      }
+      const locationClaimAdMatch = matchPath("/v1/location-claims/ad/:adSessionId/complete", normalizedPath);
+      if (req.method === "POST" && locationClaimAdMatch && locationClaimHandlers) {
+        await locationClaimHandlers.completeAd(req, res, locationClaimAdMatch.adSessionId);
+        return;
+      }
+      if (req.method === "POST" && normalizedPath === "/v1/location-claims/finalize" && locationClaimHandlers) {
+        await locationClaimHandlers.finalizeClaim(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/location-claims/history" && locationClaimHandlers) {
+        await locationClaimHandlers.history(req, res);
         return;
       }
       if (req.method === "GET" && normalizedPath === "/v1/creator/economy/dashboard" && economyHandlers) {

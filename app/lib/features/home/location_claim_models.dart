@@ -176,28 +176,44 @@ class LocationClaimState {
 class ClaimTransaction {
   const ClaimTransaction({
     required this.locationId,
+    required this.locationName,
     required this.reward,
+    required this.destinationAddress,
+    required this.payoutStatus,
     required this.claimCountAfter,
     required this.createdAt,
+    this.txid,
   });
 
   final String locationId;
+  final String locationName;
   final double reward;
+  final String destinationAddress;
+  final String payoutStatus;
   final int claimCountAfter;
   final DateTime createdAt;
+  final String? txid;
 
   Map<String, dynamic> toJson() => {
         'locationId': locationId,
+        'locationName': locationName,
         'reward': reward,
+        'destinationAddress': destinationAddress,
+        'payoutStatus': payoutStatus,
         'claimCountAfter': claimCountAfter,
         'createdAt': createdAt.toUtc().toIso8601String(),
+        'txid': txid,
       };
 
   static ClaimTransaction fromJson(Map<String, dynamic> json) => ClaimTransaction(
         locationId: (json['locationId'] as String?) ?? '',
+        locationName: (json['locationName'] as String?) ?? '',
         reward: (json['reward'] as num?)?.toDouble() ?? 0,
+        destinationAddress: (json['destinationAddress'] as String?) ?? '',
+        payoutStatus: (json['payoutStatus'] as String?) ?? 'pending',
         claimCountAfter: (json['claimCountAfter'] as num?)?.toInt() ?? 0,
         createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '')?.toUtc() ?? DateTime.now().toUtc(),
+        txid: (json['txid'] as String?)?.trim().isEmpty == true ? null : (json['txid'] as String?),
       );
 }
 

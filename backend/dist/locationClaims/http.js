@@ -40,12 +40,13 @@ export function createLocationClaimsHttpHandlers(service) {
         finalizeClaim: async (req, res) => {
             const body = await parseJsonBody(req);
             sendJson(res, 200, {
-                claim: service.finalizeClaim({
+                claim: await service.finalizeClaim({
                     userId: requireUser(req),
                     locationId: String(body.locationId ?? ""),
                     visitId: String(body.visitId ?? ""),
                     adSessionId: String(body.adSessionId ?? ""),
-                    idempotencyKey: String(body.idempotencyKey ?? "")
+                    idempotencyKey: String(body.idempotencyKey ?? ""),
+                    payoutAddress: String(body.payoutAddress ?? ""),
                 })
             });
         },

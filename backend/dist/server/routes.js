@@ -47,6 +47,7 @@ import { createPerbugTipsHttpHandlers } from "../perbugTips/http.js";
 import { createCompetitionHttpHandlers } from "../competition/http.js";
 import { createSponsoredLocationsHttpHandlers } from "../sponsoredLocations/http.js";
 import { createPerbugEconomyHttpHandlers } from "../perbugEconomy/http.js";
+import { createLocationClaimsHttpHandlers } from "../locationClaims/http.js";
 import { createViewerEngagementRewardsHttpHandlers } from "../viewerEngagementRewards/http.js";
 import { createPerbugMarketplaceHttpHandlers as createPerbugLegacyHttpHandlers } from "../perbug/http.js";
 import { createPerbugMarketplaceHttpHandlers } from "../perbugMarketplace/http.js";
@@ -147,6 +148,7 @@ export function createRoutes(service, merchantService, deps) {
     const competitionHandlers = deps?.competitionService ? createCompetitionHttpHandlers(deps.competitionService) : null;
     const sponsoredLocationHandlers = deps?.sponsoredLocationsService ? createSponsoredLocationsHttpHandlers(deps.sponsoredLocationsService) : null;
     const economyHandlers = deps?.perbugEconomyService ? createPerbugEconomyHttpHandlers(deps.perbugEconomyService) : null;
+    const locationClaimHandlers = deps?.locationClaimsService ? createLocationClaimsHttpHandlers(deps.locationClaimsService) : null;
     const viewerRewardsHandlers = deps?.viewerEngagementRewardsService ? createViewerEngagementRewardsHttpHandlers(deps.viewerEngagementRewardsService) : null;
     const perbugHandlers = deps?.perbugService ? createPerbugLegacyHttpHandlers(deps.perbugService) : null;
     const perbugWorldHandlers = deps?.perbugWorldHandlers ?? null;
@@ -539,6 +541,14 @@ export function createRoutes(service, merchantService, deps) {
                 await economyHandlers.withdraw(req, res);
                 return;
             }
+            if (req.method === "PUT" && normalizedPath === "/v1/perbug-economy/payout-address" && economyHandlers) {
+                await economyHandlers.upsertPayoutAddress(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/perbug-economy/withdrawals" && economyHandlers) {
+                await economyHandlers.withdrawals(req, res);
+                return;
+            }
             if (req.method === "POST" && normalizedPath === "/v1/business/quests" && economyHandlers) {
                 await economyHandlers.createQuest(req, res);
                 return;
@@ -602,6 +612,31 @@ export function createRoutes(service, merchantService, deps) {
             }
             if (req.method === "GET" && normalizedPath === "/v1/perbug-economy/me" && economyHandlers) {
                 await economyHandlers.consumerDashboard(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/location-claims/nearby" && locationClaimHandlers) {
+                await locationClaimHandlers.nearby(req, res, url);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/location-claims/visits" && locationClaimHandlers) {
+                await locationClaimHandlers.registerVisit(req, res);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/location-claims/prepare" && locationClaimHandlers) {
+                await locationClaimHandlers.prepareClaim(req, res);
+                return;
+            }
+            const locationClaimAdMatch = matchPath("/v1/location-claims/ad/:adSessionId/complete", normalizedPath);
+            if (req.method === "POST" && locationClaimAdMatch && locationClaimHandlers) {
+                await locationClaimHandlers.completeAd(req, res, locationClaimAdMatch.adSessionId);
+                return;
+            }
+            if (req.method === "POST" && normalizedPath === "/v1/location-claims/finalize" && locationClaimHandlers) {
+                await locationClaimHandlers.finalizeClaim(req, res);
+                return;
+            }
+            if (req.method === "GET" && normalizedPath === "/v1/location-claims/history" && locationClaimHandlers) {
+                await locationClaimHandlers.history(req, res);
                 return;
             }
             if (req.method === "GET" && normalizedPath === "/v1/creator/economy/dashboard" && economyHandlers) {
