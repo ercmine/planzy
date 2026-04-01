@@ -50,7 +50,7 @@ class RpgBarSurface extends StatelessWidget {
             Positioned.fill(
               child: Image(
                 image: const AssetImage(AppAssets.rpgBarFrame),
-                fit: BoxFit.fill,
+                fit: BoxFit.contain,
                 centerSlice: _centerSlice,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
