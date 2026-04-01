@@ -282,6 +282,7 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
   final _addressController = TextEditingController();
   final _amountController = TextEditingController();
   bool _withdrawing = false;
+  bool _savingAddress = false;
   String? _statusMessage;
   String? _txid;
 
@@ -291,7 +292,9 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
     final walletAddress = ref.read(walletAddressProvider);
     if (walletAddress != null && walletAddress.trim().isNotEmpty) {
       _walletLinkController.text = walletAddress;
+      _addressController.text = walletAddress;
     }
+    unawaited(_loadPayoutAddress());
   }
 
   @override
@@ -302,17 +305,63 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
     super.dispose();
   }
 
+  Future<void> _loadPayoutAddress() async {
+    try {
+      final apiClient = await ref.read(apiClientProvider.future);
+      final payload = await apiClient.getJson('/v1/perbug-economy/me');
+      final payoutProfile = (payload['payoutProfile'] as Map?)?.cast<String, dynamic>();
+      final payoutAddress = payoutProfile?['payoutAddress']?.toString().trim();
+      if (payoutAddress == null || payoutAddress.isEmpty || !mounted) {
+        return;
+      }
+      setState(() {
+        _walletLinkController.text = payoutAddress;
+        if (_addressController.text.trim().isEmpty) {
+          _addressController.text = payoutAddress;
+        }
+      });
+      final store = await ref.read(identityStoreProvider.future);
+      await store.setWalletSessionAddress(payoutAddress);
+      ref.read(walletAddressProvider.notifier).state = payoutAddress;
+      await ref.read(perbugGameControllerProvider.notifier).setWalletLink(walletAddress: payoutAddress);
+    } catch (_) {
+      // Best-effort hydration from backend payout profile.
+    }
+  }
+
   Future<void> _saveWalletAddress() async {
     final walletAddress = _walletLinkController.text.trim();
     final normalized = walletAddress.isEmpty ? null : walletAddress;
-    final store = await ref.read(identityStoreProvider.future);
-    await store.setWalletSessionAddress(normalized);
-    ref.read(walletAddressProvider.notifier).state = normalized;
-    await ref.read(perbugGameControllerProvider.notifier).setWalletLink(walletAddress: normalized);
-    if (!mounted) return;
     setState(() {
-      _statusMessage = normalized == null ? 'Wallet address cleared.' : 'Wallet address saved and linked.';
+      _savingAddress = true;
+      _statusMessage = null;
     });
+    try {
+      final store = await ref.read(identityStoreProvider.future);
+      await store.setWalletSessionAddress(normalized);
+      ref.read(walletAddressProvider.notifier).state = normalized;
+      await ref.read(perbugGameControllerProvider.notifier).setWalletLink(walletAddress: normalized);
+      if (normalized != null) {
+        final apiClient = await ref.read(apiClientProvider.future);
+        await apiClient.putJson('/v1/perbug-economy/payout-address', body: {'payoutAddress': normalized});
+        if (_addressController.text.trim().isEmpty) {
+          _addressController.text = normalized;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = normalized == null
+            ? 'Wallet address cleared from this device.'
+            : 'Wallet address saved for payouts and linked.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Saving wallet address failed: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _savingAddress = false);
+      }
+    }
   }
 
   Future<void> _clearWalletAddress() async {
@@ -391,7 +440,7 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                   controller: _walletLinkController,
                   decoration: const InputDecoration(
                     labelText: 'Saved wallet address',
-                    hintText: '0x...',
+                    hintText: 'pb1q...',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -401,8 +450,8 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                   runSpacing: 8,
                   children: [
                     RpgBarButton(
-                      onPressed: _saveWalletAddress,
-                      label: 'Save Address',
+                      onPressed: _savingAddress ? null : _saveWalletAddress,
+                      label: _savingAddress ? 'Saving...' : 'Save Address',
                     ),
                     RpgBarButton(
                       onPressed: _clearWalletAddress,
@@ -425,7 +474,7 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                   controller: _addressController,
                   decoration: const InputDecoration(
                     labelText: 'Perbug address',
-                    hintText: '0x...',
+                    hintText: 'pb1q...',
                     border: OutlineInputBorder(),
                   ),
                 ),
