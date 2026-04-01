@@ -8,6 +8,25 @@ const requireHeader = (req, key) => {
 };
 export function createPerbugEconomyHttpHandlers(service) {
     return {
+        withdraw: async (req, res) => {
+            const body = await parseJsonBody(req);
+            const toAddress = String(body.toAddress ?? "").trim();
+            const amountPerbug = Number(body.amountPerbug ?? 0);
+            if (!toAddress)
+                throw new ValidationError(["toAddress is required"]);
+            if (!Number.isFinite(amountPerbug) || amountPerbug <= 0)
+                throw new ValidationError(["amountPerbug must be positive"]);
+            sendJson(res, 202, {
+                withdrawal: {
+                    id: `wd_${Date.now().toString(36)}`,
+                    userId: requireHeader(req, "x-user-id"),
+                    toAddress,
+                    amountPerbug,
+                    status: "queued",
+                    submittedAt: new Date().toISOString()
+                }
+            });
+        },
         creditUser: async (req, res) => {
             const body = await parseJsonBody(req);
             sendJson(res, 200, { wallet: service.creditUser(String(body.userId ?? ""), Number(body.amountPerbug ?? 0), requireHeader(req, "x-admin-id")) });

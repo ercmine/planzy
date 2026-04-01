@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_routes.dart';
 import '../../app/theme/rpg_bar.dart';
 import '../../app/theme/widgets.dart';
+import '../../providers/app_providers.dart';
 import 'location_claim_controller.dart';
 import 'location_claim_models.dart';
 import 'perbug_economy_models.dart';
@@ -265,11 +266,60 @@ class PerbugProgressionPage extends ConsumerWidget {
   }
 }
 
-class PerbugWalletPage extends ConsumerWidget {
+class PerbugWalletPage extends ConsumerStatefulWidget {
   const PerbugWalletPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PerbugWalletPage> createState() => _PerbugWalletPageState();
+}
+
+class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
+  final _addressController = TextEditingController();
+  bool _withdrawing = false;
+  String? _statusMessage;
+
+  @override
+  void dispose() {
+    _addressController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _withdraw({required int balance}) async {
+    final toAddress = _addressController.text.trim();
+    if (toAddress.isEmpty) {
+      setState(() => _statusMessage = 'Enter a Perbug address before withdrawing.');
+      return;
+    }
+    if (balance <= 0) {
+      setState(() => _statusMessage = 'No Perbug balance available to withdraw.');
+      return;
+    }
+
+    setState(() {
+      _withdrawing = true;
+      _statusMessage = null;
+    });
+
+    try {
+      final apiClient = await ref.read(apiClientProvider.future);
+      await apiClient.postJson('/v1/perbug-economy/withdraw', body: {
+        'toAddress': toAddress,
+        'amountPerbug': balance,
+      });
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Withdrawal submitted to backend for $toAddress.');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Withdrawal failed: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _withdrawing = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final economy = ref.watch(perbugGameControllerProvider).economy;
     final connected = economy.walletLink.isConnected;
     return _PerbugGameShell(
@@ -283,6 +333,33 @@ class PerbugWalletPage extends ConsumerWidget {
             body: connected
                 ? 'Identity is connected. Asset-backed systems can sync with live progression.'
                 : 'You can continue in demo mode and connect later from entry or profile.',
+          ),
+          _LorePanel(
+            title: 'Withdraw Perbug',
+            subtitle: 'Send your full wallet balance to a Perbug address',
+            body: 'Enter the destination Perbug address and press Withdraw to call the backend transfer endpoint.',
+            trailing: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _addressController,
+                  decoration: const InputDecoration(
+                    labelText: 'Perbug address',
+                    hintText: '0x...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                RpgBarButton(
+                  onPressed: _withdrawing ? null : () => _withdraw(balance: economy.wallet.balance),
+                  label: _withdrawing ? 'Withdrawing...' : 'Withdraw',
+                ),
+                if (_statusMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_statusMessage!, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           RpgBarButton(
