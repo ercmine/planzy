@@ -60,6 +60,9 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   Future<List<ClaimableLocation>> _seedLocationsForPosition(AppLocation? position) async {
     if (position == null) return const [];
 
+    final remote = await _loadRemoteClaimables(position);
+    if (remote.isNotEmpty) return remote;
+
     final apiClient = await _ref.read(apiClientProvider.future);
     final geoClient = RemoteMapGeoClient(apiClient);
 
@@ -105,6 +108,41 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       );
     }
     return resolved;
+  }
+
+  Future<List<ClaimableLocation>> _loadRemoteClaimables(AppLocation position) async {
+    try {
+      final apiClient = await _ref.read(apiClientProvider.future);
+      final response = await apiClient.getJson('/v1/location-claims/nearby?lat=${position.lat}&lng=${position.lng}');
+      final locations = (response['locations'] as List<dynamic>? ?? const <dynamic>[]);
+      final parsed = <ClaimableLocation>[];
+      for (final item in locations) {
+        final map = (item as Map?)?.cast<String, dynamic>();
+        final location = (map?['location'] as Map?)?.cast<String, dynamic>();
+        if (location == null) continue;
+        final id = location['id']?.toString().trim() ?? '';
+        if (id.isEmpty) continue;
+        parsed.add(
+          ClaimableLocation(
+            id: id,
+            lat: (location['lat'] as num?)?.toDouble() ?? position.lat,
+            lng: (location['lng'] as num?)?.toDouble() ?? position.lng,
+            displayName: location['displayName']?.toString().trim().isNotEmpty == true
+                ? location['displayName'].toString().trim()
+                : 'Claim Node',
+            category: location['category']?.toString().trim().isNotEmpty == true
+                ? location['category'].toString().trim()
+                : 'zone',
+            claimRadiusMeters: (location['claimRadiusMeters'] as num?)?.toDouble() ?? defaultClaimRadiusMeters,
+            rarity: location['rarity']?.toString(),
+            cooldownUntil: DateTime.tryParse(location['cooldownUntil']?.toString() ?? '')?.toUtc(),
+          ),
+        );
+      }
+      return parsed;
+    } catch (_) {
+      return const [];
+    }
   }
 
   Future<String?> _resolveDisplayName({
