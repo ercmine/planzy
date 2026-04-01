@@ -37,7 +37,8 @@ String? resolvePerbugRedirect({
   final onLearnMore = path == AppRoutes.learnMore;
   final onMap = path == AppRoutes.liveMap || path == AppRoutes.world;
   final onProfile = path == AppRoutes.profile;
-  final isAllowedUnauthed = onEntry || onLearnMore || onMap || onProfile;
+  final onPrimaryTabs = path == AppRoutes.squad || path == AppRoutes.inventory || path == AppRoutes.progression;
+  final isAllowedUnauthed = onEntry || onLearnMore || onMap || onProfile || onPrimaryTabs;
   final canEnterGame = hasWalletSession || hasDemoSession;
 
   if (!canEnterGame && !isAllowedUnauthed) {
