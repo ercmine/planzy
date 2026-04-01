@@ -136,7 +136,7 @@ class PerbugSquadPage extends ConsumerStatefulWidget {
 
 class _PerbugSquadPageState extends ConsumerState<PerbugSquadPage> {
   static const _addressRequiredMessage = 'Enter a Perbug wallet address before saving.';
-  static const _addressInvalidMessage = 'Enter a valid Perbug wallet address (pb1... or 0x...).';
+  static const _addressInvalidMessage = 'Enter a valid Perbug wallet address (legacy P..., p... or SegWit pb1q.../pb1p... formats).';
 
   final _walletController = TextEditingController();
   bool _saving = false;
@@ -163,7 +163,11 @@ class _PerbugSquadPageState extends ConsumerState<PerbugSquadPage> {
 
   bool _isValidPerbugAddress(String value) {
     final candidate = value.trim();
-    if (candidate.startsWith('pb1') && candidate.length >= 20) return true;
+    if (candidate.isEmpty) return false;
+    if (RegExp(r'^P[1-9A-HJ-NP-Za-km-z]{25,60}$').hasMatch(candidate)) return true;
+    if (RegExp(r'^p[1-9A-HJ-NP-Za-km-z]{25,60}$').hasMatch(candidate)) return true;
+    if (RegExp(r'^pb1q[ac-hj-np-z02-9]{20,120}$').hasMatch(candidate)) return true;
+    if (RegExp(r'^pb1p[ac-hj-np-z02-9]{20,120}$').hasMatch(candidate)) return true;
     return RegExp(r'^0x[a-fA-F0-9]{40}$').hasMatch(candidate);
   }
 
@@ -473,7 +477,7 @@ class PerbugWalletPage extends ConsumerStatefulWidget {
 
 class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
   static const _addressRequiredMessage = 'Enter a Perbug wallet address before saving.';
-  static const _addressInvalidMessage = 'Enter a valid Perbug wallet address (pb1... or 0x...).';
+  static const _addressInvalidMessage = 'Enter a valid Perbug wallet address (legacy P..., p... or SegWit pb1q.../pb1p... formats).';
 
   final _walletLinkController = TextEditingController();
   final _addressController = TextEditingController();
@@ -506,7 +510,11 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
 
   bool _isValidPerbugAddress(String value) {
     final candidate = value.trim();
-    if (candidate.startsWith('pb1') && candidate.length >= 20) return true;
+    if (candidate.isEmpty) return false;
+    if (RegExp(r'^P[1-9A-HJ-NP-Za-km-z]{25,60}$').hasMatch(candidate)) return true;
+    if (RegExp(r'^p[1-9A-HJ-NP-Za-km-z]{25,60}$').hasMatch(candidate)) return true;
+    if (RegExp(r'^pb1q[ac-hj-np-z02-9]{20,120}$').hasMatch(candidate)) return true;
+    if (RegExp(r'^pb1p[ac-hj-np-z02-9]{20,120}$').hasMatch(candidate)) return true;
     return RegExp(r'^0x[a-fA-F0-9]{40}$').hasMatch(candidate);
   }
 

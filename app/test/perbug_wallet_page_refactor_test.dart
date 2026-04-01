@@ -51,6 +51,29 @@ void main() {
     expect(find.textContaining('Claimed Perbug and withdrawals will be sent to your saved payout address.'), findsOneWidget);
   });
 
+
+  testWidgets('accepts legacy and segwit Perbug wallet address formats', (tester) async {
+    await _pumpWalletPage(tester);
+
+    final saveFinder = find.byKey(const Key('wallet-save-button'));
+    final validAddresses = [
+      'PL4NATYUWfMsiE95myLPmp99cFVFYPGBUG',
+      'pB5dMMFR4ts5VAcRxizQSb8E5XHfZ4nGzN',
+      'pb1qse0dq8hu6zumucarnm6nrzmcd23v80xld6xz7d',
+      'pb1pksfcex4p9005xxg5n57h6fzpg37j433xlxem5yp8txm8hv72dchsghvf97',
+    ];
+
+    for (final address in validAddresses) {
+      await tester.enterText(find.byKey(const Key('wallet-address-input')), address);
+      await tester.pump();
+
+      final saveInkWell = tester.widget<InkWell>(
+        find.descendant(of: saveFinder, matching: find.byType(InkWell)),
+      );
+      expect(saveInkWell.onTap, isNotNull, reason: 'Address should be accepted: $address');
+    }
+  });
+
   testWidgets('address validation keeps primary save action disabled until valid address is entered', (tester) async {
     await _pumpWalletPage(tester);
 
