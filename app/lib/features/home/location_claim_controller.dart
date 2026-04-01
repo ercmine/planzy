@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/api_error.dart';
 import '../../core/location/location_controller.dart';
 import '../../core/location/location_models.dart';
 import '../perbug/chain/perbug_chain_providers.dart';
@@ -345,8 +346,39 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       );
       _persistState();
     } catch (error) {
-      _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Payout submission failed: $error');
+      _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Payout submission failed: ${_formatClaimSubmitError(error)}');
     }
+  }
+
+  String _formatClaimSubmitError(Object error) {
+    if (error is! ApiError) return error.toString();
+
+    final payload = error.serverPayload;
+    if (payload is ValidationErrorPayload && payload.details.isNotEmpty) {
+      return payload.details.first;
+    }
+
+    final details = error.details;
+    if (details is Map) {
+      final detailField = details['details'];
+      if (detailField is List && detailField.isNotEmpty) {
+        final first = detailField.first?.toString().trim() ?? '';
+        if (first.isNotEmpty) return first;
+      }
+      if (detailField is String && detailField.trim().isNotEmpty) {
+        return detailField.trim();
+      }
+      if (details['error'] is String && (details['error'] as String).trim().isNotEmpty) {
+        return (details['error'] as String).trim();
+      }
+    }
+
+    if (details is List && details.isNotEmpty) {
+      final first = details.first?.toString().trim() ?? '';
+      if (first.isNotEmpty) return first;
+    }
+
+    return error.message;
   }
 
   Future<void> claimInstantly(String locationId) async {
