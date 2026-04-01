@@ -12,22 +12,21 @@ const requireHeader = (req: IncomingMessage, key: string) => {
 
 export function createPerbugEconomyHttpHandlers(service: PerbugEconomyService) {
   return {
+    upsertPayoutAddress: async (req: IncomingMessage, res: ServerResponse) => {
+      const body = await parseJsonBody(req) as { payoutAddress?: string };
+      sendJson(res, 200, { payoutProfile: service.upsertPayoutAddress(requireHeader(req, "x-user-id"), String(body.payoutAddress ?? "")) });
+    },
+    withdrawals: async (req: IncomingMessage, res: ServerResponse) => {
+      sendJson(res, 200, { withdrawals: service.listWithdrawals(requireHeader(req, "x-user-id")) });
+    },
     withdraw: async (req: IncomingMessage, res: ServerResponse) => {
-      const body = await parseJsonBody(req) as { toAddress?: string; amountPerbug?: number };
-      const toAddress = String(body.toAddress ?? "").trim();
+      const body = await parseJsonBody(req) as { toAddress?: string; amountPerbug?: number; idempotencyKey?: string };
       const amountPerbug = Number(body.amountPerbug ?? 0);
-      if (!toAddress) throw new ValidationError(["toAddress is required"]);
       if (!Number.isFinite(amountPerbug) || amountPerbug <= 0) throw new ValidationError(["amountPerbug must be positive"]);
-      sendJson(res, 202, {
-        withdrawal: {
-          id: `wd_${Date.now().toString(36)}`,
-          userId: requireHeader(req, "x-user-id"),
-          toAddress,
-          amountPerbug,
-          status: "queued",
-          submittedAt: new Date().toISOString()
-        }
-      });
+      const userId = requireHeader(req, "x-user-id");
+      const idempotencyKey = String(body.idempotencyKey ?? readHeader(req, "x-idempotency-key") ?? "");
+      const withdrawal = await service.requestWithdrawal({ userId, amountPerbug, toAddress: body.toAddress, idempotencyKey });
+      sendJson(res, 200, { withdrawal });
     },
     creditUser: async (req: IncomingMessage, res: ServerResponse) => {
       const body = await parseJsonBody(req) as { userId?: string; amountPerbug?: number };

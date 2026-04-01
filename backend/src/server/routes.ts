@@ -686,6 +686,14 @@ export function createRoutes(
         await economyHandlers.withdraw(req, res);
         return;
       }
+      if (req.method === "PUT" && normalizedPath === "/v1/perbug-economy/payout-address" && economyHandlers) {
+        await economyHandlers.upsertPayoutAddress(req, res);
+        return;
+      }
+      if (req.method === "GET" && normalizedPath === "/v1/perbug-economy/withdrawals" && economyHandlers) {
+        await economyHandlers.withdrawals(req, res);
+        return;
+      }
       if (req.method === "POST" && normalizedPath === "/v1/business/quests" && economyHandlers) {
         await economyHandlers.createQuest(req, res);
         return;

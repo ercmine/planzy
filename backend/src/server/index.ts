@@ -64,7 +64,7 @@ import { LeaderboardsService, MemoryLeaderboardsStore } from "../leaderboards/in
 import { CollectionsService, MemoryCollectionStore } from "../collections/index.js";
 import { MemorySocialGamificationStore, SocialGamificationService } from "../socialGamification/index.js";
 import { GamificationControlService, MemoryGamificationControlStore } from "../gamificationControl/index.js";
-import { logPerbugRpcStartupDiagnostics, MemoryPerbugRewardsStore, PerbugRewardsService } from "../perbugRewards/index.js";
+import { logPerbugRpcStartupDiagnostics, MemoryPerbugRewardsStore, PerbugRewardsService, PerbugRpcClient } from "../perbugRewards/index.js";
 import { MemoryPerbugTipsStore, PerbugTipsService } from "../perbugTips/index.js";
 import { CompetitionService, MemoryCompetitionStore } from "../competition/index.js";
 import { MemorySponsoredLocationStore, SponsoredLocationsService } from "../sponsoredLocations/index.js";
@@ -281,7 +281,7 @@ export function createServer(options?: CreateServerOptions) {
   const perbugMarketplaceService = new PerbugStoreMarketplaceService(seedMarketplaceListings());
 
   const walletAuthService = new WalletAuthService(new MemoryWalletAuthStore(), accountsService);
-  const perbugEconomyService = new PerbugEconomyService(new MemoryPerbugEconomyStore());
+  const perbugEconomyService = new PerbugEconomyService(new MemoryPerbugEconomyStore(), new PerbugRpcClient());
   const perbugWorldService = new PerbugWorldService(new MemoryPerbugWorldStore());
   const perbugWorldHandlers = createPerbugWorldHttpHandlers(perbugWorldService);
   const viewerEngagementRewardsService = new ViewerEngagementRewardsService(new MemoryViewerEngagementStore(), {

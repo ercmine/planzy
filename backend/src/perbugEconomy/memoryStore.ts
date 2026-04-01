@@ -1,4 +1,4 @@
-import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRewardRecord, CuratorGuide, CuratorGuideAnalytics, EconomyFraudFlag, EconomyLedgerEntry, EconomyStore, ExplorationProgress, Offer, PremiumMembership, QuestCompletion, Redemption, TokenAccount, TokenSplitConfig } from "./types.js";
+import type { BusinessQuest, CollectionDefinition, CollectionProgress, CreatorRewardRecord, CuratorGuide, CuratorGuideAnalytics, EconomyFraudFlag, EconomyLedgerEntry, EconomyStore, ExplorationProgress, Offer, PremiumMembership, QuestCompletion, Redemption, TokenAccount, TokenSplitConfig, UserPayoutProfile, WithdrawalRecord } from "./types.js";
 
 const accountKey = (ownerType: TokenAccount["ownerType"], ownerId: string) => `${ownerType}:${ownerId}`;
 const collectionProgressKey = (collectionId: string, userId: string) => `${collectionId}:${userId}`;
@@ -21,6 +21,10 @@ export class MemoryPerbugEconomyStore implements EconomyStore {
   private offers = new Map<string, Offer>();
   private redemptionsByUser = new Map<string, Redemption[]>();
   private fraudFlags: EconomyFraudFlag[] = [];
+  private payoutProfiles = new Map<string, UserPayoutProfile>();
+  private withdrawals = new Map<string, WithdrawalRecord>();
+  private withdrawalsByUser = new Map<string, WithdrawalRecord[]>();
+  private withdrawalsByIdempotency = new Map<string, string>();
 
   listSplitConfigs(): TokenSplitConfig[] { return [...this.splitConfigs.values()].map((v) => structuredClone(v)); }
   saveSplitConfig(config: TokenSplitConfig): void { this.splitConfigs.set(config.feature, structuredClone(config)); }
@@ -95,4 +99,30 @@ export class MemoryPerbugEconomyStore implements EconomyStore {
 
   addFraudFlag(flag: EconomyFraudFlag): void { this.fraudFlags.unshift(structuredClone(flag)); }
   listFraudFlags(): EconomyFraudFlag[] { return this.fraudFlags.map((f) => structuredClone(f)); }
+
+  savePayoutProfile(profile: UserPayoutProfile): void {
+    this.payoutProfiles.set(profile.userId, structuredClone(profile));
+  }
+  getPayoutProfile(userId: string): UserPayoutProfile | null {
+    return this.payoutProfiles.has(userId) ? structuredClone(this.payoutProfiles.get(userId)!) : null;
+  }
+
+  saveWithdrawal(record: WithdrawalRecord): void {
+    this.withdrawals.set(record.id, structuredClone(record));
+    const existing = (this.withdrawalsByUser.get(record.userId) ?? []).filter((item) => item.id !== record.id);
+    this.withdrawalsByUser.set(record.userId, [structuredClone(record), ...existing]);
+    this.withdrawalsByIdempotency.set(`${record.userId}:${record.idempotencyKey}`, record.id);
+  }
+  getWithdrawal(withdrawalId: string): WithdrawalRecord | null {
+    return this.withdrawals.has(withdrawalId) ? structuredClone(this.withdrawals.get(withdrawalId)!) : null;
+  }
+  getWithdrawalByIdempotency(userId: string, idempotencyKey: string): WithdrawalRecord | null {
+    const key = `${userId}:${idempotencyKey}`;
+    const id = this.withdrawalsByIdempotency.get(key);
+    if (!id) return null;
+    return this.getWithdrawal(id);
+  }
+  listWithdrawalsByUser(userId: string): WithdrawalRecord[] {
+    return (this.withdrawalsByUser.get(userId) ?? []).map((item) => structuredClone(item));
+  }
 }
