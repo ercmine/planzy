@@ -127,31 +127,224 @@ class PerbugEncounterPage extends ConsumerWidget {
   }
 }
 
-class PerbugSquadPage extends ConsumerWidget {
+class PerbugSquadPage extends ConsumerStatefulWidget {
   const PerbugSquadPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PerbugSquadPage> createState() => _PerbugSquadPageState();
+}
+
+class _PerbugSquadPageState extends ConsumerState<PerbugSquadPage> {
+  static const _addressRequiredMessage = 'Enter a Perbug wallet address before saving.';
+  static const _addressInvalidMessage = 'Enter a valid Perbug wallet address (pb1... or 0x...).';
+
+  final _walletController = TextEditingController();
+  bool _saving = false;
+  bool _sending = false;
+  String? _statusMessage;
+  String? _fieldMessage;
+  String? _txid;
+
+  @override
+  void initState() {
+    super.initState();
+    final walletAddress = ref.read(walletAddressProvider);
+    if (walletAddress != null && walletAddress.trim().isNotEmpty) {
+      _walletController.text = walletAddress;
+    }
+    unawaited(_loadPayoutAddress());
+  }
+
+  @override
+  void dispose() {
+    _walletController.dispose();
+    super.dispose();
+  }
+
+  bool _isValidPerbugAddress(String value) {
+    final candidate = value.trim();
+    if (candidate.startsWith('pb1') && candidate.length >= 20) return true;
+    return RegExp(r'^0x[a-fA-F0-9]{40}$').hasMatch(candidate);
+  }
+
+  String? _validateWalletAddress(String value) {
+    final candidate = value.trim();
+    if (candidate.isEmpty) return _addressRequiredMessage;
+    if (!_isValidPerbugAddress(candidate)) return _addressInvalidMessage;
+    return null;
+  }
+
+  Future<void> _loadPayoutAddress() async {
+    try {
+      final apiClient = await ref.read(apiClientProvider.future);
+      final payload = await apiClient.getJson('/v1/perbug-economy/me');
+      final payoutProfile = (payload['payoutProfile'] as Map?)?.cast<String, dynamic>();
+      final payoutAddress = payoutProfile?['payoutAddress']?.toString().trim();
+      if (payoutAddress == null || payoutAddress.isEmpty || !mounted) {
+        return;
+      }
+      setState(() => _walletController.text = payoutAddress);
+      final store = await ref.read(identityStoreProvider.future);
+      await store.setWalletSessionAddress(payoutAddress);
+      ref.read(walletAddressProvider.notifier).state = payoutAddress;
+      await ref.read(perbugGameControllerProvider.notifier).setWalletLink(walletAddress: payoutAddress);
+    } catch (_) {
+      // Best-effort hydration from backend payout profile.
+    }
+  }
+
+  Future<void> _saveWalletAddress() async {
+    final walletAddress = _walletController.text.trim();
+    final validationMessage = _validateWalletAddress(walletAddress);
+    if (validationMessage != null) {
+      setState(() {
+        _fieldMessage = validationMessage;
+        _statusMessage = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _statusMessage = null;
+      _fieldMessage = null;
+    });
+
+    try {
+      final store = await ref.read(identityStoreProvider.future);
+      await store.setWalletSessionAddress(walletAddress);
+      ref.read(walletAddressProvider.notifier).state = walletAddress;
+      await ref.read(perbugGameControllerProvider.notifier).setWalletLink(walletAddress: walletAddress);
+
+      final apiClient = await ref.read(apiClientProvider.future);
+      await apiClient.putJson('/v1/perbug-economy/payout-address', body: {'payoutAddress': walletAddress});
+
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Perbug wallet address saved.');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Saving wallet address failed: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  Future<void> _sendClaimedPerbug({required double claimBalance}) async {
+    final destination = _walletController.text.trim();
+    if (destination.isEmpty) {
+      setState(() => _statusMessage = 'Save your Perbug wallet address first.');
+      return;
+    }
+    if (claimBalance <= 0) {
+      setState(() => _statusMessage = 'No claimed Perbug available to send.');
+      return;
+    }
+
+    setState(() {
+      _sending = true;
+      _statusMessage = null;
+      _txid = null;
+    });
+
+    try {
+      final apiClient = await ref.read(apiClientProvider.future);
+      final response = await apiClient.postJson('/v1/perbug-economy/withdraw', body: {
+        'toAddress': destination,
+        'amountPerbug': claimBalance,
+        'idempotencyKey': 'send_claimed_${DateTime.now().microsecondsSinceEpoch}',
+      });
+      final withdrawal = (response['withdrawal'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+      final txid = withdrawal['txid'] as String?;
+
+      if (!mounted) return;
+      setState(() {
+        _txid = txid;
+        _statusMessage = txid == null
+            ? 'Claimed Perbug send requested to $destination.'
+            : 'Claimed Perbug sent to $destination.';
+      });
+      unawaited(ref.read(postActionAdCoordinatorProvider).onWithdrawSuccess());
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Sending claimed Perbug failed: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(locationClaimControllerProvider);
+    final savedAddress = ref.watch(walletAddressProvider)?.trim();
+    final hasSavedAddress = savedAddress != null && savedAddress.isNotEmpty;
+    final canSave = !_saving && _validateWalletAddress(_walletController.text) == null;
+
     return _PerbugGameShell(
       title: 'Perbug Wallet',
-      subtitle: 'Your live claim balance',
+      subtitle: 'Save payout destination and send claimed Perbug',
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _StatStrip(items: [
-            _StatItem('Balance', '${state.balance} Ⓟ'),
-            _StatItem('Cap', '${state.globalPool.totalClaimableSupply.toStringAsFixed(0)}'),
-            _StatItem('Claimed', '${state.globalPool.totalClaimedSupply.toStringAsFixed(6)}'),
+            _StatItem('Claimed', '${state.balance.toStringAsFixed(6)} Ⓟ'),
+            _StatItem('Payouts', '${state.claimHistory.length}'),
+            _StatItem('Pool Left', state.globalPool.remainingClaimableSupply.toStringAsFixed(2)),
           ]),
           const SizedBox(height: 12),
           _LorePanel(
-            title: 'Global claim pool',
-            subtitle: 'Lifetime distribution cap',
-            body: 'Total ${state.globalPool.totalClaimableSupply.toStringAsFixed(0)} • Claimed ${state.globalPool.totalClaimedSupply.toStringAsFixed(6)} • Remaining ${state.globalPool.remainingClaimableSupply.toStringAsFixed(6)}',
+            title: 'Saved Perbug Wallet Address',
+            subtitle: hasSavedAddress ? 'Current: ${_prettyAddress(savedAddress)}' : 'Address required before sending',
+            body: 'Save the wallet where claimed Perbug should be sent. This is the destination used when you tap Send to Wallet.',
+            trailing: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _walletController,
+                  onChanged: (_) => setState(() => _fieldMessage = null),
+                  decoration: InputDecoration(
+                    labelText: 'Perbug wallet address',
+                    hintText: 'Paste pb1... or 0x... address',
+                    border: const OutlineInputBorder(),
+                    errorText: _fieldMessage,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                RpgBarButton(
+                  onPressed: canSave ? _saveWalletAddress : null,
+                  label: _saving ? 'Saving...' : 'Save Wallet Address',
+                ),
+              ],
+            ),
           ),
+          _LorePanel(
+            title: 'Claimed Perbug Payout',
+            subtitle: hasSavedAddress ? 'Destination ${_prettyAddress(savedAddress!)}' : 'Save wallet address first',
+            body: 'Move your currently claimed Perbug balance to the saved wallet destination.',
+            trailing: RpgBarButton(
+              onPressed: _sending || !hasSavedAddress ? null : () => _sendClaimedPerbug(claimBalance: state.balance),
+              label: _sending ? 'Sending...' : 'Send to Wallet',
+            ),
+          ),
+          if (_statusMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(_statusMessage!, style: Theme.of(context).textTheme.bodySmall),
+          ],
+          if (_txid != null) ...[
+            const SizedBox(height: 6),
+            SelectableText('txid: $_txid'),
+          ],
         ],
       ),
     );
+  }
+
+  String _prettyAddress(String address) {
+    if (address.length <= 16) return address;
+    return '${address.substring(0, 8)}…${address.substring(address.length - 8)}';
   }
 }
 
