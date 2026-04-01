@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -278,12 +279,17 @@ class PerbugWalletPage extends ConsumerStatefulWidget {
 }
 
 class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
+  static const _addressRequiredMessage = 'Enter a Perbug wallet address before saving.';
+  static const _addressInvalidMessage = 'Enter a valid Perbug wallet address (pb1... or 0x...).';
+
   final _walletLinkController = TextEditingController();
   final _addressController = TextEditingController();
   final _amountController = TextEditingController();
+
   bool _withdrawing = false;
   bool _savingAddress = false;
   String? _statusMessage;
+  String? _fieldMessage;
   String? _txid;
 
   @override
@@ -305,6 +311,19 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
     super.dispose();
   }
 
+  bool _isValidPerbugAddress(String value) {
+    final candidate = value.trim();
+    if (candidate.startsWith('pb1') && candidate.length >= 20) return true;
+    return RegExp(r'^0x[a-fA-F0-9]{40}$').hasMatch(candidate);
+  }
+
+  String? _validateWalletAddress(String value) {
+    final candidate = value.trim();
+    if (candidate.isEmpty) return _addressRequiredMessage;
+    if (!_isValidPerbugAddress(candidate)) return _addressInvalidMessage;
+    return null;
+  }
+
   Future<void> _loadPayoutAddress() async {
     try {
       final apiClient = await ref.read(apiClientProvider.future);
@@ -316,9 +335,7 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
       }
       setState(() {
         _walletLinkController.text = payoutAddress;
-        if (_addressController.text.trim().isEmpty) {
-          _addressController.text = payoutAddress;
-        }
+        _addressController.text = payoutAddress;
       });
       final store = await ref.read(identityStoreProvider.future);
       await store.setWalletSessionAddress(payoutAddress);
@@ -331,32 +348,38 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
 
   Future<void> _saveWalletAddress() async {
     final walletAddress = _walletLinkController.text.trim();
-    final normalized = walletAddress.isEmpty ? null : walletAddress;
+    final validationMessage = _validateWalletAddress(walletAddress);
+    if (validationMessage != null) {
+      setState(() {
+        _fieldMessage = validationMessage;
+        _statusMessage = null;
+      });
+      return;
+    }
+
     setState(() {
       _savingAddress = true;
       _statusMessage = null;
+      _fieldMessage = null;
     });
+
     try {
       final store = await ref.read(identityStoreProvider.future);
-      await store.setWalletSessionAddress(normalized);
-      ref.read(walletAddressProvider.notifier).state = normalized;
-      await ref.read(perbugGameControllerProvider.notifier).setWalletLink(walletAddress: normalized);
-      if (normalized != null) {
-        final apiClient = await ref.read(apiClientProvider.future);
-        await apiClient.putJson('/v1/perbug-economy/payout-address', body: {'payoutAddress': normalized});
-        if (_addressController.text.trim().isEmpty) {
-          _addressController.text = normalized;
-        }
-      }
+      await store.setWalletSessionAddress(walletAddress);
+      ref.read(walletAddressProvider.notifier).state = walletAddress;
+      await ref.read(perbugGameControllerProvider.notifier).setWalletLink(walletAddress: walletAddress);
+
+      final apiClient = await ref.read(apiClientProvider.future);
+      await apiClient.putJson('/v1/perbug-economy/payout-address', body: {'payoutAddress': walletAddress});
+      _addressController.text = walletAddress;
+
       if (!mounted) return;
       setState(() {
-        _statusMessage = normalized == null
-            ? 'Wallet address cleared from this device.'
-            : 'Wallet address saved for payouts and linked.';
+        _statusMessage = 'Payout wallet address saved. Future claims and withdrawals will be sent here.';
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _statusMessage = 'Saving wallet address failed: $error');
+      setState(() => _statusMessage = 'Saving payout address failed: $error');
     } finally {
       if (mounted) {
         setState(() => _savingAddress = false);
@@ -364,16 +387,11 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
     }
   }
 
-  Future<void> _clearWalletAddress() async {
-    _walletLinkController.clear();
-    await _saveWalletAddress();
-  }
-
   Future<void> _withdraw({required int balance}) async {
     final toAddress = _addressController.text.trim();
     final requestedAmount = int.tryParse(_amountController.text.trim()) ?? balance;
     if (toAddress.isEmpty) {
-      setState(() => _statusMessage = 'Enter a Perbug address before withdrawing.');
+      setState(() => _statusMessage = 'Set and save a payout wallet before withdrawing Perbug.');
       return;
     }
     if (requestedAmount <= 0 || balance <= 0) {
@@ -404,8 +422,8 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
       setState(() {
         _txid = txid;
         _statusMessage = txid == null
-            ? 'Withdrawal submitted to backend for $toAddress.'
-            : 'Withdrawal completed to $toAddress.';
+            ? 'Withdrawal submitted. Destination wallet: $toAddress.'
+            : 'Withdrawal completed. Destination wallet: $toAddress.';
       });
       unawaited(ref.read(postActionAdCoordinatorProvider).onWithdrawSuccess());
     } catch (error) {
@@ -418,30 +436,53 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
     }
   }
 
+  Future<void> _copyAddress(String value) async {
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!mounted) return;
+    setState(() => _statusMessage = 'Copied payout wallet address.');
+  }
+
   @override
   Widget build(BuildContext context) {
     final economy = ref.watch(perbugGameControllerProvider).economy;
-    final connected = economy.walletLink.isConnected;
+    final savedAddress = ref.watch(walletAddressProvider)?.trim();
+    final hasSavedAddress = savedAddress != null && savedAddress.isNotEmpty;
+    final saveCandidate = _walletLinkController.text.trim();
+    final canSave = !_savingAddress && _validateWalletAddress(saveCandidate) == null;
+
     return _PerbugGameShell(
-      title: 'Identity / Wallet',
-      subtitle: 'Account linkage state',
+      title: 'Perbug Payout Wallet',
+      subtitle: 'Set where claims and withdrawals are sent',
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _LorePanel(
-            title: connected ? 'Wallet linked' : 'Wallet disconnected',
-            subtitle: connected ? (economy.walletLink.walletAddress ?? 'address pending') : 'Demo-compatible mode',
-            body: connected
-                ? 'Identity is connected. Asset-backed systems can sync with live progression.'
-                : 'You can continue in demo mode and connect later from entry or profile.',
-            trailing: Column(
+          AppCard(
+            key: const Key('wallet-address-primary-card'),
+            tone: AppCardTone.featured,
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text('Perbug Wallet Address', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Text(
+                  'Enter the Perbug wallet address where your rewards should be sent. Claims and withdrawals send real Perbug to this address. This app is not a wallet and does not hold your private keys.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
                 TextField(
+                  key: const Key('wallet-address-input'),
                   controller: _walletLinkController,
-                  decoration: const InputDecoration(
-                    labelText: 'Saved wallet address',
-                    hintText: 'pb1q...',
-                    border: OutlineInputBorder(),
+                  minLines: 1,
+                  maxLines: 2,
+                  onChanged: (_) => setState(() => _fieldMessage = null),
+                  decoration: InputDecoration(
+                    labelText: 'Payout wallet address',
+                    hintText: 'Paste pb1... or 0x... address',
+                    border: const OutlineInputBorder(),
+                    errorText: _fieldMessage,
+                    helperText: hasSavedAddress
+                        ? 'Current destination is shown below. Update this before your next claim/withdraw.'
+                        : 'Required before claiming or withdrawing Perbug.',
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -450,48 +491,59 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                   runSpacing: 8,
                   children: [
                     RpgBarButton(
-                      onPressed: _savingAddress ? null : _saveWalletAddress,
-                      label: _savingAddress ? 'Saving...' : 'Save Address',
+                      key: const Key('wallet-save-button'),
+                      onPressed: canSave ? _saveWalletAddress : null,
+                      label: _savingAddress ? 'Saving...' : hasSavedAddress ? 'Update Address' : 'Save Address',
                     ),
-                    RpgBarButton(
-                      onPressed: _clearWalletAddress,
-                      label: 'Clear',
-                      variant: RpgButtonVariant.secondary,
-                    ),
+                    if (hasSavedAddress)
+                      OutlinedButton.icon(
+                        onPressed: () => _copyAddress(savedAddress),
+                        icon: const Icon(Icons.copy_rounded),
+                        label: const Text('Copy Current Address'),
+                      ),
                   ],
                 ),
+                const SizedBox(height: 10),
+                if (hasSavedAddress)
+                  SelectableText(
+                    'Current claim/withdraw destination: ${_prettyAddress(savedAddress)}',
+                    key: const Key('wallet-current-destination'),
+                  )
+                else
+                  const Text(
+                    'Setup required: add your payout wallet address to enable claims and withdrawals.',
+                    key: Key('wallet-empty-state-message'),
+                  ),
               ],
             ),
           ),
+          const SizedBox(height: 12),
           _LorePanel(
-            title: 'Withdraw Perbug',
-            subtitle: 'Send your full wallet balance to a Perbug address',
-            body: 'Enter the destination Perbug address and press Withdraw to call the backend transfer endpoint.',
+            key: const Key('wallet-claim-withdraw-panel'),
+            title: 'Claim and Withdraw to Destination Wallet',
+            subtitle: hasSavedAddress ? 'Destination: ${_prettyAddress(savedAddress!)}' : 'Address required before payout actions',
+            body: hasSavedAddress
+                ? 'Claimed Perbug and withdrawals will be sent to your saved payout address. Changing it updates future payouts only.'
+                : 'Add and save a payout wallet address above first. Claim and withdraw controls remain secondary until setup is complete.',
             trailing: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextField(
-                  controller: _addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Perbug address',
-                    hintText: 'pb1q...',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+                Text('Available balance: ${economy.wallet.balance} PERBUG'),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _amountController,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: 'Amount',
+                    labelText: 'Amount to withdraw',
                     hintText: '${economy.wallet.balance}',
                     border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 10),
                 RpgBarButton(
-                  onPressed: _withdrawing ? null : () => _withdraw(balance: economy.wallet.balance),
-                  label: _withdrawing ? 'Withdrawing...' : 'Withdraw',
+                  key: const Key('wallet-withdraw-button'),
+                  onPressed: _withdrawing || !hasSavedAddress ? null : () => _withdraw(balance: economy.wallet.balance),
+                  label: _withdrawing ? 'Withdrawing...' : 'Withdraw Perbug',
                 ),
                 if (_statusMessage != null) ...[
                   const SizedBox(height: 8),
@@ -500,9 +552,26 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
                 if (_txid != null) ...[
                   const SizedBox(height: 6),
                   SelectableText('txid: $_txid'),
-                ]
+                ],
               ],
             ),
+          ),
+          _LorePanel(
+            key: const Key('wallet-history-panel'),
+            title: 'Recent Perbug Activity',
+            subtitle: 'Secondary activity history',
+            body: 'Use this for quick status checks after setting your payout destination above.',
+            trailing: economy.wallet.transactions.isEmpty
+                ? const Text('No Perbug transactions yet.')
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: economy.wallet.transactions.take(5).map((tx) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text('${tx.type.name.toUpperCase()} ${tx.amount} • ${tx.createdAt.toIso8601String()}'),
+                      );
+                    }).toList(growable: false),
+                  ),
           ),
           const SizedBox(height: 8),
           RpgBarButton(
@@ -513,6 +582,11 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
         ],
       ),
     );
+  }
+
+  String _prettyAddress(String address) {
+    if (address.length <= 16) return address;
+    return '${address.substring(0, 8)}…${address.substring(address.length - 8)}';
   }
 }
 
@@ -551,6 +625,7 @@ class _PerbugGameShell extends StatelessWidget {
 
 class _LorePanel extends StatelessWidget {
   const _LorePanel({
+    super.key,
     required this.title,
     required this.subtitle,
     required this.body,
