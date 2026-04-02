@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'telegram_mini_app.dart';
+import 'telegram_mini_app_controller.dart';
 import 'telegram_mini_app_runtime_stub.dart'
     if (dart.library.js_interop) 'telegram_mini_app_runtime_web.dart' as runtime_impl;
 
@@ -19,4 +20,8 @@ final telegramMiniAppRuntimeProvider = Provider<TelegramMiniAppRuntime>((ref) {
 final telegramMiniAppContextProvider = StreamProvider<TelegramMiniAppContext>((ref) {
   final runtime = ref.watch(telegramMiniAppRuntimeProvider);
   return runtime.contextChanges();
+});
+
+final telegramMiniAppControllerProvider = Provider<TelegramMiniAppController>((ref) {
+  return createTelegramMiniAppController();
 });

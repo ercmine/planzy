@@ -1,5 +1,6 @@
 (function () {
   const globalKey = '__PERBUG_TELEGRAM';
+  const apiKey = '__PERBUG_TELEGRAM_API';
   const updateEvent = 'perbug:telegram:update';
 
   const coerceNumber = (value) => {
@@ -22,9 +23,13 @@
     document.documentElement.style.setProperty(name, value);
   };
 
-  const extractState = () => {
+  const getWebApp = () => {
     const telegram = window.Telegram;
-    const webApp = telegram && telegram.WebApp;
+    return telegram && telegram.WebApp ? telegram.WebApp : null;
+  };
+
+  const extractState = () => {
+    const webApp = getWebApp();
     const isTelegramMiniApp = Boolean(webApp);
 
     if (!isTelegramMiniApp) {
@@ -80,6 +85,12 @@
     const bodyText = parseThemeColor(theme.text_color);
     if (bodyBg) document.body.style.backgroundColor = bodyBg;
     if (bodyText) document.body.style.color = bodyText;
+
+    if (state.viewportStableHeight != null) {
+      setCssVar('--tg-viewport-stable-height', `${state.viewportStableHeight}px`);
+    } else {
+      setCssVar('--tg-viewport-stable-height', null);
+    }
   };
 
   const publishState = () => {
@@ -89,29 +100,66 @@
     window.dispatchEvent(new CustomEvent(updateEvent, { detail: state }));
   };
 
+  const safeCall = (fn) => {
+    try {
+      fn();
+    } catch (_) {
+      // Ignore API availability differences across Telegram clients.
+    }
+  };
+
+  const installApi = () => {
+    window[apiKey] = {
+      expand() {
+        const webApp = getWebApp();
+        if (!webApp) return;
+        safeCall(() => webApp.expand());
+      },
+      showMainButton(text) {
+        const webApp = getWebApp();
+        if (!webApp || !webApp.MainButton) return;
+        safeCall(() => {
+          if (typeof text === 'string' && text.trim()) {
+            webApp.MainButton.setText(text.trim());
+          }
+          webApp.MainButton.show();
+        });
+      },
+      hideMainButton() {
+        const webApp = getWebApp();
+        if (!webApp || !webApp.MainButton) return;
+        safeCall(() => webApp.MainButton.hide());
+      },
+      showBackButton() {
+        const webApp = getWebApp();
+        if (!webApp || !webApp.BackButton) return;
+        safeCall(() => webApp.BackButton.show());
+      },
+      hideBackButton() {
+        const webApp = getWebApp();
+        if (!webApp || !webApp.BackButton) return;
+        safeCall(() => webApp.BackButton.hide());
+      }
+    };
+  };
+
   const bootstrap = () => {
-    const telegram = window.Telegram;
-    const webApp = telegram && telegram.WebApp;
+    const webApp = getWebApp();
 
     if (webApp) {
-      try {
-        webApp.ready();
-        webApp.expand();
+      safeCall(() => webApp.ready());
+      safeCall(() => webApp.expand());
+      safeCall(() => {
         if (typeof webApp.disableVerticalSwipes === 'function') {
           webApp.disableVerticalSwipes();
         }
-      } catch (_) {
-        // Ignore API availability differences across Telegram clients.
-      }
+      });
 
-      try {
-        webApp.onEvent('themeChanged', publishState);
-        webApp.onEvent('viewportChanged', publishState);
-      } catch (_) {
-        // Ignore event registration failures.
-      }
+      safeCall(() => webApp.onEvent('themeChanged', publishState));
+      safeCall(() => webApp.onEvent('viewportChanged', publishState));
     }
 
+    installApi();
     publishState();
   };
 
