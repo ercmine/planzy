@@ -220,11 +220,16 @@ class _PerbugSquadPageState extends ConsumerState<PerbugSquadPage> {
       ref.read(walletAddressProvider.notifier).state = walletAddress;
       await ref.read(perbugGameControllerProvider.notifier).setWalletLink(walletAddress: walletAddress);
 
-      final apiClient = await ref.read(apiClientProvider.future);
-      await apiClient.putJson('/v1/perbug-economy/payout-address', body: {'payoutAddress': walletAddress});
+      String status = 'Perbug wallet address saved.';
+      try {
+        final apiClient = await ref.read(apiClientProvider.future);
+        await apiClient.putJson('/v1/perbug-economy/payout-address', body: {'payoutAddress': walletAddress});
+      } catch (_) {
+        status = 'Perbug wallet address saved on this device. Sync to server will retry automatically.';
+      }
 
       if (!mounted) return;
-      setState(() => _statusMessage = 'Perbug wallet address saved.');
+      setState(() => _statusMessage = status);
     } catch (error) {
       if (!mounted) return;
       setState(() => _statusMessage = 'Saving wallet address failed: $error');
@@ -570,13 +575,19 @@ class _PerbugWalletPageState extends ConsumerState<PerbugWalletPage> {
       ref.read(walletAddressProvider.notifier).state = walletAddress;
       await ref.read(perbugGameControllerProvider.notifier).setWalletLink(walletAddress: walletAddress);
 
-      final apiClient = await ref.read(apiClientProvider.future);
-      await apiClient.putJson('/v1/perbug-economy/payout-address', body: {'payoutAddress': walletAddress});
+      String status =
+          'Payout wallet address saved. Claims first land in your in-app balance, and you can withdraw to this wallet anytime from this tab.';
+      try {
+        final apiClient = await ref.read(apiClientProvider.future);
+        await apiClient.putJson('/v1/perbug-economy/payout-address', body: {'payoutAddress': walletAddress});
+      } catch (_) {
+        status = 'Payout wallet saved on this device. Server sync will retry automatically.';
+      }
       _addressController.text = walletAddress;
 
       if (!mounted) return;
       setState(() {
-        _statusMessage = 'Payout wallet address saved. Claims first land in your in-app balance, and you can withdraw to this wallet anytime from this tab.';
+        _statusMessage = status;
       });
     } catch (error) {
       if (!mounted) return;
