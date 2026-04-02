@@ -1,31 +1,22 @@
+import 'dart:developer' as developer;
 import 'dart:js_util' as js_util;
 
 import 'package:web/web.dart' as web;
 
+import 'rewarded_claim_ad_logic.dart';
 import 'rewarded_claim_ad_service.dart';
 
-Future<RewardedClaimAdResult> showRewardedClaimInterstitial() async {
-  if (!js_util.hasProperty(web.window, 'show_10822588')) {
-    return const RewardedClaimAdResult(
-      success: false,
-      message: 'Rewarded ad SDK is not loaded.',
-    );
-  }
+RewardedClaimAdBridge defaultRewardedClaimAdBridge() {
+  return RewardedClaimAdBridge(
+    hasRewardedFunction: () => js_util.hasProperty(web.window, 'show_10822588'),
+    invokeRewardedFunction: () => js_util.callMethod<Object?>(web.window, 'show_10822588', const <Object?>[]),
+    awaitPromise: (value) => js_util.promiseToFuture<Object?>(value),
+  );
+}
 
-  try {
-    final result = js_util.callMethod<Object?>(web.window, 'show_10822588', const <Object?>[]);
-    if (result == null) {
-      return const RewardedClaimAdResult(
-        success: false,
-        message: 'Rewarded ad did not return a completion promise.',
-      );
-    }
-    await js_util.promiseToFuture<Object?>(result);
-    return const RewardedClaimAdResult(success: true);
-  } catch (error) {
-    return RewardedClaimAdResult(
-      success: false,
-      message: 'Rewarded ad failed: $error',
-    );
-  }
+Future<RewardedClaimAdResult> showRewardedClaimInterstitial() async {
+  return runRewardedClaimInterstitial(
+    bridge: defaultRewardedClaimAdBridge(),
+    log: (message) => developer.log(message, name: 'perbug.rewarded_claim_ad'),
+  );
 }
