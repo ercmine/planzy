@@ -188,4 +188,33 @@ describe("LocationClaimsService", () => {
     });
     expect(farVisit.state).toBe("approaching");
   });
+
+  test("resolves canonical place identity into deterministic claim location ids", async () => {
+    const service = new LocationClaimsService(new MemoryLocationClaimsStore(), rpcClient);
+    const visit = service.registerVisit({
+      userId: "u-canonical",
+      canonicalPlaceId: "plc_abc_123",
+      lat: 37.775,
+      lng: -122.4194,
+      displayName: "Canonical Node",
+      category: "district",
+      accuracyMeters: 8
+    });
+
+    expect(visit.locationId.startsWith("loc_dyn_")).toBe(true);
+
+    const gate = service.prepareAdGate({ userId: "u-canonical", canonicalPlaceId: "plc_abc_123", visitId: visit.id });
+    service.markAdCompleted(gate.id);
+    const claim = await service.finalizeClaim({
+      userId: "u-canonical",
+      canonicalPlaceId: "plc_abc_123",
+      visitId: visit.id,
+      adSessionId: gate.id,
+      idempotencyKey: "canon-claim",
+      payoutAddress: "PBUG_ADDR_1"
+    });
+
+    expect(claim.locationId).toBe(visit.locationId);
+  });
+
 });

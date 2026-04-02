@@ -43,4 +43,36 @@ describe("location claims http endpoints", () => {
       visit: expect.objectContaining({ locationId: "loc_seed_1", state: "in_range" })
     });
   });
+
+  it("supports canonicalPlaceId for dynamic node claims", async () => {
+    const headers = { "content-type": "application/json", "x-user-id": "u_http_dynamic" };
+    const visitResponse = await fetch(`${baseUrl}/v1/location-claims/visits`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        canonicalPlaceId: "plc_http_dynamic_1",
+        lat: 37.7749,
+        lng: -122.4194,
+        displayName: "Dynamic Place",
+        category: "district",
+        accuracyMeters: 10
+      })
+    });
+    expect(visitResponse.status).toBe(201);
+    const visitPayload = await visitResponse.json() as { visit: { id: string; locationId: string } };
+    expect(visitPayload.visit.locationId.startsWith("loc_dyn_")).toBe(true);
+
+    const prepareResponse = await fetch(`${baseUrl}/v1/location-claims/prepare`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        canonicalPlaceId: "plc_http_dynamic_1",
+        visitId: visitPayload.visit.id
+      })
+    });
+    expect(prepareResponse.status).toBe(200);
+    const preparePayload = await prepareResponse.json() as { adGate: { id: string } };
+
+    expect(preparePayload.adGate.id.startsWith("ad_")).toBe(true);
+  });
 });

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { ValidationError } from "../plans/errors.js";
 import { DEFAULT_CLAIM_RADIUS_METERS } from "./constants.js";
@@ -21,6 +21,16 @@ const DEFAULT_DEPLETION_THRESHOLD = 1_000n; // 0.001 Perbug
 export interface LocationClaimPayoutRpcClient {
   validateAddress(address: string): Promise<boolean>;
   sendToAddress(address: string, amount: number, comment?: string): Promise<string>;
+}
+export interface LocationIdentityInput {
+  locationId?: string;
+  placeId?: string;
+  canonicalPlaceId?: string;
+  nodeId?: string;
+  lat?: number;
+  lng?: number;
+  displayName?: string;
+  category?: string;
 }
 
 function nowIso(): string { return new Date().toISOString(); }
@@ -123,8 +133,8 @@ export class LocationClaimsService {
       .map((entry) => ({ ...entry, flowState: this.flowStateFor(input.userId, entry.location.id, entry.inRange) }));
   }
 
-  registerVisit(input: { userId: string; locationId: string; lat: number; lng: number; accuracyMeters?: number }): UserVisit {
-    const location = this.requireLocation(input.locationId);
+  registerVisit(input: { userId: string; lat: number; lng: number; accuracyMeters?: number } & LocationIdentityInput): UserVisit {
+    const location = this.resolveOrCreateLocation(input);
     const distance = distanceMeters(input.lat, input.lng, location.lat, location.lng);
     const state = distance <= location.claimRadiusMeters ? "in_range" : distance <= location.claimRadiusMeters * 1.8 ? "approaching" : "out_of_range";
     const visit: UserVisit = {
@@ -148,9 +158,11 @@ export class LocationClaimsService {
     return visit;
   }
 
-  prepareAdGate(input: { userId: string; locationId: string; visitId: string }): AdGateRecord {
-    const location = this.requireLocation(input.locationId);
+  prepareAdGate(input: { userId: string; visitId: string } & LocationIdentityInput): AdGateRecord {
     const visit = this.requireVisit(input.visitId);
+    const location = (input.locationId || input.placeId || input.canonicalPlaceId || input.nodeId)
+      ? this.resolveOrCreateLocation(input)
+      : this.requireLocation(visit.locationId);
     if (visit.userId !== input.userId || visit.locationId != location.id) throw new ValidationError(["visit ownership mismatch"]);
     if (visit.state !== "in_range") throw new ValidationError(["visit is not within claim radius"]);
     if (location.isDepleted) throw new ValidationError(["location depleted"]);
@@ -158,7 +170,7 @@ export class LocationClaimsService {
     const record: AdGateRecord = {
       id: `ad_${randomUUID()}`,
       userId: input.userId,
-      locationId: input.locationId,
+      locationId: location.id,
       status: "required"
     };
     this.store.saveAdGate(record);
@@ -175,7 +187,7 @@ export class LocationClaimsService {
     return record;
   }
 
-  async finalizeClaim(input: { userId: string; locationId: string; visitId: string; adSessionId: string; idempotencyKey: string; payoutAddress: string; year?: number }): Promise<FinalizedClaim> {
+  async finalizeClaim(input: { userId: string; visitId: string; adSessionId: string; idempotencyKey: string; payoutAddress: string; year?: number } & LocationIdentityInput): Promise<FinalizedClaim> {
     const existing = this.store.getFinalizedClaimByIdempotencyKey(input.idempotencyKey);
     if (existing) return existing;
     const payoutAddress = input.payoutAddress.trim();
@@ -184,11 +196,18 @@ export class LocationClaimsService {
     const validPayoutAddress = await this.payoutRpcClient.validateAddress(payoutAddress);
     if (!validPayoutAddress) throw new ValidationError(["invalid Perbug payout address"]);
 
-    const location = this.requireLocation(input.locationId);
-    if (location.isDepleted) throw new ValidationError(["location depleted"]);
-
     const visit = this.requireVisit(input.visitId);
-    if (visit.userId !== input.userId || visit.locationId !== input.locationId) throw new ValidationError(["visit mismatch"]);
+    const location = (input.locationId || input.placeId || input.canonicalPlaceId || input.nodeId)
+      ? this.resolveOrCreateLocation(input)
+      : this.requireLocation(visit.locationId);
+    this.log("location_claim.finalize.resolve", {
+      userId: input.userId,
+      submittedLocationId: input.locationId,
+      resolvedLocationId: location.id,
+      visitId: input.visitId
+    });
+    if (location.isDepleted) throw new ValidationError(["location depleted"]);
+    if (visit.userId !== input.userId || visit.locationId !== location.id) throw new ValidationError(["visit mismatch"]);
     if (visit.state !== "in_range") throw new ValidationError(["not in claim range"]);
     if ((visit.accuracyMeters ?? 0) > 120) throw new ValidationError(["accuracy too low for claim"]);
     if (this.store.listClaimsByLocation(location.id).some((c) => c.userId === input.userId)) {
@@ -209,7 +228,7 @@ export class LocationClaimsService {
     const attempt: ClaimAttempt = {
       id: `attempt_${randomUUID()}`,
       userId: input.userId,
-      locationId: input.locationId,
+      locationId: location.id,
       visitId: input.visitId,
       adSessionId: input.adSessionId,
       requestedReward: rewardAtomic,
@@ -222,7 +241,7 @@ export class LocationClaimsService {
       attempt.status = "rejected";
       attempt.rejectionReason = "emission_pool_exhausted";
       this.store.saveAttempt(attempt);
-      this.store.addLedgerEntry({ id: `ledger_${randomUUID()}`, type: "rejection", userId: input.userId, locationId: input.locationId, attemptId: attempt.id, metadata: { reason: attempt.rejectionReason }, createdAt: nowIso() });
+      this.store.addLedgerEntry({ id: `ledger_${randomUUID()}`, type: "rejection", userId: input.userId, locationId: location.id, attemptId: attempt.id, metadata: { reason: attempt.rejectionReason }, createdAt: nowIso() });
       throw new ValidationError(["emission pool exhausted"]);
     }
 
@@ -232,7 +251,7 @@ export class LocationClaimsService {
     const claim: FinalizedClaim = {
       id: `claim_${randomUUID()}`,
       userId: input.userId,
-      locationId: input.locationId,
+      locationId: location.id,
       visitId: input.visitId,
       attemptId: attempt.id,
       adSessionId: input.adSessionId,
@@ -257,7 +276,7 @@ export class LocationClaimsService {
     pool.updatedAt = nowIso();
     this.store.upsertAnnualPool(pool);
     this.store.saveFinalizedClaim(claim);
-    this.store.addLedgerEntry({ id: `ledger_${randomUUID()}`, type: "claim", userId: input.userId, locationId: input.locationId, attemptId: attempt.id, claimId: claim.id, amount: claim.rewardIssued, metadata: { year: pool.year, reward: claim.rewardIssuedDisplay }, createdAt: nowIso() });
+    this.store.addLedgerEntry({ id: `ledger_${randomUUID()}`, type: "claim", userId: input.userId, locationId: location.id, attemptId: attempt.id, claimId: claim.id, amount: claim.rewardIssued, metadata: { year: pool.year, reward: claim.rewardIssuedDisplay }, createdAt: nowIso() });
 
     location.claimCount += 1;
     location.totalClaims = location.claimCount;
@@ -294,9 +313,56 @@ export class LocationClaimsService {
   }
 
   private requireLocation(locationId: string): ClaimableLocation {
-    const location = this.store.getLocation(locationId);
+    const normalized = locationId.trim();
+    const location = this.store.getLocation(normalized) ?? this.store.getLocationByAlias(normalized);
     if (!location) throw new ValidationError(["location not found"]);
     return location;
+  }
+
+  resolveOrCreateLocation(input: LocationIdentityInput): ClaimableLocation {
+    const locationId = input.locationId?.trim() ?? "";
+    const placeId = input.placeId?.trim() ?? "";
+    const canonicalPlaceId = input.canonicalPlaceId?.trim() ?? "";
+    const nodeId = input.nodeId?.trim() ?? "";
+    const aliases = [locationId, placeId, canonicalPlaceId ? `canonical:${canonicalPlaceId}` : "", nodeId ? `node:${nodeId}` : ""].filter(Boolean);
+
+    for (const alias of aliases) {
+      const byAlias = this.store.getLocationByAlias(alias);
+      if (byAlias) return byAlias;
+      const byId = this.store.getLocation(alias);
+      if (byId) return byId;
+    }
+
+    const hasCoordinates = typeof input.lat === "number" && Number.isFinite(input.lat) && typeof input.lng === "number" && Number.isFinite(input.lng);
+    if (!hasCoordinates) throw new ValidationError(["canonical location identity is required for claim"]);
+
+    const canonicalLocationKey = canonicalPlaceId || nodeId || `${input.lat!.toFixed(6)}:${input.lng!.toFixed(6)}:${(input.displayName ?? "").trim().toLowerCase()}`;
+    const generatedLocationId = locationId && locationId.startsWith("loc_")
+      ? locationId
+      : `loc_dyn_${createHash("sha256").update(canonicalLocationKey).digest("hex").slice(0, 16)}`;
+    const existing = this.store.getLocation(generatedLocationId);
+    if (existing) return existing;
+
+    const location = this.upsertLocation({
+      id: generatedLocationId,
+      canonicalLocationKey,
+      sourceNodeId: nodeId || undefined,
+      sourcePlaceId: canonicalPlaceId || placeId || undefined,
+      lat: input.lat!,
+      lng: input.lng!,
+      displayName: (input.displayName ?? "").trim() || "Perbug Claim Node",
+      category: (input.category ?? "").trim() || "map_node",
+      state: "available",
+      cooldownSeconds: 3600
+    });
+    for (const alias of aliases) this.store.upsertLocationAlias(alias, location.id);
+    this.store.upsertLocationAlias(`canonical:${canonicalLocationKey}`, location.id);
+    this.log("location_claim.location_autocreated", { locationId: location.id, canonicalLocationKey, sourceNodeId: nodeId || null, sourcePlaceId: canonicalPlaceId || placeId || null });
+    return location;
+  }
+
+  private log(event: string, payload: Record<string, unknown>): void {
+    console.info(JSON.stringify({ event, ...payload }));
   }
 
   private requireVisit(visitId: string): UserVisit {

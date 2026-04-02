@@ -11,8 +11,21 @@ function requireUser(req: IncomingMessage): string {
 }
 
 function coerceLocationId(body: Record<string, unknown>): string {
-  const locationIdCandidate = body.locationId ?? body.placeId;
+  const locationIdCandidate = body.locationId ?? body.placeId ?? body.nodeId ?? body.canonicalPlaceId;
   return String(locationIdCandidate ?? "").trim();
+}
+
+function parseLocationIdentity(body: Record<string, unknown>) {
+  return {
+    locationId: coerceLocationId(body),
+    placeId: typeof body.placeId === "string" ? body.placeId.trim() : undefined,
+    canonicalPlaceId: typeof body.canonicalPlaceId === "string" ? body.canonicalPlaceId.trim() : undefined,
+    nodeId: typeof body.nodeId === "string" ? body.nodeId.trim() : undefined,
+    lat: typeof body.lat === "number" ? body.lat : undefined,
+    lng: typeof body.lng === "number" ? body.lng : undefined,
+    displayName: typeof body.displayName === "string" ? body.displayName.trim() : undefined,
+    category: typeof body.category === "string" ? body.category.trim() : undefined
+  };
 }
 
 export function createLocationClaimsHttpHandlers(service: LocationClaimsService) {
@@ -28,7 +41,7 @@ export function createLocationClaimsHttpHandlers(service: LocationClaimsService)
       sendJson(res, 201, {
         visit: service.registerVisit({
           userId: requireUser(req),
-          locationId: coerceLocationId(body),
+          ...parseLocationIdentity(body),
           lat: Number(body.lat ?? 0),
           lng: Number(body.lng ?? 0),
           accuracyMeters: Number(body.accuracyMeters ?? 0)
@@ -40,7 +53,7 @@ export function createLocationClaimsHttpHandlers(service: LocationClaimsService)
       sendJson(res, 200, {
         adGate: service.prepareAdGate({
           userId: requireUser(req),
-          locationId: coerceLocationId(body),
+          ...parseLocationIdentity(body),
           visitId: String(body.visitId ?? "")
         })
       });
@@ -51,7 +64,7 @@ export function createLocationClaimsHttpHandlers(service: LocationClaimsService)
       sendJson(res, 200, {
         claim: await service.finalizeClaim({
           userId: requireUser(req),
-          locationId: coerceLocationId(body),
+          ...parseLocationIdentity(body),
           visitId: String(body.visitId ?? ""),
           adSessionId: String(body.adSessionId ?? ""),
           idempotencyKey: String(body.idempotencyKey ?? ""),

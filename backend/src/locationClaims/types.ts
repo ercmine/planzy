@@ -12,6 +12,9 @@ export interface LocationClaimHistoryEntry {
 
 export interface ClaimableLocation {
   id: string;
+  canonicalLocationKey?: string;
+  sourceNodeId?: string;
+  sourcePlaceId?: string;
   lat: number;
   lng: number;
   displayName: string;
@@ -118,6 +121,8 @@ export interface NearbyLocationResult {
 export interface LocationClaimsStore {
   upsertLocation(location: ClaimableLocation): void;
   getLocation(locationId: string): ClaimableLocation | null;
+  getLocationByAlias(alias: string): ClaimableLocation | null;
+  upsertLocationAlias(alias: string, locationId: string): void;
   listLocations(): ClaimableLocation[];
 
   upsertAnnualPool(pool: AnnualEmissionPool): void;
