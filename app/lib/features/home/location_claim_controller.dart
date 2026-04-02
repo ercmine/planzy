@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +35,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   Map<String, Map<String, dynamic>> _persistedClaimablesById = const {};
   LocationClaimPersistenceStore? _persistence;
   int _locationRevision = 0;
+  final Set<String> _activeClaimRequests = <String>{};
 
   Future<void> _restoreFromDisk() async {
     final prefs = await _ref.read(sharedPreferencesProvider.future);
@@ -260,6 +262,10 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   Future<void> finalizeClaim(String locationId) async {
     final entry = _findExistingClaimable(locationId);
     if (entry == null) return;
+    if (_activeClaimRequests.contains(locationId)) {
+      _setFlow(locationId, ClaimFlowState.claimProcessing, banner: 'Claim already in progress.');
+      return;
+    }
     if (entry.flowState == ClaimFlowState.claimSuccess || entry.flowState == ClaimFlowState.alreadyClaimed || entry.flowState == ClaimFlowState.cooldown) {
       final cooldownUntil = entry.cooldownUntil;
       if (cooldownUntil != null && cooldownUntil.isAfter(DateTime.now().toUtc())) {
@@ -282,12 +288,14 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       return;
     }
 
+    _activeClaimRequests.add(locationId);
     _setFlow(locationId, ClaimFlowState.claimProcessing);
 
     final rawReward = _locationReward(entry.claimCount);
     final payout = math.min(rawReward, remaining);
     if (payout < _minimumReward) {
       _setFlow(locationId, ClaimFlowState.unavailable, banner: 'Remaining supply is below minimum claim precision.');
+      _activeClaimRequests.remove(locationId);
       return;
     }
 
@@ -344,6 +352,17 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         return;
       }
 
+      final rewardedAdService = _ref.read(rewardedClaimAdServiceProvider);
+      final adResult = await rewardedAdService.showRewardedInterstitial();
+      if (!adResult.success) {
+        developer.log(
+          'Rewarded claim ad did not complete for location $locationId: ${adResult.message ?? 'unknown error'}',
+          name: 'perbug.location_claim',
+        );
+        _setFlow(locationId, ClaimFlowState.adRequired, banner: adResult.message ?? 'Rewarded ad did not complete. Try again to claim.');
+        return;
+      }
+
       await apiClient.postJson('/v1/location-claims/ad/$adSessionId/complete', body: const <String, dynamic>{});
 
       final response = await apiClient.postJson('/v1/location-claims/finalize', body: {
@@ -380,6 +399,8 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       _persistState();
     } catch (error) {
       _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Payout submission failed: ${_formatClaimSubmitError(error)}');
+    } finally {
+      _activeClaimRequests.remove(locationId);
     }
   }
 
@@ -432,7 +453,6 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
     _setFlow(locationId, ClaimFlowState.claimReady);
     await finalizeClaim(locationId);
   }
-
 
   void debugSetGlobalClaimedSupplyForTesting(double totalClaimedSupply) {
     state = state.copyWith(
