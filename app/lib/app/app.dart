@@ -7,6 +7,7 @@ import '../core/debug_flags.dart';
 import '../core/identity/identity_provider.dart';
 import '../core/platform/perbug_platform.dart';
 import '../core/telemetry/telemetry_dispatcher.dart';
+import '../core/telegram/telegram_mini_app_runtime.dart';
 import '../providers/app_providers.dart';
 import 'app_routes.dart';
 import 'perbug_recovery_page.dart';
@@ -54,6 +55,7 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
     _initializeAds();
 
     final router = ref.watch(routerProvider);
+    final telegramContext = ref.watch(telegramMiniAppContextProvider).valueOrNull;
 
     return MaterialApp.router(
       title: 'Perbug',
@@ -64,9 +66,14 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
       routerConfig: router,
       builder: (context, child) {
         final content = child ?? const PerbugRecoveryPage();
+        final telegramBackground = telegramContext?.themeParams['bg_color'];
+        final shell = Container(
+          color: telegramBackground == null ? null : Color(_parseHexColor(telegramBackground)),
+          child: content,
+        );
         return Stack(
           children: [
-            content,
+            shell,
             const OfflineBanner(),
             Positioned.fill(
               child: IgnorePointer(
@@ -113,6 +120,18 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
       dispatcher.start();
     }
   }
+}
+
+
+int _parseHexColor(String hex) {
+  final value = hex.replaceAll('#', '').trim();
+  if (value.length == 6) {
+    return int.parse('FF$value', radix: 16);
+  }
+  if (value.length == 8) {
+    return int.parse(value, radix: 16);
+  }
+  return 0xFF101014;
 }
 
 class _StartupStatusPanel extends ConsumerWidget {
@@ -234,6 +253,18 @@ class _PerbugDebugOverlay extends ConsumerWidget {
       orElse: () => 'platform: probing…',
     );
 
+    final telegramStatus = ref.watch(telegramMiniAppContextProvider).maybeWhen(
+          data: (context) {
+            if (!context.isTelegramMiniApp) {
+              return 'telegram: browser';
+            }
+            final userLabel = context.user?.username ?? context.user?.firstName ?? 'anonymous';
+            final viewport = context.viewportHeight?.toStringAsFixed(0) ?? 'n/a';
+            return 'telegram: mini-app • user:$userLabel • viewport:$viewport • init:${context.hasInitData ? 'yes' : 'no'}';
+          },
+          orElse: () => 'telegram: probing…',
+        );
+
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 620),
       child: Material(
@@ -249,6 +280,7 @@ class _PerbugDebugOverlay extends ConsumerWidget {
                 Text('route: ${uri.path}${uri.hasQuery ? '?${uri.query}' : ''}'),
                 Text(status),
                 Text('startup: ${startupStageLabel(startupState.stage)}'),
+                Text(telegramStatus),
                 ...startupState.checks
                     .where((check) => !check.ok)
                     .map(

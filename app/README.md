@@ -127,3 +127,28 @@ Then open `http://<your-computer-lan-ip>:8080` from your phone browser.
 - [ ] Build iOS archive (`./scripts/build_ios.sh` or stage variant).
 - [ ] Build Android APK/AAB with the scripts above.
 - [ ] Capture updated store screenshots.
+
+## Telegram Mini App (Flutter Web)
+
+Perbug now supports Telegram Mini Apps through the existing Flutter Web target.
+
+### Local/dev behavior
+
+- The app runs normally in a browser when Telegram APIs are absent.
+- When opened inside Telegram, `window.Telegram.WebApp` is detected from `web/telegram_shell.js`.
+- Telegram context is published to Flutter through a `window.__PERBUG_TELEGRAM` bridge and `perbug:telegram:update` events.
+
+### Telegram setup (BotFather)
+
+1. Host the Flutter web build over HTTPS.
+2. In BotFather, configure your bot Mini App URL to your hosted `index.html`.
+3. Add a button that opens the Mini App (inline keyboard `web_app` button or menu button).
+4. Launch via bot command/button; Telegram will pass signed `initData` and user context.
+
+### Build/deploy
+
+```bash
+flutter build web -t lib/main_prod.dart
+```
+
+Serve the generated `build/web` output from your HTTPS domain configured in your bot.
