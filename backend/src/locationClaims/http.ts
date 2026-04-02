@@ -10,6 +10,11 @@ function requireUser(req: IncomingMessage): string {
   return userId;
 }
 
+function coerceLocationId(body: Record<string, unknown>): string {
+  const locationIdCandidate = body.locationId ?? body.placeId;
+  return String(locationIdCandidate ?? "").trim();
+}
+
 export function createLocationClaimsHttpHandlers(service: LocationClaimsService) {
   return {
     nearby: async (req: IncomingMessage, res: ServerResponse, url: URL) => {
@@ -23,7 +28,7 @@ export function createLocationClaimsHttpHandlers(service: LocationClaimsService)
       sendJson(res, 201, {
         visit: service.registerVisit({
           userId: requireUser(req),
-          locationId: String(body.locationId ?? ""),
+          locationId: coerceLocationId(body),
           lat: Number(body.lat ?? 0),
           lng: Number(body.lng ?? 0),
           accuracyMeters: Number(body.accuracyMeters ?? 0)
@@ -35,7 +40,7 @@ export function createLocationClaimsHttpHandlers(service: LocationClaimsService)
       sendJson(res, 200, {
         adGate: service.prepareAdGate({
           userId: requireUser(req),
-          locationId: String(body.locationId ?? ""),
+          locationId: coerceLocationId(body),
           visitId: String(body.visitId ?? "")
         })
       });
@@ -46,7 +51,7 @@ export function createLocationClaimsHttpHandlers(service: LocationClaimsService)
       sendJson(res, 200, {
         claim: await service.finalizeClaim({
           userId: requireUser(req),
-          locationId: String(body.locationId ?? ""),
+          locationId: coerceLocationId(body),
           visitId: String(body.visitId ?? ""),
           adSessionId: String(body.adSessionId ?? ""),
           idempotencyKey: String(body.idempotencyKey ?? ""),
