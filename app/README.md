@@ -135,15 +135,15 @@ Perbug now supports Telegram Mini Apps through the existing Flutter Web target.
 ### Local/dev behavior
 
 - The app runs normally in a browser when Telegram APIs are absent.
-- When opened inside Telegram, `window.Telegram.WebApp` is detected from `web/telegram_shell.js`.
+- When opened inside Telegram via **Perbugbot**, `window.Telegram.WebApp` is detected from `web/telegram_shell.js`.
 - Telegram context is published to Flutter through a `window.__PERBUG_TELEGRAM` bridge and `perbug:telegram:update` events.
 
 ### Telegram setup (BotFather)
 
 1. Host the Flutter web build over HTTPS.
 2. In BotFather, configure your bot Mini App URL to your hosted `index.html`.
-3. Add a button that opens the Mini App (inline keyboard `web_app` button or menu button).
-4. Launch via bot command/button; Telegram will pass signed `initData` and user context.
+3. Add a button that opens the Mini App (inline keyboard `web_app` button or menu button named `Open Perbugbot`).
+4. Launch via bot command/button; Telegram will pass signed `initData`, user context, and Telegram theme/viewport updates.
 
 ### Build/deploy
 
@@ -152,3 +152,14 @@ flutter build web -t lib/main_prod.dart
 ```
 
 Serve the generated `build/web` output from your HTTPS domain configured in your bot.
+
+
+### Telegram bridge helpers available
+
+`web/telegram_shell.js` now exposes a safe bridge at `window.__PERBUG_TELEGRAM_API` for:
+
+- `expand()`
+- `showMainButton(text)` / `hideMainButton()`
+- `showBackButton()` / `hideBackButton()`
+
+Outside Telegram, these helpers are no-op and Flutter still runs in normal browser mode.

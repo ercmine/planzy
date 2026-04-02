@@ -170,3 +170,34 @@ Perbug payout and node integration now uses a local Bitcoin-style JSON-RPC endpo
 
 The backend expects `rpcbind=127.0.0.1` and `rpcallowip=127.0.0.1` in the node config.
 
+
+## Telegram Mini App + Perbugbot
+
+Perbug can run as a Telegram Mini App using the Flutter Web build hosted on HTTPS.
+
+### Required environment variables
+
+Set these in backend/bot runtime environments (never in frontend code):
+
+- `TELEGRAM_BOT_TOKEN` — Bot token for **Perbugbot** from BotFather.
+- `PERBUG_MINI_APP_URL` — HTTPS URL where `flutter build web` output is hosted.
+- `PERBUG_BOT_DISPLAY_NAME` — Optional label override (defaults to `Perbugbot`).
+
+### Bot setup summary
+
+1. Build and deploy Flutter web (`app/build/web`) to your production HTTPS URL.
+2. Configure Mini App URL in BotFather for **Perbugbot**.
+3. Run backend bot worker:
+   ```bash
+   cd backend
+   npm run build
+   npm run bot:perbug
+   ```
+4. `/start`, `/app`, and `/open` commands will send a launch keyboard with a `web_app` button.
+5. The bot also configures the chat menu button to open the same Mini App URL.
+
+### Security notes
+
+- Do not hardcode `TELEGRAM_BOT_TOKEN` in source files.
+- Do not expose Telegram bot token to Flutter web clients.
+- If a token is leaked in logs/chats/source, rotate in BotFather and update server env values.
