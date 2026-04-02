@@ -40,6 +40,7 @@ import '../features/results/results_controller.dart';
 import '../features/results/results_state.dart';
 import '../features/settings/settings_controller.dart';
 import '../features/home/review_prompt_service.dart';
+import '../features/home/rewarded_claim_ad_service.dart';
 import '../features/accomplishments/accomplishment_repository.dart';
 import '../features/challenges/challenge_repository.dart';
 import '../features/economy/economy_models.dart';
@@ -80,6 +81,11 @@ final actionInterstitialAdServiceProvider = Provider<ActionInterstitialAdService
 
 final postActionAdCoordinatorProvider = Provider<PostActionAdCoordinator>((ref) {
   return PostActionAdCoordinator(adService: ref.watch(actionInterstitialAdServiceProvider));
+});
+
+
+final rewardedClaimAdServiceProvider = Provider<RewardedClaimAdService>((ref) {
+  return const LibTlRewardedClaimAdService();
 });
 
 final adDeckInjectorProvider = Provider<AdDeckInjector>((ref) {
