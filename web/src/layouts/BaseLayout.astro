@@ -19,7 +19,6 @@ const { title, description, canonical, ogImage = '/social-card.svg', structuredD
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="monetag" content="2a6cd817893b229d2a94e31c23d6f4a0" />
     <link rel="icon" type="image/svg+xml" href="/perbug1.svg" />
     <title>{title}</title>
     <meta name="description" content={description} />
@@ -38,7 +37,6 @@ const { title, description, canonical, ogImage = '/social-card.svg', structuredD
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
     {structuredData && <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />}
-    <script src="https://quge5.com/88/tag.min.js" data-zone="225825" async data-cfasync="false"></script>
   </head>
   <body>
     <Header />
