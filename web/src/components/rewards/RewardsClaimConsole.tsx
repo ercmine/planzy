@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ConnectionProvider, WalletProvider, useWallet } from '@solana/wallet-adapter-react';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { attemptClaimAdTrigger } from '@/lib/perbugClaimAds';
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 type Dashboard = {
@@ -16,6 +17,7 @@ function RewardsConsoleInner({ apiBaseUrl, cluster }: { apiBaseUrl: string; clus
   const [userId, setUserId] = useState('demo-creator');
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [status, setStatus] = useState<string>('Connect Phantom to claim PERBUG');
+  const [claimingReviewId, setClaimingReviewId] = useState<string | null>(null);
 
   async function signIn() {
     if (!wallet.publicKey || !wallet.signMessage) return;
@@ -42,20 +44,34 @@ function RewardsConsoleInner({ apiBaseUrl, cluster }: { apiBaseUrl: string; clus
   }
 
   async function claim(reviewId: string) {
-    if (!wallet.publicKey) return;
+    if (!wallet.publicKey || claimingReviewId) return;
+
+    setClaimingReviewId(reviewId);
     setStatus('Claim submitted');
-    const response = await fetch(`${apiBaseUrl}/v1/rewards/reviews/${reviewId}/claim`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-user-id': userId },
-      body: JSON.stringify({ walletPublicKey: wallet.publicKey.toBase58() })
-    });
-    if (!response.ok) {
-      const payload = await response.text();
-      setStatus(`Claim failed: ${payload}`);
-      return;
+
+    attemptClaimAdTrigger({ claimKey: reviewId, logger: console });
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/v1/rewards/reviews/${reviewId}/claim`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-user-id': userId },
+        body: JSON.stringify({ walletPublicKey: wallet.publicKey.toBase58() })
+      });
+
+      if (!response.ok) {
+        const payload = await response.text();
+        setStatus(`Claim failed: ${payload}`);
+        return;
+      }
+
+      setStatus('Claim confirmed on Solana');
+      await loadDashboard(userId);
+    } catch (error) {
+      console.warn('[perbug-claim] Claim request failed unexpectedly.', error);
+      setStatus('Claim failed due to a temporary network issue. Please try again.');
+    } finally {
+      setClaimingReviewId(null);
     }
-    setStatus('Claim confirmed on Solana');
-    await loadDashboard(userId);
   }
 
   return (
@@ -88,7 +104,13 @@ function RewardsConsoleInner({ apiBaseUrl, cluster }: { apiBaseUrl: string; clus
             </div>
             <div className="flex items-center gap-3">
               <span>{item.review.finalRewardAmount ?? 0} PERBUG</span>
-              <button className="rounded-full bg-emerald-400 px-4 py-2 font-medium text-slate-950" onClick={() => claim(item.review.id)}>Claim</button>
+              <button
+                className="rounded-full bg-emerald-400 px-4 py-2 font-medium text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => claim(item.review.id)}
+                disabled={claimingReviewId !== null || !wallet.publicKey}
+              >
+                {claimingReviewId === item.review.id ? 'Claiming…' : 'Claim Perbug'}
+              </button>
             </div>
           </div>
         ))}
