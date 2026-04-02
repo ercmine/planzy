@@ -260,18 +260,22 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   }
 
   Future<void> finalizeClaim(String locationId) async {
+    developer.log('Claim Perbug tapped for location $locationId.', name: 'perbug.location_claim');
     final entry = _findExistingClaimable(locationId);
     if (entry == null) return;
     if (_activeClaimRequests.contains(locationId)) {
+      developer.log('Duplicate claim prevented for location $locationId (request already active).', name: 'perbug.location_claim');
       _setFlow(locationId, ClaimFlowState.claimProcessing, banner: 'Claim already in progress.');
       return;
     }
     if (entry.flowState == ClaimFlowState.claimSuccess || entry.flowState == ClaimFlowState.alreadyClaimed || entry.flowState == ClaimFlowState.cooldown) {
       final cooldownUntil = entry.cooldownUntil;
       if (cooldownUntil != null && cooldownUntil.isAfter(DateTime.now().toUtc())) {
+        developer.log('Claim prevented by cooldown for location $locationId.', name: 'perbug.location_claim');
         _setFlow(locationId, ClaimFlowState.cooldown, banner: 'Node cooling down until ${cooldownUntil.toLocal()}.');
         return;
       }
+      developer.log('Claim prevented because location was already claimed in this session for $locationId.', name: 'perbug.location_claim');
       _setFlow(locationId, ClaimFlowState.alreadyClaimed, banner: 'This location was already claimed in this session.');
       return;
     }
@@ -351,8 +355,10 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Ad gate setup failed. Please retry claim.');
         return;
       }
+      developer.log('Rewarded ad gate prepared for location $locationId with session $adSessionId.', name: 'perbug.location_claim');
 
       final rewardedAdService = _ref.read(rewardedClaimAdServiceProvider);
+      developer.log('Starting rewarded claim ad flow for location $locationId.', name: 'perbug.location_claim');
       final adResult = await rewardedAdService.showRewardedInterstitial();
       if (!adResult.success) {
         developer.log(
@@ -362,6 +368,7 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         _setFlow(locationId, ClaimFlowState.adRequired, banner: adResult.message ?? 'Rewarded ad did not complete. Try again to claim.');
         return;
       }
+      developer.log('Rewarded ad completed. Finalizing claim for location $locationId.', name: 'perbug.location_claim');
 
       await apiClient.postJson('/v1/location-claims/ad/$adSessionId/complete', body: const <String, dynamic>{});
 
@@ -397,7 +404,9 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
         banner: '${payout.toStringAsFixed(6)} Perbug payout submitted to wallet ${_maskAddress(payoutAddress)}.',
       );
       _persistState();
+      developer.log('Claim finalized successfully for location $locationId with payout status $payoutStatus.', name: 'perbug.location_claim');
     } catch (error) {
+      developer.log('Claim finalization failed for location $locationId: $error', name: 'perbug.location_claim');
       _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Payout submission failed: ${_formatClaimSubmitError(error)}');
     } finally {
       _activeClaimRequests.remove(locationId);
