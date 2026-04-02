@@ -106,32 +106,9 @@ export class PerbugRpcClient {
         rpcUrl: buildPerbugRpcWalletUrl(this.config, this.configuredWalletName)
       };
     }
-
-    const loaded = await this.tryListWallets();
-    if (!loaded.available) {
-      return {
-        kind: "root",
-        rpcUrl: buildPerbugRpcWalletUrl(this.config)
-      };
-    }
-
-    if ((loaded.loadedWallets?.length ?? 0) === 0) {
-      throw new PerbugRpcRequestError("perbug_rpc_no_wallet_loaded:getbalance", {
-        kind: "no_wallet_loaded",
-        method: "listwallets",
-        url: buildPerbugRpcNodeUrl(this.config)
-      });
-    }
-
-    const [firstWallet] = loaded.loadedWallets ?? [];
-    if (!firstWallet) {
-      return { kind: "root", rpcUrl: buildPerbugRpcWalletUrl(this.config) };
-    }
-
     return {
-      kind: "auto_detected",
-      walletName: firstWallet,
-      rpcUrl: buildPerbugRpcWalletUrl(this.config, firstWallet)
+      kind: "root",
+      rpcUrl: buildPerbugRpcWalletUrl(this.config)
     };
   }
 

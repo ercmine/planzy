@@ -63,12 +63,9 @@ describe("PerbugRpcClient", () => {
     await expect(client.getBalance()).rejects.toMatchObject({ details: { kind: "node_unreachable" } });
   });
 
-  it("auto-detects loaded wallet when wallet name is not configured", async () => {
+  it("uses root wallet endpoint for getbalance when wallet name is not configured", async () => {
     const fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
       const payload = JSON.parse(String(options?.body ?? "{}")) as { method: string };
-      if (payload.method === "listwallets") {
-        return { ok: true, status: 200, json: async () => ({ result: ["rewards"], error: null, id: "1" }) };
-      }
       if (payload.method === "getbalance") {
         return { ok: true, status: 200, json: async () => ({ result: 1.5, error: null, id: "2" }) };
       }
@@ -83,7 +80,7 @@ describe("PerbugRpcClient", () => {
       url,
       method: JSON.parse(String((opts as RequestInit).body)).method
     }));
-    expect(calls[0]).toMatchObject({ url: "http://127.0.0.1:9332/", method: "listwallets" });
-    expect(calls[1]).toMatchObject({ url: "http://127.0.0.1:9332/wallet/rewards", method: "getbalance" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ url: "http://127.0.0.1:9332/", method: "getbalance" });
   });
 });
