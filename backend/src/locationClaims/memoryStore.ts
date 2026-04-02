@@ -11,6 +11,7 @@ import type {
 
 export class MemoryLocationClaimsStore implements LocationClaimsStore {
   private readonly locations = new Map<string, ClaimableLocation>();
+  private readonly locationAliases = new Map<string, string>();
   private readonly pools = new Map<number, AnnualEmissionPool>();
   private readonly visits = new Map<string, UserVisit>();
   private readonly adGates = new Map<string, AdGateRecord>();
@@ -19,8 +20,20 @@ export class MemoryLocationClaimsStore implements LocationClaimsStore {
   private readonly claimsByIdempotency = new Map<string, string>();
   private readonly ledger: LocationClaimLedgerEntry[] = [];
 
-  upsertLocation(location: ClaimableLocation): void { this.locations.set(location.id, structuredClone(location)); }
+  upsertLocation(location: ClaimableLocation): void {
+    this.locations.set(location.id, structuredClone(location));
+    this.locationAliases.set(location.id, location.id);
+    if (location.canonicalLocationKey) this.locationAliases.set(`canonical:${location.canonicalLocationKey}`, location.id);
+    if (location.sourceNodeId) this.locationAliases.set(`node:${location.sourceNodeId}`, location.id);
+    if (location.sourcePlaceId) this.locationAliases.set(`place:${location.sourcePlaceId}`, location.id);
+  }
   getLocation(locationId: string): ClaimableLocation | null { return this.locations.get(locationId) ? structuredClone(this.locations.get(locationId)!) : null; }
+  getLocationByAlias(alias: string): ClaimableLocation | null {
+    const locationId = this.locationAliases.get(alias);
+    if (!locationId) return null;
+    return this.getLocation(locationId);
+  }
+  upsertLocationAlias(alias: string, locationId: string): void { this.locationAliases.set(alias, locationId); }
   listLocations(): ClaimableLocation[] { return [...this.locations.values()].map((v) => structuredClone(v)); }
 
   upsertAnnualPool(pool: AnnualEmissionPool): void { this.pools.set(pool.year, structuredClone(pool)); }
