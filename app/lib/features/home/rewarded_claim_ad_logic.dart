@@ -11,7 +11,7 @@ class RewardedClaimAdBridge {
 
   final bool Function() hasRewardedFunction;
   final Object? Function() invokeRewardedFunction;
-  final Future<Object?> Function(Object? value) awaitPromise;
+  final Future<Object?> Function(Object value) awaitPromise;
 }
 
 Future<RewardedClaimAdResult> runRewardedClaimInterstitial({
