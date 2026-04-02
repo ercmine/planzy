@@ -314,10 +314,42 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
 
     try {
       final apiClient = await _ref.read(apiClientProvider.future);
+      final position = state.currentPosition;
+      if (position == null) {
+        _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Current location unavailable. Enable location and try claiming again.');
+        return;
+      }
+
+      final visitResponse = await apiClient.postJson('/v1/location-claims/visits', body: {
+        'locationId': locationId,
+        'lat': position.lat,
+        'lng': position.lng,
+        'accuracyMeters': position.accuracyMeters ?? 25,
+      });
+      final visit = ((visitResponse['visit'] as Map?) ?? const {}).cast<String, dynamic>();
+      final visitId = visit['id']?.toString().trim() ?? '';
+      if (visitId.isEmpty) {
+        _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Visit validation failed. Please retry claim.');
+        return;
+      }
+
+      final gateResponse = await apiClient.postJson('/v1/location-claims/prepare', body: {
+        'locationId': locationId,
+        'visitId': visitId,
+      });
+      final gate = ((gateResponse['adGate'] as Map?) ?? const {}).cast<String, dynamic>();
+      final adSessionId = gate['id']?.toString().trim() ?? '';
+      if (adSessionId.isEmpty) {
+        _setFlow(locationId, ClaimFlowState.claimReady, banner: 'Ad gate setup failed. Please retry claim.');
+        return;
+      }
+
+      await apiClient.postJson('/v1/location-claims/ad/$adSessionId/complete', body: const <String, dynamic>{});
+
       final response = await apiClient.postJson('/v1/location-claims/finalize', body: {
         'locationId': locationId,
-        'visitId': entry.visitId ?? 'visit-local-${DateTime.now().millisecondsSinceEpoch}',
-        'adSessionId': entry.adSessionId ?? 'ad-local-${DateTime.now().millisecondsSinceEpoch}',
+        'visitId': visitId,
+        'adSessionId': adSessionId,
         'idempotencyKey': 'claim-${DateTime.now().microsecondsSinceEpoch}',
         'payoutAddress': payoutAddress,
       });
