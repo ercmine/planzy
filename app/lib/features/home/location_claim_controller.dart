@@ -414,11 +414,20 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
   }
 
   String _formatClaimSubmitError(Object error) {
-    if (error is! ApiError) return error.toString();
+    String normalize(String message) {
+      final trimmed = message.trim();
+      if (trimmed.isEmpty) return trimmed;
+      if (trimmed.toLowerCase() == 'visit is not within claim radius') {
+        return 'Visit not within claim radius';
+      }
+      return trimmed[0].toUpperCase() + trimmed.substring(1);
+    }
+
+    if (error is! ApiError) return normalize(error.toString());
 
     final payload = error.serverPayload;
     if (payload is ValidationErrorPayload && payload.details.isNotEmpty) {
-      return payload.details.first;
+      return normalize(payload.details.first);
     }
 
     final details = error.details;
@@ -426,22 +435,22 @@ class LocationClaimController extends StateNotifier<LocationClaimState> {
       final detailField = details['details'];
       if (detailField is List && detailField.isNotEmpty) {
         final first = detailField.first?.toString().trim() ?? '';
-        if (first.isNotEmpty) return first;
+        if (first.isNotEmpty) return normalize(first);
       }
       if (detailField is String && detailField.trim().isNotEmpty) {
-        return detailField.trim();
+        return normalize(detailField);
       }
       if (details['error'] is String && (details['error'] as String).trim().isNotEmpty) {
-        return (details['error'] as String).trim();
+        return normalize(details['error'] as String);
       }
     }
 
     if (details is List && details.isNotEmpty) {
       final first = details.first?.toString().trim() ?? '';
-      if (first.isNotEmpty) return first;
+      if (first.isNotEmpty) return normalize(first);
     }
 
-    return error.message;
+    return normalize(error.message);
   }
 
   Future<void> claimInstantly(String locationId) async {
