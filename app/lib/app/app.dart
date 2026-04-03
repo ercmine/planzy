@@ -25,6 +25,7 @@ class PerbugApp extends ConsumerStatefulWidget {
 class _PerbugAppState extends ConsumerState<PerbugApp> {
   TelemetryDispatcher? _registeredDispatcher;
   bool _adsInitialized = false;
+  bool _startupInterstitialAttempted = false;
 
   @override
   void didChangeDependencies() {
@@ -53,6 +54,7 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
 
     _syncDispatcherRegistration();
     _initializeAds();
+    _maybeShowStartupInterstitial();
 
     final router = ref.watch(routerProvider);
     final telegramContext = ref.watch(telegramMiniAppContextProvider).valueOrNull;
@@ -100,6 +102,22 @@ class _PerbugAppState extends ConsumerState<PerbugApp> {
     _adsInitialized = true;
     ref.read(adsServiceProvider).initialize();
     ref.read(actionInterstitialAdServiceProvider).initialize();
+  }
+
+  void _maybeShowStartupInterstitial() {
+    if (_startupInterstitialAttempted) {
+      return;
+    }
+    _startupInterstitialAttempted = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_showStartupInterstitial());
+    });
+  }
+
+  Future<void> _showStartupInterstitial() async {
+    final interstitialService = ref.read(actionInterstitialAdServiceProvider);
+    await interstitialService.initialize();
+    await interstitialService.showIfAvailable(InterstitialAdTrigger.appOpen);
   }
 
   void _syncDispatcherRegistration() {
