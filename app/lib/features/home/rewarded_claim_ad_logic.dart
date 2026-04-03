@@ -27,24 +27,24 @@ Future<RewardedClaimAdResult> runRewardedClaimInterstitial({
   }
 
   try {
-    log?.call('Invoking rewarded claim ad: show_10822588().');
+    log?.call('Invoking in-app claim ad: show_10822588({ type: inApp, ... }).');
     final result = bridge.invokeRewardedFunction();
     if (result == null) {
-      log?.call('Rewarded claim ad invocation returned null promise.');
+      log?.call('In-app claim ad invocation returned null promise.');
       return const RewardedClaimAdResult(
         success: false,
-        message: 'Rewarded ad did not return a completion promise.',
+        message: 'In-app ad did not return a completion promise.',
       );
     }
 
     await bridge.awaitPromise(result);
-    log?.call('Rewarded claim ad completed successfully.');
+    log?.call('In-app claim ad completed successfully.');
     return const RewardedClaimAdResult(success: true);
   } catch (error) {
-    log?.call('Rewarded claim ad failed: $error');
+    log?.call('In-app claim ad failed: $error');
     return RewardedClaimAdResult(
       success: false,
-      message: 'Rewarded ad failed: $error',
+      message: 'In-app ad failed: $error',
     );
   }
 }
