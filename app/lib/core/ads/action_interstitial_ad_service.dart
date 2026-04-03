@@ -7,7 +7,7 @@ import '../../config/admob_config.dart';
 import '../../config/admob_test_ids.dart';
 import '../logging/log.dart';
 
-enum InterstitialAdTrigger { claimSuccess, withdrawSuccess }
+enum InterstitialAdTrigger { appOpen, claimSuccess, withdrawSuccess }
 
 abstract class ActionInterstitialAdService {
   Future<void> initialize();
