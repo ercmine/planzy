@@ -4,9 +4,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    allowedHosts: ['eatdoge.com', 'perbug.dev'],
-    fs: {
-      allow: ['..'],
-    },
+    host: '0.0.0.0',
+    port: 4321,
+    allowedHosts: ['perbug.com', 'www.perbug.com', 'app.perbug.com'],
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 4321,
+    allowedHosts: ['perbug.com', 'www.perbug.com', 'app.perbug.com'],
   },
 })
