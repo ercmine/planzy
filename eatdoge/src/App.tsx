@@ -111,6 +111,18 @@ export default function App({ dogeSrc }: { dogeSrc: string }) {
       })),
     [],
   )
+  const loaderParticles = useMemo(
+    () =>
+      Array.from({ length: 18 }, (_, index) => ({
+        id: index,
+        size: 4 + ((index * 3) % 8),
+        left: `${8 + ((index * 17.5) % 84)}%`,
+        top: `${10 + ((index * 21.3) % 80)}%`,
+        delay: index * 0.12,
+        duration: 2.8 + (index % 5) * 0.6,
+      })),
+    [],
+  )
 
   return (
     <div className="noise relative overflow-hidden bg-charcoal text-cream">
@@ -121,13 +133,37 @@ export default function App({ dogeSrc }: { dogeSrc: string }) {
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.6, ease: 'easeOut' } }}
           >
-            <motion.img
-              src={dogeSrc}
-              alt="EatDoge mascot"
-              className="mb-6 h-28 w-28 rounded-full border border-doge-200/20 bg-doge-100/10 p-4 shadow-glow"
-              animate={{ y: [0, -14, 0], rotate: [0, -3, 3, 0] }}
-              transition={{ repeat: Number.POSITIVE_INFINITY, duration: 2.8, ease: 'easeInOut' }}
-            />
+            <div className="pointer-events-none absolute inset-0">
+              {loaderParticles.map((particle) => (
+                <motion.span
+                  key={particle.id}
+                  className="absolute rounded-full bg-doge-200/70"
+                  style={{ left: particle.left, top: particle.top, width: particle.size, height: particle.size }}
+                  animate={{ y: [0, -18, 0], x: [0, 8, 0], opacity: [0.15, 0.8, 0.15], scale: [0.9, 1.25, 0.9] }}
+                  transition={{
+                    repeat: Number.POSITIVE_INFINITY,
+                    duration: particle.duration,
+                    delay: particle.delay,
+                    ease: 'easeInOut',
+                  }}
+                />
+              ))}
+            </div>
+            <motion.div
+              className="relative mb-6 rounded-[2rem] border border-doge-100/20 bg-white/5 px-8 py-7 shadow-glow"
+              animate={{ y: [0, -12, 0], rotate: [0, -1.5, 1.5, 0] }}
+              transition={{ repeat: Number.POSITIVE_INFINITY, duration: 3.2, ease: 'easeInOut' }}
+            >
+              <motion.div
+                className="absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_center,rgba(255,219,153,0.22),transparent_65%)]"
+                animate={{ opacity: [0.25, 0.6, 0.25], scale: [0.96, 1.05, 0.96] }}
+                transition={{ repeat: Number.POSITIVE_INFINITY, duration: 2.6, ease: 'easeInOut' }}
+              />
+              <p className="relative text-center text-4xl font-semibold tracking-[-0.06em] text-white sm:text-5xl">
+                Eat<span className="bg-gradient-to-r from-doge-100 via-doge-300 to-doge-200 bg-clip-text text-transparent">Doge</span>
+              </p>
+              <p className="relative mt-2 text-center text-xs uppercase tracking-[0.4em] text-doge-200/70">very snack • much wow</p>
+            </motion.div>
             <motion.p
               className="text-sm uppercase tracking-[0.45em] text-doge-200/70"
               animate={{ opacity: [0.4, 1, 0.4] }}
